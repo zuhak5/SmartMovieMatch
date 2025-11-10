@@ -38,11 +38,16 @@ export function subscribeToSession(callback) {
   };
 }
 
-export async function registerUser({ username, password }) {
+export async function registerUser({ username, password, name }) {
   const sanitized = sanitizeUsername(username);
   validateCredentials(sanitized, password);
 
-  const response = await authRequest("signup", { username: sanitized, password });
+  const payload = { username: sanitized, password };
+  if (typeof name === "string" && name.trim()) {
+    payload.name = name.trim();
+  }
+
+  const response = await authRequest("signup", payload);
   const session = normalizeSession(response && response.session);
   if (!session) {
     throw new Error("Unexpected response from the authentication service.");
@@ -100,6 +105,21 @@ export async function persistWatchedRemote(session, watchedMovies) {
   const response = await authRequest(
     "syncWatched",
     { watched: trimmed },
+    activeSession.token
+  );
+  const updatedSession = normalizeSession(response && response.session);
+  if (updatedSession) {
+    persistSession(updatedSession);
+  }
+  return updatedSession;
+}
+
+export async function persistFavoritesRemote(session, favorites) {
+  const activeSession = ensureActiveSession(session);
+  const trimmed = Array.isArray(favorites) ? favorites.slice(-100) : [];
+  const response = await authRequest(
+    "syncFavorites",
+    { favorites: trimmed },
     activeSession.token
   );
   const updatedSession = normalizeSession(response && response.session);
@@ -182,15 +202,22 @@ function normalizeSession(value) {
   if (!value.username || typeof value.username !== "string") {
     return null;
   }
+  const displayName =
+    typeof value.displayName === "string" && value.displayName.trim()
+      ? value.displayName.trim()
+      : value.username;
   return {
     token: value.token,
     username: value.username,
+    displayName,
     createdAt: value.createdAt || null,
     lastLoginAt: value.lastLoginAt || null,
     lastPreferencesSync: value.lastPreferencesSync || null,
     lastWatchedSync: value.lastWatchedSync || null,
+    lastFavoritesSync: value.lastFavoritesSync || null,
     preferencesSnapshot: value.preferencesSnapshot || null,
-    watchedHistory: Array.isArray(value.watchedHistory) ? value.watchedHistory : []
+    watchedHistory: Array.isArray(value.watchedHistory) ? value.watchedHistory : [],
+    favoritesList: Array.isArray(value.favoritesList) ? value.favoritesList : []
   };
 }
 

@@ -1,6 +1,3 @@
-export const STORAGE_KEY = "smartMovieMatch_watched_v1";
-export const FAVORITES_STORAGE_KEY = "smartMovieMatch_favorites_v1";
-
 export const API_ROUTES = {
   tmdb: "/api/tmdb",
   omdb: "/api/omdb",

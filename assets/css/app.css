@@ -286,6 +286,12 @@
       color: var(--text-subtle);
     }
 
+    .field-hint {
+      font-size: 0.72rem;
+      color: var(--text-subtle);
+      margin: 0;
+    }
+
     .input-base {
       border-radius: 999px;
       border: 1px solid rgba(148, 163, 184, 0.4);
@@ -509,11 +515,28 @@
   padding: 0.52rem 0.2rem;
 }
 
-.mood-intensity {
+.mood-intensity { 
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
   margin-top: 0.6rem;
+}
+
+.range-control {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.range-control .input-range {
+  flex: 1 1 auto;
+}
+
+.range-value {
+  font-size: 0.8rem;
+  color: var(--text-subtle);
+  min-width: 4.5rem;
+  text-align: right;
 }
 
 .mood-intensity-label {
@@ -680,6 +703,11 @@
       color: #e5e7eb;
       box-shadow: 0 10px 30px rgba(15, 23, 42, 1);
       transform: translateY(-1px);
+    }
+
+    .btn-wide {
+      width: 100%;
+      justify-content: center;
     }
 
     .btn-subtle-danger {
@@ -1597,77 +1625,48 @@
     #clearWatchedBtn {
       display: none;
     }
-    /* Watched panel */
 
-    .watched-panel-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.4rem;
+    .watched-list {
       margin-top: 0.65rem;
     }
 
-    .watched-chip {
-      border-radius: 999px;
-      border: 1px solid rgba(148, 163, 184, 0.45);
-      padding: 0.18rem 0.55rem;
-      font-size: 0.75rem;
-      background: rgba(15, 23, 42, 0.98);
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      color: var(--text-subtle);
-      max-width: 100%;
+    .watched-chip .favorite-poster {
+      background: linear-gradient(160deg, rgba(22, 163, 74, 0.55), rgba(15, 118, 110, 0.45));
+      color: #bbf7d0;
+      box-shadow: inset 0 0 0 1px rgba(21, 128, 61, 0.4);
     }
 
-    .watched-chip-icon {
-      font-size: 0.8rem;
-      color: #4ade80;
+    .watched-chip .favorite-poster-placeholder {
+      color: #bbf7d0;
     }
 
-    .watched-chip-title {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 180px;
+    .watched-chip .watched-poster-icon {
+      font-size: 1.4rem;
+      filter: drop-shadow(0 4px 10px rgba(21, 128, 61, 0.45));
     }
 
-    .watched-chip-rating {
-      font-size: 0.72rem;
-      color: #facc15;
+    .watched-chip .favorite-genres {
+      color: rgba(148, 163, 184, 0.85);
     }
 
-    .watched-chip-remove {
-      border: none;
-      background: transparent;
-      color: rgba(148, 163, 184, 0.6);
-      cursor: pointer;
-      padding: 0;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 18px;
-      height: 18px;
-      border-radius: 999px;
-      transition: background-color var(--transition-fast), color var(--transition-fast);
-    }
-
-    .watched-chip-remove:hover,
-    .watched-chip-remove:focus-visible {
-      background: rgba(248, 113, 113, 0.18);
-      color: #fca5a5;
-      outline: none;
-    }
-
-    .watched-chip-remove svg {
-      width: 12px;
-      height: 12px;
-      display: block;
+    .watched-meta {
+      color: rgba(148, 163, 184, 0.85);
     }
 
     .empty-state {
       font-size: 0.8rem;
       color: var(--text-subtle);
       margin-top: 0.4rem;
+    }
+
+    .show-more-row {
+      margin-top: 1rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    #showMoreBtn {
+      display: none;
     }
 
     /* Status & loading */

@@ -6,7 +6,7 @@ Smart Movie Match is a client-first movie recommendation assistant. It lets peop
 
 - **Taste-aware recommendations** – combines TMDB discovery/search and OMDb enrichment to surface relevant titles.
 - **YouTube trailer lookup** – grabs the top trailer for each pick or links to a search if none are embedded.
-- **Local watched list** – keeps track of what you have already seen in `localStorage` to avoid repeats.
+- **Cloud-synced library** – stores watched history and favorites in Supabase so your data travels with you.
 - **Accessible UI** – responsive layout with skeleton states and clear status messaging.
 
 ## Getting started
@@ -49,7 +49,7 @@ Key modules:
 
 - `assets/js/recommendations.js` – orchestrates TMDB discovery/search, OMDb enrichment, trailer lookups, and scoring logic.
 - `assets/js/ui.js` – renders UI components, skeleton states, and watched history widgets.
-- `assets/js/storage.js` – persists the watched list in `localStorage`.
+- `assets/js/auth.js` – manages Supabase-backed authentication and data sync.
 - `assets/js/main.js` – entry point that wires events, loads state, and kicks off recommendation requests.
 
 ## Environment variables
@@ -76,8 +76,10 @@ create table if not exists public.auth_users (
   last_login_at timestamptz,
   last_preferences_sync timestamptz,
   last_watched_sync timestamptz,
+  last_favorites_sync timestamptz,
   preferences_snapshot jsonb,
-  watched_history jsonb default '[]'::jsonb
+  watched_history jsonb default '[]'::jsonb,
+  favorites_list jsonb default '[]'::jsonb
 );
 
 create table if not exists public.auth_sessions (
@@ -86,7 +88,8 @@ create table if not exists public.auth_sessions (
   created_at timestamptz not null,
   last_active_at timestamptz not null,
   last_preferences_sync timestamptz,
-  last_watched_sync timestamptz
+  last_watched_sync timestamptz,
+  last_favorites_sync timestamptz
 );
 ```
 
