@@ -479,6 +479,69 @@
       color: rgba(148, 163, 184, 0.85);
     }
 
+    .preferences-collection-collapsible {
+      position: relative;
+    }
+
+    .preferences-collection-collapsible.collapsed::after {
+      content: "";
+      position: absolute;
+      inset: auto 0 2.6rem 0;
+      height: 2.6rem;
+      pointer-events: none;
+      background: linear-gradient(transparent, rgba(15, 23, 42, 0.95));
+      opacity: 0.85;
+    }
+
+    .preferences-collection-collapsible .preferences-collection-item.collection-item-extra {
+      display: grid;
+    }
+
+    .preferences-collection-collapsible.collapsed
+      .preferences-collection-item.collection-item-extra {
+      display: none;
+    }
+
+    .preferences-collection-toggle {
+      align-self: flex-start;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.2rem 0.65rem;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      font-size: 0.7rem;
+      color: rgba(148, 163, 184, 0.85);
+      cursor: pointer;
+      transition: background-color var(--transition-fast), color var(--transition-fast),
+        border-color var(--transition-fast), transform var(--transition-fast);
+      margin-top: 0.1rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .preferences-collection-toggle:hover {
+      color: rgba(226, 232, 240, 0.95);
+      border-color: rgba(148, 163, 184, 0.55);
+      background: rgba(30, 41, 59, 0.85);
+      transform: translateY(-1px);
+    }
+
+    .preferences-collection-toggle:focus-visible {
+      outline: 2px solid rgba(56, 189, 248, 0.8);
+      outline-offset: 2px;
+    }
+
+    .preferences-collection-toggle .toggle-icon {
+      transition: transform var(--transition-fast);
+      font-size: 0.8rem;
+    }
+
+    .preferences-collection-toggle.is-expanded .toggle-icon {
+      transform: rotate(180deg);
+    }
+
     /* Genre pills */
 
     .genre-grid {
@@ -1010,18 +1073,76 @@
       padding: 0 0.9rem 0.55rem;
       font-size: 0.8rem;
       color: var(--text-subtle);
-      line-height: 1.35;
-      max-height: 3.4em;
-      overflow: hidden;
+      line-height: 1.4;
       position: relative;
     }
 
-    .movie-plot::after {
+    .movie-plot-text {
+      margin: 0;
+    }
+
+    .movie-plot.is-collapsible.is-collapsed .movie-plot-text {
+      max-height: 4.4em;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 4;
+    }
+
+    .movie-plot.is-collapsible::after {
       content: "";
       position: absolute;
       inset: auto 0 0 0;
-      height: 18px;
+      height: 1.6rem;
+      pointer-events: none;
       background: linear-gradient(transparent, rgba(15, 23, 42, 0.95));
+      opacity: 0;
+      transition: opacity var(--transition-fast);
+    }
+
+    .movie-plot.is-collapsible.is-collapsed::after {
+      opacity: 1;
+    }
+
+    .movie-plot-toggle {
+      margin-top: 0.35rem;
+      margin-left: 0.1rem;
+      border: none;
+      background: none;
+      color: rgba(148, 163, 184, 0.9);
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.28rem;
+      cursor: pointer;
+      padding: 0.12rem 0.3rem;
+      border-radius: 999px;
+      transition: color var(--transition-fast), background-color var(--transition-fast);
+    }
+
+    .movie-plot-toggle:hover,
+    .movie-plot-toggle:focus-visible {
+      color: rgba(226, 232, 240, 0.95);
+      background: rgba(30, 41, 59, 0.6);
+      outline: none;
+    }
+
+    .movie-plot-toggle .icon {
+      transition: transform var(--transition-fast);
+    }
+
+    .movie-plot.is-expanded .movie-plot-toggle .icon {
+      transform: rotate(180deg);
+    }
+
+    .movie-plot.is-expanded .movie-plot-toggle {
+      color: rgba(226, 232, 240, 0.95);
+    }
+
+    .movie-plot.is-expanded::after {
+      opacity: 0;
     }
 
     .movie-actions {
@@ -1336,7 +1457,9 @@
       border: 1px solid rgba(148, 163, 184, 0.4);
       color: rgba(148, 163, 184, 0.8);
       transition: background-color var(--transition-fast), color var(--transition-fast),
-        border-color var(--transition-fast), box-shadow var(--transition-fast);
+        border-color var(--transition-fast), box-shadow var(--transition-fast),
+        transform var(--transition-fast);
+      will-change: transform;
     }
 
     .movie-state-icon[role="button"] {
@@ -1364,6 +1487,22 @@
       background: rgba(34, 197, 94, 0.16);
       border-color: rgba(34, 197, 94, 0.5);
       box-shadow: 0 10px 24px rgba(34, 197, 94, 0.2);
+    }
+
+    .movie-state-icon.state-icon-pulse {
+      animation: state-icon-pulse 0.45s ease;
+    }
+
+    @keyframes state-icon-pulse {
+      0% {
+        transform: scale(1);
+      }
+      45% {
+        transform: scale(1.12);
+      }
+      100% {
+        transform: scale(1);
+      }
     }
 
     .movie-details {
@@ -1411,6 +1550,14 @@
       font-size: 0.85rem;
       color: var(--text-main);
       line-height: 1.5;
+    }
+
+    .movie-plot.is-collapsible.is-collapsed .movie-plot-text {
+      color: var(--text-subtle);
+    }
+
+    .movie-plot.is-expanded .movie-plot-text {
+      color: var(--text-main);
     }
 
     .movie-actions {
