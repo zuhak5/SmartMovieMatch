@@ -69,59 +69,60 @@ export function renderWatchedList(watchedMovies, options = {}) {
     .slice()
     .reverse()
     .forEach((movie) => {
-      const chip = document.createElement("div");
-      chip.className = "watched-chip";
+      const card = document.createElement("div");
+      card.className = "watched-card";
 
-      const icon = document.createElement("span");
-      icon.className = "watched-chip-icon";
-      icon.textContent = "✓";
+      const poster = document.createElement("div");
+      poster.className = "watched-poster";
+      poster.setAttribute("aria-hidden", "true");
+      const posterIcon = document.createElement("span");
+      posterIcon.className = "watched-poster-icon";
+      posterIcon.textContent = "✓";
+      posterIcon.setAttribute("aria-hidden", "true");
+      poster.appendChild(posterIcon);
 
-      const titleSpan = document.createElement("span");
-      titleSpan.className = "watched-chip-title";
-      titleSpan.textContent = movie.title + (movie.year ? ` (${movie.year})` : "");
+      const body = document.createElement("div");
+      body.className = "watched-body";
 
-      const ratingSpan = document.createElement("span");
-      ratingSpan.className = "watched-chip-rating";
-      if (movie.rating) {
-        ratingSpan.textContent = `★ ${movie.rating.toFixed(1)}`;
-      } else {
-        ratingSpan.textContent = "★ –";
+      const title = document.createElement("div");
+      title.className = "watched-title";
+      title.textContent = movie.title + (movie.year ? ` (${movie.year})` : "");
+
+      const meta = document.createElement("div");
+      meta.className = "watched-meta";
+      const parts = [];
+      if (typeof movie.rating === "number" && Number.isFinite(movie.rating)) {
+        parts.push(`IMDb ${movie.rating.toFixed(1)}`);
       }
+      if (Array.isArray(movie.genres) && movie.genres.length) {
+        parts.push(movie.genres.slice(0, 3).join(" • "));
+      }
+      meta.textContent = parts.length ? parts.join(" • ") : "Marked as watched";
 
-      chip.appendChild(icon);
-      chip.appendChild(titleSpan);
-      chip.appendChild(ratingSpan);
+      body.appendChild(title);
+      body.appendChild(meta);
+
+      card.appendChild(poster);
+      card.appendChild(body);
 
       if (onRemove) {
         const removeBtn = document.createElement("button");
         removeBtn.type = "button";
-        removeBtn.className = "watched-chip-remove";
+        removeBtn.className = "watched-remove";
         removeBtn.setAttribute(
           "aria-label",
           `Remove ${movie.title}${movie.year ? ` (${movie.year})` : ""} from watched`
         );
-
-        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        svg.setAttribute("viewBox", "0 0 12 12");
-        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        path.setAttribute(
-          "d",
-          "M3.08 2.37a.7.7 0 0 0-.99.99L5.01 6l-2.92 2.64a.7.7 0 1 0 .96 1.02L6 7.11l2.95 2.55a.7.7 0 1 0 .92-1.05L7 6l2.87-2.64a.7.7 0 0 0-.94-1.04L6 4.93 3.08 2.37Z"
-        );
-        path.setAttribute("fill", "currentColor");
-        svg.appendChild(path);
-        svg.setAttribute("aria-hidden", "true");
-        removeBtn.appendChild(svg);
-
+        removeBtn.innerHTML =
+          '<span class="sr-only">Remove</span><span aria-hidden="true">✕</span>';
         removeBtn.addEventListener("click", () => {
           playUiClick();
           onRemove(movie);
         });
-
-        chip.appendChild(removeBtn);
+        card.appendChild(removeBtn);
       }
 
-      listEl.appendChild(chip);
+      listEl.appendChild(card);
     });
 }
 

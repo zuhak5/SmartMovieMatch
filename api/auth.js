@@ -66,6 +66,8 @@ async function handleAction(action, req, payload) {
       return syncPreferences(req, payload);
     case "syncWatched":
       return syncWatched(req, payload);
+    case "syncFavorites":
+      return syncFavorites(req, payload);
     case "logout":
       return logout(req, payload);
     default:
@@ -76,10 +78,12 @@ async function handleAction(action, req, payload) {
 async function signup(payload) {
   const usernameInput = sanitizeUsername(payload.username);
   const password = typeof payload.password === "string" ? payload.password : "";
+  const displayNameInput = sanitizeDisplayName(payload.name);
 
   validateCredentials(usernameInput, password);
 
   const canonical = canonicalUsername(usernameInput);
+  const preferredDisplayName = displayNameInput || usernameInput;
 
   const existingRow = await selectUserRow(canonical);
   if (existingRow) {
@@ -92,15 +96,17 @@ async function signup(payload) {
 
   const userRow = await insertUserRow({
     username: canonical,
-    display_name: usernameInput,
+    display_name: preferredDisplayName,
     password_hash: passwordHash,
     salt,
     created_at: now,
     last_login_at: now,
     last_preferences_sync: null,
     last_watched_sync: null,
+    last_favorites_sync: null,
     preferences_snapshot: null,
-    watched_history: []
+    watched_history: [],
+    favorites_list: []
   });
 
   const userRecord = mapUserRow(userRow);
@@ -233,6 +239,43 @@ async function syncWatched(req, payload) {
   };
 }
 
+async function syncFavorites(req, payload) {
+  const { sessionRecord, userRecord } = await authenticate(req, payload);
+  const favorites = sanitizeFavorites(payload.favorites);
+
+  const now = new Date().toISOString();
+  const updatedUserRow = await updateUserRow(userRecord.username, {
+    favorites_list: favorites,
+    last_favorites_sync: now
+  });
+  const updatedSessionRow = await updateSessionRow(sessionRecord.token, {
+    last_favorites_sync: now,
+    last_active_at: now
+  });
+
+  const refreshedUser = updatedUserRow
+    ? mapUserRow(updatedUserRow)
+    : {
+        ...userRecord,
+        favoritesList: favorites,
+        lastFavoritesSync: now
+      };
+  const refreshedSession = updatedSessionRow
+    ? mapSessionRow(updatedSessionRow)
+    : {
+        ...sessionRecord,
+        lastFavoritesSync: now,
+        lastActiveAt: now
+      };
+
+  return {
+    body: {
+      ok: true,
+      session: toSessionResponse(refreshedUser, refreshedSession)
+    }
+  };
+}
+
 async function logout(req, payload) {
   const token = extractToken(req, payload);
   if (!token) {
@@ -308,7 +351,8 @@ async function createSessionRecord(userRecord, timestamp) {
     created_at: timestamp,
     last_active_at: timestamp,
     last_preferences_sync: userRecord.lastPreferencesSync || null,
-    last_watched_sync: userRecord.lastWatchedSync || null
+    last_watched_sync: userRecord.lastWatchedSync || null,
+    last_favorites_sync: userRecord.lastFavoritesSync || null
   }, "POST");
 
   return mapSessionRow(sessionRow);
@@ -500,6 +544,13 @@ function sanitizeUsername(username) {
   return username.trim();
 }
 
+function sanitizeDisplayName(name) {
+  if (typeof name !== "string") {
+    return "";
+  }
+  return name.trim().slice(0, 120);
+}
+
 function canonicalUsername(username) {
   return sanitizeUsername(username).toLowerCase();
 }
@@ -523,8 +574,10 @@ function mapUserRow(row) {
     lastLoginAt: row.last_login_at,
     lastPreferencesSync: row.last_preferences_sync,
     lastWatchedSync: row.last_watched_sync,
+    lastFavoritesSync: row.last_favorites_sync,
     preferencesSnapshot: row.preferences_snapshot || null,
-    watchedHistory: Array.isArray(row.watched_history) ? row.watched_history : []
+    watchedHistory: Array.isArray(row.watched_history) ? row.watched_history : [],
+    favoritesList: Array.isArray(row.favorites_list) ? row.favorites_list : []
   };
 }
 
@@ -535,22 +588,27 @@ function mapSessionRow(row) {
     createdAt: row.created_at,
     lastActiveAt: row.last_active_at,
     lastPreferencesSync: row.last_preferences_sync,
-    lastWatchedSync: row.last_watched_sync
+    lastWatchedSync: row.last_watched_sync,
+    lastFavoritesSync: row.last_favorites_sync
   };
 }
 
 function toSessionResponse(userRecord, sessionRecord) {
+  const displayName = userRecord.displayName || userRecord.username;
   return {
     token: sessionRecord.token,
-    username: userRecord.displayName,
+    username: userRecord.username,
+    displayName,
     createdAt: userRecord.createdAt,
     lastLoginAt: userRecord.lastLoginAt || null,
     lastPreferencesSync: userRecord.lastPreferencesSync || null,
     lastWatchedSync: userRecord.lastWatchedSync || null,
+    lastFavoritesSync: userRecord.lastFavoritesSync || null,
     preferencesSnapshot: userRecord.preferencesSnapshot || null,
     watchedHistory: Array.isArray(userRecord.watchedHistory)
       ? userRecord.watchedHistory
-      : []
+      : [],
+    favoritesList: Array.isArray(userRecord.favoritesList) ? userRecord.favoritesList : []
   };
 }
 
@@ -573,6 +631,45 @@ function sanitizePreferences(preferences) {
     safe.likesText = preferences.likesText.slice(0, 500);
   }
   return safe;
+}
+
+function sanitizeFavorites(favorites) {
+  if (!Array.isArray(favorites)) {
+    return [];
+  }
+
+  const normalized = favorites
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+      const title = typeof entry.title === "string" ? entry.title.trim() : "";
+      if (!title) {
+        return null;
+      }
+      const imdbID = typeof entry.imdbID === "string" ? entry.imdbID.slice(0, 32) : null;
+      const year = typeof entry.year === "string" ? entry.year.slice(0, 16) : "";
+      const poster = typeof entry.poster === "string" ? entry.poster.slice(0, 512) : null;
+      const overview = typeof entry.overview === "string" ? entry.overview.slice(0, 2000) : "";
+      const genres = Array.isArray(entry.genres)
+        ? entry.genres
+            .map((genre) => (typeof genre === "string" ? genre.trim() : ""))
+            .filter(Boolean)
+            .slice(0, 10)
+        : [];
+
+      return {
+        imdbID,
+        title,
+        year,
+        poster,
+        overview,
+        genres
+      };
+    })
+    .filter(Boolean);
+
+  return normalized.slice(-100);
 }
 
 function extractToken(req, payload) {
