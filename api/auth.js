@@ -72,6 +72,8 @@ async function handleAction(action, req, payload) {
       return syncFavorites(req, payload);
     case "logout":
       return logout(req, payload);
+    case "updateProfile":
+      return updateProfile(req, payload);
     default:
       throw new HttpError(400, "Unsupported action");
   }
@@ -168,10 +170,14 @@ async function sessionInfo(req, payload) {
 async function syncPreferences(req, payload) {
   const { sessionRecord, userRecord } = await authenticate(req, payload);
   const preferences = sanitizePreferences(payload.preferences);
+  const mergedPreferences = mergePreferencesSnapshot(
+    userRecord.preferencesSnapshot,
+    preferences
+  );
 
   const now = new Date().toISOString();
   const updatedUserRow = await updateUserRow(userRecord.username, {
-    preferences_snapshot: preferences,
+    preferences_snapshot: mergedPreferences,
     last_preferences_sync: now
   });
   const updatedSessionRow = await updateSessionRow(sessionRecord.token, {
@@ -183,7 +189,7 @@ async function syncPreferences(req, payload) {
     ? mapUserRow(updatedUserRow)
     : {
         ...userRecord,
-        preferencesSnapshot: preferences,
+        preferencesSnapshot: mergedPreferences,
         lastPreferencesSync: now
       };
   const refreshedSession = updatedSessionRow
@@ -288,6 +294,98 @@ async function logout(req, payload) {
   return { body: { ok: true } };
 }
 
+async function updateProfile(req, payload) {
+  const { sessionRecord, userRecord } = await authenticate(req, payload);
+  const profile = payload && typeof payload.profile === "object" ? payload.profile : {};
+
+  const updates = {};
+  let modified = false;
+  let nextPreferencesSnapshot = clonePreferencesSnapshot(userRecord.preferencesSnapshot);
+  let nextAvatarUrl = userRecord.avatarUrl;
+
+  if (profile.displayName !== undefined) {
+    const name = sanitizeDisplayName(profile.displayName);
+    if (name.length < 2) {
+      throw new HttpError(400, "Names need at least 2 characters after trimming.");
+    }
+    updates.display_name = name;
+    modified = true;
+  }
+
+  if (profile.password !== undefined) {
+    const password = typeof profile.password === "string" ? profile.password : "";
+    validatePassword(password);
+    const salt = crypto.randomBytes(16).toString("hex");
+    const passwordHash = hashPassword(password, salt);
+    updates.password_hash = passwordHash;
+    updates.salt = salt;
+    modified = true;
+  }
+
+  if (profile.avatar !== undefined) {
+    const avatar = sanitizeAvatar(profile.avatar);
+    const { snapshot, changed } = applyAvatarToPreferences(
+      userRecord.preferencesSnapshot,
+      avatar
+    );
+    nextPreferencesSnapshot = snapshot;
+    if (changed) {
+      updates.preferences_snapshot = snapshot;
+      modified = true;
+    }
+    if (typeof avatar === "string") {
+      nextAvatarUrl = avatar;
+    } else if (avatar === null) {
+      nextAvatarUrl = null;
+    } else {
+      nextAvatarUrl = extractAvatarFromPreferences(snapshot);
+    }
+  }
+
+  if (!modified) {
+    return {
+      body: {
+        ok: true,
+        session: toSessionResponse(userRecord, sessionRecord)
+      }
+    };
+  }
+
+  const now = new Date().toISOString();
+
+  const updatedUserRow = await updateUserRow(userRecord.username, updates);
+  const updatedSessionRow = await updateSessionRow(sessionRecord.token, {
+    last_active_at: now
+  });
+
+  const refreshedUser = updatedUserRow
+    ? mapUserRow(updatedUserRow)
+    : {
+        ...userRecord,
+        displayName:
+          updates.display_name !== undefined ? updates.display_name : userRecord.displayName,
+        passwordHash:
+          updates.password_hash !== undefined ? updates.password_hash : userRecord.passwordHash,
+        salt: updates.salt !== undefined ? updates.salt : userRecord.salt,
+        avatarUrl: nextAvatarUrl,
+        preferencesSnapshot:
+          updates.preferences_snapshot !== undefined
+            ? updates.preferences_snapshot
+            : nextPreferencesSnapshot
+      };
+
+  const refreshedSession = updatedSessionRow
+    ? mapSessionRow(updatedSessionRow)
+    : { ...sessionRecord, lastActiveAt: now };
+
+  return {
+    body: {
+      ok: true,
+      session: toSessionResponse(refreshedUser, refreshedSession)
+    }
+  };
+}
+
 async function authenticate(req, payload) {
   const token = extractToken(req, payload);
   if (!token) {
@@ -311,13 +409,28 @@ async function authenticate(req, payload) {
   };
 }
 
+const AUTH_USER_COLUMNS = [
+  "username",
+  "display_name",
+  "password_hash",
+  "salt",
+  "created_at",
+  "last_login_at",
+  "last_preferences_sync",
+  "last_watched_sync",
+  "last_favorites_sync",
+  "preferences_snapshot",
+  "watched_history",
+  "favorites_list"
+].join(",");
+
 async function selectUserRow(username) {
   if (!username) {
     return null;
   }
   const rows = await supabaseFetch("auth_users", {
     query: {
-      select: "*",
+      select: AUTH_USER_COLUMNS,
       username: `eq.${username}`,
       limit: "1"
     }
@@ -329,25 +442,27 @@ async function selectUserRow(username) {
 }
 
 async function insertUserRow(values) {
-  return await mutateRows("auth_users", values, "POST");
+  await mutateRows("auth_users", values, "POST");
+  return await selectUserRow(values.username);
 }
 
 async function updateUserRow(username, patch) {
   if (!username) {
     return null;
   }
-  return await mutateRows(
+  await mutateRows(
     `auth_users?username=eq.${encodeURIComponent(username)}`,
     patch,
     "PATCH"
   );
+  return await selectUserRow(username);
 }
 
 async function createSessionRecord(userRecord, timestamp) {
   const token = crypto.randomBytes(24).toString("hex");
   await deleteSessionsByUsername(userRecord.username);
 
-  const sessionRow = await mutateRows("auth_sessions", {
+  await mutateRows("auth_sessions", {
     token,
     username: userRecord.username,
     created_at: timestamp,
@@ -357,18 +472,32 @@ async function createSessionRecord(userRecord, timestamp) {
     last_favorites_sync: userRecord.lastFavoritesSync || null
   }, "POST");
 
-  return mapSessionRow(sessionRow);
+  const sessionRow = await selectSessionRow(token);
+  if (sessionRow) {
+    return mapSessionRow(sessionRow);
+  }
+
+  return {
+    token,
+    username: userRecord.username,
+    createdAt: timestamp,
+    lastActiveAt: timestamp,
+    lastPreferencesSync: userRecord.lastPreferencesSync || null,
+    lastWatchedSync: userRecord.lastWatchedSync || null,
+    lastFavoritesSync: userRecord.lastFavoritesSync || null
+  };
 }
 
 async function updateSessionRow(token, patch) {
   if (!token) {
     return null;
   }
-  return await mutateRows(
+  await mutateRows(
     `auth_sessions?token=eq.${encodeURIComponent(token)}`,
     patch,
     "PATCH"
   );
+  return await selectSessionRow(token);
 }
 
 async function selectSessionRow(token) {
@@ -412,12 +541,12 @@ async function deleteSessionByToken(token) {
   });
 }
 
-async function mutateRows(path, values, method) {
+async function mutateRows(path, values, method, { prefer } = {}) {
   const body = method === "POST" ? [values] : values;
   const target = method === "POST" ? path : `${path}`;
   const rows = await supabaseFetch(target, {
     method,
-    headers: { Prefer: "return=representation" },
+    headers: { Prefer: prefer || "return=minimal" },
     body
   });
   if (Array.isArray(rows)) {
@@ -455,36 +584,72 @@ async function supabaseFetch(path, { method = "GET", headers = {}, query, body }
   try {
     response = await fetch(url, init);
   } catch (error) {
-    handleSupabaseError("Network error", error);
+    console.error("Supabase network error:", error);
+    throw new HttpError(503, "Authentication storage service is unreachable. Check your Supabase configuration.");
+  }
+
+  let text = "";
+  try {
+    text = await response.text();
+  } catch (error) {
+    console.error("Supabase response read error:", error);
+    throw new HttpError(502, "Failed to read the authentication storage response.");
   }
 
   if (!response.ok) {
-    const errorText = await safeReadResponse(response);
-    handleSupabaseError(`HTTP ${response.status} ${response.statusText}: ${errorText}`);
+    const message = buildSupabaseErrorMessage(response.status, text) ||
+      "Authentication storage request failed due to a configuration issue.";
+    console.error("Supabase error response:", {
+      status: response.status,
+      statusText: response.statusText,
+      body: text
+    });
+
+    const status = response.status >= 500 ? 503 : 500;
+    throw new HttpError(status, message);
   }
 
-  if (response.status === 204) {
-    return null;
-  }
-
-  const text = await response.text();
-  if (!text) {
+  if (response.status === 204 || !text) {
     return null;
   }
 
   try {
     return JSON.parse(text);
   } catch (error) {
-    handleSupabaseError("Invalid JSON response", error);
+    console.error("Supabase JSON parse error:", text, error);
+    throw new HttpError(502, "Authentication storage returned invalid data.");
   }
 }
 
-async function safeReadResponse(response) {
-  try {
-    return await response.text();
-  } catch (error) {
-    return "";
+function buildSupabaseErrorMessage(status, rawBody) {
+  if (!rawBody) {
+    return status >= 500
+      ? "Authentication storage service is currently unavailable. Try again later."
+      : "Authentication storage request failed. Please verify your database schema.";
   }
+
+  try {
+    const parsed = JSON.parse(rawBody);
+    if (parsed && typeof parsed === "object") {
+      const message =
+        parsed.message ||
+        parsed.error_description ||
+        parsed.error ||
+        parsed.hint ||
+        parsed.details;
+      if (typeof message === "string" && message.trim()) {
+        return `Authentication storage error (${status}): ${message.trim()}`;
+      }
+    }
+  } catch (error) {
+    // Ignore JSON parsing issues and fall back to generic messaging.
+  }
+
+  const trimmed = rawBody.trim();
+  if (trimmed) {
+    return `Authentication storage error (${status}): ${trimmed.slice(0, 300)}`;
+  }
+  return null;
 }
 
 function nodeFetch(input, options = {}) {
@@ -534,11 +699,6 @@ function nodeFetch(input, options = {}) {
   });
 }
 
-function handleSupabaseError(context, error) {
-  console.error("Supabase error:", context, error);
-  throw new HttpError(500, "Authentication storage service failure.");
-}
-
 function sanitizeUsername(username) {
   if (typeof username !== "string") {
     return "";
@@ -551,6 +711,146 @@ function sanitizeDisplayName(name) {
     return "";
   }
   return name.trim().slice(0, 120);
+}
+
+function sanitizeAvatar(value) {
+  if (value === null) {
+    return null;
+  }
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "string") {
+    throw new HttpError(400, "Profile pictures must be provided as a string.");
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (trimmed.length > 250000) {
+    throw new HttpError(400, "Profile pictures are too large. Choose a smaller image.");
+  }
+  if (
+    !trimmed.startsWith("data:image/") &&
+    !trimmed.startsWith("https://") &&
+    !trimmed.startsWith("http://")
+  ) {
+    throw new HttpError(400, "Profile pictures must be a data URL or an absolute image URL.");
+  }
+  return trimmed;
+}
+
+function extractAvatarFromPreferences(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") {
+    return null;
+  }
+  const profile = snapshot.profile;
+  if (!profile || typeof profile !== "object") {
+    return null;
+  }
+  const avatar = profile.avatarUrl;
+  if (typeof avatar === "string") {
+    const trimmed = avatar.trim();
+    return trimmed ? trimmed : null;
+  }
+  return null;
+}
+
+function clonePreferencesSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") {
+    return null;
+  }
+  try {
+    return JSON.parse(JSON.stringify(snapshot));
+  } catch (error) {
+    if (Array.isArray(snapshot)) {
+      return snapshot.slice();
+    }
+    return { ...snapshot };
+  }
+}
+
+function applyAvatarToPreferences(currentSnapshot, avatar) {
+  const original = clonePreferencesSnapshot(currentSnapshot);
+  if (avatar === undefined) {
+    return { snapshot: original, changed: false };
+  }
+
+  let next = clonePreferencesSnapshot(currentSnapshot);
+  if (!next) {
+    next = {};
+  }
+
+  if (avatar === null) {
+    if (next.profile && typeof next.profile === "object") {
+      delete next.profile.avatarUrl;
+    }
+  } else {
+    if (!next.profile || typeof next.profile !== "object") {
+      next.profile = {};
+    }
+    next.profile.avatarUrl = avatar;
+  }
+
+  if (next.profile && typeof next.profile === "object" && !hasSnapshotContent(next.profile)) {
+    delete next.profile;
+  }
+
+  if (!hasSnapshotContent(next)) {
+    next = null;
+  }
+
+  const changed = !snapshotsEqual(original, next);
+  return { snapshot: next, changed };
+}
+
+function mergePreferencesSnapshot(currentSnapshot, incomingSnapshot) {
+  const current = clonePreferencesSnapshot(currentSnapshot);
+  const incoming = clonePreferencesSnapshot(incomingSnapshot);
+  const currentAvatar = extractAvatarFromPreferences(current);
+
+  let next = incoming;
+
+  if (currentAvatar) {
+    if (!next) {
+      next = { profile: { avatarUrl: currentAvatar } };
+    } else {
+      if (!next.profile || typeof next.profile !== "object") {
+        next.profile = {};
+      }
+      if (next.profile.avatarUrl === undefined) {
+        next.profile.avatarUrl = currentAvatar;
+      }
+    }
+  }
+
+  if (next && next.profile && typeof next.profile === "object" && !hasSnapshotContent(next.profile)) {
+    delete next.profile;
+  }
+
+  if (next && !hasSnapshotContent(next)) {
+    next = null;
+  }
+
+  return next;
+}
+
+function hasSnapshotContent(value) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+  return Object.keys(value).length > 0;
+}
+
+function snapshotsEqual(a, b) {
+  try {
+    return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  } catch (error) {
+    return a === b;
+  }
 }
 
 function canonicalUsername(username) {
@@ -566,18 +866,31 @@ function validateCredentials(username, password) {
   }
 }
 
+function validatePassword(password) {
+  if (!password || password.length < 6) {
+    throw new HttpError(400, "Passwords must include 6 or more characters.");
+  }
+}
+
 function mapUserRow(row) {
+  const preferencesSnapshot =
+    row && typeof row.preferences_snapshot === "object" && row.preferences_snapshot !== null
+      ? row.preferences_snapshot
+      : null;
+  const avatarFromPreferences = extractAvatarFromPreferences(preferencesSnapshot);
+
   return {
     username: row.username,
     displayName: row.display_name,
     passwordHash: row.password_hash,
     salt: row.salt,
     createdAt: row.created_at,
+    avatarUrl: avatarFromPreferences || null,
     lastLoginAt: row.last_login_at,
     lastPreferencesSync: row.last_preferences_sync,
     lastWatchedSync: row.last_watched_sync,
     lastFavoritesSync: row.last_favorites_sync,
-    preferencesSnapshot: row.preferences_snapshot || null,
+    preferencesSnapshot,
     watchedHistory: Array.isArray(row.watched_history) ? row.watched_history : [],
     favoritesList: Array.isArray(row.favorites_list) ? row.favorites_list : []
   };
@@ -597,10 +910,16 @@ function mapSessionRow(row) {
 
 function toSessionResponse(userRecord, sessionRecord) {
   const displayName = userRecord.displayName || userRecord.username;
+  const profileName =
+    typeof userRecord.displayName === "string" && userRecord.displayName.trim()
+      ? userRecord.displayName.trim()
+      : null;
   return {
     token: sessionRecord.token,
     username: userRecord.username,
     displayName,
+    profileName,
+    avatarUrl: userRecord.avatarUrl || null,
     createdAt: userRecord.createdAt,
     lastLoginAt: userRecord.lastLoginAt || null,
     lastPreferencesSync: userRecord.lastPreferencesSync || null,
