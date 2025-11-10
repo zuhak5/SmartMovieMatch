@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Smart Movie Match – Online Recommender</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="assets/css/app.css" />
+
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <div class="account-bar" role="navigation">
+      <span id="accountGreeting" class="account-greeting">You’re browsing as guest.</span>
+      <a id="accountLoginLink" class="account-link" href="login.html">Log in / Sign up</a>
+      <button id="accountLogoutBtn" class="account-logout" type="button">Log out</button>
+    </div>
+    <div class="app-title-row">
+      <h1 class="app-title">
+        🎬 Smart Movie Match
+        <span class="badge text-mono">Online • OMDb + TMDB + YouTube</span>
+      </h1>
+      <span class="pill-context">
+        <span class="pill-dot"></span>
+        No static catalog – everything fetched live
+      </span>
+    </div>
+    <p class="app-subtitle">
+      Tell me what you’re into and I’ll hunt for fresh movies online, then tailor the picks
+      to your mood and what you’ve already watched.
+    </p>
+  </header>
+
+  <main class="app-main">
+    <!-- Preferences -->
+    <section class="panel">
+      <div class="panel-inner">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Your vibe</div>
+            <div class="panel-subtitle">Name, genres, mood &amp; what you’ve liked</div>
+          </div>
+        </div>
+        <p class="hint-text">
+          The more you share (what you’ve seen, favorite genres, your mood), the smarter the
+          suggestions become. Movies you mark as “watched” also tune the recommender.
+        </p>
+
+        <form id="prefsForm">
+          <!-- Name -->
+          <div class="field-group">
+            <div class="field-label-row">
+              <label for="nameInput">Name <span class="field-label-secondary">(optional)</span></label>
+              <div class="field-label-secondary">
+                I’ll use this to personalize headings only.
+              </div>
+            </div>
+            <input
+              id="nameInput"
+              class="input-base input-text"
+              type="text"
+              autocomplete="name"
+              placeholder="e.g., Alex"
+            />
+          </div>
+
+          <!-- Genres -->
+          <div class="field-group">
+            <div class="field-label-row">
+              <label>Genres you enjoy</label>
+              <div class="field-label-secondary">
+                Pick a few – you can mix anything.
+              </div>
+            </div>
+            <div class="genre-grid">
+              <!-- TMDB genre IDs -->
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="28" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Action
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="12" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Adventure
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="35" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Comedy
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="18" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Drama
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="27" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Horror
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="53" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Thriller
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="10749" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Romance
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="878" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Sci-Fi
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="80" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Crime
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="9648" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Mystery
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="16" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Animation
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="10751" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Family
+                </span>
+              </label>
+            </div>
+          </div>
+
+
+          <!-- Mood -->
+          <div class="field-group">
+            <div class="field-label-row">
+              <label>Tonight’s mood</label>
+              <div class="field-label-secondary">
+                Choose a vibe and energy level to steer the tone.
+              </div>
+            </div>
+            <div class="mood-row mood-row-enhanced">
+              <label class="mood-option" data-mood-copy="Surprise me with a balanced mix.">
+                <input type="radio" name="mood" value="any" checked />
+                <span class="mood-label">
+                  <span class="mood-emoji">🎲</span>
+                  Surprise me
+                </span>
+              </label>
+              <label class="mood-option" data-mood-copy="Breezy, uplifting picks incoming.">
+                <input type="radio" name="mood" value="light" />
+                <span class="mood-label">
+                  <span class="mood-emoji">✨</span>
+                  Feel-good
+                </span>
+              </label>
+              <label class="mood-option" data-mood-copy="We’ll lean into atmospheric thrillers.">
+                <input type="radio" name="mood" value="dark" />
+                <span class="mood-label">
+                  <span class="mood-emoji">🌒</span>
+                  Intense
+                </span>
+              </label>
+            </div>
+            <div class="mood-intensity">
+              <label for="moodIntensity" class="mood-intensity-label">Energy level</label>
+              <input
+                id="moodIntensity"
+                class="input-range"
+                type="range"
+                min="0"
+                max="2"
+                step="1"
+                value="1"
+                aria-describedby="moodDynamicCopy"
+              />
+              <div class="mood-intensity-scale">
+                <span data-intensity-value="0">Chill</span>
+                <span data-intensity-value="1" class="active">Balanced</span>
+                <span data-intensity-value="2">Amped</span>
+              </div>
+            </div>
+            <div id="moodDynamicCopy" class="mood-dynamic-copy">
+              Expect a balanced mix of moods.
+            </div>
+          </div>
+
+<!-- Count -->
+          <div class="field-group">
+            <div class="field-label-row">
+              <label for="countInput">Number of suggestions</label>
+              <div class="field-label-secondary">
+                Between 4 and 12 movies per batch.
+              </div>
+            </div>
+            <input
+              id="countInput"
+              class="input-base input-text"
+              type="number"
+              min="4"
+              max="12"
+              value="8"
+            />
+          </div>
+
+          <div class="preferences-preview" id="preferencesPreview" aria-live="polite">
+            <div class="preferences-preview-title">Live summary</div>
+            <div class="preferences-preview-empty">
+              Choose genres, mood, or favorites and I’ll summarize them here in real time.
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button type="submit" class="btn-primary">
+              <span>Find movies for me</span>
+              <span aria-hidden="true">🔍</span>
+            </button>
+            <span class="status-row" id="prefsStatusRow">
+              <span class="status-dot" id="prefsStatusDot"></span>
+              <span id="prefsStatusText">
+                Signed-in users sync preferences securely to our cloud log.
+              </span>
+            </span>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- Right column: recommendations + watched -->
+    <div class="right-column">
+      <section class="panel">
+        <div class="panel-inner">
+          <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
+          <div class="recommendations-header">
+            <div>
+              <div class="recommendations-title" id="recTitle">Recommendations</div>
+              <div class="recommendations-meta">
+                <span id="recMetaPrimary">Tune your preferences, then I’ll blend TMDB discovery with fresh OMDb details.</span>
+                <span class="pill-mini">
+                  <span class="swatch"></span>
+                  IMDb rating • genres • plot • trailer
+                </span>
+              </div>
+            </div>
+            <div>
+              <button type="button" class="btn-subtle btn-chip btn-chip-muted" id="recNudgeBtn">
+                Shuffle suggestions
+              </button>
+            </div>
+          </div>
+
+          <div
+            id="recStatus"
+            class="status-row"
+            aria-live="polite"
+            aria-atomic="true"
+            style="margin-bottom: 0.4rem;"
+          >
+            <span class="status-dot" id="recStatusDot"></span>
+            <span id="recStatusText">
+              No calls made yet. Hit “Find movies for me” to start.
+            </span>
+          </div>
+
+          <div id="recError" class="error-text" style="display:none;"></div>
+
+          <div id="recommendationsGrid" class="recommendations-grid"></div>
+        </div>
+      </section>
+
+
+        <section class="panel collections-panel">
+          <div class="panel-inner">
+            <div class="panel-header collections-header">
+              <div>
+                <div class="panel-title">Your collections</div>
+                <div class="panel-subtitle">
+                  Tap the heart or eye on any card to pin favorites or track your watched history.
+                </div>
+              </div>
+              <div class="collection-tabs" role="tablist">
+                <button
+                  type="button"
+                  class="collection-tab active"
+                  id="favoritesTab"
+                  data-target="favorites"
+                  role="tab"
+                  aria-controls="favoritesView"
+                  aria-selected="true"
+                >
+                  Favorites
+                </button>
+                <button
+                  type="button"
+                  class="collection-tab"
+                  id="watchedTab"
+                  data-target="watched"
+                  role="tab"
+                  aria-controls="watchedView"
+                  aria-selected="false"
+                >
+                  Watched
+                </button>
+              </div>
+            </div>
+            <div class="collection-summary" id="favoritesSummary"></div>
+            <div class="collection-summary" id="watchedSummary"></div>
+            <div id="favoritesView" class="collection-view active" role="tabpanel" aria-labelledby="favoritesTab">
+              <div id="favoritesList" class="favorites-list"></div>
+              <div id="favoritesEmpty" class="empty-state">
+                Tap the heart on any recommendation to save it here for quick access.
+              </div>
+            </div>
+            <div id="watchedView" class="collection-view" role="tabpanel" aria-labelledby="watchedTab">
+              <div id="watchedList" class="watched-panel-list"></div>
+              <div id="watchedEmpty" class="empty-state">
+                You haven’t marked anything as watched yet. Use the
+                <strong>“I’ve watched this”</strong> button on any recommendation and I’ll reshape future suggestions around it.
+              </div>
+              <div class="collection-actions">
+                <button type="button" class="btn-subtle btn-subtle-danger" id="clearWatchedBtn">
+                  <span>Clear history</span>
+                  <span aria-hidden="true">🧹</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+    </div>
+  </main>
+</div>
+
+  <script type="module" src="assets/js/main.js"></script>
+
+</body>
+</html>
+
