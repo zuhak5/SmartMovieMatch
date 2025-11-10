@@ -994,9 +994,6 @@ function revealMoreRecommendations() {
 
 function handleMarkWatched(omdbMovie) {
   const added = markAsWatched(omdbMovie);
-  if (added) {
-    getRecommendations(true);
-  }
   return added;
 }
 
@@ -1024,8 +1021,7 @@ function handleRemoveWatched(movie) {
   state.watchedMovies = next;
   refreshWatchedUi();
   scheduleWatchedSync();
-  setRecStatus("Updated your watched list. Refreshing suggestions…", true);
-  getRecommendations(true);
+  setRecStatus("Updated your watched list.", false);
 }
 
 function handleToggleFavorite(payload) {
@@ -1060,7 +1056,6 @@ function handleToggleFavorite(payload) {
     state.favorites.splice(existingIndex, 1);
     refreshFavoritesUi();
     scheduleFavoritesSync();
-    getRecommendations(true);
     return false;
   }
 
@@ -1096,7 +1091,6 @@ function handleToggleFavorite(payload) {
 
   refreshFavoritesUi();
   scheduleFavoritesSync();
-  getRecommendations(true);
   return true;
 }
 
@@ -1123,7 +1117,6 @@ function handleRemoveFavorite(movie) {
   state.favorites = next;
   refreshFavoritesUi();
   scheduleFavoritesSync();
-  getRecommendations(true);
 }
 
 function markAsWatched(omdbMovie) {
