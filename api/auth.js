@@ -5,10 +5,7 @@ const fetch = typeof global.fetch === "function" ? global.fetch.bind(global) : n
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error("Missing Supabase configuration for authentication service.");
-}
+const AUTH_SERVICE_CONFIGURED = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -19,6 +16,11 @@ class HttpError extends Error {
 
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
+
+  if (!AUTH_SERVICE_CONFIGURED) {
+    res.status(503).json({ error: "Authentication service is not configured." });
+    return;
+  }
 
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
