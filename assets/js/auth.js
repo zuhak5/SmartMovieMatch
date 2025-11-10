@@ -83,35 +83,6 @@ export function logoutSession() {
   });
 }
 
-export async function updateProfile(session, updates = {}) {
-  const activeSession = ensureActiveSession(session);
-  const profile = {};
-  const safeUpdates = updates && typeof updates === "object" ? updates : {};
-
-  if (Object.prototype.hasOwnProperty.call(safeUpdates, "displayName")) {
-    profile.displayName =
-      typeof safeUpdates.displayName === "string" ? safeUpdates.displayName : "";
-  }
-  if (Object.prototype.hasOwnProperty.call(safeUpdates, "password")) {
-    profile.password = typeof safeUpdates.password === "string" ? safeUpdates.password : "";
-  }
-  if (Object.prototype.hasOwnProperty.call(safeUpdates, "avatar")) {
-    profile.avatar = safeUpdates.avatar;
-  }
-
-  const response = await authRequest(
-    "updateProfile",
-    { profile },
-    activeSession.token
-  );
-
-  const sessionUpdate = normalizeSession(response && response.session);
-  if (sessionUpdate) {
-    persistSession(sessionUpdate);
-  }
-  return sessionUpdate;
-}
-
 export async function persistPreferencesRemote(session, preferences) {
   const activeSession = ensureActiveSession(session);
   const response = await authRequest(
@@ -239,14 +210,6 @@ function normalizeSession(value) {
     token: value.token,
     username: value.username,
     displayName,
-    profileName:
-      typeof value.profileName === "string" && value.profileName.trim()
-        ? value.profileName.trim()
-        : null,
-    avatarUrl:
-      typeof value.avatarUrl === "string" && value.avatarUrl.trim()
-        ? value.avatarUrl.trim()
-        : null,
     createdAt: value.createdAt || null,
     lastLoginAt: value.lastLoginAt || null,
     lastPreferencesSync: value.lastPreferencesSync || null,

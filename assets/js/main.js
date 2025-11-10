@@ -5,8 +5,7 @@ import {
   logoutSession,
   persistPreferencesRemote,
   persistWatchedRemote,
-  persistFavoritesRemote,
-  updateProfile
+  persistFavoritesRemote
 } from "./auth.js";
 import {
   discoverCandidateMovies,
@@ -49,17 +48,6 @@ const state = {
     lastFavoritesSync: null
   }
 };
-
-const accountSettingsState = {
-  open: false,
-  originalAvatar: null,
-  draftAvatar: null,
-  avatarRemoved: false,
-  lastFocus: null,
-  expectingSessionRefresh: false
-};
-
-let accountSettingsEventsBound = false;
 
 const GENRE_ICON_MAP = {
   "28": "💥", // Action
@@ -256,17 +244,6 @@ function init() {
     state.session = session;
     hydrateFromSession(session);
     updateAccountUi(session);
-    if (!session && accountSettingsState.open) {
-      closeAccountSettings();
-    } else if (accountSettingsState.open) {
-      if (accountSettingsState.expectingSessionRefresh) {
-        populateAccountSettingsForm();
-        setAccountSettingsStatus("Profile updated successfully.", "success");
-        accountSettingsState.expectingSessionRefresh = false;
-      } else {
-        updateAccountSettingsAvatarPreview();
-      }
-    }
     setSyncStatus(
       session
         ? "Signed in – your taste profile syncs automatically."
@@ -356,8 +333,6 @@ function wireEvents() {
       }
     });
   });
-
-  wireAccountSettings();
 }
 
 function refreshWatchedUi() {
@@ -1223,16 +1198,12 @@ function updateAccountUi(session) {
   const greeting = $("accountGreeting");
   const loginLink = $("accountLoginLink");
   const logoutBtn = $("accountLogoutBtn");
-  const settingsBtn = $("accountSettingsBtn");
-  const avatarImg = $("accountAvatar");
-  const avatarFallback = $("accountAvatarFallback");
 
   if (!greeting || !loginLink || !logoutBtn) {
     return;
   }
 
   const displayName = session ? session.displayName || session.username || "" : "";
-  const avatarUrl = session && typeof session.avatarUrl === "string" ? session.avatarUrl : null;
 
   if (displayName) {
     greeting.textContent = `Signed in as ${displayName}`;
@@ -1244,394 +1215,6 @@ function updateAccountUi(session) {
     greeting.classList.remove("account-greeting-auth");
     loginLink.style.display = "inline-flex";
     logoutBtn.style.display = "none";
-  }
-
-  if (settingsBtn) {
-    settingsBtn.style.display = session ? "inline-flex" : "none";
-    settingsBtn.setAttribute("aria-expanded", accountSettingsState.open ? "true" : "false");
-  }
-
-  if (avatarImg) {
-    if (avatarUrl) {
-      avatarImg.src = avatarUrl;
-      avatarImg.hidden = false;
-    } else {
-      avatarImg.removeAttribute("src");
-      avatarImg.hidden = true;
-    }
-  }
-
-  if (avatarFallback) {
-    const fallbackText = displayName ? displayName.charAt(0).toUpperCase() : "🙂";
-    avatarFallback.textContent = fallbackText;
-    avatarFallback.hidden = !!(avatarUrl && avatarImg);
-  }
-}
-
-function wireAccountSettings() {
-  const modal = $("accountSettingsModal");
-  if (!modal || accountSettingsEventsBound) {
-    return;
-  }
-  accountSettingsEventsBound = true;
-
-  const settingsBtn = $("accountSettingsBtn");
-  if (settingsBtn) {
-    settingsBtn.addEventListener("click", () => {
-      if (!state.session) {
-        window.location.href = "login.html";
-        return;
-      }
-      playUiClick();
-      openAccountSettings();
-    });
-  }
-
-  const closeBtn = $("accountSettingsClose");
-  if (closeBtn) {
-    closeBtn.addEventListener("click", () => {
-      playUiClick();
-      closeAccountSettings();
-    });
-  }
-
-  modal.addEventListener("click", (event) => {
-    const target = event.target;
-    if (target && target.dataset && target.dataset.dismiss === "modal") {
-      closeAccountSettings();
-    }
-  });
-
-  const form = $("accountSettingsForm");
-  if (form) {
-    form.addEventListener("submit", handleAccountSettingsSubmit);
-  }
-
-  const fileInput = $("accountAvatarInput");
-  if (fileInput) {
-    fileInput.addEventListener("change", handleAvatarFileChange);
-  }
-
-  const removeBtn = $("accountAvatarRemove");
-  if (removeBtn) {
-    removeBtn.addEventListener("click", handleAvatarRemove);
-  }
-
-  document.addEventListener("keydown", handleAccountModalKeydown, true);
-}
-
-function openAccountSettings() {
-  if (!state.session) {
-    window.location.href = "login.html";
-    return;
-  }
-  const modal = $("accountSettingsModal");
-  const dialog = $("accountSettingsCard");
-  if (!modal) {
-    return;
-  }
-
-  accountSettingsState.open = true;
-  accountSettingsState.lastFocus = document.activeElement &&
-    typeof document.activeElement.focus === "function"
-      ? document.activeElement
-      : null;
-  accountSettingsState.avatarRemoved = false;
-  accountSettingsState.originalAvatar =
-    state.session && state.session.avatarUrl ? state.session.avatarUrl : null;
-  accountSettingsState.draftAvatar = accountSettingsState.originalAvatar;
-
-  modal.hidden = false;
-  document.body.classList.add("has-open-modal");
-  populateAccountSettingsForm();
-  updateAccountUi(state.session);
-
-  window.requestAnimationFrame(() => {
-    const nameInput = $("accountNameInput");
-    if (nameInput) {
-      nameInput.focus();
-      nameInput.select();
-    } else if (dialog) {
-      dialog.focus();
-    }
-  });
-}
-
-function closeAccountSettings() {
-  const modal = $("accountSettingsModal");
-  if (!modal || !accountSettingsState.open) {
-    return;
-  }
-
-  modal.hidden = true;
-  document.body.classList.remove("has-open-modal");
-  accountSettingsState.open = false;
-  accountSettingsState.avatarRemoved = false;
-  accountSettingsState.draftAvatar = null;
-  accountSettingsState.originalAvatar = null;
-  accountSettingsState.expectingSessionRefresh = false;
-
-  const fileInput = $("accountAvatarInput");
-  if (fileInput) {
-    fileInput.value = "";
-  }
-  setAccountSettingsStatus("", "muted");
-  updateAccountUi(state.session);
-
-  const lastFocus = accountSettingsState.lastFocus;
-  accountSettingsState.lastFocus = null;
-  if (lastFocus && typeof lastFocus.focus === "function") {
-    lastFocus.focus();
-  }
-}
-
-function populateAccountSettingsForm() {
-  const nameInput = $("accountNameInput");
-  const passwordInput = $("accountPasswordInput");
-  const avatarInput = $("accountAvatarInput");
-
-  if (nameInput) {
-    nameInput.value = getCurrentProfileName();
-  }
-  if (passwordInput) {
-    passwordInput.value = "";
-  }
-  if (avatarInput) {
-    avatarInput.value = "";
-  }
-
-  accountSettingsState.avatarRemoved = false;
-  accountSettingsState.originalAvatar =
-    state.session && state.session.avatarUrl ? state.session.avatarUrl : null;
-  accountSettingsState.draftAvatar = accountSettingsState.originalAvatar;
-
-  setAccountSettingsStatus("", "muted");
-  updateAccountSettingsAvatarPreview();
-}
-
-function getCurrentProfileName() {
-  if (state.session) {
-    if (typeof state.session.profileName === "string" && state.session.profileName.trim()) {
-      return state.session.profileName.trim();
-    }
-    if (typeof state.session.displayName === "string" && state.session.displayName.trim()) {
-      return state.session.displayName.trim();
-    }
-  }
-  return "";
-}
-
-function getProfileInitial() {
-  const name = getCurrentProfileName();
-  if (name) {
-    return name.charAt(0).toUpperCase();
-  }
-  if (state.session && typeof state.session.username === "string" && state.session.username) {
-    return state.session.username.charAt(0).toUpperCase();
-  }
-  return "🙂";
-}
-
-function setAccountSettingsStatus(message, variant = "muted") {
-  const status = $("accountSettingsStatus");
-  if (!status) {
-    return;
-  }
-  if (message) {
-    status.textContent = message;
-    status.dataset.variant = variant;
-    status.hidden = false;
-  } else {
-    status.textContent = "";
-    status.dataset.variant = "muted";
-    status.hidden = true;
-  }
-}
-
-function updateAccountSettingsAvatarPreview() {
-  const previewImg = $("accountAvatarPreview");
-  const previewFallback = $("accountAvatarPreviewFallback");
-  const removeBtn = $("accountAvatarRemove");
-
-  const activeAvatar = accountSettingsState.avatarRemoved
-    ? null
-    : accountSettingsState.draftAvatar;
-
-  if (previewImg) {
-    if (activeAvatar) {
-      previewImg.src = activeAvatar;
-      previewImg.hidden = false;
-    } else {
-      previewImg.removeAttribute("src");
-      previewImg.hidden = true;
-    }
-  }
-
-  if (previewFallback) {
-    previewFallback.textContent = getProfileInitial();
-    previewFallback.hidden = !!activeAvatar;
-  }
-
-  if (removeBtn) {
-    const hasAvatar = Boolean(
-      accountSettingsState.draftAvatar || accountSettingsState.originalAvatar
-    );
-    removeBtn.disabled = !hasAvatar;
-  }
-}
-
-function handleAvatarFileChange(event) {
-  const input = event.target;
-  if (!input || !input.files || !input.files.length) {
-    return;
-  }
-  const [file] = input.files;
-  if (!file) {
-    return;
-  }
-  if (file.size > 250000) {
-    input.value = "";
-    setAccountSettingsStatus(
-      "That image is too large. Pick one under 250 KB.",
-      "error"
-    );
-    return;
-  }
-
-  const reader = new FileReader();
-  reader.onload = () => {
-    const result = typeof reader.result === "string" ? reader.result : "";
-    if (!result.startsWith("data:image/")) {
-      input.value = "";
-      setAccountSettingsStatus(
-        "We couldn’t read that image format. Try a different picture.",
-        "error"
-      );
-      return;
-    }
-    accountSettingsState.draftAvatar = result;
-    accountSettingsState.avatarRemoved = false;
-    updateAccountSettingsAvatarPreview();
-    setAccountSettingsStatus("Preview updated. Save to apply the change.", "muted");
-  };
-  reader.onerror = () => {
-    input.value = "";
-    setAccountSettingsStatus(
-      "We couldn’t read that file. Try again with a different image.",
-      "error"
-    );
-  };
-  reader.readAsDataURL(file);
-}
-
-function handleAvatarRemove(event) {
-  event.preventDefault();
-  if (!accountSettingsState.draftAvatar && !accountSettingsState.originalAvatar) {
-    return;
-  }
-  accountSettingsState.draftAvatar = null;
-  accountSettingsState.avatarRemoved = true;
-  const input = $("accountAvatarInput");
-  if (input) {
-    input.value = "";
-  }
-  updateAccountSettingsAvatarPreview();
-  setAccountSettingsStatus("Profile picture will be removed after saving.", "muted");
-}
-
-function handleAccountModalKeydown(event) {
-  if (event.key === "Escape" && accountSettingsState.open) {
-    event.preventDefault();
-    closeAccountSettings();
-  }
-}
-
-async function handleAccountSettingsSubmit(event) {
-  event.preventDefault();
-  if (!state.session) {
-    window.location.href = "login.html";
-    return;
-  }
-
-  const nameInput = $("accountNameInput");
-  const passwordInput = $("accountPasswordInput");
-  const saveBtn = $("accountSettingsSave");
-  const form = $("accountSettingsForm");
-
-  const nameValue = nameInput ? nameInput.value.trim() : "";
-  const passwordValue = passwordInput ? passwordInput.value : "";
-
-  if (nameValue.length < 2) {
-    setAccountSettingsStatus("Names need at least 2 characters.", "error");
-    if (nameInput) {
-      nameInput.focus();
-    }
-    return;
-  }
-
-  if (passwordValue && passwordValue.length < 6) {
-    setAccountSettingsStatus("Passwords must include 6 or more characters.", "error");
-    if (passwordInput) {
-      passwordInput.focus();
-    }
-    return;
-  }
-
-  const updates = {};
-  const currentProfileName = getCurrentProfileName();
-  if (nameValue !== currentProfileName) {
-    updates.displayName = nameValue;
-  }
-  if (passwordValue) {
-    updates.password = passwordValue;
-  }
-
-  if (accountSettingsState.avatarRemoved) {
-    if (accountSettingsState.originalAvatar || accountSettingsState.draftAvatar) {
-      updates.avatar = null;
-    }
-  } else if (
-    accountSettingsState.draftAvatar &&
-    accountSettingsState.draftAvatar !== accountSettingsState.originalAvatar
-  ) {
-    updates.avatar = accountSettingsState.draftAvatar;
-  }
-
-  if (Object.keys(updates).length === 0) {
-    setAccountSettingsStatus("No changes to save just yet.", "muted");
-    return;
-  }
-
-  setAccountSettingsStatus("Saving your changes…", "loading");
-  if (saveBtn) {
-    saveBtn.disabled = true;
-    saveBtn.setAttribute("aria-busy", "true");
-  }
-  if (form) {
-    form.classList.add("is-saving");
-  }
-
-  try {
-    accountSettingsState.expectingSessionRefresh = true;
-    await updateProfile(state.session, updates);
-    if (passwordInput) {
-      passwordInput.value = "";
-    }
-  } catch (error) {
-    accountSettingsState.expectingSessionRefresh = false;
-    const message =
-      error && error.message
-        ? error.message
-        : "We couldn’t update your profile right now. Try again in a moment.";
-    setAccountSettingsStatus(message, "error");
-  } finally {
-    if (saveBtn) {
-      saveBtn.disabled = false;
-      saveBtn.removeAttribute("aria-busy");
-    }
-    if (form) {
-      form.classList.remove("is-saving");
-    }
   }
 }
 
