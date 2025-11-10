@@ -24,7 +24,7 @@ import {
   setRecError
 } from "./ui.js";
 import { $ } from "./dom.js";
-import { playUiClick } from "./sound.js";
+import { playUiClick, playExpandSound } from "./sound.js";
 
 const RECOMMENDATIONS_PAGE_SIZE = 20;
 
@@ -253,9 +253,15 @@ function updatePreferencesPreview() {
     return listWrap;
   };
 
-  const createItem = ({ title: itemTitle, meta, icon, poster }) => {
-    const item = document.createElement("div");
-    item.className = "preferences-collection-item";
+  const createItem = (item) => {
+    const itemTitle = item.title || "Untitled";
+    const meta = item.meta || "";
+    const poster = item.poster || null;
+    const icon = item.icon || null;
+    const details = Array.isArray(item.details) ? item.details.filter(Boolean) : [];
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "preferences-collection-item";
 
     const iconWrap = document.createElement("div");
     iconWrap.className = "preferences-collection-icon";
@@ -284,9 +290,53 @@ function updatePreferencesPreview() {
     body.appendChild(titleEl);
     body.appendChild(metaEl);
 
-    item.appendChild(iconWrap);
-    item.appendChild(body);
-    return item;
+    wrapper.appendChild(iconWrap);
+    wrapper.appendChild(body);
+
+    if (details.length) {
+      wrapper.setAttribute("role", "button");
+      wrapper.setAttribute("tabindex", "0");
+      wrapper.setAttribute("aria-expanded", "false");
+
+      const detailEl = document.createElement("div");
+      detailEl.className = "preferences-collection-details";
+      detailEl.style.display = "none";
+      details.forEach((line, index) => {
+        const row = document.createElement("div");
+        row.className =
+          index === 0
+            ? "preferences-collection-detail-primary"
+            : "preferences-collection-detail-meta";
+        row.textContent = line;
+        detailEl.appendChild(row);
+      });
+      wrapper.appendChild(detailEl);
+
+      const toggle = () => {
+        const expanded = wrapper.classList.toggle("expanded");
+        detailEl.style.display = expanded ? "block" : "none";
+        wrapper.setAttribute("aria-expanded", expanded ? "true" : "false");
+        playExpandSound(expanded);
+      };
+
+      wrapper.addEventListener("click", (event) => {
+        if (event.target.closest("button")) {
+          return;
+        }
+        playUiClick();
+        toggle();
+      });
+
+      wrapper.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          playUiClick();
+          toggle();
+        }
+      });
+    }
+
+    return wrapper;
   };
 
   const addItems = (listEl, items, emptyMessage) => {
@@ -336,6 +386,30 @@ function updatePreferencesPreview() {
     if (latestFavorite && Array.isArray(latestFavorite.genres) && latestFavorite.genres.length) {
       metaParts.push(latestFavorite.genres.slice(0, 2).join(" • "));
     }
+    const detailLines = [];
+    if (latestFavorite && latestFavorite.overview) {
+      detailLines.push(latestFavorite.overview);
+    }
+    const extraMeta = [];
+    if (latestFavorite && latestFavorite.year) {
+      extraMeta.push(`Year: ${latestFavorite.year}`);
+    }
+    if (
+      latestFavorite &&
+      typeof latestFavorite.rating === "number" &&
+      Number.isFinite(latestFavorite.rating)
+    ) {
+      extraMeta.push(`IMDb ${latestFavorite.rating.toFixed(1)}`);
+    }
+    if (latestFavorite && Array.isArray(latestFavorite.genres) && latestFavorite.genres.length) {
+      extraMeta.push(`Genres: ${latestFavorite.genres.join(", ")}`);
+    }
+    if (extraMeta.length) {
+      detailLines.push(extraMeta.join(" • "));
+    }
+    if (!detailLines.length) {
+      detailLines.push("No additional details saved yet.");
+    }
     collectionItems.push({
       title:
         latestFavorite && latestFavorite.title
@@ -343,7 +417,8 @@ function updatePreferencesPreview() {
           : "Latest favorite",
       meta: metaParts.join(" • "),
       poster: latestFavorite && latestFavorite.poster ? latestFavorite.poster : null,
-      icon: "♡"
+      icon: "♡",
+      details: detailLines
     });
   }
 
@@ -356,6 +431,27 @@ function updatePreferencesPreview() {
     if (latestWatched && Array.isArray(latestWatched.genres) && latestWatched.genres.length) {
       metaParts.push(latestWatched.genres.slice(0, 2).join(" • "));
     }
+    const detailLines = [];
+    const watchedMeta = [];
+    if (latestWatched && latestWatched.year) {
+      watchedMeta.push(`Year: ${latestWatched.year}`);
+    }
+    if (
+      latestWatched &&
+      typeof latestWatched.rating === "number" &&
+      Number.isFinite(latestWatched.rating)
+    ) {
+      watchedMeta.push(`IMDb ${latestWatched.rating.toFixed(1)}`);
+    }
+    if (latestWatched && Array.isArray(latestWatched.genres) && latestWatched.genres.length) {
+      watchedMeta.push(`Genres: ${latestWatched.genres.join(", ")}`);
+    }
+    if (watchedMeta.length) {
+      detailLines.push(watchedMeta.join(" • "));
+    }
+    if (!detailLines.length) {
+      detailLines.push("Recently marked as watched.");
+    }
     collectionItems.push({
       title:
         latestWatched && latestWatched.title
@@ -363,7 +459,8 @@ function updatePreferencesPreview() {
           : "Latest watched",
       meta: metaParts.join(" • "),
       poster: latestWatched && latestWatched.poster ? latestWatched.poster : null,
-      icon: "👁️"
+      icon: "👁️",
+      details: detailLines
     });
   }
 
@@ -792,6 +889,10 @@ function handleToggleFavorite(payload) {
   const genres = omdbMovie && omdbMovie.Genre
     ? omdbMovie.Genre.split(",").map((genre) => genre.trim()).filter(Boolean)
     : [];
+  const rating =
+    omdbMovie && omdbMovie.imdbRating && omdbMovie.imdbRating !== "N/A"
+      ? parseFloat(omdbMovie.imdbRating)
+      : null;
 
   state.favorites.push({
     imdbID,
@@ -803,7 +904,8 @@ function handleToggleFavorite(payload) {
     overview:
       (tmdbMovie && tmdbMovie.overview) ||
       (omdbMovie && omdbMovie.Plot && omdbMovie.Plot !== "N/A" ? omdbMovie.Plot : ""),
-    genres
+    genres,
+    rating
   });
 
   refreshFavoritesUi();
@@ -1088,7 +1190,13 @@ function applyFavoritesList(favorites) {
           ? entry.genres
               .map((genre) => (typeof genre === "string" ? genre : ""))
               .filter(Boolean)
-          : []
+          : [],
+        rating:
+          typeof entry.rating === "number"
+            ? entry.rating
+            : typeof entry.rating === "string" && entry.rating.trim() !== ""
+            ? Number(entry.rating)
+            : null
       };
     })
     .filter(Boolean);
