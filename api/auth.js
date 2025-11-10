@@ -171,10 +171,14 @@ async function sessionInfo(req, payload) {
 async function syncPreferences(req, payload) {
   const { sessionRecord, userRecord } = await authenticate(req, payload);
   const preferences = sanitizePreferences(payload.preferences);
+  const mergedPreferences = mergePreferencesSnapshot(
+    userRecord.preferencesSnapshot,
+    preferences
+  );
 
   const now = new Date().toISOString();
   const updatedUserRow = await updateUserRow(userRecord.username, {
-    preferences_snapshot: preferences,
+    preferences_snapshot: mergedPreferences,
     last_preferences_sync: now
   });
   const updatedSessionRow = await updateSessionRow(sessionRecord.token, {
@@ -186,7 +190,7 @@ async function syncPreferences(req, payload) {
     ? mapUserRow(updatedUserRow)
     : {
         ...userRecord,
-        preferencesSnapshot: preferences,
+        preferencesSnapshot: mergedPreferences,
         lastPreferencesSync: now
       };
   const refreshedSession = updatedSessionRow
@@ -676,6 +680,14 @@ function validatePassword(password) {
 }
 
 function mapUserRow(row) {
+  const preferencesSnapshot =
+    row && typeof row.preferences_snapshot === "object" && row.preferences_snapshot !== null
+      ? row.preferences_snapshot
+      : null;
+  const avatarFromColumn =
+    typeof row.avatar_url === "string" && row.avatar_url.trim() ? row.avatar_url.trim() : null;
+  const avatarFromPreferences = extractAvatarFromPreferences(preferencesSnapshot);
+
   return {
     username: row.username,
     displayName: row.display_name,
@@ -687,7 +699,7 @@ function mapUserRow(row) {
     lastPreferencesSync: row.last_preferences_sync,
     lastWatchedSync: row.last_watched_sync,
     lastFavoritesSync: row.last_favorites_sync,
-    preferencesSnapshot: row.preferences_snapshot || null,
+    preferencesSnapshot,
     watchedHistory: Array.isArray(row.watched_history) ? row.watched_history : [],
     favoritesList: Array.isArray(row.favorites_list) ? row.favorites_list : []
   };
