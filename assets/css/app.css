@@ -819,6 +819,16 @@
       gap: 1.1rem;
     }
 
+    .recommendations-actions {
+      display: none;
+      justify-content: center;
+      margin-top: 1rem;
+    }
+
+    #showMoreRecsBtn {
+      display: none;
+    }
+
     @media (min-width: 720px) {
       .recommendations-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1557,6 +1567,7 @@
       align-items: center;
       justify-content: center;
       font-size: 1.2rem;
+      position: relative;
     }
 
     .favorite-poster-placeholder {
@@ -1629,76 +1640,45 @@
       margin-top: 0.65rem;
     }
 
-    .watched-card {
-      display: grid;
-      grid-template-columns: 60px minmax(0, 1fr) auto;
-      gap: 0.55rem;
+    .watched-chip {
+      position: relative;
+    }
+
+    .watched-chip .favorite-poster {
+      background: linear-gradient(160deg, rgba(15, 118, 110, 0.35), rgba(15, 23, 42, 0.92));
+      border: 1px solid rgba(45, 212, 191, 0.25);
+    }
+
+    .watched-chip .favorite-poster-placeholder {
+      color: rgba(148, 163, 184, 0.85);
+    }
+
+    .watched-chip .watched-badge {
+      position: absolute;
+      right: 4px;
+      bottom: 4px;
+      display: inline-flex;
       align-items: center;
-      padding: 0.45rem 0.6rem;
-      border-radius: var(--radius-md);
-      background: rgba(15, 23, 42, 0.92);
-      border: 1px solid rgba(148, 163, 184, 0.25);
-      transition: transform var(--transition-fast), box-shadow var(--transition-fast);
-    }
-
-    .watched-poster {
-      width: 60px;
-      height: 60px;
-      border-radius: 12px;
-      background: linear-gradient(160deg, rgba(22, 163, 74, 0.55), rgba(15, 118, 110, 0.45));
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.4rem;
-      color: #bbf7d0;
-      box-shadow: inset 0 0 0 1px rgba(21, 128, 61, 0.4);
-    }
-
-    .watched-poster-icon {
-      filter: drop-shadow(0 4px 10px rgba(21, 128, 61, 0.45));
-    }
-
-    .watched-body {
-      display: flex;
-      flex-direction: column;
       gap: 0.25rem;
-      min-width: 0;
-    }
-
-    .watched-title {
-      font-size: 0.85rem;
-      color: var(--text-main);
+      font-size: 0.65rem;
       font-weight: 600;
+      color: #f8fafc;
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.95), rgba(16, 185, 129, 0.85));
+      border-radius: 999px;
+      padding: 0.1rem 0.45rem;
+      box-shadow: 0 8px 18px rgba(16, 185, 129, 0.4);
     }
 
-    .watched-meta {
-      font-size: 0.72rem;
+    .watched-chip .watched-badge span[aria-hidden="true"] {
+      font-size: 0.7rem;
+    }
+
+    .watched-chip .favorite-genres {
       color: var(--text-subtle);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
 
     .watched-remove {
-      border: none;
-      background: rgba(148, 163, 184, 0.2);
-      color: rgba(226, 232, 240, 0.9);
-      border-radius: 50%;
-      width: 28px;
-      height: 28px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.85rem;
-      cursor: pointer;
-      transition: background-color var(--transition-fast), transform 120ms ease-out;
-    }
-
-    .watched-remove:hover,
-    .watched-remove:focus-visible {
-      background: rgba(248, 113, 113, 0.4);
-      transform: translateY(-1px);
-      outline: none;
+      margin-left: auto;
     }
 
     .empty-state {
