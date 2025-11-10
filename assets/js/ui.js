@@ -547,7 +547,45 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites,
 
   const plotEl = document.createElement("div");
   plotEl.className = "movie-plot";
-  plotEl.textContent = plot;
+  const plotText = document.createElement("p");
+  plotText.className = "movie-plot-text";
+  plotText.textContent = plot;
+  plotEl.appendChild(plotText);
+
+  if (typeof plot === "string" && plot.trim().length > 220) {
+    plotEl.classList.add("is-collapsible", "is-collapsed");
+
+    const toggleBtn = document.createElement("button");
+    toggleBtn.type = "button";
+    toggleBtn.className = "movie-plot-toggle";
+    toggleBtn.innerHTML =
+      '<span class="label">Read more</span><span class="icon" aria-hidden="true">▾</span>';
+    toggleBtn.setAttribute("aria-expanded", "false");
+
+    const setExpanded = (expanded) => {
+      plotEl.classList.toggle("is-expanded", expanded);
+      plotEl.classList.toggle("is-collapsed", !expanded);
+      toggleBtn.setAttribute("aria-expanded", expanded ? "true" : "false");
+      const label = toggleBtn.querySelector(".label");
+      if (label) {
+        label.textContent = expanded ? "Show less" : "Read more";
+      }
+      const icon = toggleBtn.querySelector(".icon");
+      if (icon) {
+        icon.textContent = expanded ? "▴" : "▾";
+      }
+    };
+
+    toggleBtn.addEventListener("click", () => {
+      const expanded = !plotEl.classList.contains("is-expanded");
+      playUiClick();
+      setExpanded(expanded);
+      playExpandSound(expanded);
+    });
+
+    setExpanded(false);
+    plotEl.appendChild(toggleBtn);
+  }
 
   const actions = document.createElement("div");
   actions.className = "movie-actions";
@@ -560,7 +598,7 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites,
     imdbID ? movie.imdbID === imdbID : movie.title === title
   );
   if (watchedMatch) {
-    markButtonAsWatched(watchedBtn, title, watchedStateIcon);
+    markButtonAsWatched(watchedBtn, title, watchedStateIcon, { animate: false });
   } else {
     watchedBtn.setAttribute("aria-pressed", "false");
     watchedBtn.setAttribute("aria-label", `Mark ${title} as watched`);
@@ -573,7 +611,7 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites,
     }
     const added = handlers.onMarkWatched ? handlers.onMarkWatched(omdb) : true;
     if (added) {
-      markButtonAsWatched(watchedBtn, title, watchedStateIcon);
+      markButtonAsWatched(watchedBtn, title, watchedStateIcon, { animate: true });
     }
     return added;
   };
@@ -620,7 +658,7 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites,
       isFavorite: currentlyFavorite
     });
     if (typeof nowFavorite === "boolean") {
-      setFavoriteState(favoriteBtn, nowFavorite, favoriteStateIcon, title);
+      setFavoriteState(favoriteBtn, nowFavorite, favoriteStateIcon, title, { animate: true });
       playFavoriteSound(nowFavorite);
     }
   };
@@ -743,7 +781,7 @@ function formatReasons(reasons) {
   return topTwo.join(" • ");
 }
 
-function markButtonAsWatched(btn, title, watchedIcon) {
+function markButtonAsWatched(btn, title, watchedIcon, options = {}) {
   btn.classList.add("watched");
   btn.setAttribute("aria-pressed", "true");
   btn.setAttribute("aria-label", `Marked ${title} as watched`);
@@ -756,9 +794,12 @@ function markButtonAsWatched(btn, title, watchedIcon) {
   btn.appendChild(icon);
   btn.appendChild(text);
   applyWatchedIconState(watchedIcon, true, title);
+  if (options.animate) {
+    triggerStateIconPulse(watchedIcon);
+  }
 }
 
-function setFavoriteState(btn, isFavorite, favoriteIcon, title) {
+function setFavoriteState(btn, isFavorite, favoriteIcon, title, options = {}) {
   if (isFavorite) {
     btn.classList.add("favorited");
     btn.setAttribute("aria-pressed", "true");
@@ -769,6 +810,9 @@ function setFavoriteState(btn, isFavorite, favoriteIcon, title) {
     btn.setAttribute("aria-pressed", "false");
     btn.innerHTML = `<span class="favorite-btn-icon">♡</span><span>Save to favorites</span>`;
     applyFavoriteIconState(favoriteIcon, false, title);
+  }
+  if (options.animate) {
+    triggerStateIconPulse(favoriteIcon);
   }
 }
 
@@ -804,4 +848,22 @@ function applyFavoriteIconState(iconEl, isFavorite, title) {
       isFavorite ? `${title} saved to favorites` : `Save ${title} to favorites`
     );
   }
+}
+
+function triggerStateIconPulse(iconEl) {
+  if (!iconEl) {
+    return;
+  }
+  iconEl.classList.remove("state-icon-pulse");
+  // force reflow so animation can restart
+  // eslint-disable-next-line no-unused-expressions
+  iconEl.offsetWidth;
+  iconEl.classList.add("state-icon-pulse");
+  iconEl.addEventListener(
+    "animationend",
+    () => {
+      iconEl.classList.remove("state-icon-pulse");
+    },
+    { once: true }
+  );
 }
