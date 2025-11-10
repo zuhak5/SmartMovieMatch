@@ -951,6 +951,7 @@ function hydrateFromSession(session) {
     lastWatchedSync: session.lastWatchedSync || null,
     lastFavoritesSync: session.lastFavoritesSync || null
   };
+  updateCountValueLabel();
 }
 
 
