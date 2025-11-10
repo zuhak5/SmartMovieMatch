@@ -103,6 +103,7 @@ async function signup(payload) {
     display_name: preferredDisplayName,
     password_hash: passwordHash,
     salt,
+    avatar_url: null,
     created_at: now,
     last_login_at: now,
     last_preferences_sync: null,
@@ -300,8 +301,6 @@ async function updateProfile(req, payload) {
 
   const updates = {};
   let modified = false;
-  let nextPreferencesSnapshot = clonePreferencesSnapshot(userRecord.preferencesSnapshot);
-  let nextAvatarUrl = userRecord.avatarUrl;
 
   if (profile.displayName !== undefined) {
     const name = sanitizeDisplayName(profile.displayName);
@@ -324,22 +323,8 @@ async function updateProfile(req, payload) {
 
   if (profile.avatar !== undefined) {
     const avatar = sanitizeAvatar(profile.avatar);
-    const { snapshot, changed } = applyAvatarToPreferences(
-      userRecord.preferencesSnapshot,
-      avatar
-    );
-    nextPreferencesSnapshot = snapshot;
-    if (changed) {
-      updates.preferences_snapshot = snapshot;
-      modified = true;
-    }
-    if (typeof avatar === "string") {
-      nextAvatarUrl = avatar;
-    } else if (avatar === null) {
-      nextAvatarUrl = null;
-    } else {
-      nextAvatarUrl = extractAvatarFromPreferences(snapshot);
-    }
+    updates.avatar_url = avatar;
+    modified = true;
   }
 
   if (!modified) {
@@ -367,11 +352,8 @@ async function updateProfile(req, payload) {
         passwordHash:
           updates.password_hash !== undefined ? updates.password_hash : userRecord.passwordHash,
         salt: updates.salt !== undefined ? updates.salt : userRecord.salt,
-        avatarUrl: nextAvatarUrl,
-        preferencesSnapshot:
-          updates.preferences_snapshot !== undefined
-            ? updates.preferences_snapshot
-            : nextPreferencesSnapshot
+        avatarUrl:
+          updates.avatar_url !== undefined ? updates.avatar_url : userRecord.avatarUrl
       };
 
   const refreshedSession = updatedSessionRow
@@ -709,119 +691,6 @@ function sanitizeAvatar(value) {
   return trimmed;
 }
 
-function extractAvatarFromPreferences(snapshot) {
-  if (!snapshot || typeof snapshot !== "object") {
-    return null;
-  }
-  const profile = snapshot.profile;
-  if (!profile || typeof profile !== "object") {
-    return null;
-  }
-  const avatar = profile.avatarUrl;
-  if (typeof avatar === "string") {
-    const trimmed = avatar.trim();
-    return trimmed ? trimmed : null;
-  }
-  return null;
-}
-
-function clonePreferencesSnapshot(snapshot) {
-  if (!snapshot || typeof snapshot !== "object") {
-    return null;
-  }
-  try {
-    return JSON.parse(JSON.stringify(snapshot));
-  } catch (error) {
-    if (Array.isArray(snapshot)) {
-      return snapshot.slice();
-    }
-    return { ...snapshot };
-  }
-}
-
-function applyAvatarToPreferences(currentSnapshot, avatar) {
-  const original = clonePreferencesSnapshot(currentSnapshot);
-  if (avatar === undefined) {
-    return { snapshot: original, changed: false };
-  }
-
-  let next = clonePreferencesSnapshot(currentSnapshot);
-  if (!next) {
-    next = {};
-  }
-
-  if (avatar === null) {
-    if (next.profile && typeof next.profile === "object") {
-      delete next.profile.avatarUrl;
-    }
-  } else {
-    if (!next.profile || typeof next.profile !== "object") {
-      next.profile = {};
-    }
-    next.profile.avatarUrl = avatar;
-  }
-
-  if (next.profile && typeof next.profile === "object" && !hasSnapshotContent(next.profile)) {
-    delete next.profile;
-  }
-
-  if (!hasSnapshotContent(next)) {
-    next = null;
-  }
-
-  const changed = !snapshotsEqual(original, next);
-  return { snapshot: next, changed };
-}
-
-function mergePreferencesSnapshot(currentSnapshot, incomingSnapshot) {
-  const current = clonePreferencesSnapshot(currentSnapshot);
-  const incoming = clonePreferencesSnapshot(incomingSnapshot);
-  const currentAvatar = extractAvatarFromPreferences(current);
-
-  let next = incoming;
-
-  if (currentAvatar) {
-    if (!next) {
-      next = { profile: { avatarUrl: currentAvatar } };
-    } else {
-      if (!next.profile || typeof next.profile !== "object") {
-        next.profile = {};
-      }
-      if (next.profile.avatarUrl === undefined) {
-        next.profile.avatarUrl = currentAvatar;
-      }
-    }
-  }
-
-  if (next && next.profile && typeof next.profile === "object" && !hasSnapshotContent(next.profile)) {
-    delete next.profile;
-  }
-
-  if (next && !hasSnapshotContent(next)) {
-    next = null;
-  }
-
-  return next;
-}
-
-function hasSnapshotContent(value) {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-  if (Array.isArray(value)) {
-    return value.length > 0;
-  }
-  return Object.keys(value).length > 0;
-}
-
-function snapshotsEqual(a, b) {
-  try {
-    return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
-  } catch (error) {
-    return a === b;
-  }
-}
-
 function canonicalUsername(username) {
   return sanitizeUsername(username).toLowerCase();
 }
@@ -856,7 +725,7 @@ function mapUserRow(row) {
     passwordHash: row.password_hash,
     salt: row.salt,
     createdAt: row.created_at,
-    avatarUrl: avatarFromColumn || avatarFromPreferences || null,
+    avatarUrl: row.avatar_url || null,
     lastLoginAt: row.last_login_at,
     lastPreferencesSync: row.last_preferences_sync,
     lastWatchedSync: row.last_watched_sync,
