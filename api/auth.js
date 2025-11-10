@@ -72,6 +72,8 @@ async function handleAction(action, req, payload) {
       return syncFavorites(req, payload);
     case "logout":
       return logout(req, payload);
+    case "updateProfile":
+      return updateProfile(req, payload);
     default:
       throw new HttpError(400, "Unsupported action");
   }
@@ -101,6 +103,7 @@ async function signup(payload) {
     display_name: preferredDisplayName,
     password_hash: passwordHash,
     salt,
+    avatar_url: null,
     created_at: now,
     last_login_at: now,
     last_preferences_sync: null,
@@ -286,6 +289,79 @@ async function logout(req, payload) {
 
   await deleteSessionByToken(token);
   return { body: { ok: true } };
+}
+
+async function updateProfile(req, payload) {
+  const { sessionRecord, userRecord } = await authenticate(req, payload);
+  const profile = payload && typeof payload.profile === "object" ? payload.profile : {};
+
+  const updates = {};
+  let modified = false;
+
+  if (profile.displayName !== undefined) {
+    const name = sanitizeDisplayName(profile.displayName);
+    if (name.length < 2) {
+      throw new HttpError(400, "Names need at least 2 characters after trimming.");
+    }
+    updates.display_name = name;
+    modified = true;
+  }
+
+  if (profile.password !== undefined) {
+    const password = typeof profile.password === "string" ? profile.password : "";
+    validatePassword(password);
+    const salt = crypto.randomBytes(16).toString("hex");
+    const passwordHash = hashPassword(password, salt);
+    updates.password_hash = passwordHash;
+    updates.salt = salt;
+    modified = true;
+  }
+
+  if (profile.avatar !== undefined) {
+    const avatar = sanitizeAvatar(profile.avatar);
+    updates.avatar_url = avatar;
+    modified = true;
+  }
+
+  if (!modified) {
+    return {
+      body: {
+        ok: true,
+        session: toSessionResponse(userRecord, sessionRecord)
+      }
+    };
+  }
+
+  const now = new Date().toISOString();
+
+  const updatedUserRow = await updateUserRow(userRecord.username, updates);
+  const updatedSessionRow = await updateSessionRow(sessionRecord.token, {
+    last_active_at: now
+  });
+
+  const refreshedUser = updatedUserRow
+    ? mapUserRow(updatedUserRow)
+    : {
+        ...userRecord,
+        displayName:
+          updates.display_name !== undefined ? updates.display_name : userRecord.displayName,
+        passwordHash:
+          updates.password_hash !== undefined ? updates.password_hash : userRecord.passwordHash,
+        salt: updates.salt !== undefined ? updates.salt : userRecord.salt,
+        avatarUrl:
+          updates.avatar_url !== undefined ? updates.avatar_url : userRecord.avatarUrl
+      };
+
+  const refreshedSession = updatedSessionRow
+    ? mapSessionRow(updatedSessionRow)
+    : { ...sessionRecord, lastActiveAt: now };
+
+  return {
+    body: {
+      ok: true,
+      session: toSessionResponse(refreshedUser, refreshedSession)
+    }
+  };
 }
 
 async function authenticate(req, payload) {
@@ -553,6 +629,33 @@ function sanitizeDisplayName(name) {
   return name.trim().slice(0, 120);
 }
 
+function sanitizeAvatar(value) {
+  if (value === null) {
+    return null;
+  }
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "string") {
+    throw new HttpError(400, "Profile pictures must be provided as a string.");
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (trimmed.length > 250000) {
+    throw new HttpError(400, "Profile pictures are too large. Choose a smaller image.");
+  }
+  if (
+    !trimmed.startsWith("data:image/") &&
+    !trimmed.startsWith("https://") &&
+    !trimmed.startsWith("http://")
+  ) {
+    throw new HttpError(400, "Profile pictures must be a data URL or an absolute image URL.");
+  }
+  return trimmed;
+}
+
 function canonicalUsername(username) {
   return sanitizeUsername(username).toLowerCase();
 }
@@ -566,6 +669,12 @@ function validateCredentials(username, password) {
   }
 }
 
+function validatePassword(password) {
+  if (!password || password.length < 6) {
+    throw new HttpError(400, "Passwords must include 6 or more characters.");
+  }
+}
+
 function mapUserRow(row) {
   return {
     username: row.username,
@@ -573,6 +682,7 @@ function mapUserRow(row) {
     passwordHash: row.password_hash,
     salt: row.salt,
     createdAt: row.created_at,
+    avatarUrl: row.avatar_url || null,
     lastLoginAt: row.last_login_at,
     lastPreferencesSync: row.last_preferences_sync,
     lastWatchedSync: row.last_watched_sync,
@@ -597,10 +707,16 @@ function mapSessionRow(row) {
 
 function toSessionResponse(userRecord, sessionRecord) {
   const displayName = userRecord.displayName || userRecord.username;
+  const profileName =
+    typeof userRecord.displayName === "string" && userRecord.displayName.trim()
+      ? userRecord.displayName.trim()
+      : null;
   return {
     token: sessionRecord.token,
     username: userRecord.username,
     displayName,
+    profileName,
+    avatarUrl: userRecord.avatarUrl || null,
     createdAt: userRecord.createdAt,
     lastLoginAt: userRecord.lastLoginAt || null,
     lastPreferencesSync: userRecord.lastPreferencesSync || null,
