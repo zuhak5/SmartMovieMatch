@@ -26,16 +26,13 @@ function throwIfAborted(signal) {
 }
 
 export async function discoverCandidateMovies(
-  { selectedGenres, mood, moodIntensity, favoriteTitles, seed },
+  { selectedGenres, favoriteTitles, seed },
   { signal } = {}
 ) {
   const candidateMap = new Map();
 
   const fetchOptions = { signal };
 
-  const intensity =
-    typeof moodIntensity === "number" ? Math.min(2, Math.max(0, moodIntensity)) : 1;
-  const intensityMultiplier = intensity === 2 ? 1.35 : intensity === 0 ? 0.75 : 1;
   const favorites = Array.isArray(favoriteTitles)
     ? favoriteTitles
         .map((title) => (typeof title === "string" ? title.trim() : ""))
@@ -49,7 +46,6 @@ export async function discoverCandidateMovies(
     }
     const weightMultiplier =
       typeof opts.weightMultiplier === "number" ? opts.weightMultiplier : 1;
-    const moodBias = typeof opts.moodBias === "number" ? opts.moodBias : 0;
     const reason = opts.reason;
 
     results.forEach((movie) => {
@@ -81,8 +77,6 @@ export async function discoverCandidateMovies(
         score += overlap.length * 4.2;
       }
 
-      score += moodBias * intensityMultiplier;
-
       if (voteCount) {
         score += Math.log10(1 + voteCount) * 1.5;
       }
@@ -96,7 +90,7 @@ export async function discoverCandidateMovies(
         }
       }
 
-      existing.score += score * weightMultiplier * intensityMultiplier;
+      existing.score += score * weightMultiplier;
 
       if (reason && !existing.reasons.includes(reason)) {
         existing.reasons.push(reason);
@@ -107,35 +101,11 @@ export async function discoverCandidateMovies(
   }
 
   const genreList = [...selectedGenres];
-  const moodGenresLight = ["35", "10751", "16", "10749"];
-  const moodGenresDark = ["27", "53", "80", "18"];
-
-  if (mood === "light") {
-    moodGenresLight.forEach((genre) => {
-      if (!genreList.includes(genre)) {
-        genreList.push(genre);
-      }
-    });
-  } else if (mood === "dark") {
-    moodGenresDark.forEach((genre) => {
-      if (!genreList.includes(genre)) {
-        genreList.push(genre);
-      }
-    });
-  }
 
   const discoverParams = {
     sort_by: "popularity.desc",
     "vote_count.gte": "150"
   };
-
-  if (intensity === 2) {
-    discoverParams.sort_by = "vote_average.desc";
-    discoverParams["vote_average.gte"] = "6.5";
-  } else if (intensity === 0) {
-    discoverParams.sort_by = "release_date.desc";
-    discoverParams["vote_average.lte"] = "7.5";
-  }
 
   if (genreList.length) {
     discoverParams.with_genres = genreList.join(",");
@@ -151,7 +121,6 @@ export async function discoverCandidateMovies(
     if (data && Array.isArray(data.results)) {
       addCandidatesFromResults(data.results, {
         weightMultiplier: 1,
-        moodBias: mood === "light" ? 2 : mood === "dark" ? 2 : 0.5,
         reason: genreList.length
           ? "Popular in your chosen genres"
           : "Popular worldwide this week"
@@ -192,7 +161,6 @@ export async function discoverCandidateMovies(
 
       addCandidatesFromResults(data.results, {
         weightMultiplier: 1.4,
-        moodBias: mood === "light" ? 1.2 : mood === "dark" ? 1.2 : 0.6,
         reason: `Because "${chunk}" is in your favorites`
       });
 
@@ -215,7 +183,6 @@ export async function discoverCandidateMovies(
             if (recommendations && Array.isArray(recommendations.results)) {
               addCandidatesFromResults(recommendations.results, {
                 weightMultiplier: 1.25,
-                moodBias: mood === "light" ? 1.1 : mood === "dark" ? 1.2 : 0.6,
                 reason: `Fans of "${referenceTitle}" also enjoyed`
               });
             }
@@ -243,8 +210,7 @@ export async function discoverCandidateMovies(
             if (similar && Array.isArray(similar.results)) {
               addCandidatesFromResults(similar.results, {
                 weightMultiplier: 1.1,
-                moodBias: mood === "light" ? 0.9 : mood === "dark" ? 1.25 : 0.5,
-                reason: `Similar energy to "${referenceTitle}"`
+                reason: `Similar picks to "${referenceTitle}"`
               });
             }
           } catch (error) {
@@ -269,7 +235,6 @@ export async function discoverCandidateMovies(
       if (data && Array.isArray(data.results)) {
         addCandidatesFromResults(data.results, {
           weightMultiplier: 0.9,
-          moodBias: mood === "light" || mood === "dark" ? 0.6 : 0.3,
           reason: "Trending this week"
         });
       }
@@ -286,7 +251,6 @@ export async function discoverCandidateMovies(
 
 export function scoreAndSelectCandidates(candidates, opts, watchedMovies) {
   const selectedGenres = opts.selectedGenres || [];
-  const mood = opts.mood || "any";
   const favoriteTitles = Array.isArray(opts.favoriteTitles) ? opts.favoriteTitles : [];
   const favoriteSet = new Set(
     favoriteTitles
@@ -379,20 +343,6 @@ export function scoreAndSelectCandidates(candidates, opts, watchedMovies) {
         );
         if (overlaps.length) {
           addReason("Matches your selected genres");
-        }
-      }
-
-      if (mood === "light") {
-        const lightGenres = ["Comedy", "Family", "Animation", "Romance"];
-        if (genreNames.some((genre) => lightGenres.includes(genre))) {
-          personalizationBoost += 1.6;
-          addReason("Fits today’s feel-good vibe");
-        }
-      } else if (mood === "dark") {
-        const darkGenres = ["Thriller", "Horror", "Crime", "Drama"];
-        if (genreNames.some((genre) => darkGenres.includes(genre))) {
-          personalizationBoost += 1.6;
-          addReason("Taps into your intense mood");
         }
       }
 
