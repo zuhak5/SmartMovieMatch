@@ -10,6 +10,49 @@ const ytCache = new Map();
 
 const ABORT_ERROR_NAME = "AbortError";
 
+function createFallbackOmdbFromTmdb(movie) {
+  if (!movie) {
+    return null;
+  }
+
+  const title = movie.title || movie.original_title || "";
+  if (!title) {
+    return null;
+  }
+
+  const year = movie.release_date && movie.release_date.length >= 4
+    ? movie.release_date.slice(0, 4)
+    : "";
+
+  const genres = Array.isArray(movie.genre_ids)
+    ? movie.genre_ids
+        .map((id) => TMDB_GENRES[id] || "")
+        .filter((name) => name && name.length > 0)
+    : [];
+
+  const poster = movie.poster_path
+    ? `https://image.tmdb.org/t/p/w342${movie.poster_path}`
+    : "N/A";
+
+  const plot = typeof movie.overview === "string" && movie.overview.trim().length
+    ? movie.overview.trim()
+    : "No plot summary available from TMDB.";
+
+  return {
+    Title: title,
+    Year: year,
+    imdbID: "",
+    Type: "movie",
+    Poster: poster,
+    Plot: plot,
+    Genre: genres.join(", "),
+    imdbRating: "N/A",
+    Ratings: [],
+    Response: "True",
+    __source: "tmdb-fallback"
+  };
+}
+
 function isAbortError(error) {
   return (
     !!error &&
@@ -512,25 +555,37 @@ export async function fetchOmdbForCandidates(entries, { signal } = {}) {
       };
     }
 
+    let data = null;
     try {
-      const data = await fetchFromOmdb({ t: title, y: year }, fetchOptions);
-      if (!data || data.Response === "False") {
-        return null;
-      }
-      omdbCache.set(cacheKey, data);
-      return {
-        candidate: movie,
-        tmdb: movie,
-        omdb: data,
-        reasons
-      };
+      data = await fetchFromOmdb({ t: title, y: year }, fetchOptions);
     } catch (error) {
       if (isAbortError(error)) {
         throw error;
       }
       console.warn("OMDb fetch error for", title, error);
-      return null;
     }
+
+    if (!data || data.Response === "False") {
+      const fallback = createFallbackOmdbFromTmdb(movie);
+      if (!fallback) {
+        return null;
+      }
+      omdbCache.set(cacheKey, fallback);
+      return {
+        candidate: movie,
+        tmdb: movie,
+        omdb: fallback,
+        reasons
+      };
+    }
+
+    omdbCache.set(cacheKey, data);
+    return {
+      candidate: movie,
+      tmdb: movie,
+      omdb: data,
+      reasons
+    };
   });
 
   try {
