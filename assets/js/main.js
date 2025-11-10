@@ -49,6 +49,153 @@ const state = {
   }
 };
 
+const GENRE_ICON_MAP = {
+  "28": "💥", // Action
+  "12": "🧭", // Adventure
+  "16": "🎨", // Animation
+  "18": "🎭", // Drama
+  "27": "👻", // Horror
+  "35": "😂", // Comedy
+  "53": "🔍", // Thriller
+  "80": "🕵️", // Crime
+  "878": "🚀", // Sci-Fi
+  "9648": "🧩", // Mystery
+  "10749": "❤️", // Romance
+  "10751": "👨‍👩‍👧", // Family
+};
+
+function getGenreIcon(genreId, label) {
+  if (genreId && GENRE_ICON_MAP[genreId]) {
+    return GENRE_ICON_MAP[genreId];
+  }
+  if (!label) {
+    return "🎬";
+  }
+  const normalized = label.trim().toLowerCase();
+  const fallback = {
+    action: "💥",
+    adventure: "🧭",
+    animation: "🎨",
+    comedy: "😂",
+    crime: "🕵️",
+    drama: "🎭",
+    family: "👨‍👩‍👧",
+    horror: "👻",
+    mystery: "🧩",
+    romance: "❤️",
+    "sci-fi": "🚀",
+    thriller: "🔍",
+  };
+  return fallback[normalized] || "🎬";
+}
+
+function ensureSnapshotExpandedFromItem(itemEl, event) {
+  if (!itemEl) {
+    return false;
+  }
+  const listEl = itemEl.closest(".preferences-collection-collapsible");
+  if (!listEl || listEl.dataset.expanded === "true") {
+    return false;
+  }
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  playUiClick();
+  if (typeof listEl.__toggleSnapshot === "function") {
+    listEl.__toggleSnapshot(true);
+  } else {
+    listEl.classList.add("expanded");
+    listEl.classList.remove("collapsed");
+    listEl.dataset.expanded = "true";
+  }
+  return true;
+}
+
+function finalizeCollectionsSnapshot(listEl) {
+  if (!listEl) {
+    return;
+  }
+  const items = Array.from(listEl.querySelectorAll(".preferences-collection-item"));
+  const extraItems = items.filter((item) => item.classList.contains("collection-item-extra"));
+  if (!extraItems.length) {
+    return;
+  }
+
+  listEl.classList.add("preferences-collection-collapsible", "collapsed");
+  listEl.dataset.collapsible = "true";
+  listEl.dataset.expanded = "false";
+  listEl.dataset.totalItems = String(items.length);
+
+  extraItems.forEach((item) => {
+    const currentTabIndex = item.getAttribute("tabindex");
+    item.dataset.snapshotTabindex = currentTabIndex === null ? "" : currentTabIndex;
+  });
+
+  const updateExtrasVisibility = (expanded) => {
+    extraItems.forEach((item) => {
+      if (expanded) {
+        const stored = item.dataset.snapshotTabindex;
+        if (stored === "") {
+          item.removeAttribute("tabindex");
+        } else {
+          item.setAttribute("tabindex", stored);
+        }
+        item.removeAttribute("aria-hidden");
+      } else {
+        item.setAttribute("tabindex", "-1");
+        item.setAttribute("aria-hidden", "true");
+      }
+    });
+  };
+
+  updateExtrasVisibility(false);
+
+  const toggleBtn = document.createElement("button");
+  toggleBtn.type = "button";
+  toggleBtn.className = "preferences-collection-toggle";
+  toggleBtn.innerHTML =
+    `<span class="toggle-label">Show all (${items.length})</span><span class="toggle-icon" aria-hidden="true">▾</span>`;
+  toggleBtn.setAttribute("aria-expanded", "false");
+  listEl.appendChild(toggleBtn);
+
+  const toggleList = (expand, options = {}) => {
+    const previous = listEl.dataset.expanded === "true";
+    const next = typeof expand === "boolean" ? expand : !previous;
+    if (next === previous) {
+      return next;
+    }
+    listEl.dataset.expanded = next ? "true" : "false";
+    listEl.classList.toggle("expanded", next);
+    listEl.classList.toggle("collapsed", !next);
+    toggleBtn.setAttribute("aria-expanded", next ? "true" : "false");
+    toggleBtn.classList.toggle("is-expanded", next);
+    const label = toggleBtn.querySelector(".toggle-label");
+    if (label) {
+      label.textContent = next ? "Show less" : `Show all (${items.length})`;
+    }
+    const icon = toggleBtn.querySelector(".toggle-icon");
+    if (icon) {
+      icon.textContent = next ? "▴" : "▾";
+    }
+    updateExtrasVisibility(next);
+    if (!options.silent) {
+      playExpandSound(next);
+    }
+    return next;
+  };
+
+  toggleBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    playUiClick();
+    toggleList();
+  });
+
+  // expose controller so list items can trigger expansion
+  // eslint-disable-next-line no-param-reassign
+  listEl.__toggleSnapshot = toggleList;
+}
+
 function getActiveDisplayName() {
   if (state.session) {
     if (state.session.displayName && state.session.displayName.trim()) {
@@ -218,18 +365,23 @@ function updatePreferencesPreview() {
   const selectedGenreInputs = Array.from(
     document.querySelectorAll('label.genre-pill input[name="genre"]:checked')
   );
-  const selectedGenreLabels = selectedGenreInputs
+  const selectedGenres = selectedGenreInputs
     .map((input) => {
       const genreId = input.value;
+      let labelText = "";
       if (genreId && TMDB_GENRES[genreId]) {
-        return TMDB_GENRES[genreId];
+        labelText = TMDB_GENRES[genreId];
+      } else {
+        const label = input.closest(".genre-pill");
+        if (label) {
+          const span = label.querySelector(".genre-pill-label");
+          labelText = span ? span.textContent.trim() : "";
+        }
       }
-      const label = input.closest(".genre-pill");
-      if (!label) {
-        return "";
+      if (!labelText) {
+        return null;
       }
-      const span = label.querySelector(".genre-pill-label");
-      return span ? span.textContent.trim() : "";
+      return { id: genreId, label: labelText };
     })
     .filter(Boolean);
 
@@ -262,6 +414,9 @@ function updatePreferencesPreview() {
 
     const wrapper = document.createElement("div");
     wrapper.className = "preferences-collection-item";
+    if (item.extra) {
+      wrapper.classList.add("collection-item-extra");
+    }
 
     const iconWrap = document.createElement("div");
     iconWrap.className = "preferences-collection-icon";
@@ -323,6 +478,9 @@ function updatePreferencesPreview() {
         if (event.target.closest("button")) {
           return;
         }
+        if (ensureSnapshotExpandedFromItem(wrapper, event)) {
+          return;
+        }
         playUiClick();
         toggle();
       });
@@ -330,6 +488,9 @@ function updatePreferencesPreview() {
       wrapper.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
+          if (ensureSnapshotExpandedFromItem(wrapper, event)) {
+            return;
+          }
           playUiClick();
           toggle();
         }
@@ -356,16 +517,16 @@ function updatePreferencesPreview() {
   const genreList = createList("Selected genres");
   const genreItems = [];
   const maxGenres = 4;
-  selectedGenreLabels.slice(0, maxGenres).forEach((label) => {
+  selectedGenres.slice(0, maxGenres).forEach((genre) => {
     genreItems.push({
-      title: label,
+      title: genre.label,
       meta: "Preferred genre",
-      icon: "🎭"
+      icon: getGenreIcon(genre.id, genre.label)
     });
   });
-  if (selectedGenreLabels.length > maxGenres) {
+  if (selectedGenres.length > maxGenres) {
     genreItems.push({
-      title: `+${selectedGenreLabels.length - maxGenres} more`,
+      title: `+${selectedGenres.length - maxGenres} more`,
       meta: "Additional genres selected",
       icon: "➕"
     });
@@ -381,86 +542,110 @@ function updatePreferencesPreview() {
   const collectionItems = [];
 
   if (state.favorites.length) {
-    const latestFavorite = state.favorites[state.favorites.length - 1];
-    const metaParts = [`${state.favorites.length} saved`];
-    if (latestFavorite && Array.isArray(latestFavorite.genres) && latestFavorite.genres.length) {
-      metaParts.push(latestFavorite.genres.slice(0, 2).join(" • "));
-    }
-    const detailLines = [];
-    if (latestFavorite && latestFavorite.overview) {
-      detailLines.push(latestFavorite.overview);
-    }
-    const extraMeta = [];
-    if (latestFavorite && latestFavorite.year) {
-      extraMeta.push(`Year: ${latestFavorite.year}`);
-    }
-    if (
-      latestFavorite &&
-      typeof latestFavorite.rating === "number" &&
-      Number.isFinite(latestFavorite.rating)
-    ) {
-      extraMeta.push(`IMDb ${latestFavorite.rating.toFixed(1)}`);
-    }
-    if (latestFavorite && Array.isArray(latestFavorite.genres) && latestFavorite.genres.length) {
-      extraMeta.push(`Genres: ${latestFavorite.genres.join(", ")}`);
-    }
-    if (extraMeta.length) {
-      detailLines.push(extraMeta.join(" • "));
-    }
-    if (!detailLines.length) {
-      detailLines.push("No additional details saved yet.");
-    }
-    collectionItems.push({
-      title:
-        latestFavorite && latestFavorite.title
-          ? latestFavorite.title
-          : "Latest favorite",
-      meta: metaParts.join(" • "),
-      poster: latestFavorite && latestFavorite.poster ? latestFavorite.poster : null,
-      icon: "♡",
-      details: detailLines
+    const favoritesSnapshot = state.favorites.slice(-5).reverse();
+    favoritesSnapshot.forEach((favorite, index) => {
+      if (!favorite) {
+        return;
+      }
+      const metaParts = [];
+      if (index === 0) {
+        metaParts.push(`${state.favorites.length} saved`);
+      } else {
+        metaParts.push("Saved favorite");
+      }
+      if (favorite.year) {
+        metaParts.push(favorite.year);
+      }
+      if (Array.isArray(favorite.genres) && favorite.genres.length) {
+        metaParts.push(favorite.genres.slice(0, 2).join(" • "));
+      }
+      if (typeof favorite.rating === "number" && Number.isFinite(favorite.rating)) {
+        metaParts.push(`IMDb ${favorite.rating.toFixed(1)}`);
+      }
+
+      const detailLines = [];
+      if (favorite.overview) {
+        detailLines.push(favorite.overview);
+      }
+      const extraMeta = [];
+      if (favorite.year) {
+        extraMeta.push(`Year: ${favorite.year}`);
+      }
+      if (Array.isArray(favorite.genres) && favorite.genres.length) {
+        extraMeta.push(`Genres: ${favorite.genres.join(", ")}`);
+      }
+      if (typeof favorite.rating === "number" && Number.isFinite(favorite.rating)) {
+        extraMeta.push(`IMDb ${favorite.rating.toFixed(1)}`);
+      }
+      if (extraMeta.length) {
+        detailLines.push(extraMeta.join(" • "));
+      }
+      if (index === 0 && state.favorites.length > favoritesSnapshot.length) {
+        detailLines.push(`+${state.favorites.length - favoritesSnapshot.length} more favorites tracked`);
+      }
+      if (!detailLines.length) {
+        detailLines.push("Saved to favorites for later.");
+      }
+
+      collectionItems.push({
+        title: favorite.title ? favorite.title : index === 0 ? "Latest favorite" : "Favorite pick",
+        meta: metaParts.join(" • ") || "Favorite pick",
+        poster: favorite.poster ? favorite.poster : null,
+        icon: "♡",
+        details: detailLines,
+        extra: index > 0
+      });
     });
   }
 
   if (state.watchedMovies.length) {
-    const latestWatched = state.watchedMovies[state.watchedMovies.length - 1];
-    const metaParts = [`${state.watchedMovies.length} logged`];
-    if (latestWatched && typeof latestWatched.rating === "number") {
-      metaParts.push(`IMDb ${latestWatched.rating.toFixed(1)}`);
-    }
-    if (latestWatched && Array.isArray(latestWatched.genres) && latestWatched.genres.length) {
-      metaParts.push(latestWatched.genres.slice(0, 2).join(" • "));
-    }
-    const detailLines = [];
-    const watchedMeta = [];
-    if (latestWatched && latestWatched.year) {
-      watchedMeta.push(`Year: ${latestWatched.year}`);
-    }
-    if (
-      latestWatched &&
-      typeof latestWatched.rating === "number" &&
-      Number.isFinite(latestWatched.rating)
-    ) {
-      watchedMeta.push(`IMDb ${latestWatched.rating.toFixed(1)}`);
-    }
-    if (latestWatched && Array.isArray(latestWatched.genres) && latestWatched.genres.length) {
-      watchedMeta.push(`Genres: ${latestWatched.genres.join(", ")}`);
-    }
-    if (watchedMeta.length) {
-      detailLines.push(watchedMeta.join(" • "));
-    }
-    if (!detailLines.length) {
-      detailLines.push("Recently marked as watched.");
-    }
-    collectionItems.push({
-      title:
-        latestWatched && latestWatched.title
-          ? latestWatched.title
-          : "Latest watched",
-      meta: metaParts.join(" • "),
-      poster: latestWatched && latestWatched.poster ? latestWatched.poster : null,
-      icon: "👁️",
-      details: detailLines
+    const watchedSnapshot = state.watchedMovies.slice(-5).reverse();
+    watchedSnapshot.forEach((movie, index) => {
+      if (!movie) {
+        return;
+      }
+      const metaParts = [];
+      if (index === 0) {
+        metaParts.push(`${state.watchedMovies.length} logged`);
+      } else {
+        metaParts.push("Watched entry");
+      }
+      if (typeof movie.rating === "number" && Number.isFinite(movie.rating)) {
+        metaParts.push(`IMDb ${movie.rating.toFixed(1)}`);
+      }
+      if (Array.isArray(movie.genres) && movie.genres.length) {
+        metaParts.push(movie.genres.slice(0, 2).join(" • "));
+      }
+
+      const detailLines = [];
+      const watchedMeta = [];
+      if (movie.year) {
+        watchedMeta.push(`Year: ${movie.year}`);
+      }
+      if (Array.isArray(movie.genres) && movie.genres.length) {
+        watchedMeta.push(`Genres: ${movie.genres.join(", ")}`);
+      }
+      if (typeof movie.rating === "number" && Number.isFinite(movie.rating)) {
+        watchedMeta.push(`IMDb ${movie.rating.toFixed(1)}`);
+      }
+      if (watchedMeta.length) {
+        detailLines.push(watchedMeta.join(" • "));
+      }
+      if (index === 0 && state.watchedMovies.length > watchedSnapshot.length) {
+        detailLines.push(`+${state.watchedMovies.length - watchedSnapshot.length} more watched titles logged`);
+      }
+      if (!detailLines.length) {
+        detailLines.push("Recently marked as watched.");
+      }
+
+      collectionItems.push({
+        title: movie.title ? movie.title : index === 0 ? "Latest watched" : "Watched movie",
+        meta: metaParts.join(" • ") || "Watched movie",
+        poster: movie.poster ? movie.poster : null,
+        icon: "👁️",
+        details: detailLines,
+        extra: index > 0
+      });
     });
   }
 
@@ -469,6 +654,7 @@ function updatePreferencesPreview() {
     collectionItems,
     "Mark favorites or watched movies to build your collections."
   );
+  finalizeCollectionsSnapshot(collectionsList);
   listsWrap.appendChild(collectionsList);
 
   if (hasGenreItems || hasCollectionItems) {
@@ -808,9 +994,6 @@ function revealMoreRecommendations() {
 
 function handleMarkWatched(omdbMovie) {
   const added = markAsWatched(omdbMovie);
-  if (added) {
-    getRecommendations(true);
-  }
   return added;
 }
 
@@ -838,8 +1021,7 @@ function handleRemoveWatched(movie) {
   state.watchedMovies = next;
   refreshWatchedUi();
   scheduleWatchedSync();
-  setRecStatus("Updated your watched list. Refreshing suggestions…", true);
-  getRecommendations(true);
+  setRecStatus("Updated your watched list.", false);
 }
 
 function handleToggleFavorite(payload) {
@@ -874,7 +1056,6 @@ function handleToggleFavorite(payload) {
     state.favorites.splice(existingIndex, 1);
     refreshFavoritesUi();
     scheduleFavoritesSync();
-    getRecommendations(true);
     return false;
   }
 
@@ -910,7 +1091,6 @@ function handleToggleFavorite(payload) {
 
   refreshFavoritesUi();
   scheduleFavoritesSync();
-  getRecommendations(true);
   return true;
 }
 
@@ -937,7 +1117,6 @@ function handleRemoveFavorite(movie) {
   state.favorites = next;
   refreshFavoritesUi();
   scheduleFavoritesSync();
-  getRecommendations(true);
 }
 
 function markAsWatched(omdbMovie) {
