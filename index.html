@@ -30,11 +30,81 @@
       Tell me what you’re into and I’ll hunt for fresh movies online, then tailor the picks
       to your mood and what you’ve already watched.
     </p>
+    <ul class="app-highlight-grid" aria-label="Highlights">
+      <li class="highlight-card" tabindex="0">
+        <span class="highlight-icon" aria-hidden="true">⚡</span>
+        <div class="highlight-body">
+          <span class="highlight-title">Live discovery</span>
+          <span class="highlight-text">TMDB &amp; OMDb blended in real time.</span>
+        </div>
+      </li>
+      <li class="highlight-card" tabindex="0">
+        <span class="highlight-icon" aria-hidden="true">🧠</span>
+        <div class="highlight-body">
+          <span class="highlight-title">Adaptive taste</span>
+          <span class="highlight-text">Every favorite and watched tag reshapes picks.</span>
+        </div>
+      </li>
+      <li class="highlight-card" tabindex="0">
+        <span class="highlight-icon" aria-hidden="true">🎯</span>
+        <div class="highlight-body">
+          <span class="highlight-title">Precision filters</span>
+          <span class="highlight-text">Dial in vibes, runtime, and mood before fetching.</span>
+        </div>
+      </li>
+    </ul>
+
+    <section class="app-how-it-works" aria-labelledby="howItWorksHeading">
+      <div class="how-header">
+        <div>
+          <h2 id="howItWorksHeading" class="how-title">How the match comes together</h2>
+          <p class="how-subtitle">
+            A lightweight flow tuned for quick iteration. Adjust inputs, sync your history,
+            and watch the recommendations regenerate in seconds.
+          </p>
+        </div>
+        <span class="how-refresh-pill" aria-label="Recommendations refresh in about a minute">
+          ⏱️ ~60s refresh
+        </span>
+      </div>
+      <div class="how-step-grid">
+        <article class="how-step-card" tabindex="0">
+          <span class="how-step-icon" aria-hidden="true">🪄</span>
+          <div class="how-step-body">
+            <h3 class="how-step-title">Set your vibe</h3>
+            <p class="how-step-text">
+              Start with genres, moods, and deal-breakers. The preference panel keeps your
+              latest tweaks pinned while you browse.
+            </p>
+          </div>
+        </article>
+        <article class="how-step-card" tabindex="0">
+          <span class="how-step-icon" aria-hidden="true">📚</span>
+          <div class="how-step-body">
+            <h3 class="how-step-title">Sync your history</h3>
+            <p class="how-step-text">
+              Mark favorites or watched titles. Smart Movie Match cross-checks them against
+              TMDB so repeats stay out of the queue.
+            </p>
+          </div>
+        </article>
+        <article class="how-step-card" tabindex="0">
+          <span class="how-step-icon" aria-hidden="true">🤖</span>
+          <div class="how-step-body">
+            <h3 class="how-step-title">Review smarter picks</h3>
+            <p class="how-step-text">
+              Each fetch ranks candidates by similarity, freshness, and social buzz. Tap a
+              card to expand stats or share the queue.
+            </p>
+          </div>
+        </article>
+      </div>
+    </section>
   </header>
 
   <main class="app-main">
     <!-- Preferences -->
-    <section class="panel">
+    <section class="panel panel-sticky">
       <div class="panel-inner">
         <div class="panel-header">
           <div>
