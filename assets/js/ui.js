@@ -69,27 +69,38 @@ export function renderWatchedList(watchedMovies, options = {}) {
     .slice()
     .reverse()
     .forEach((movie) => {
-      const card = document.createElement("div");
-      card.className = "watched-card";
+      const item = document.createElement("div");
+      item.className = "favorite-chip watched-chip";
 
-      const poster = document.createElement("div");
-      poster.className = "watched-poster";
-      poster.setAttribute("aria-hidden", "true");
-      const posterIcon = document.createElement("span");
-      posterIcon.className = "watched-poster-icon";
-      posterIcon.textContent = "✓";
-      posterIcon.setAttribute("aria-hidden", "true");
-      poster.appendChild(posterIcon);
+      const posterWrap = document.createElement("div");
+      posterWrap.className = "favorite-poster";
+      if (movie.poster) {
+        const img = document.createElement("img");
+        img.src = movie.poster;
+        img.alt = `Poster for ${movie.title}`;
+        posterWrap.appendChild(img);
+      } else {
+        const placeholder = document.createElement("span");
+        placeholder.className = "favorite-poster-placeholder";
+        placeholder.textContent = "✓";
+        placeholder.setAttribute("aria-hidden", "true");
+        posterWrap.appendChild(placeholder);
+      }
 
-      const body = document.createElement("div");
-      body.className = "watched-body";
+      const badge = document.createElement("span");
+      badge.className = "watched-badge";
+      badge.innerHTML = '<span aria-hidden="true">✓</span><span>Watched</span>';
+      posterWrap.appendChild(badge);
+
+      const content = document.createElement("div");
+      content.className = "favorite-body";
 
       const title = document.createElement("div");
-      title.className = "watched-title";
+      title.className = "favorite-title";
       title.textContent = movie.title + (movie.year ? ` (${movie.year})` : "");
 
       const meta = document.createElement("div");
-      meta.className = "watched-meta";
+      meta.className = "favorite-genres";
       const parts = [];
       if (typeof movie.rating === "number" && Number.isFinite(movie.rating)) {
         parts.push(`IMDb ${movie.rating.toFixed(1)}`);
@@ -99,16 +110,16 @@ export function renderWatchedList(watchedMovies, options = {}) {
       }
       meta.textContent = parts.length ? parts.join(" • ") : "Marked as watched";
 
-      body.appendChild(title);
-      body.appendChild(meta);
+      content.appendChild(title);
+      content.appendChild(meta);
 
-      card.appendChild(poster);
-      card.appendChild(body);
+      item.appendChild(posterWrap);
+      item.appendChild(content);
 
       if (onRemove) {
         const removeBtn = document.createElement("button");
         removeBtn.type = "button";
-        removeBtn.className = "watched-remove";
+        removeBtn.className = "favorite-remove watched-remove";
         removeBtn.setAttribute(
           "aria-label",
           `Remove ${movie.title}${movie.year ? ` (${movie.year})` : ""} from watched`
@@ -119,10 +130,10 @@ export function renderWatchedList(watchedMovies, options = {}) {
           playUiClick();
           onRemove(movie);
         });
-        card.appendChild(removeBtn);
+        item.appendChild(removeBtn);
       }
 
-      listEl.appendChild(card);
+      listEl.appendChild(item);
     });
 }
 
@@ -266,7 +277,7 @@ export function renderRecommendations(items, watchedMovies, options = {}) {
     const msg = document.createElement("div");
     msg.className = "empty-state";
     msg.textContent =
-      "No movies to show yet. Try adjusting your genres or mood, then click “Find movies for me”.";
+      "No movies to show yet. Try adjusting your genres or favorites, then click “Find movies for me”.";
     grid.appendChild(msg);
     return;
   }
@@ -339,6 +350,108 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites,
   titleRow.appendChild(titleEl);
   titleRow.appendChild(yearEl);
 
+  let isWatched = watchedMovies.some((movie) =>
+    imdbID ? movie.imdbID === imdbID : movie.title === title
+  );
+  let isFavorite = favorites.some((fav) =>
+    imdbID && fav.imdbID
+      ? fav.imdbID === imdbID
+      : fav.title.toLowerCase() === title.toLowerCase()
+  );
+
+  let watchedBtn = null;
+  let favoriteBtn = null;
+
+  const quickActions = document.createElement("div");
+  quickActions.className = "movie-quick-actions";
+
+  const quickWatchedBtn = document.createElement("button");
+  quickWatchedBtn.type = "button";
+  quickWatchedBtn.className = "quick-action-btn quick-action-watched";
+  quickWatchedBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (isWatched) {
+      return;
+    }
+    playUiClick();
+    const added = handlers.onMarkWatched ? handlers.onMarkWatched(omdb) : true;
+    if (added) {
+      isWatched = true;
+      applyWatchedState(true);
+    }
+  });
+  quickActions.appendChild(quickWatchedBtn);
+
+  const quickFavoriteBtn = document.createElement("button");
+  quickFavoriteBtn.type = "button";
+  quickFavoriteBtn.className = "quick-action-btn quick-action-favorite";
+  quickFavoriteBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (!handlers.onToggleFavorite) {
+      return;
+    }
+    const next = handlers.onToggleFavorite({ omdb, tmdb, isFavorite });
+    if (typeof next === "boolean") {
+      isFavorite = next;
+      applyFavoriteState(isFavorite);
+      playFavoriteSound(isFavorite);
+    }
+  });
+  quickActions.appendChild(quickFavoriteBtn);
+
+  const applyWatchedState = (watched) => {
+    quickWatchedBtn.classList.toggle("active", watched);
+    quickWatchedBtn.setAttribute("aria-pressed", watched ? "true" : "false");
+    quickWatchedBtn.setAttribute(
+      "aria-label",
+      watched ? `Marked ${title} as watched` : `Mark ${title} as watched`
+    );
+    quickWatchedBtn.setAttribute(
+      "title",
+      watched ? `Marked ${title} as watched` : `Mark ${title} as watched`
+    );
+    quickWatchedBtn.innerHTML = watched
+      ? '<span aria-hidden="true">✓</span>'
+      : '<span aria-hidden="true">👁️</span>';
+
+    if (watchedBtn) {
+      if (watched) {
+        markButtonAsWatched(watchedBtn, title);
+      } else {
+        watchedBtn.classList.remove("watched");
+        watchedBtn.setAttribute("aria-pressed", "false");
+        watchedBtn.setAttribute("aria-label", `Mark ${title} as watched`);
+        watchedBtn.innerHTML =
+          '<span class="watched-btn-icon">👁️</span><span>I’ve watched this</span>';
+      }
+    }
+  };
+
+  const applyFavoriteState = (favorite) => {
+    quickFavoriteBtn.classList.toggle("active", favorite);
+    quickFavoriteBtn.setAttribute("aria-pressed", favorite ? "true" : "false");
+    quickFavoriteBtn.setAttribute(
+      "aria-label",
+      favorite ? `Remove ${title} from favorites` : `Save ${title} to favorites`
+    );
+    quickFavoriteBtn.setAttribute(
+      "title",
+      favorite ? `Favorited` : `Save to favorites`
+    );
+    quickFavoriteBtn.innerHTML = favorite
+      ? '<span aria-hidden="true">♥</span>'
+      : '<span aria-hidden="true">♡</span>';
+
+    if (favoriteBtn) {
+      setFavoriteState(favoriteBtn, favorite);
+    }
+  };
+
+  const topRow = document.createElement("div");
+  topRow.className = "movie-summary-top";
+  topRow.appendChild(titleRow);
+  topRow.appendChild(quickActions);
+
   const ratingsRow = document.createElement("div");
   ratingsRow.className = "movie-ratings";
 
@@ -360,7 +473,7 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites,
     infoWrap.appendChild(reasonRow);
   }
 
-  infoWrap.appendChild(titleRow);
+  infoWrap.appendChild(topRow);
   infoWrap.appendChild(ratingsRow);
 
   const genreTags = document.createElement("div");
@@ -395,57 +508,43 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites,
   const actions = document.createElement("div");
   actions.className = "movie-actions";
 
-  const watchedBtn = document.createElement("button");
+  watchedBtn = document.createElement("button");
   watchedBtn.type = "button";
   watchedBtn.className = "watched-btn";
-  watchedBtn.innerHTML = `<span class="watched-btn-icon">👁️</span><span>I’ve watched this</span>`;
-  const watchedMatch = watchedMovies.some((movie) =>
-    imdbID ? movie.imdbID === imdbID : movie.title === title
-  );
-  if (watchedMatch) {
-    markButtonAsWatched(watchedBtn, title);
-  } else {
-    watchedBtn.setAttribute("aria-pressed", "false");
-    watchedBtn.setAttribute("aria-label", `Mark ${title} as watched`);
-  }
-
   watchedBtn.addEventListener("click", (event) => {
     event.stopPropagation();
     playUiClick();
-    if (watchedBtn.classList.contains("watched")) {
+    if (isWatched) {
       return;
     }
     const added = handlers.onMarkWatched ? handlers.onMarkWatched(omdb) : true;
     if (added) {
-      markButtonAsWatched(watchedBtn, title);
+      isWatched = true;
+      applyWatchedState(true);
     }
   });
 
-  const favoriteBtn = document.createElement("button");
+  favoriteBtn = document.createElement("button");
   favoriteBtn.type = "button";
   favoriteBtn.className = "favorite-btn";
-  favoriteBtn.innerHTML = `<span class="favorite-btn-icon">♡</span><span>Save to favorites</span>`;
-  const isFavorite = favorites.some((fav) =>
-    imdbID && fav.imdbID
-      ? fav.imdbID === imdbID
-      : fav.title.toLowerCase() === title.toLowerCase()
-  );
-  setFavoriteState(favoriteBtn, isFavorite);
-
   favoriteBtn.addEventListener("click", (event) => {
     event.stopPropagation();
     if (!handlers.onToggleFavorite) {
       return;
     }
-    const nowFavorite = handlers.onToggleFavorite({ omdb, tmdb, isFavorite });
-    if (typeof nowFavorite === "boolean") {
-      setFavoriteState(favoriteBtn, nowFavorite);
-      playFavoriteSound(nowFavorite);
+    const next = handlers.onToggleFavorite({ omdb, tmdb, isFavorite });
+    if (typeof next === "boolean") {
+      isFavorite = next;
+      applyFavoriteState(isFavorite);
+      playFavoriteSound(isFavorite);
     }
   });
 
   actions.appendChild(watchedBtn);
   actions.appendChild(favoriteBtn);
+
+  applyWatchedState(isWatched);
+  applyFavoriteState(isFavorite);
 
   const trailerArea = document.createElement("div");
   trailerArea.className = "movie-trailer";

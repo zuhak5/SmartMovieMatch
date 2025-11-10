@@ -27,7 +27,7 @@
     </div>
     <p class="app-subtitle">
       Tell me what you’re into and I’ll hunt for fresh movies online, then tailor the picks
-      to your mood and what you’ve already watched.
+      to what you’ve already watched.
     </p>
   </header>
 
@@ -35,14 +35,14 @@
     <!-- Preferences -->
     <section class="panel">
       <div class="panel-inner">
-        <div class="panel-header">
-          <div>
-            <div class="panel-title">Your vibe</div>
-            <div class="panel-subtitle">Genres, mood &amp; what you’ve liked</div>
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Your vibe</div>
+              <div class="panel-subtitle">Genres &amp; what you’ve liked</div>
+            </div>
           </div>
-        </div>
         <p class="hint-text">
-          The more you share (what you’ve seen, favorite genres, your mood), the smarter the
+          The more you share (what you’ve seen and favorite genres), the smarter the
           suggestions become. Movies you mark as “watched” also tune the recommender.
         </p>
 
@@ -145,87 +145,10 @@
           </div>
 
 
-          <!-- Mood -->
-          <div class="field-group">
-            <div class="field-label-row">
-              <label>Tonight’s mood</label>
-              <div class="field-label-secondary">
-                Choose a vibe and energy level to steer the tone.
-              </div>
-            </div>
-            <div class="mood-row mood-row-enhanced">
-              <label class="mood-option" data-mood-copy="Surprise me with a balanced mix.">
-                <input type="radio" name="mood" value="any" checked />
-                <span class="mood-label">
-                  <span class="mood-emoji">🎲</span>
-                  Surprise me
-                </span>
-              </label>
-              <label class="mood-option" data-mood-copy="Breezy, uplifting picks incoming.">
-                <input type="radio" name="mood" value="light" />
-                <span class="mood-label">
-                  <span class="mood-emoji">✨</span>
-                  Feel-good
-                </span>
-              </label>
-              <label class="mood-option" data-mood-copy="We’ll lean into atmospheric thrillers.">
-                <input type="radio" name="mood" value="dark" />
-                <span class="mood-label">
-                  <span class="mood-emoji">🌒</span>
-                  Intense
-                </span>
-              </label>
-            </div>
-            <div class="mood-intensity">
-              <label for="moodIntensity" class="mood-intensity-label">Energy level</label>
-              <input
-                id="moodIntensity"
-                class="input-range"
-                type="range"
-                min="0"
-                max="2"
-                step="1"
-                value="1"
-                aria-describedby="moodDynamicCopy"
-              />
-              <div class="mood-intensity-scale">
-                <span data-intensity-value="0">Chill</span>
-                <span data-intensity-value="1" class="active">Balanced</span>
-                <span data-intensity-value="2">Amped</span>
-              </div>
-            </div>
-            <div id="moodDynamicCopy" class="mood-dynamic-copy">
-              Expect a balanced mix of moods.
-            </div>
-          </div>
-
-<!-- Count -->
-          <div class="field-group">
-            <div class="field-label-row">
-              <label for="countInput">Number of suggestions</label>
-              <div class="field-label-secondary">
-                Drag to choose how many movies to fetch (4–20).
-              </div>
-            </div>
-            <div class="range-control">
-              <input
-                id="countInput"
-                class="input-range"
-                type="range"
-                min="4"
-                max="20"
-                step="1"
-                value="12"
-                aria-describedby="countValue"
-              />
-              <span id="countValue" class="range-value" aria-live="polite">12 movies</span>
-            </div>
-          </div>
-
           <div class="preferences-preview" id="preferencesPreview" aria-live="polite">
             <div class="preferences-preview-title">Live summary</div>
             <div class="preferences-preview-empty">
-              Choose genres, mood, or favorites and I’ll summarize them here in real time.
+              Choose genres, favorites, or log watched titles and I’ll summarize them here in real time.
             </div>
           </div>
 
@@ -245,8 +168,66 @@
       </div>
     </section>
 
-    <!-- Right column: recommendations + watched -->
+    <!-- Right column: collections + recommendations -->
     <div class="right-column">
+      <section class="panel collections-panel">
+        <div class="panel-inner">
+          <div class="panel-header collections-header">
+            <div>
+              <div class="panel-title">Your collections</div>
+              <div class="panel-subtitle">
+                Tap the heart or eye on any card to pin favorites or track your watched history.
+              </div>
+            </div>
+            <div class="collection-tabs" role="tablist">
+              <button
+                type="button"
+                class="collection-tab active"
+                id="favoritesTab"
+                data-target="favorites"
+                role="tab"
+                aria-controls="favoritesView"
+                aria-selected="true"
+              >
+                Favorites
+              </button>
+              <button
+                type="button"
+                class="collection-tab"
+                id="watchedTab"
+                data-target="watched"
+                role="tab"
+                aria-controls="watchedView"
+                aria-selected="false"
+              >
+                Watched
+              </button>
+            </div>
+          </div>
+          <div class="collection-summary" id="favoritesSummary"></div>
+          <div class="collection-summary" id="watchedSummary"></div>
+          <div id="favoritesView" class="collection-view active" role="tabpanel" aria-labelledby="favoritesTab">
+            <div id="favoritesList" class="favorites-list"></div>
+            <div id="favoritesEmpty" class="empty-state">
+              Tap the heart on any recommendation to save it here for quick access.
+            </div>
+          </div>
+          <div id="watchedView" class="collection-view" role="tabpanel" aria-labelledby="watchedTab">
+            <div id="watchedList" class="watched-panel-list"></div>
+            <div id="watchedEmpty" class="empty-state">
+              You haven’t marked anything as watched yet. Use the
+              <strong>“I’ve watched this”</strong> button on any recommendation and I’ll reshape future suggestions around it.
+            </div>
+            <div class="collection-actions">
+              <button type="button" class="btn-subtle btn-subtle-danger" id="clearWatchedBtn">
+                <span>Clear history</span>
+                <span aria-hidden="true">🧹</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="panel">
         <div class="panel-inner">
           <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
@@ -284,67 +265,11 @@
           <div id="recError" class="error-text" style="display:none;"></div>
 
           <div id="recommendationsGrid" class="recommendations-grid"></div>
+          <div class="recommendations-actions" id="recommendationsActions">
+            <button type="button" class="btn-subtle btn-chip" id="showMoreRecsBtn">Show more</button>
+          </div>
         </div>
       </section>
-
-
-        <section class="panel collections-panel">
-          <div class="panel-inner">
-            <div class="panel-header collections-header">
-              <div>
-                <div class="panel-title">Your collections</div>
-                <div class="panel-subtitle">
-                  Tap the heart or eye on any card to pin favorites or track your watched history.
-                </div>
-              </div>
-              <div class="collection-tabs" role="tablist">
-                <button
-                  type="button"
-                  class="collection-tab active"
-                  id="favoritesTab"
-                  data-target="favorites"
-                  role="tab"
-                  aria-controls="favoritesView"
-                  aria-selected="true"
-                >
-                  Favorites
-                </button>
-                <button
-                  type="button"
-                  class="collection-tab"
-                  id="watchedTab"
-                  data-target="watched"
-                  role="tab"
-                  aria-controls="watchedView"
-                  aria-selected="false"
-                >
-                  Watched
-                </button>
-              </div>
-            </div>
-            <div class="collection-summary" id="favoritesSummary"></div>
-            <div class="collection-summary" id="watchedSummary"></div>
-            <div id="favoritesView" class="collection-view active" role="tabpanel" aria-labelledby="favoritesTab">
-              <div id="favoritesList" class="favorites-list"></div>
-              <div id="favoritesEmpty" class="empty-state">
-                Tap the heart on any recommendation to save it here for quick access.
-              </div>
-            </div>
-            <div id="watchedView" class="collection-view" role="tabpanel" aria-labelledby="watchedTab">
-              <div id="watchedList" class="watched-panel-list"></div>
-              <div id="watchedEmpty" class="empty-state">
-                You haven’t marked anything as watched yet. Use the
-                <strong>“I’ve watched this”</strong> button on any recommendation and I’ll reshape future suggestions around it.
-              </div>
-              <div class="collection-actions">
-                <button type="button" class="btn-subtle btn-subtle-danger" id="clearWatchedBtn">
-                  <span>Clear history</span>
-                  <span aria-hidden="true">🧹</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
 
     </div>
   </main>
