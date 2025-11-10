@@ -657,6 +657,12 @@ function sanitizeFavorites(favorites) {
             .filter(Boolean)
             .slice(0, 10)
         : [];
+      const ratingValue =
+        typeof entry.rating === "number"
+          ? entry.rating
+          : typeof entry.rating === "string" && entry.rating.trim() !== ""
+          ? Number(entry.rating)
+          : null;
 
       return {
         imdbID,
@@ -664,7 +670,8 @@ function sanitizeFavorites(favorites) {
         year,
         poster,
         overview,
-        genres
+        genres,
+        rating: Number.isFinite(ratingValue) ? ratingValue : null
       };
     })
     .filter(Boolean);
