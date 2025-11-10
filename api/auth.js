@@ -391,13 +391,28 @@ async function authenticate(req, payload) {
   };
 }
 
+const AUTH_USER_COLUMNS = [
+  "username",
+  "display_name",
+  "password_hash",
+  "salt",
+  "created_at",
+  "last_login_at",
+  "last_preferences_sync",
+  "last_watched_sync",
+  "last_favorites_sync",
+  "preferences_snapshot",
+  "watched_history",
+  "favorites_list"
+].join(",");
+
 async function selectUserRow(username) {
   if (!username) {
     return null;
   }
   const rows = await supabaseFetch("auth_users", {
     query: {
-      select: "*",
+      select: AUTH_USER_COLUMNS,
       username: `eq.${username}`,
       limit: "1"
     }
@@ -409,25 +424,27 @@ async function selectUserRow(username) {
 }
 
 async function insertUserRow(values) {
-  return await mutateRows("auth_users", values, "POST");
+  await mutateRows("auth_users", values, "POST");
+  return await selectUserRow(values.username);
 }
 
 async function updateUserRow(username, patch) {
   if (!username) {
     return null;
   }
-  return await mutateRows(
+  await mutateRows(
     `auth_users?username=eq.${encodeURIComponent(username)}`,
     patch,
     "PATCH"
   );
+  return await selectUserRow(username);
 }
 
 async function createSessionRecord(userRecord, timestamp) {
   const token = crypto.randomBytes(24).toString("hex");
   await deleteSessionsByUsername(userRecord.username);
 
-  const sessionRow = await mutateRows("auth_sessions", {
+  await mutateRows("auth_sessions", {
     token,
     username: userRecord.username,
     created_at: timestamp,
@@ -437,18 +454,32 @@ async function createSessionRecord(userRecord, timestamp) {
     last_favorites_sync: userRecord.lastFavoritesSync || null
   }, "POST");
 
-  return mapSessionRow(sessionRow);
+  const sessionRow = await selectSessionRow(token);
+  if (sessionRow) {
+    return mapSessionRow(sessionRow);
+  }
+
+  return {
+    token,
+    username: userRecord.username,
+    createdAt: timestamp,
+    lastActiveAt: timestamp,
+    lastPreferencesSync: userRecord.lastPreferencesSync || null,
+    lastWatchedSync: userRecord.lastWatchedSync || null,
+    lastFavoritesSync: userRecord.lastFavoritesSync || null
+  };
 }
 
 async function updateSessionRow(token, patch) {
   if (!token) {
     return null;
   }
-  return await mutateRows(
+  await mutateRows(
     `auth_sessions?token=eq.${encodeURIComponent(token)}`,
     patch,
     "PATCH"
   );
+  return await selectSessionRow(token);
 }
 
 async function selectSessionRow(token) {
@@ -492,12 +523,12 @@ async function deleteSessionByToken(token) {
   });
 }
 
-async function mutateRows(path, values, method) {
+async function mutateRows(path, values, method, { prefer } = {}) {
   const body = method === "POST" ? [values] : values;
   const target = method === "POST" ? path : `${path}`;
   const rows = await supabaseFetch(target, {
     method,
-    headers: { Prefer: "return=representation" },
+    headers: { Prefer: prefer || "return=minimal" },
     body
   });
   if (Array.isArray(rows)) {
