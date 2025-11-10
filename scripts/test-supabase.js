@@ -29,7 +29,9 @@ async function main() {
     created_at: now,
     last_login_at: now,
     preferences_snapshot: {},
-    watched_history: []
+    watched_history: [],
+    favorites_list: [],
+    last_favorites_sync: now
   };
 
   console.log('🧪 Inserting test user %s into auth_users…', testUsername);

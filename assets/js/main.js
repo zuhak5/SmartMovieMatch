@@ -1,10 +1,11 @@
-import { STORAGE_KEY, TMDB_GENRES, FAVORITES_STORAGE_KEY } from "./config.js";
+import { TMDB_GENRES } from "./config.js";
 import {
   loadSession,
   subscribeToSession,
   logoutSession,
   persistPreferencesRemote,
-  persistWatchedRemote
+  persistWatchedRemote,
+  persistFavoritesRemote
 } from "./auth.js";
 import {
   discoverCandidateMovies,
@@ -12,7 +13,6 @@ import {
   fetchOmdbForCandidates,
   fetchTrailersForMovies
 } from "./recommendations.js";
-import { loadWatchedMovies, saveWatchedMovies, loadFavorites, saveFavorites } from "./storage.js";
 import {
   renderWatchedList,
   updateWatchedSummary,
@@ -34,12 +34,14 @@ const state = {
   activeCollectionView: "favorites",
   session: null,
   watchedSyncTimer: null,
+  favoritesSyncTimer: null,
   activeRecToken: null,
   activeRecAbort: null,
   sessionHydration: {
     token: null,
     lastPreferencesSync: null,
-    lastWatchedSync: null
+    lastWatchedSync: null,
+    lastFavoritesSync: null
   }
 };
 
@@ -50,8 +52,8 @@ function isAbortError(error) {
 document.addEventListener("DOMContentLoaded", init);
 
 function init() {
-  state.watchedMovies = loadWatchedMovies(STORAGE_KEY);
-  state.favorites = loadFavorites(FAVORITES_STORAGE_KEY);
+  state.watchedMovies = [];
+  state.favorites = [];
   state.session = loadSession();
   hydrateFromSession(state.session);
   refreshWatchedUi();
@@ -61,7 +63,7 @@ function init() {
   setSyncStatus(
     state.session
       ? "Signed in – your taste profile syncs automatically."
-      : "Sign in to sync your preferences and watched history across devices.",
+      : "Sign in to sync your preferences and watch history across devices.",
     state.session ? "success" : "muted"
   );
 
@@ -72,7 +74,7 @@ function init() {
     setSyncStatus(
       session
         ? "Signed in – your taste profile syncs automatically."
-        : "Signed out. Preferences stay local until you sign in again.",
+        : "Signed out. Preferences won’t sync until you sign in again.",
       session ? "success" : "muted"
     );
   });
@@ -87,7 +89,7 @@ function wireEvents() {
       playUiClick();
       logoutSession();
       setSyncStatus(
-        "Signed out. Preferences stay local until you sign in again.",
+        "Signed out. Preferences won’t sync until you sign in again.",
         "muted"
       );
     });
@@ -173,7 +175,6 @@ function wireEvents() {
         return;
       }
       state.watchedMovies = [];
-      saveWatchedMovies(STORAGE_KEY, state.watchedMovies);
       refreshWatchedUi();
       scheduleWatchedSync();
       getRecommendations(true);
@@ -544,7 +545,6 @@ function handleRemoveWatched(movie) {
   }
 
   state.watchedMovies = next;
-  saveWatchedMovies(STORAGE_KEY, state.watchedMovies);
   refreshWatchedUi();
   scheduleWatchedSync();
   setRecStatus("Updated your watched list. Refreshing suggestions…", true);
@@ -581,8 +581,8 @@ function handleToggleFavorite(payload) {
 
   if (existingIndex !== -1) {
     state.favorites.splice(existingIndex, 1);
-    saveFavorites(FAVORITES_STORAGE_KEY, state.favorites);
     refreshFavoritesUi();
+    scheduleFavoritesSync();
     getRecommendations(true);
     return false;
   }
@@ -612,8 +612,8 @@ function handleToggleFavorite(payload) {
     genres
   });
 
-  saveFavorites(FAVORITES_STORAGE_KEY, state.favorites);
   refreshFavoritesUi();
+  scheduleFavoritesSync();
   getRecommendations(true);
   return true;
 }
@@ -639,8 +639,8 @@ function handleRemoveFavorite(movie) {
   }
 
   state.favorites = next;
-  saveFavorites(FAVORITES_STORAGE_KEY, state.favorites);
   refreshFavoritesUi();
+  scheduleFavoritesSync();
   getRecommendations(true);
 }
 
@@ -674,7 +674,6 @@ function markAsWatched(omdbMovie) {
     rating
   });
 
-  saveWatchedMovies(STORAGE_KEY, state.watchedMovies);
   refreshWatchedUi();
   scheduleWatchedSync();
   return true;
@@ -810,8 +809,21 @@ function hydrateFromSession(session) {
     state.sessionHydration = {
       token: null,
       lastPreferencesSync: null,
-      lastWatchedSync: null
+      lastWatchedSync: null,
+      lastFavoritesSync: null
     };
+    if (state.watchedSyncTimer) {
+      window.clearTimeout(state.watchedSyncTimer);
+      state.watchedSyncTimer = null;
+    }
+    if (state.favoritesSyncTimer) {
+      window.clearTimeout(state.favoritesSyncTimer);
+      state.favoritesSyncTimer = null;
+    }
+    state.watchedMovies = [];
+    state.favorites = [];
+    refreshWatchedUi();
+    refreshFavoritesUi();
     return;
   }
 
@@ -827,6 +839,12 @@ function hydrateFromSession(session) {
       state.sessionHydration.token !== session.token ||
       session.lastPreferencesSync !== state.sessionHydration.lastPreferencesSync
     );
+  const shouldHydrateFavorites =
+    Array.isArray(session.favoritesList) &&
+    (
+      state.sessionHydration.token !== session.token ||
+      session.lastFavoritesSync !== state.sessionHydration.lastFavoritesSync
+    );
 
   if (shouldHydrateWatched) {
     applyWatchedHistory(session.watchedHistory);
@@ -836,10 +854,15 @@ function hydrateFromSession(session) {
     applyPreferencesSnapshot(session.preferencesSnapshot);
   }
 
+  if (shouldHydrateFavorites) {
+    applyFavoritesList(session.favoritesList);
+  }
+
   state.sessionHydration = {
     token: session.token,
     lastPreferencesSync: session.lastPreferencesSync || null,
-    lastWatchedSync: session.lastWatchedSync || null
+    lastWatchedSync: session.lastWatchedSync || null,
+    lastFavoritesSync: session.lastFavoritesSync || null
   };
 }
 
@@ -935,8 +958,40 @@ function applyWatchedHistory(history) {
     .filter(Boolean);
 
   state.watchedMovies = normalized;
-  saveWatchedMovies(STORAGE_KEY, state.watchedMovies);
   refreshWatchedUi();
+}
+
+function applyFavoritesList(favorites) {
+  if (!Array.isArray(favorites)) {
+    return;
+  }
+
+  const normalized = favorites
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+      const title = typeof entry.title === "string" ? entry.title : "";
+      if (!title) {
+        return null;
+      }
+      return {
+        imdbID: entry.imdbID || null,
+        title,
+        year: typeof entry.year === "string" ? entry.year : "",
+        poster: typeof entry.poster === "string" ? entry.poster : null,
+        overview: typeof entry.overview === "string" ? entry.overview : "",
+        genres: Array.isArray(entry.genres)
+          ? entry.genres
+              .map((genre) => (typeof genre === "string" ? genre : ""))
+              .filter(Boolean)
+          : []
+      };
+    })
+    .filter(Boolean);
+
+  state.favorites = normalized;
+  refreshFavoritesUi();
 }
 
 function syncPreferencesSnapshot(snapshot) {
@@ -966,7 +1021,7 @@ function syncPreferencesSnapshot(snapshot) {
     .catch((error) => {
       console.warn("Preference sync failed", error);
       setSyncStatus(
-        "Couldn’t sync your preferences right now. They stay saved locally.",
+        "Couldn’t sync your preferences right now. We’ll try again automatically.",
         "error"
       );
     });
@@ -993,11 +1048,41 @@ function scheduleWatchedSync() {
     } catch (error) {
       console.warn("Watched sync failed", error);
       setSyncStatus(
-        "Couldn’t sync watched history. We’ll keep it locally until the connection returns.",
+        "Couldn’t sync watched history right now. We’ll try again automatically.",
         "error"
       );
     } finally {
       state.watchedSyncTimer = null;
+    }
+  }, 600);
+}
+
+function scheduleFavoritesSync() {
+  if (!state.session) {
+    if (state.favorites.length) {
+      setSyncStatus("Sign in to sync your favorites.", "muted");
+    }
+    return;
+  }
+
+  if (state.favoritesSyncTimer) {
+    window.clearTimeout(state.favoritesSyncTimer);
+  }
+
+  setSyncStatus("Syncing your favorites…", "loading");
+
+  state.favoritesSyncTimer = window.setTimeout(async () => {
+    try {
+      await persistFavoritesRemote(state.session, state.favorites);
+      setSyncStatus("Favorites synced moments ago.", "success");
+    } catch (error) {
+      console.warn("Favorites sync failed", error);
+      setSyncStatus(
+        "Couldn’t sync favorites right now. We’ll try again automatically.",
+        "error"
+      );
+    } finally {
+      state.favoritesSyncTimer = null;
     }
   }, 600);
 }

@@ -109,6 +109,21 @@ export async function persistWatchedRemote(session, watchedMovies) {
   return updatedSession;
 }
 
+export async function persistFavoritesRemote(session, favorites) {
+  const activeSession = ensureActiveSession(session);
+  const trimmed = Array.isArray(favorites) ? favorites.slice(-100) : [];
+  const response = await authRequest(
+    "syncFavorites",
+    { favorites: trimmed },
+    activeSession.token
+  );
+  const updatedSession = normalizeSession(response && response.session);
+  if (updatedSession) {
+    persistSession(updatedSession);
+  }
+  return updatedSession;
+}
+
 function notifySubscribers(session) {
   subscribers.forEach((callback) => {
     try {
@@ -189,8 +204,10 @@ function normalizeSession(value) {
     lastLoginAt: value.lastLoginAt || null,
     lastPreferencesSync: value.lastPreferencesSync || null,
     lastWatchedSync: value.lastWatchedSync || null,
+    lastFavoritesSync: value.lastFavoritesSync || null,
     preferencesSnapshot: value.preferencesSnapshot || null,
-    watchedHistory: Array.isArray(value.watchedHistory) ? value.watchedHistory : []
+    watchedHistory: Array.isArray(value.watchedHistory) ? value.watchedHistory : [],
+    favoritesList: Array.isArray(value.favoritesList) ? value.favoritesList : []
   };
 }
 
