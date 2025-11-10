@@ -277,7 +277,7 @@ export function renderRecommendations(items, watchedMovies, options = {}) {
     const msg = document.createElement("div");
     msg.className = "empty-state";
     msg.textContent =
-      "No movies to show yet. Try adjusting your genres or mood, then click “Find movies for me”.";
+      "No movies to show yet. Try adjusting your genres, then click “Find movies for me”.";
     grid.appendChild(msg);
     return;
   }
@@ -384,6 +384,19 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites,
   });
   infoWrap.appendChild(genreTags);
 
+  const stateIcons = document.createElement("div");
+  stateIcons.className = "movie-state-icons";
+
+  const watchedStateIcon = document.createElement("span");
+  watchedStateIcon.className = "movie-state-icon watched-icon";
+  stateIcons.appendChild(watchedStateIcon);
+
+  const favoriteStateIcon = document.createElement("span");
+  favoriteStateIcon.className = "movie-state-icon favorite-icon";
+  stateIcons.appendChild(favoriteStateIcon);
+
+  infoWrap.appendChild(stateIcons);
+
   summaryButton.appendChild(posterWrap);
   summaryButton.appendChild(infoWrap);
 
@@ -414,10 +427,11 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites,
     imdbID ? movie.imdbID === imdbID : movie.title === title
   );
   if (watchedMatch) {
-    markButtonAsWatched(watchedBtn, title);
+    markButtonAsWatched(watchedBtn, title, watchedStateIcon);
   } else {
     watchedBtn.setAttribute("aria-pressed", "false");
     watchedBtn.setAttribute("aria-label", `Mark ${title} as watched`);
+    applyWatchedIconState(watchedStateIcon, false);
   }
 
   watchedBtn.addEventListener("click", (event) => {
@@ -428,7 +442,7 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites,
     }
     const added = handlers.onMarkWatched ? handlers.onMarkWatched(omdb) : true;
     if (added) {
-      markButtonAsWatched(watchedBtn, title);
+      markButtonAsWatched(watchedBtn, title, watchedStateIcon);
     }
   });
 
@@ -441,7 +455,7 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites,
       ? fav.imdbID === imdbID
       : fav.title.toLowerCase() === title.toLowerCase()
   );
-  setFavoriteState(favoriteBtn, isFavorite);
+  setFavoriteState(favoriteBtn, isFavorite, favoriteStateIcon);
 
   favoriteBtn.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -450,7 +464,7 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites,
     }
     const nowFavorite = handlers.onToggleFavorite({ omdb, tmdb, isFavorite });
     if (typeof nowFavorite === "boolean") {
-      setFavoriteState(favoriteBtn, nowFavorite);
+      setFavoriteState(favoriteBtn, nowFavorite, favoriteStateIcon);
       playFavoriteSound(nowFavorite);
     }
   });
@@ -554,7 +568,7 @@ function formatReasons(reasons) {
   return topTwo.join(" • ");
 }
 
-function markButtonAsWatched(btn, title) {
+function markButtonAsWatched(btn, title, watchedIcon) {
   btn.classList.add("watched");
   btn.setAttribute("aria-pressed", "true");
   btn.setAttribute("aria-label", `Marked ${title} as watched`);
@@ -566,16 +580,39 @@ function markButtonAsWatched(btn, title) {
   text.textContent = "Watched";
   btn.appendChild(icon);
   btn.appendChild(text);
+  applyWatchedIconState(watchedIcon, true);
 }
 
-function setFavoriteState(btn, isFavorite) {
+function setFavoriteState(btn, isFavorite, favoriteIcon) {
   if (isFavorite) {
     btn.classList.add("favorited");
     btn.setAttribute("aria-pressed", "true");
     btn.innerHTML = `<span class="favorite-btn-icon">♥</span><span>Favorited</span>`;
+    applyFavoriteIconState(favoriteIcon, true);
   } else {
     btn.classList.remove("favorited");
     btn.setAttribute("aria-pressed", "false");
     btn.innerHTML = `<span class="favorite-btn-icon">♡</span><span>Save to favorites</span>`;
+    applyFavoriteIconState(favoriteIcon, false);
   }
+}
+
+function applyWatchedIconState(iconEl, isWatched) {
+  if (!iconEl) {
+    return;
+  }
+  iconEl.classList.toggle("active", isWatched);
+  iconEl.innerHTML = isWatched
+    ? '<span class="icon">✓</span><span>Watched</span>'
+    : '<span class="icon">👁️</span><span>Watched</span>';
+}
+
+function applyFavoriteIconState(iconEl, isFavorite) {
+  if (!iconEl) {
+    return;
+  }
+  iconEl.classList.toggle("active", isFavorite);
+  iconEl.innerHTML = isFavorite
+    ? '<span class="icon">♥</span><span>Favorite</span>'
+    : '<span class="icon">♡</span><span>Favorite</span>';
 }
