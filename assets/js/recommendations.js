@@ -10,81 +10,6 @@ const ytCache = new Map();
 
 const ABORT_ERROR_NAME = "AbortError";
 
-class MaxHeap {
-  constructor() {
-    this.heap = [];
-  }
-
-  push(node) {
-    this.heap.push(node);
-    this.bubbleUp(this.heap.length - 1);
-  }
-
-  pop() {
-    if (this.heap.length === 0) {
-      return undefined;
-    }
-    const top = this.heap[0];
-    const end = this.heap.pop();
-    if (this.heap.length > 0 && end) {
-      this.heap[0] = end;
-      this.bubbleDown(0);
-    }
-    return top;
-  }
-
-  size() {
-    return this.heap.length;
-  }
-
-  bubbleUp(index) {
-    while (index > 0) {
-      const parentIndex = Math.floor((index - 1) / 2);
-      if (this.heap[parentIndex].priority >= this.heap[index].priority) {
-        break;
-      }
-      [this.heap[parentIndex], this.heap[index]] = [
-        this.heap[index],
-        this.heap[parentIndex]
-      ];
-      index = parentIndex;
-    }
-  }
-
-  bubbleDown(index) {
-    const length = this.heap.length;
-    while (true) {
-      const leftIndex = index * 2 + 1;
-      const rightIndex = leftIndex + 1;
-      let largest = index;
-
-      if (
-        leftIndex < length &&
-        this.heap[leftIndex].priority > this.heap[largest].priority
-      ) {
-        largest = leftIndex;
-      }
-
-      if (
-        rightIndex < length &&
-        this.heap[rightIndex].priority > this.heap[largest].priority
-      ) {
-        largest = rightIndex;
-      }
-
-      if (largest === index) {
-        break;
-      }
-
-      [this.heap[index], this.heap[largest]] = [
-        this.heap[largest],
-        this.heap[index]
-      ];
-      index = largest;
-    }
-  }
-}
-
 function createFallbackOmdbFromTmdb(movie) {
   if (!movie) {
     return null;
@@ -544,7 +469,6 @@ export function scoreAndSelectCandidates(candidates, opts, watchedMovies) {
       }
 
       const slightRandom = noiseForMovie(movie) * 0.4;
-      const penaltyGenres = [...new Set(genreNames.filter(Boolean))];
 
       return {
         movie,
@@ -555,54 +479,47 @@ export function scoreAndSelectCandidates(candidates, opts, watchedMovies) {
           qualityBoost +
           slightRandom -
           (alreadyWatched ? 999 : 0),
-        alreadyWatched,
-        genrePenaltyGenres: penaltyGenres
+        alreadyWatched
       };
     })
     .filter((entry) => !entry.alreadyWatched);
 
   const genreCounts = new Map();
-  const heap = new MaxHeap();
+  const remaining = scored.slice();
   const selected = [];
 
   const computePenalty = (entry) => {
-    const names = entry.genrePenaltyGenres;
-    if (!names || !names.length) {
+    const names = (entry.movie.genre_ids || [])
+      .map((id) => TMDB_GENRES[id] || "")
+      .filter(Boolean);
+    if (!names.length) {
       return 0;
     }
-    return names.reduce((sum, name) => sum + (genreCounts.get(name) || 0) * 0.9, 0);
+    return names.reduce(
+      (sum, name) => sum + (genreCounts.get(name) || 0) * 0.9,
+      0
+    );
   };
 
-  scored.forEach((entry) => {
-    heap.push({ entry, priority: entry.score - computePenalty(entry) });
-  });
-
-  while (heap.size() > 0 && selected.length < maxCount) {
-    const node = heap.pop();
-    if (!node) {
-      break;
-    }
-
-    const next = node.entry;
+  while (remaining.length && selected.length < maxCount) {
+    remaining.sort(
+      (a, b) => b.score - computePenalty(b) - (a.score - computePenalty(a))
+    );
+    const next = remaining.shift();
     const penalty = computePenalty(next);
     const adjustedScore = next.score - penalty;
-
-    if (Math.abs(adjustedScore - node.priority) > 1e-6) {
-      heap.push({ entry: next, priority: adjustedScore });
-      continue;
-    }
-
     if (penalty < 0.5 && selected.length > 0) {
       const hasReason = next.reasons.some((reason) => reason.includes("mix"));
       if (!hasReason) {
         next.reasons.push("Balances the mix");
       }
     }
-
     next.score = adjustedScore;
     selected.push(next);
-    const penaltyGenres = next.genrePenaltyGenres || [];
-    penaltyGenres.forEach((genre) => {
+    const genres = (next.movie.genre_ids || [])
+      .map((id) => TMDB_GENRES[id] || "")
+      .filter(Boolean);
+    genres.forEach((genre) => {
       genreCounts.set(genre, (genreCounts.get(genre) || 0) + 1);
     });
   }
