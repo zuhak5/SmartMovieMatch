@@ -38,11 +38,16 @@ export function subscribeToSession(callback) {
   };
 }
 
-export async function registerUser({ username, password }) {
+export async function registerUser({ username, password, name }) {
   const sanitized = sanitizeUsername(username);
   validateCredentials(sanitized, password);
 
-  const response = await authRequest("signup", { username: sanitized, password });
+  const payload = { username: sanitized, password };
+  if (typeof name === "string" && name.trim()) {
+    payload.name = name.trim();
+  }
+
+  const response = await authRequest("signup", payload);
   const session = normalizeSession(response && response.session);
   if (!session) {
     throw new Error("Unexpected response from the authentication service.");
@@ -197,9 +202,14 @@ function normalizeSession(value) {
   if (!value.username || typeof value.username !== "string") {
     return null;
   }
+  const displayName =
+    typeof value.displayName === "string" && value.displayName.trim()
+      ? value.displayName.trim()
+      : value.username;
   return {
     token: value.token,
     username: value.username,
+    displayName,
     createdAt: value.createdAt || null,
     lastLoginAt: value.lastLoginAt || null,
     lastPreferencesSync: value.lastPreferencesSync || null,

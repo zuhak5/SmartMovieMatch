@@ -45,6 +45,46 @@ const state = {
   }
 };
 
+function getActiveDisplayName() {
+  if (state.session) {
+    if (state.session.displayName && state.session.displayName.trim()) {
+      return state.session.displayName.trim();
+    }
+    if (state.session.username && state.session.username.trim()) {
+      return state.session.username.trim();
+    }
+  }
+  if (
+    state.session &&
+    state.session.preferencesSnapshot &&
+    typeof state.session.preferencesSnapshot.name === "string"
+  ) {
+    const fromSnapshot = state.session.preferencesSnapshot.name.trim();
+    if (fromSnapshot) {
+      return fromSnapshot;
+    }
+  }
+  return "";
+}
+
+function updateCountValueLabel() {
+  const countInput = $("countInput");
+  const valueEl = $("countValue");
+  if (!countInput || !valueEl) {
+    return;
+  }
+  const parsed = parseInt(countInput.value || "0", 10);
+  let value = Number.isNaN(parsed) ? 0 : parsed;
+  if (value > 0) {
+    value = Math.min(20, Math.max(4, value));
+    if (String(value) !== countInput.value) {
+      countInput.value = String(value);
+    }
+  }
+  const suffix = value === 1 ? "movie" : "movies";
+  valueEl.textContent = value > 0 ? `${value} ${suffix}` : `0 ${suffix}`;
+}
+
 function isAbortError(error) {
   return !!error && error.name === "AbortError";
 }
@@ -106,11 +146,6 @@ function wireEvents() {
 
   const updatePreview = () => updatePreferencesPreview();
 
-  const nameInput = $("nameInput");
-  if (nameInput) {
-    nameInput.addEventListener("input", updatePreview);
-  }
-
   document
     .querySelectorAll('input[name="genre"]')
     .forEach((checkbox) =>
@@ -147,9 +182,13 @@ function wireEvents() {
 
   const countInput = $("countInput");
   if (countInput) {
-    const handleCountChange = () => updatePreview();
+    const handleCountChange = () => {
+      updateCountValueLabel();
+      updatePreview();
+    };
     countInput.addEventListener("input", handleCountChange);
     countInput.addEventListener("change", handleCountChange);
+    updateCountValueLabel();
   }
 
   const recNudgeBtn = $("recNudgeBtn");
@@ -217,12 +256,15 @@ function updatePreferencesPreview() {
     return;
   }
 
-  const nameInput = $("nameInput");
   const countInput = $("countInput");
 
-  const name = nameInput ? nameInput.value.trim() : "";
+  const name = getActiveDisplayName();
   const desiredCountRaw = countInput ? countInput.value : "";
-  const desiredCount = parseInt(desiredCountRaw, 10);
+  let desiredCount = parseInt(desiredCountRaw, 10);
+  if (Number.isNaN(desiredCount)) {
+    desiredCount = 12;
+  }
+  desiredCount = Math.min(20, Math.max(4, desiredCount));
 
   const selectedGenreInputs = Array.from(
     document.querySelectorAll('label.genre-pill input[name="genre"]:checked')
@@ -349,7 +391,7 @@ async function getRecommendations(isShuffleOnly) {
   };
 
   try {
-    const name = $("nameInput").value.trim();
+    const name = getActiveDisplayName();
     const selectedGenres = Array.from(
       document.querySelectorAll('input[name="genre"]:checked')
     ).map((cb) => cb.value);
@@ -358,12 +400,13 @@ async function getRecommendations(isShuffleOnly) {
     const favoriteTitles = state.favorites.map((fav) => fav.title).filter(Boolean);
 
     const countInput = $("countInput");
-    let desiredCount = parseInt(countInput.value || "8", 10);
+    let desiredCount = parseInt(countInput.value || "12", 10);
     if (Number.isNaN(desiredCount)) {
-      desiredCount = 8;
+      desiredCount = 12;
     }
-    desiredCount = Math.min(12, Math.max(4, desiredCount));
+    desiredCount = Math.min(20, Math.max(4, desiredCount));
     countInput.value = String(desiredCount);
+    updateCountValueLabel();
     updatePreferencesPreview();
 
     const preferencesSnapshot = {
@@ -782,8 +825,10 @@ function updateAccountUi(session) {
     return;
   }
 
-  if (session && session.username) {
-    greeting.textContent = `Signed in as ${session.username}`;
+  const displayName = session ? session.displayName || session.username || "" : "";
+
+  if (displayName) {
+    greeting.textContent = `Signed in as ${displayName}`;
     greeting.classList.add("account-greeting-auth");
     loginLink.style.display = "none";
     logoutBtn.style.display = "inline-flex";
@@ -824,6 +869,7 @@ function hydrateFromSession(session) {
     state.favorites = [];
     refreshWatchedUi();
     refreshFavoritesUi();
+    updateCountValueLabel();
     return;
   }
 
@@ -864,17 +910,13 @@ function hydrateFromSession(session) {
     lastWatchedSync: session.lastWatchedSync || null,
     lastFavoritesSync: session.lastFavoritesSync || null
   };
+  updateCountValueLabel();
 }
 
 
 function applyPreferencesSnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== "object") {
     return;
-  }
-
-  const nameInput = $("nameInput");
-  if (nameInput) {
-    nameInput.value = snapshot.name || "";
   }
 
   if (Array.isArray(snapshot.selectedGenres)) {
@@ -916,7 +958,9 @@ function applyPreferencesSnapshot(snapshot) {
   if (countInput) {
     const desiredCount = parseInt(snapshot.desiredCount, 10);
     if (!Number.isNaN(desiredCount)) {
-      countInput.value = String(desiredCount);
+      const clamped = Math.min(20, Math.max(4, desiredCount));
+      countInput.value = String(clamped);
+      updateCountValueLabel();
     }
   }
 

@@ -78,10 +78,12 @@ async function handleAction(action, req, payload) {
 async function signup(payload) {
   const usernameInput = sanitizeUsername(payload.username);
   const password = typeof payload.password === "string" ? payload.password : "";
+  const displayNameInput = sanitizeDisplayName(payload.name);
 
   validateCredentials(usernameInput, password);
 
   const canonical = canonicalUsername(usernameInput);
+  const preferredDisplayName = displayNameInput || usernameInput;
 
   const existingRow = await selectUserRow(canonical);
   if (existingRow) {
@@ -94,7 +96,7 @@ async function signup(payload) {
 
   const userRow = await insertUserRow({
     username: canonical,
-    display_name: usernameInput,
+    display_name: preferredDisplayName,
     password_hash: passwordHash,
     salt,
     created_at: now,
@@ -542,6 +544,13 @@ function sanitizeUsername(username) {
   return username.trim();
 }
 
+function sanitizeDisplayName(name) {
+  if (typeof name !== "string") {
+    return "";
+  }
+  return name.trim().slice(0, 120);
+}
+
 function canonicalUsername(username) {
   return sanitizeUsername(username).toLowerCase();
 }
@@ -585,9 +594,11 @@ function mapSessionRow(row) {
 }
 
 function toSessionResponse(userRecord, sessionRecord) {
+  const displayName = userRecord.displayName || userRecord.username;
   return {
     token: sessionRecord.token,
-    username: userRecord.displayName,
+    username: userRecord.username,
+    displayName,
     createdAt: userRecord.createdAt,
     lastLoginAt: userRecord.lastLoginAt || null,
     lastPreferencesSync: userRecord.lastPreferencesSync || null,

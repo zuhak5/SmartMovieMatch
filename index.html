@@ -38,7 +38,7 @@
         <div class="panel-header">
           <div>
             <div class="panel-title">Your vibe</div>
-            <div class="panel-subtitle">Name, genres, mood &amp; what you’ve liked</div>
+            <div class="panel-subtitle">Genres, mood &amp; what you’ve liked</div>
           </div>
         </div>
         <p class="hint-text">
@@ -47,23 +47,6 @@
         </p>
 
         <form id="prefsForm">
-          <!-- Name -->
-          <div class="field-group">
-            <div class="field-label-row">
-              <label for="nameInput">Name <span class="field-label-secondary">(optional)</span></label>
-              <div class="field-label-secondary">
-                I’ll use this to personalize headings only.
-              </div>
-            </div>
-            <input
-              id="nameInput"
-              class="input-base input-text"
-              type="text"
-              autocomplete="name"
-              placeholder="e.g., Alex"
-            />
-          </div>
-
           <!-- Genres -->
           <div class="field-group">
             <div class="field-label-row">
@@ -221,17 +204,22 @@
             <div class="field-label-row">
               <label for="countInput">Number of suggestions</label>
               <div class="field-label-secondary">
-                Between 4 and 12 movies per batch.
+                Drag to choose how many movies to fetch (4–20).
               </div>
             </div>
-            <input
-              id="countInput"
-              class="input-base input-text"
-              type="number"
-              min="4"
-              max="12"
-              value="8"
-            />
+            <div class="range-control">
+              <input
+                id="countInput"
+                class="input-range"
+                type="range"
+                min="4"
+                max="20"
+                step="1"
+                value="12"
+                aria-describedby="countValue"
+              />
+              <span id="countValue" class="range-value" aria-live="polite">12 movies</span>
+            </div>
           </div>
 
           <div class="preferences-preview" id="preferencesPreview" aria-live="polite">
