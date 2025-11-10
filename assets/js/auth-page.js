@@ -9,10 +9,27 @@ const state = {
   mode: "login"
 };
 
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      const comma = result.indexOf(",");
+      // strip "data:*/*;base64," prefix if present
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = (e) => reject(e);
+    reader.readAsDataURL(file);
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+
   const form = $("authForm");
   const toggleBtn = $("authModeToggle");
   const status = $("authStatus");
+  const avatarInput = $("avatarInput");
+  const avatarGroup = $("avatarGroup");
   const submitBtn = $("authSubmit");
   const nameInput = $("displayNameInput");
 
@@ -62,7 +79,15 @@ document.addEventListener("DOMContentLoaded", () => {
         '<span class="status-loading">Contacting the sync service…</span>';
 
       if (state.mode === "signup") {
-        await registerUser({ username, password, name: displayNameValue });
+let avatarBase64 = null;
+let avatarFileName = null;
+if (avatarInput && avatarInput.files && avatarInput.files[0]) {
+  const file = avatarInput.files[0];
+  avatarBase64 = await fileToBase64(file);
+  avatarFileName = file.name;
+}
+await registerUser({ username, password, name: displayNameValue, avatarBase64, avatarFileName });
+
         status.innerHTML =
           '<span class="status-success">Account created! Redirecting…</span>';
       } else {

@@ -98,3 +98,23 @@ Enable Row-Level Security (RLS) on both tables and create policies that allow th
 ## Contributing
 
 Issues and pull requests are welcome. Please describe any significant changes, and where possible include reproduction steps for bug reports.
+
+## Avatar Upload (Supabase) Integration
+
+This update adds avatar upload during signup.
+
+- Storage bucket used: `avatars` (public recommended)
+- New columns in `public.auth_users`: `avatar_path`, `avatar_url`
+- Server API: `/api/signup` (uploads avatar using Service Role, inserts user & session)
+- Client: signup page includes `<input type="file" name="avatar" />` and posts base64 to API
+- Migration: `supabase/migrations/add_auth_users_avatar.sql` (idempotent)
+
+### Environment
+Set in `.env.local`:
+```
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+> Make sure your Supabase Storage bucket `avatars` exists. If it is private, switch `getPublicUrl` to signed URLs.

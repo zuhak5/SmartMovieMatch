@@ -7,6 +7,33 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const AUTH_SERVICE_CONFIGURED = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 
+function safeFilename(name) {
+  return String(name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+async function uploadToStorage(bucket, objectPath, buffer, contentType = 'application/octet-stream') {
+  if (!AUTH_SERVICE_CONFIGURED) {
+    throw new HttpError(500, "Auth service not configured");
+  }
+  const target = new URL(`/storage/v1/object/${bucket}/${objectPath}`, SUPABASE_URL).toString();
+  const res = await fetch(target, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      'Content-Type': contentType,
+      'x-upsert': 'false'
+    },
+    body: buffer
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new HttpError(res.status, "Avatar upload failed: " + text);
+  }
+  // Public URL (if bucket is public)
+  const publicUrl = new URL(`/storage/v1/object/public/${bucket}/${objectPath}`, SUPABASE_URL).toString();
+  return { path: objectPath, publicUrl };
+}
+
 class HttpError extends Error {
   constructor(status, message) {
     super(message);
@@ -93,23 +120,28 @@ async function signup(payload) {
   }
 
   const now = new Date().toISOString();
+let avatar_path = null;
+let avatar_url = null;
+try {
+  const base64 = typeof payload.avatarBase64 === "string" && payload.avatarBase64.trim() ? payload.avatarBase64.trim() : null;
+  const originalName = safeFilename(payload.avatarFileName || 'avatar.png');
+  if (base64) {
+    const buffer = Buffer.from(base64, 'base64');
+    const objectPath = `${canonical}/${Date.now()}-${originalName}`;
+    const uploaded = await uploadToStorage('avatars', objectPath, buffer, 'application/octet-stream');
+    avatar_path = uploaded.path;
+    avatar_url = uploaded.publicUrl;
+  }
+} catch (e) {
+  console.warn("Avatar upload skipped:", e && e.message ? e.message : e);
+}
+
   const salt = crypto.randomBytes(16).toString("hex");
   const passwordHash = hashPassword(password, salt);
 
-  const userRow = await insertUserRow({
-    username: canonical,
-    display_name: preferredDisplayName,
-    password_hash: passwordHash,
-    salt,
-    created_at: now,
-    last_login_at: now,
-    last_preferences_sync: null,
-    last_watched_sync: null,
-    last_favorites_sync: null,
-    preferences_snapshot: null,
-    watched_history: [],
-    favorites_list: []
-  });
+  \1\2,
+    avatar_path: avatar_path,
+    avatar_url: avatar_url\3;
 
   const userRecord = mapUserRow(userRow);
   const sessionRecord = await createSessionRecord(userRecord, now);

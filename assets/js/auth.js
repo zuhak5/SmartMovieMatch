@@ -38,11 +38,11 @@ export function subscribeToSession(callback) {
   };
 }
 
-export async function registerUser({ username, password, name }) {
+export async function registerUser({ username, password, name, avatarBase64 = null, avatarFileName = null }) {
   const sanitized = sanitizeUsername(username);
   validateCredentials(sanitized, password);
 
-  const payload = { username: sanitized, password };
+  const payload = { username: sanitized, password, name, avatarBase64, avatarFileName };
   if (typeof name === "string" && name.trim()) {
     payload.name = name.trim();
   }
