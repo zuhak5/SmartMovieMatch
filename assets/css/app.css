@@ -387,6 +387,7 @@ h6 {
 
 @media (min-width: 960px) {
   .app-main {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.45fr);
     gap: 2rem;
   }
 }
