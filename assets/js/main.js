@@ -32,6 +32,7 @@ const state = {
   watchedMovies: [],
   favorites: [],
   lastRecSeed: Math.random(),
+  moodIntensity: 1,
   activeCollectionView: "favorites",
   session: null,
   watchedSyncTimer: null,
@@ -265,6 +266,11 @@ function updatePreferencesPreview() {
     })
     .filter(Boolean);
 
+  const moodInput = document.querySelector('input[name="mood"]:checked');
+  const moodValue = moodInput ? moodInput.value : "any";
+  const moodLabel = getMoodSummaryLabel(moodValue, state.moodIntensity);
+  const energyLabel = getMoodIntensityLabel(state.moodIntensity);
+
   container.innerHTML = "";
 
   const title = document.createElement("div");
@@ -290,6 +296,10 @@ function updatePreferencesPreview() {
     chipsWrap.appendChild(chip);
   };
 
+  if (name) {
+    addChip("Name", name);
+  }
+
   if (selectedGenreLabels.length) {
     const maxGenres = 3;
     const visible = selectedGenreLabels.slice(0, maxGenres);
@@ -297,6 +307,14 @@ function updatePreferencesPreview() {
     const genreSummary =
       visible.join(" • ") + (rest > 0 ? ` +${rest} more` : "");
     addChip("Genres", genreSummary);
+  }
+
+  if (moodLabel) {
+    addChip("Mood", moodLabel);
+  }
+
+  if (energyLabel) {
+    addChip("Energy", energyLabel);
   }
 
   if (state.favorites.length) {
@@ -323,7 +341,7 @@ function updatePreferencesPreview() {
     const empty = document.createElement("div");
     empty.className = "preferences-preview-empty";
     empty.textContent =
-      "Choose genres, favorites, or log watched titles and I’ll summarize them here in real time.";
+      "Choose genres, mood, or favorites and I’ll summarize them here in real time.";
     container.appendChild(empty);
   }
 }
@@ -355,6 +373,8 @@ async function getRecommendations(isShuffleOnly) {
     const selectedGenres = Array.from(
       document.querySelectorAll('input[name="genre"]:checked')
     ).map((cb) => cb.value);
+    const moodInput = document.querySelector('input[name="mood"]:checked');
+    const mood = moodInput ? moodInput.value : "any";
     const favoriteTitles = state.favorites.map((fav) => fav.title).filter(Boolean);
 
     updatePreferencesPreview();
@@ -362,6 +382,8 @@ async function getRecommendations(isShuffleOnly) {
     const preferencesSnapshot = {
       name,
       selectedGenres,
+      mood,
+      moodIntensity: state.moodIntensity,
       favoriteTitles: favoriteTitles.slice(-6),
       watchedSample: state.watchedMovies.slice(-5).map((movie) => movie.title),
       seed: state.lastRecSeed,
@@ -385,6 +407,12 @@ async function getRecommendations(isShuffleOnly) {
     }
 
     const metaEl = $("recMetaPrimary");
+    const moodSummaryRaw = getMoodSummaryLabel(mood, state.moodIntensity);
+    let moodMeta = moodSummaryRaw.toLowerCase();
+    if (moodMeta.includes("mix")) {
+      const article = /^(?:[aeiou])/i.test(moodMeta.trim()) ? "an" : "a";
+      moodMeta = `${article} ${moodMeta}`;
+    }
     const genreLabel = selectedGenres.length
       ? "inside your selected genres"
       : "across popular genres";
@@ -400,6 +428,8 @@ async function getRecommendations(isShuffleOnly) {
     const candidates = await discoverCandidateMovies(
       {
         selectedGenres,
+        mood,
+        moodIntensity: state.moodIntensity,
         favoriteTitles,
         seed: state.lastRecSeed
       },
@@ -428,6 +458,7 @@ async function getRecommendations(isShuffleOnly) {
       candidates,
       {
         selectedGenres,
+        mood,
         favoriteTitles,
         maxCount: Number.POSITIVE_INFINITY,
         seed: state.lastRecSeed
@@ -610,50 +641,6 @@ function revealMoreRecommendations() {
 function handleMarkWatched(omdbMovie) {
   const added = markAsWatched(omdbMovie);
   if (added) {
-    const imdbID = omdbMovie && omdbMovie.imdbID ? omdbMovie.imdbID : null;
-    const normalizedTitle =
-      omdbMovie && omdbMovie.Title ? omdbMovie.Title.toLowerCase() : "";
-    if (state.recommendations.length) {
-      const before = state.recommendations.length;
-      state.recommendations = state.recommendations.filter((entry) => {
-        if (!entry) {
-          return false;
-        }
-        const entryOmdb = entry.omdb || null;
-        if (entryOmdb && imdbID && entryOmdb.imdbID === imdbID) {
-          return false;
-        }
-        if (
-          entryOmdb &&
-          normalizedTitle &&
-          entryOmdb.Title &&
-          entryOmdb.Title.toLowerCase() === normalizedTitle
-        ) {
-          return false;
-        }
-        const entryTmdb = entry.tmdb || entry.candidate || null;
-        if (
-          entryTmdb &&
-          normalizedTitle &&
-          (entryTmdb.title || entryTmdb.original_title) &&
-          (entryTmdb.title || entryTmdb.original_title).toLowerCase() === normalizedTitle
-        ) {
-          return false;
-        }
-        return true;
-      });
-      if (state.recommendations.length !== before) {
-        const visible =
-          typeof state.visibleRecommendations === "number"
-            ? state.visibleRecommendations
-            : 0;
-        state.visibleRecommendations = Math.min(
-          visible,
-          state.recommendations.length
-        );
-        updateRecommendationsView();
-      }
-    }
     getRecommendations(true);
   }
   return added;
@@ -855,6 +842,63 @@ function updateCollectionVisibility() {
   }
 }
 
+function updateMoodIntensityLabels() {
+  document.querySelectorAll('[data-intensity-value]').forEach((label) => {
+    const value = parseInt(label.getAttribute('data-intensity-value') || '0', 10);
+    label.classList.toggle('active', value === state.moodIntensity);
+  });
+}
+
+function updateMoodDynamicCopy() {
+  const moodCopy = $("moodDynamicCopy");
+  if (!moodCopy) {
+    return;
+  }
+  const moodInput = document.querySelector('input[name="mood"]:checked');
+  const moodValue = moodInput ? moodInput.value : "any";
+  const summary = getMoodSummaryLabel(moodValue, state.moodIntensity);
+  if (moodValue === "any") {
+    moodCopy.textContent = `Expect a ${summary.toLowerCase()}.`;
+  } else {
+    moodCopy.textContent = `Expect ${summary.toLowerCase()}.`;
+  }
+}
+
+function getMoodIntensityLabel(intensity) {
+  const value = Math.min(2, Math.max(0, Number(intensity)));
+  if (value <= 0) {
+    return "Laid-back";
+  }
+  if (value >= 2) {
+    return "High energy";
+  }
+  return "Balanced";
+}
+
+function getMoodSummaryLabel(moodValue, intensity) {
+  const value = typeof intensity === "number" ? intensity : 1;
+  if (moodValue === "light") {
+    if (value >= 2) {
+      return "Uplifting crowd-pleasers";
+    }
+    if (value <= 0) {
+      return "Cozy comfort picks";
+    }
+    return "Feel-good stories";
+  }
+  if (moodValue === "dark") {
+    if (value >= 2) {
+      return "Edge-of-your-seat thrillers";
+    }
+    if (value <= 0) {
+      return "Moody slow-burns";
+    }
+    return "Dark & intense picks";
+  }
+  const intensityLabel = getMoodIntensityLabel(value).toLowerCase();
+  return `${intensityLabel} mix of moods`;
+}
+
 function updateAccountUi(session) {
   const greeting = $("accountGreeting");
   const loginLink = $("accountLoginLink");
@@ -992,6 +1036,8 @@ function applyPreferencesSnapshot(snapshot) {
   }
 
   updatePreferencesPreview();
+  updateMoodIntensityLabels();
+  updateMoodDynamicCopy();
 }
 
 function applyWatchedHistory(history) {

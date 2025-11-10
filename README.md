@@ -1,6 +1,6 @@
 # Smart Movie Match
 
-Smart Movie Match is a client-first movie recommendation assistant. It lets people describe what they like, pick genres, and then generates a curated batch of films with trailers and IMDb data. The app stores your "watched" history locally so suggestions improve over time, and (when you log in) syncs preferences to Supabase so your account travels with you.
+Smart Movie Match is a client-first movie recommendation assistant. It lets people describe what they like, pick genres and a preferred mood, and then generates a curated batch of films with trailers and IMDb data. The app stores your "watched" history locally so suggestions improve over time, and (when you log in) syncs preferences to Supabase so your account travels with you.
 
 ## Features
 
