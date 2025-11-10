@@ -69,27 +69,27 @@ export function renderWatchedList(watchedMovies, options = {}) {
     .slice()
     .reverse()
     .forEach((movie) => {
-      const card = document.createElement("div");
-      card.className = "watched-card";
+      const item = document.createElement("div");
+      item.className = "favorite-chip watched-chip";
 
-      const poster = document.createElement("div");
-      poster.className = "watched-poster";
-      poster.setAttribute("aria-hidden", "true");
+      const posterWrap = document.createElement("div");
+      posterWrap.className = "favorite-poster";
+      posterWrap.setAttribute("aria-hidden", "true");
       const posterIcon = document.createElement("span");
       posterIcon.className = "watched-poster-icon";
       posterIcon.textContent = "✓";
       posterIcon.setAttribute("aria-hidden", "true");
-      poster.appendChild(posterIcon);
+      posterWrap.appendChild(posterIcon);
 
-      const body = document.createElement("div");
-      body.className = "watched-body";
+      const content = document.createElement("div");
+      content.className = "favorite-body";
 
       const title = document.createElement("div");
-      title.className = "watched-title";
+      title.className = "favorite-title";
       title.textContent = movie.title + (movie.year ? ` (${movie.year})` : "");
 
       const meta = document.createElement("div");
-      meta.className = "watched-meta";
+      meta.className = "favorite-genres watched-meta";
       const parts = [];
       if (typeof movie.rating === "number" && Number.isFinite(movie.rating)) {
         parts.push(`IMDb ${movie.rating.toFixed(1)}`);
@@ -99,30 +99,29 @@ export function renderWatchedList(watchedMovies, options = {}) {
       }
       meta.textContent = parts.length ? parts.join(" • ") : "Marked as watched";
 
-      body.appendChild(title);
-      body.appendChild(meta);
+      content.appendChild(title);
+      content.appendChild(meta);
 
-      card.appendChild(poster);
-      card.appendChild(body);
+      item.appendChild(posterWrap);
+      item.appendChild(content);
 
       if (onRemove) {
         const removeBtn = document.createElement("button");
         removeBtn.type = "button";
-        removeBtn.className = "watched-remove";
+        removeBtn.className = "favorite-remove";
         removeBtn.setAttribute(
           "aria-label",
           `Remove ${movie.title}${movie.year ? ` (${movie.year})` : ""} from watched`
         );
-        removeBtn.innerHTML =
-          '<span class="sr-only">Remove</span><span aria-hidden="true">✕</span>';
+        removeBtn.innerHTML = "✕";
         removeBtn.addEventListener("click", () => {
           playUiClick();
           onRemove(movie);
         });
-        card.appendChild(removeBtn);
+        item.appendChild(removeBtn);
       }
 
-      listEl.appendChild(card);
+      listEl.appendChild(item);
     });
 }
 

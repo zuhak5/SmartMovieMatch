@@ -29,6 +29,10 @@ import { playUiClick } from "./sound.js";
 const state = {
   watchedMovies: [],
   favorites: [],
+  currentRecommendations: [],
+  visibleRecommendations: 0,
+  recommendationsPageSize: 20,
+  recommendationsCap: 60,
   lastRecSeed: Math.random(),
   moodIntensity: 1,
   activeCollectionView: "favorites",
@@ -67,26 +71,85 @@ function getActiveDisplayName() {
   return "";
 }
 
-function updateCountValueLabel() {
-  const countInput = $("countInput");
-  const valueEl = $("countValue");
-  if (!countInput || !valueEl) {
-    return;
-  }
-  const parsed = parseInt(countInput.value || "0", 10);
-  let value = Number.isNaN(parsed) ? 0 : parsed;
-  if (value > 0) {
-    value = Math.min(20, Math.max(4, value));
-    if (String(value) !== countInput.value) {
-      countInput.value = String(value);
-    }
-  }
-  const suffix = value === 1 ? "movie" : "movies";
-  valueEl.textContent = value > 0 ? `${value} ${suffix}` : `0 ${suffix}`;
-}
-
 function isAbortError(error) {
   return !!error && error.name === "AbortError";
+}
+
+function hideShowMoreButton() {
+  const btn = $("showMoreBtn");
+  if (btn) {
+    btn.style.display = "none";
+  }
+}
+
+function setRecommendationResults(items) {
+  state.currentRecommendations = Array.isArray(items) ? items.slice() : [];
+  state.visibleRecommendations = state.currentRecommendations.length
+    ? Math.min(state.recommendationsPageSize, state.currentRecommendations.length)
+    : 0;
+  updateRecommendationDisplay();
+}
+
+function updateRecommendationDisplay() {
+  const total = state.currentRecommendations.length;
+  let visible = state.visibleRecommendations;
+
+  if (total === 0) {
+    visible = 0;
+  } else {
+    if (!visible || visible < 0) {
+      visible = Math.min(state.recommendationsPageSize, total);
+      state.visibleRecommendations = visible;
+    } else if (visible > total) {
+      visible = total;
+      state.visibleRecommendations = visible;
+    }
+  }
+
+  const itemsToRender = total ? state.currentRecommendations.slice(0, visible) : [];
+  renderRecommendations(itemsToRender, state.watchedMovies, {
+    favorites: state.favorites,
+    onMarkWatched: handleMarkWatched,
+    onToggleFavorite: handleToggleFavorite
+  });
+
+  const showMoreBtn = $("showMoreBtn");
+  if (!showMoreBtn) {
+    return;
+  }
+
+  const hasMore = total > visible;
+  showMoreBtn.style.display = hasMore ? "inline-flex" : "none";
+  if (!hasMore) {
+    return;
+  }
+
+  const remaining = total - visible;
+  let label;
+  if (remaining === 1) {
+    label = "Show remaining 1 movie";
+  } else if (remaining <= state.recommendationsPageSize) {
+    label = `Show remaining ${remaining} movies`;
+  } else {
+    label = `Show more (${remaining} more)`;
+  }
+  showMoreBtn.textContent = label;
+}
+
+function showMoreRecommendations() {
+  const total = state.currentRecommendations.length;
+  if (!total) {
+    return;
+  }
+  const nextVisible = Math.min(
+    total,
+    state.visibleRecommendations + state.recommendationsPageSize
+  );
+  if (nextVisible === state.visibleRecommendations) {
+    return;
+  }
+  state.visibleRecommendations = nextVisible;
+  updateRecommendationDisplay();
 }
 
 document.addEventListener("DOMContentLoaded", init);
@@ -180,23 +243,20 @@ function wireEvents() {
     syncMoodIntensity();
   }
 
-  const countInput = $("countInput");
-  if (countInput) {
-    const handleCountChange = () => {
-      updateCountValueLabel();
-      updatePreview();
-    };
-    countInput.addEventListener("input", handleCountChange);
-    countInput.addEventListener("change", handleCountChange);
-    updateCountValueLabel();
-  }
-
   const recNudgeBtn = $("recNudgeBtn");
   if (recNudgeBtn) {
     recNudgeBtn.addEventListener("click", () => {
       playUiClick();
       state.lastRecSeed = Math.random();
       getRecommendations(true);
+    });
+  }
+
+  const showMoreBtn = $("showMoreBtn");
+  if (showMoreBtn) {
+    showMoreBtn.addEventListener("click", () => {
+      playUiClick();
+      showMoreRecommendations();
     });
   }
 
@@ -238,6 +298,7 @@ function refreshWatchedUi() {
   updatePreferencesPreview();
   updateMoodIntensityLabels();
   updateMoodDynamicCopy();
+  updateRecommendationDisplay();
 }
 
 function refreshFavoritesUi() {
@@ -247,6 +308,7 @@ function refreshFavoritesUi() {
   updatePreferencesPreview();
   updateMoodIntensityLabels();
   updateMoodDynamicCopy();
+  updateRecommendationDisplay();
 }
 
 
@@ -256,16 +318,7 @@ function updatePreferencesPreview() {
     return;
   }
 
-  const countInput = $("countInput");
-
   const name = getActiveDisplayName();
-  const desiredCountRaw = countInput ? countInput.value : "";
-  let desiredCount = parseInt(desiredCountRaw, 10);
-  if (Number.isNaN(desiredCount)) {
-    desiredCount = 12;
-  }
-  desiredCount = Math.min(20, Math.max(4, desiredCount));
-
   const selectedGenreInputs = Array.from(
     document.querySelectorAll('label.genre-pill input[name="genre"]:checked')
   );
@@ -344,10 +397,6 @@ function updatePreferencesPreview() {
     addChip("Favorites", favoritesSummary);
   }
 
-  if (!Number.isNaN(desiredCount) && desiredCount > 0) {
-    addChip("Batch size", `${desiredCount} movies`);
-  }
-
   if (state.watchedMovies.length) {
     const latest = state.watchedMovies[state.watchedMovies.length - 1];
     const latestTitle = latest ? latest.title : "";
@@ -399,14 +448,6 @@ async function getRecommendations(isShuffleOnly) {
     const mood = moodInput ? moodInput.value : "any";
     const favoriteTitles = state.favorites.map((fav) => fav.title).filter(Boolean);
 
-    const countInput = $("countInput");
-    let desiredCount = parseInt(countInput.value || "12", 10);
-    if (Number.isNaN(desiredCount)) {
-      desiredCount = 12;
-    }
-    desiredCount = Math.min(20, Math.max(4, desiredCount));
-    countInput.value = String(desiredCount);
-    updateCountValueLabel();
     updatePreferencesPreview();
 
     const preferencesSnapshot = {
@@ -415,7 +456,6 @@ async function getRecommendations(isShuffleOnly) {
       mood,
       moodIntensity: state.moodIntensity,
       favoriteTitles: favoriteTitles.slice(-6),
-      desiredCount,
       watchedSample: state.watchedMovies.slice(-5).map((movie) => movie.title),
       seed: state.lastRecSeed,
       timestamp: new Date().toISOString()
@@ -428,6 +468,9 @@ async function getRecommendations(isShuffleOnly) {
       true
     );
     showSkeletons();
+    hideShowMoreButton();
+    state.currentRecommendations = [];
+    state.visibleRecommendations = 0;
 
     const titleEl = $("recTitle");
     if (name) {
@@ -451,7 +494,7 @@ async function getRecommendations(isShuffleOnly) {
       : "with a bias toward well-loved titles";
 
     metaEl.textContent =
-      `Curating ${moodMeta} ${genreLabel}, blending TMDB discovery with OMDb details and YouTube trailers, ${watchedLabel}. Showing up to ${desiredCount} movies.`;
+      `Curating ${moodMeta} ${genreLabel}, blending TMDB discovery with OMDb details and YouTube trailers, ${watchedLabel}. I’ll surface every strong match available.`;
 
     const candidates = await discoverCandidateMovies(
       {
@@ -476,7 +519,7 @@ async function getRecommendations(isShuffleOnly) {
         "I couldn’t find anything matching that combo. Try loosening genres or mood a bit.",
         false
       );
-      renderRecommendations([], state.watchedMovies, { favorites: state.favorites });
+      setRecommendationResults([]);
       return;
     }
 
@@ -486,7 +529,7 @@ async function getRecommendations(isShuffleOnly) {
         selectedGenres,
         mood,
         favoriteTitles,
-        maxCount: desiredCount,
+        maxCount: state.recommendationsCap,
         seed: state.lastRecSeed
       },
       state.watchedMovies
@@ -504,7 +547,7 @@ async function getRecommendations(isShuffleOnly) {
         "Everything I found is already in your watched list. Try new genres or clear some history.",
         false
       );
-      renderRecommendations([], state.watchedMovies, { favorites: state.favorites });
+      setRecommendationResults([]);
       return;
     }
 
@@ -524,7 +567,7 @@ async function getRecommendations(isShuffleOnly) {
         "TMDB found candidates, but OMDb didn’t have details for them. Try again in a bit or tweak your filters.",
         false
       );
-      renderRecommendations([], state.watchedMovies, { favorites: state.favorites });
+      setRecommendationResults([]);
       return;
     }
 
@@ -534,15 +577,14 @@ async function getRecommendations(isShuffleOnly) {
       return;
     }
 
-    setRecStatus(
-      "Here’s a curated batch based on your input. Mark anything you’ve already seen – I’ll keep learning.",
-      false
-    );
-    renderRecommendations(withTrailers, state.watchedMovies, {
-      favorites: state.favorites,
-      onMarkWatched: handleMarkWatched,
-      onToggleFavorite: handleToggleFavorite
-    });
+    setRecommendationResults(withTrailers);
+    const totalCount = withTrailers.length;
+    const hasMore = totalCount > state.recommendationsPageSize;
+    const countLabel = totalCount === 1 ? "match" : "matches";
+    const statusMessage = hasMore
+      ? `Curated ${totalCount} ${countLabel}. Tap “Show more” to keep exploring.`
+      : `Curated ${totalCount} ${countLabel}. Enjoy!`;
+    setRecStatus(statusMessage, false);
   } catch (error) {
     if (signal.aborted || isStale() || isAbortError(error)) {
       return;
@@ -552,7 +594,7 @@ async function getRecommendations(isShuffleOnly) {
       "Something went wrong while talking to the APIs. Check your internet connection and API keys, then try again."
     );
     setRecStatus("I hit an error while fetching movies.", false);
-    renderRecommendations([], state.watchedMovies, { favorites: state.favorites });
+    setRecommendationResults([]);
   } finally {
     finalizeRequest();
   }
@@ -869,7 +911,6 @@ function hydrateFromSession(session) {
     state.favorites = [];
     refreshWatchedUi();
     refreshFavoritesUi();
-    updateCountValueLabel();
     return;
   }
 
@@ -951,16 +992,6 @@ function applyPreferencesSnapshot(snapshot) {
       state.moodIntensity = clamped;
       updateMoodIntensityLabels();
       updateMoodDynamicCopy();
-    }
-  }
-
-  const countInput = $("countInput");
-  if (countInput) {
-    const desiredCount = parseInt(snapshot.desiredCount, 10);
-    if (!Number.isNaN(desiredCount)) {
-      const clamped = Math.min(20, Math.max(4, desiredCount));
-      countInput.value = String(clamped);
-      updateCountValueLabel();
     }
   }
 
