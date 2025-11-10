@@ -140,6 +140,32 @@ function wireEvents() {
       })
     );
 
+  document
+    .querySelectorAll('input[name="mood"]')
+    .forEach((radio) =>
+      radio.addEventListener("change", () => {
+        playUiClick();
+        updateMoodDynamicCopy();
+        updatePreview();
+      })
+    );
+
+  const moodIntensityInput = $("moodIntensity");
+  if (moodIntensityInput) {
+    const syncMoodIntensity = () => {
+      const raw = parseInt(moodIntensityInput.value || "1", 10);
+      state.moodIntensity = Number.isNaN(raw) ? 1 : raw;
+      updateMoodIntensityLabels();
+      updateMoodDynamicCopy();
+      updatePreview();
+    };
+    moodIntensityInput.addEventListener("input", () => {
+      playUiClick();
+      syncMoodIntensity();
+    });
+    syncMoodIntensity();
+  }
+
   const recNudgeBtn = $("recNudgeBtn");
   if (recNudgeBtn) {
     recNudgeBtn.addEventListener("click", () => {
@@ -193,6 +219,8 @@ function refreshWatchedUi() {
   updateWatchedSummary(state.watchedMovies);
   updateCollectionVisibility();
   updatePreferencesPreview();
+  updateMoodIntensityLabels();
+  updateMoodDynamicCopy();
   if (state.recommendations.length && !state.activeRecAbort) {
     updateRecommendationsView();
   }
@@ -203,6 +231,8 @@ function refreshFavoritesUi() {
   updateFavoritesSummary(state.favorites);
   updateCollectionVisibility();
   updatePreferencesPreview();
+  updateMoodIntensityLabels();
+  updateMoodDynamicCopy();
   if (state.recommendations.length && !state.activeRecAbort) {
     updateRecommendationsView();
   }
@@ -214,6 +244,8 @@ function updatePreferencesPreview() {
   if (!container) {
     return;
   }
+
+  const name = getActiveDisplayName();
 
   const selectedGenreInputs = Array.from(
     document.querySelectorAll('label.genre-pill input[name="genre"]:checked')
@@ -359,7 +391,7 @@ async function getRecommendations(isShuffleOnly) {
     const watchedLabel = state.watchedMovies.length
       ? "biased by what you’ve watched recently"
       : "with a bias toward well-loved titles";
-    const baseMeta = `Curating picks ${genreLabel}, blending TMDB discovery with OMDb details and YouTube trailers, ${watchedLabel}.`;
+    const baseMeta = `Curating ${moodMeta} ${genreLabel}, blending TMDB discovery with OMDb details and YouTube trailers, ${watchedLabel}.`;
     state.recommendationContext = { baseMeta };
     if (metaEl) {
       metaEl.textContent = `${baseMeta} Gathering fresh matches…`;
@@ -382,7 +414,10 @@ async function getRecommendations(isShuffleOnly) {
       if (isStale() || signal.aborted) {
         return;
       }
-      setRecStatus("I couldn’t find anything matching that combo. Try loosening your genres.", false);
+      setRecStatus(
+        "I couldn’t find anything matching that combo. Try loosening genres or mood a bit.",
+        false
+      );
       state.recommendations = [];
       state.visibleRecommendations = 0;
       updateRecommendationsView();
@@ -545,7 +580,7 @@ function updateRecommendationsMeta() {
   const visible = total ? Math.min(total, state.visibleRecommendations || total) : 0;
 
   if (!total) {
-    metaEl.textContent = `${context.baseMeta} No matches yet – try adjusting your preferences.`;
+    metaEl.textContent = `${context.baseMeta} No matches yet – try adjusting your vibe.`;
     return;
   }
 
@@ -926,6 +961,34 @@ function applyPreferencesSnapshot(snapshot) {
     document.querySelectorAll('input[name="genre"]').forEach((checkbox) => {
       checkbox.checked = selected.has(checkbox.value);
     });
+  }
+
+  if (typeof snapshot.mood === "string") {
+    const moodValue = snapshot.mood;
+    let matched = false;
+    document.querySelectorAll('input[name="mood"]').forEach((radio) => {
+      if (!matched && radio.value === moodValue) {
+        radio.checked = true;
+        matched = true;
+      }
+    });
+    if (!matched) {
+      const defaultMood = document.querySelector('input[name="mood"][value="any"]');
+      if (defaultMood) {
+        defaultMood.checked = true;
+      }
+    }
+  }
+
+  if (typeof snapshot.moodIntensity === "number") {
+    const moodIntensityInput = $("moodIntensity");
+    if (moodIntensityInput) {
+      const clamped = Math.min(2, Math.max(0, parseInt(snapshot.moodIntensity, 10)));
+      moodIntensityInput.value = String(clamped);
+      state.moodIntensity = clamped;
+      updateMoodIntensityLabels();
+      updateMoodDynamicCopy();
+    }
   }
 
   updatePreferencesPreview();

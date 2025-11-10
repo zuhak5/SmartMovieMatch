@@ -145,6 +145,60 @@
           </div>
 
 
+          <!-- Mood -->
+          <div class="field-group">
+            <div class="field-label-row">
+              <label>Tonight’s mood</label>
+              <div class="field-label-secondary">
+                Choose a vibe and energy level to steer the tone.
+              </div>
+            </div>
+            <div class="mood-row mood-row-enhanced">
+              <label class="mood-option" data-mood-copy="Surprise me with a balanced mix.">
+                <input type="radio" name="mood" value="any" checked />
+                <span class="mood-label">
+                  <span class="mood-emoji">🎲</span>
+                  Surprise me
+                </span>
+              </label>
+              <label class="mood-option" data-mood-copy="Breezy, uplifting picks incoming.">
+                <input type="radio" name="mood" value="light" />
+                <span class="mood-label">
+                  <span class="mood-emoji">✨</span>
+                  Feel-good
+                </span>
+              </label>
+              <label class="mood-option" data-mood-copy="We’ll lean into atmospheric thrillers.">
+                <input type="radio" name="mood" value="dark" />
+                <span class="mood-label">
+                  <span class="mood-emoji">🌒</span>
+                  Intense
+                </span>
+              </label>
+            </div>
+            <div class="mood-intensity">
+              <label for="moodIntensity" class="mood-intensity-label">Energy level</label>
+              <input
+                id="moodIntensity"
+                class="input-range"
+                type="range"
+                min="0"
+                max="2"
+                step="1"
+                value="1"
+                aria-describedby="moodDynamicCopy"
+              />
+              <div class="mood-intensity-scale">
+                <span data-intensity-value="0">Chill</span>
+                <span data-intensity-value="1" class="active">Balanced</span>
+                <span data-intensity-value="2">Amped</span>
+              </div>
+            </div>
+            <div id="moodDynamicCopy" class="mood-dynamic-copy">
+              Expect a balanced mix of moods.
+            </div>
+          </div>
+
           <div class="preferences-preview" id="preferencesPreview" aria-live="polite">
             <div class="preferences-preview-title">Live summary</div>
             <div class="preferences-preview-empty">
