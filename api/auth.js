@@ -535,36 +535,72 @@ async function supabaseFetch(path, { method = "GET", headers = {}, query, body }
   try {
     response = await fetch(url, init);
   } catch (error) {
-    handleSupabaseError("Network error", error);
+    console.error("Supabase network error:", error);
+    throw new HttpError(503, "Authentication storage service is unreachable. Check your Supabase configuration.");
+  }
+
+  let text = "";
+  try {
+    text = await response.text();
+  } catch (error) {
+    console.error("Supabase response read error:", error);
+    throw new HttpError(502, "Failed to read the authentication storage response.");
   }
 
   if (!response.ok) {
-    const errorText = await safeReadResponse(response);
-    handleSupabaseError(`HTTP ${response.status} ${response.statusText}: ${errorText}`);
+    const message = buildSupabaseErrorMessage(response.status, text) ||
+      "Authentication storage request failed due to a configuration issue.";
+    console.error("Supabase error response:", {
+      status: response.status,
+      statusText: response.statusText,
+      body: text
+    });
+
+    const status = response.status >= 500 ? 503 : 500;
+    throw new HttpError(status, message);
   }
 
-  if (response.status === 204) {
-    return null;
-  }
-
-  const text = await response.text();
-  if (!text) {
+  if (response.status === 204 || !text) {
     return null;
   }
 
   try {
     return JSON.parse(text);
   } catch (error) {
-    handleSupabaseError("Invalid JSON response", error);
+    console.error("Supabase JSON parse error:", text, error);
+    throw new HttpError(502, "Authentication storage returned invalid data.");
   }
 }
 
-async function safeReadResponse(response) {
-  try {
-    return await response.text();
-  } catch (error) {
-    return "";
+function buildSupabaseErrorMessage(status, rawBody) {
+  if (!rawBody) {
+    return status >= 500
+      ? "Authentication storage service is currently unavailable. Try again later."
+      : "Authentication storage request failed. Please verify your database schema.";
   }
+
+  try {
+    const parsed = JSON.parse(rawBody);
+    if (parsed && typeof parsed === "object") {
+      const message =
+        parsed.message ||
+        parsed.error_description ||
+        parsed.error ||
+        parsed.hint ||
+        parsed.details;
+      if (typeof message === "string" && message.trim()) {
+        return `Authentication storage error (${status}): ${message.trim()}`;
+      }
+    }
+  } catch (error) {
+    // Ignore JSON parsing issues and fall back to generic messaging.
+  }
+
+  const trimmed = rawBody.trim();
+  if (trimmed) {
+    return `Authentication storage error (${status}): ${trimmed.slice(0, 300)}`;
+  }
+  return null;
 }
 
 function nodeFetch(input, options = {}) {
@@ -612,11 +648,6 @@ function nodeFetch(input, options = {}) {
       reject(error);
     }
   });
-}
-
-function handleSupabaseError(context, error) {
-  console.error("Supabase error:", context, error);
-  throw new HttpError(500, "Authentication storage service failure.");
 }
 
 function sanitizeUsername(username) {
