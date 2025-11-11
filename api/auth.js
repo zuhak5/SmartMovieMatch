@@ -120,28 +120,50 @@ async function signup(payload) {
   }
 
   const now = new Date().toISOString();
-let avatar_path = null;
-let avatar_url = null;
-try {
-  const base64 = typeof payload.avatarBase64 === "string" && payload.avatarBase64.trim() ? payload.avatarBase64.trim() : null;
-  const originalName = safeFilename(payload.avatarFileName || 'avatar.png');
-  if (base64) {
-    const buffer = Buffer.from(base64, 'base64');
-    const objectPath = `${canonical}/${Date.now()}-${originalName}`;
-    const uploaded = await uploadToStorage('avatars', objectPath, buffer, 'application/octet-stream');
-    avatar_path = uploaded.path;
-    avatar_url = uploaded.publicUrl;
+  let avatar_path = null;
+  let avatar_url = null;
+  try {
+    const base64 =
+      typeof payload.avatarBase64 === "string" && payload.avatarBase64.trim()
+        ? payload.avatarBase64.trim()
+        : null;
+    const originalName = safeFilename(payload.avatarFileName || "avatar.png");
+    if (base64) {
+      const buffer = Buffer.from(base64, "base64");
+      const objectPath = `${canonical}/${Date.now()}-${originalName}`;
+      const uploaded = await uploadToStorage(
+        "avatars",
+        objectPath,
+        buffer,
+        "application/octet-stream"
+      );
+      avatar_path = uploaded.path;
+      avatar_url = uploaded.publicUrl;
+    }
+  } catch (e) {
+    console.warn("Avatar upload skipped:", e && e.message ? e.message : e);
   }
-} catch (e) {
-  console.warn("Avatar upload skipped:", e && e.message ? e.message : e);
-}
 
   const salt = crypto.randomBytes(16).toString("hex");
   const passwordHash = hashPassword(password, salt);
 
-  \1\2,
-    avatar_path: avatar_path,
-    avatar_url: avatar_url\3;
+  const userRow = await insertUserRow({
+    username: canonical,
+    display_name: preferredDisplayName,
+    password_hash: passwordHash,
+    salt,
+    created_at: now,
+    last_login_at: now,
+    preferences_snapshot: null,
+    watched_history: [],
+    favorites_list: [],
+    avatar_path,
+    avatar_url
+  });
+
+  if (!userRow) {
+    throw new HttpError(500, "Failed to create user record.");
+  }
 
   const userRecord = mapUserRow(userRow);
   const sessionRecord = await createSessionRecord(userRecord, now);
@@ -609,6 +631,8 @@ function mapUserRow(row) {
     lastPreferencesSync: row.last_preferences_sync,
     lastWatchedSync: row.last_watched_sync,
     lastFavoritesSync: row.last_favorites_sync,
+    avatarPath: row.avatar_path || null,
+    avatarUrl: row.avatar_url || null,
     preferencesSnapshot: row.preferences_snapshot || null,
     watchedHistory: Array.isArray(row.watched_history) ? row.watched_history : [],
     favoritesList: Array.isArray(row.favorites_list) ? row.favorites_list : []
@@ -638,6 +662,7 @@ function toSessionResponse(userRecord, sessionRecord) {
     lastPreferencesSync: userRecord.lastPreferencesSync || null,
     lastWatchedSync: userRecord.lastWatchedSync || null,
     lastFavoritesSync: userRecord.lastFavoritesSync || null,
+    avatarUrl: userRecord.avatarUrl || null,
     preferencesSnapshot: userRecord.preferencesSnapshot || null,
     watchedHistory: Array.isArray(userRecord.watchedHistory)
       ? userRecord.watchedHistory
