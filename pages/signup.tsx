@@ -1,4 +1,11 @@
-import React, { useState, FormEvent, ChangeEvent, useEffect, useRef } from 'react';
+import React, {
+  useState,
+  FormEvent,
+  ChangeEvent,
+  useEffect,
+  useRef,
+  KeyboardEvent,
+} from 'react';
 
 export default function SignupPage() {
   const [loading, setLoading] = useState(false);
@@ -9,10 +16,6 @@ export default function SignupPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const allowedAvatarTypes = ['image/jpeg', 'image/png'];
-
-  const openAvatarPicker = () => {
-    fileInputRef.current?.click();
-  };
 
   useEffect(() => {
     return () => {
@@ -65,6 +68,13 @@ export default function SignupPage() {
       fileInputRef.current.value = '';
     }
     setAvatarError(null);
+  }
+
+  function handleAvatarKeyDown(event: KeyboardEvent<HTMLLabelElement>) {
+    if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
+      event.preventDefault();
+      fileInputRef.current?.click();
+    }
   }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -162,27 +172,25 @@ export default function SignupPage() {
           <div className="field">
             <span>Avatar (optional)</span>
             <div className="avatar-section">
-              <button
-                type="button"
-                className={`avatar-selector ${avatarPreview ? 'has-image' : ''}`}
-                onClick={openAvatarPicker}
-                aria-controls="avatar"
+              <label
+                className={`avatar-circle ${avatarPreview ? 'has-image' : ''}`}
+                htmlFor="avatar"
                 aria-describedby={`avatar-hint${avatarError ? ' avatar-error' : ''}`}
-                aria-label={avatarPreview ? 'Change avatar photo' : 'Upload avatar photo'}
+                role="button"
+                tabIndex={0}
+                onKeyDown={handleAvatarKeyDown}
               >
                 {avatarPreview ? (
-                  <>
-                    <img src={avatarPreview} alt="Selected avatar preview" />
-                    <span className="avatar-overlay">Change photo</span>
-                    <span className="sr-only">Choose a different avatar</span>
-                  </>
+                  <img src={avatarPreview} alt="Selected avatar preview" />
                 ) : (
-                  <div className="avatar-placeholder">
-                    <span className="icon" aria-hidden="true">📷</span>
-                    <span className="upload-title">Add photo</span>
-                  </div>
+                  <span className="avatar-placeholder" aria-hidden="true">
+                    +
+                  </span>
                 )}
-              </button>
+                <span className="sr-only">
+                  {avatarPreview ? 'Change avatar photo' : 'Upload avatar photo'}
+                </span>
+              </label>
 
               <div className="avatar-actions">
                 <p className="hint" id="avatar-hint">
@@ -206,7 +214,7 @@ export default function SignupPage() {
               type="file"
               accept=".jpg,.jpeg,.png"
               onChange={handleAvatarChange}
-              className="file-input"
+              className="hidden-avatar-input"
               ref={fileInputRef}
             />
           </div>
@@ -305,83 +313,46 @@ export default function SignupPage() {
           --avatar-size: clamp(110px, 22vw, 144px);
         }
 
-        .avatar-selector {
-          appearance: none;
-          width: var(--avatar-size);
-          height: var(--avatar-size);
+        .avatar-circle {
+          width: 100px;
+          height: 100px;
           border-radius: 50%;
-          border: 2px dashed #cbd5f5;
-          background: #f4f5ff;
-          display: inline-flex;
+          background-color: #ddd;
+          border: 2px dashed #aaa;
+          display: flex;
           align-items: center;
           justify-content: center;
           cursor: pointer;
-          transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
-          position: relative;
           overflow: hidden;
-          padding: 0;
-          color: inherit;
-          font: inherit;
+          transition: border-color 0.2s ease, transform 0.2s ease;
         }
 
-        .avatar-selector:hover,
-        .avatar-selector:focus-visible {
+        .avatar-circle:hover,
+        .avatar-circle:focus-within {
           border-color: #6366f1;
-          background: rgba(99, 102, 241, 0.12);
-          box-shadow: 0 12px 24px rgba(99, 102, 241, 0.15);
-          outline: none;
+          transform: translateY(-1px);
         }
 
-        .avatar-selector.has-image {
+        .avatar-circle.has-image {
+          background-color: transparent;
           border-style: solid;
           border-color: transparent;
-          background: transparent;
-          box-shadow: 0 12px 25px rgba(15, 23, 42, 0.25);
         }
 
-        .avatar-selector img {
+        .avatar-circle img {
           width: 100%;
           height: 100%;
           object-fit: cover;
         }
 
-        .avatar-overlay {
-          position: absolute;
-          inset: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: rgba(15, 23, 42, 0.55);
-          color: #fff;
-          font-weight: 600;
-          font-size: 0.9rem;
-          opacity: 0;
-          pointer-events: none;
-          transition: opacity 0.2s ease;
-        }
-
-        .avatar-selector:hover .avatar-overlay,
-        .avatar-selector:focus-visible .avatar-overlay {
-          opacity: 1;
-        }
-
         .avatar-placeholder {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 0.35rem;
+          font-size: 2rem;
           color: #475569;
-          text-align: center;
-          padding: 1.1rem;
+          line-height: 1;
         }
 
-        .icon {
-          font-size: 1.75rem;
-        }
-
-        .upload-title {
-          font-weight: 600;
-          color: #1e293b;
+        .avatar-circle.has-image .avatar-placeholder {
+          display: none;
         }
 
         .avatar-actions {
@@ -419,7 +390,7 @@ export default function SignupPage() {
           transform: translateY(-1px);
         }
 
-        .file-input {
+        .hidden-avatar-input {
           position: absolute;
           width: 1px;
           height: 1px;
