@@ -246,34 +246,53 @@
             </a>
           </div>
           <div class="profile-callout-body">
-            <div class="profile-callout-stats" id="profileCalloutMetrics" aria-live="polite">
-              <article class="profile-callout-stat">
-                <div class="profile-callout-label">Favorites</div>
-                <div class="profile-callout-value" id="profileCalloutFavoritesValue">0</div>
-                <div class="profile-callout-meta" id="profileCalloutFavoritesMeta">Save movies you love to build momentum.</div>
-              </article>
-              <article class="profile-callout-stat">
-                <div class="profile-callout-label">Watched</div>
-                <div class="profile-callout-value" id="profileCalloutWatchedValue">0</div>
-                <div class="profile-callout-meta" id="profileCalloutWatchedMeta">Log what you’ve seen to sharpen picks.</div>
-              </article>
-              <article class="profile-callout-stat">
-                <div class="profile-callout-label">Last sync</div>
-                <div class="profile-callout-value" id="profileCalloutSyncValue">Guest mode</div>
-                <div class="profile-callout-meta" id="profileCalloutSyncMeta">Sign in to start syncing automatically.</div>
-              </article>
-            </div>
-            <div
-              class="profile-callout-progress"
-              id="profileCalloutProgress"
-              role="img"
-              aria-live="polite"
-              aria-label="Favorite milestone progress"
-            >
-              <div class="profile-callout-progress-track">
-                <div class="profile-callout-progress-fill" id="profileCalloutProgressFill" style="width: 0%"></div>
+            <div class="profile-callout-summary">
+              <div class="profile-callout-stats" id="profileCalloutMetrics" aria-live="polite">
+                <article class="profile-callout-stat">
+                  <div class="profile-callout-label">Favorites</div>
+                  <div class="profile-callout-value" id="profileCalloutFavoritesValue">0</div>
+                  <div class="profile-callout-meta" id="profileCalloutFavoritesMeta">Save movies you love to build momentum.</div>
+                </article>
+                <article class="profile-callout-stat">
+                  <div class="profile-callout-label">Watched</div>
+                  <div class="profile-callout-value" id="profileCalloutWatchedValue">0</div>
+                  <div class="profile-callout-meta" id="profileCalloutWatchedMeta">Log what you’ve seen to sharpen picks.</div>
+                </article>
+                <article class="profile-callout-stat">
+                  <div class="profile-callout-label">Last sync</div>
+                  <div class="profile-callout-value" id="profileCalloutSyncValue">Guest mode</div>
+                  <div class="profile-callout-meta" id="profileCalloutSyncMeta">Sign in to start syncing automatically.</div>
+                </article>
               </div>
-              <div class="profile-callout-progress-text" id="profileCalloutProgressText">Add 5 favorites to unlock smarter batches.</div>
+              <div class="profile-callout-progress-row">
+                <div
+                  class="profile-callout-progress"
+                  id="profileCalloutProgress"
+                  role="img"
+                  aria-live="polite"
+                  aria-label="Favorite milestone progress"
+                >
+                  <div class="profile-callout-progress-track">
+                    <div class="profile-callout-progress-fill" id="profileCalloutProgressFill" style="width: 0%"></div>
+                  </div>
+                  <div class="profile-callout-progress-text" id="profileCalloutProgressText">Add 5 favorites to unlock smarter batches.</div>
+                </div>
+                <div class="profile-callout-footnotes" role="list">
+                  <span class="profile-callout-footnote" role="listitem">
+                    <span class="profile-callout-footnote-icon" aria-hidden="true">✔</span>
+                    <span id="profileCalloutHighlightFavorites">Favorites sync across every device you sign into.</span>
+                  </span>
+                  <span class="profile-callout-footnote" role="listitem">
+                    <span class="profile-callout-footnote-icon" aria-hidden="true">✔</span>
+                    <span id="profileCalloutHighlightWatched">Watched titles keep discovery fresh and spoiler-free.</span>
+                  </span>
+                  <span class="profile-callout-footnote" role="listitem">
+                    <span class="profile-callout-footnote-icon" aria-hidden="true">✔</span>
+                    <span id="profileCalloutHighlightSnapshots">Snapshots capture your preferences after each sync.</span>
+                  </span>
+                </div>
+              </div>
+              <div class="profile-callout-illustration" aria-hidden="true">🍿</div>
             </div>
             <div class="profile-callout-snapshots" id="profileCalloutSnapshots" aria-live="polite">
               <article class="profile-callout-snapshot" aria-label="Favorites snapshot">
@@ -286,7 +305,22 @@
                     </div>
                   </div>
                 </header>
-                <ul class="profile-callout-snapshot-list" id="profileCalloutFavoritesList"></ul>
+                <ul
+                  class="profile-callout-snapshot-list"
+                  id="profileCalloutFavoritesList"
+                  data-expanded="false"
+                ></ul>
+                <button
+                  class="profile-callout-toggle"
+                  type="button"
+                  data-profile-snapshot-toggle
+                  data-target="profileCalloutFavoritesList"
+                  data-label-singular="favorite"
+                  data-label-plural="favorites"
+                  hidden
+                >
+                  Show all favorites
+                </button>
               </article>
               <article class="profile-callout-snapshot" aria-label="Watched snapshot">
                 <header class="profile-callout-snapshot-header">
@@ -298,24 +332,24 @@
                     </div>
                   </div>
                 </header>
-                <ul class="profile-callout-snapshot-list" id="profileCalloutWatchedList"></ul>
+                <ul
+                  class="profile-callout-snapshot-list"
+                  id="profileCalloutWatchedList"
+                  data-expanded="false"
+                ></ul>
+                <button
+                  class="profile-callout-toggle"
+                  type="button"
+                  data-profile-snapshot-toggle
+                  data-target="profileCalloutWatchedList"
+                  data-label-singular="watched title"
+                  data-label-plural="watched titles"
+                  hidden
+                >
+                  Show all watched titles
+                </button>
               </article>
             </div>
-            <ul class="profile-callout-highlights">
-              <li>
-                <span class="profile-callout-icon" aria-hidden="true">✔</span>
-                <span id="profileCalloutHighlightFavorites">Favorites sync across every device you sign into.</span>
-              </li>
-              <li>
-                <span class="profile-callout-icon" aria-hidden="true">✔</span>
-                <span id="profileCalloutHighlightWatched">Watched titles keep discovery fresh and spoiler-free.</span>
-              </li>
-              <li>
-                <span class="profile-callout-icon" aria-hidden="true">✔</span>
-                <span id="profileCalloutHighlightSnapshots">Snapshots capture your preferences after each sync.</span>
-              </li>
-            </ul>
-            <div class="profile-callout-illustration" aria-hidden="true">🍿</div>
           </div>
         </div>
       </section>

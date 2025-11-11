@@ -56,6 +56,7 @@ const state = {
 
 const PROFILE_CALLOUT_MILESTONE = 5;
 const PROFILE_CALLOUT_PULSE_DURATION = 2400;
+const PROFILE_CALLOUT_SNAPSHOT_LIMIT = 3;
 let profileCalloutSnapshot = {
   favoritesCount: 0,
   watchedCount: 0,
@@ -505,6 +506,24 @@ function wireEvents() {
         playUiClick();
         switchCollectionView(target);
       }
+    });
+  });
+
+  document.querySelectorAll("[data-profile-snapshot-toggle]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const targetId = button.getAttribute("data-target");
+      if (!targetId) {
+        return;
+      }
+      const listEl = document.getElementById(targetId);
+      if (!listEl) {
+        return;
+      }
+      const isExpanded = listEl.dataset.expanded === "true";
+      listEl.dataset.expanded = isExpanded ? "false" : "true";
+      playUiClick();
+      playExpandSound(!isExpanded);
+      refreshProfileOverviewCallout();
     });
   });
 }
@@ -1049,6 +1068,10 @@ function refreshProfileOverviewCallout(options = {}) {
     }
     listEl.innerHTML = "";
 
+    const toggleBtn = listEl.id
+      ? document.querySelector(`.profile-callout-toggle[data-target="${listEl.id}"]`)
+      : null;
+
     if (!totalCount) {
       if (subtitleEl) {
         subtitleEl.textContent = emptyMessage;
@@ -1057,16 +1080,33 @@ function refreshProfileOverviewCallout(options = {}) {
       empty.className = "profile-callout-snapshot-empty";
       empty.textContent = emptyMessage;
       listEl.appendChild(empty);
+      listEl.dataset.expanded = "false";
+      if (toggleBtn) {
+        toggleBtn.hidden = true;
+        toggleBtn.setAttribute("aria-hidden", "true");
+        toggleBtn.setAttribute("aria-expanded", "false");
+      }
       return;
     }
 
-    const limit = 3;
-    const recentItems = items.slice(-limit).reverse();
+    if (totalCount <= PROFILE_CALLOUT_SNAPSHOT_LIMIT) {
+      listEl.dataset.expanded = "false";
+    }
+
+    const isExpanded = listEl.dataset.expanded === "true" && totalCount > PROFILE_CALLOUT_SNAPSHOT_LIMIT;
+    const sortedItems = items.filter(Boolean);
+    const visibleItems = isExpanded
+      ? sortedItems.reverse()
+      : sortedItems.slice(-PROFILE_CALLOUT_SNAPSHOT_LIMIT).reverse();
 
     if (subtitleEl) {
-      const visibleCount = recentItems.length;
-      const overallLabel = totalCount === 1 ? singularLabel : pluralLabel;
-      subtitleEl.textContent = `${visibleCount} of ${totalCount} ${overallLabel}`;
+      const totalLabel = totalCount === 1 ? singularLabel : pluralLabel;
+      if (isExpanded) {
+        subtitleEl.textContent = `All ${totalCount} ${totalLabel}`;
+      } else {
+        const visibleCount = visibleItems.length;
+        subtitleEl.textContent = `Latest ${visibleCount} of ${totalCount} ${totalLabel}`;
+      }
     }
 
     const formatMeta = (entry) => {
@@ -1086,33 +1126,66 @@ function refreshProfileOverviewCallout(options = {}) {
       return parts.join(" • ");
     };
 
-    recentItems.forEach((entry) => {
+    visibleItems.forEach((entry) => {
       if (!entry) {
         return;
       }
       const item = document.createElement("li");
       item.className = "profile-callout-snapshot-item";
+      const thumb = document.createElement("div");
+      thumb.className = "profile-callout-snapshot-thumb";
+      if (entry.poster) {
+        const img = document.createElement("img");
+        img.src = entry.poster;
+        img.alt = `Poster for ${entry.title || "this movie"}`;
+        thumb.appendChild(img);
+      } else {
+        const fallback = document.createElement("span");
+        fallback.className = "profile-callout-snapshot-thumb-fallback";
+        const initial = entry.title ? entry.title.trim().charAt(0).toUpperCase() : "🎬";
+        fallback.textContent = initial || "🎬";
+        thumb.appendChild(fallback);
+      }
+      item.appendChild(thumb);
+
+      const content = document.createElement("div");
+      content.className = "profile-callout-snapshot-content";
       const title = document.createElement("span");
       title.className = "profile-callout-snapshot-item-title";
       title.textContent = entry.title || "Untitled";
-      item.appendChild(title);
+      content.appendChild(title);
       const meta = formatMeta(entry);
       if (meta) {
         const metaEl = document.createElement("span");
         metaEl.className = "profile-callout-snapshot-item-meta";
         metaEl.textContent = meta;
-        item.appendChild(metaEl);
+        content.appendChild(metaEl);
       }
+      if (isExpanded && entry.overview) {
+        const overview = document.createElement("span");
+        overview.className = "profile-callout-snapshot-item-overview";
+        overview.textContent = entry.overview;
+        content.appendChild(overview);
+      }
+      item.appendChild(content);
       listEl.appendChild(item);
     });
 
-    if (totalCount > recentItems.length) {
-      const remainder = totalCount - recentItems.length;
-      const more = document.createElement("li");
-      more.className = "profile-callout-snapshot-item profile-callout-snapshot-more";
-      const label = remainder === 1 ? singularLabel : pluralLabel;
-      more.textContent = `+${remainder} more ${label}`;
-      listEl.appendChild(more);
+    if (toggleBtn) {
+      const pluralText = toggleBtn.dataset.labelPlural || pluralLabel;
+      const singularText = toggleBtn.dataset.labelSingular || singularLabel;
+      const label = totalCount === 1 ? singularText : pluralText;
+      const canExpand = totalCount > PROFILE_CALLOUT_SNAPSHOT_LIMIT;
+      toggleBtn.hidden = !canExpand;
+      toggleBtn.setAttribute("aria-hidden", canExpand ? "false" : "true");
+      toggleBtn.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+      if (canExpand) {
+        toggleBtn.textContent = isExpanded
+          ? `Show recent ${label}`
+          : `Show all ${label}`;
+      } else {
+        toggleBtn.textContent = `All ${totalCount} ${label}`;
+      }
     }
   };
 
