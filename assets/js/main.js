@@ -331,6 +331,12 @@ function init() {
   });
 
   wireEvents();
+
+  if (window.location.hash === "#profileOverview" || window.location.hash === "#overview") {
+    window.requestAnimationFrame(() => {
+      highlightProfileOverview();
+    });
+  }
 }
 
 function wireEvents() {
@@ -572,14 +578,29 @@ function handleAccountMenuAction(action) {
 
 function highlightProfileOverview() {
   const section = $("profileOverview");
-  if (!section || section.hidden) {
+  if (section && !section.hidden) {
+    section.scrollIntoView({ behavior: "smooth", block: "start" });
+    section.classList.add("account-insights--pulse");
+    window.setTimeout(() => {
+      section.classList.remove("account-insights--pulse");
+    }, 1200);
     return;
   }
-  section.scrollIntoView({ behavior: "smooth", block: "start" });
-  section.classList.add("account-insights--pulse");
-  window.setTimeout(() => {
-    section.classList.remove("account-insights--pulse");
-  }, 1200);
+
+  const signedOutCard = $("profileOverviewSignedOut");
+  if (signedOutCard && !signedOutCard.hidden) {
+    signedOutCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    signedOutCard.classList.add("account-insights--pulse");
+    window.setTimeout(() => {
+      signedOutCard.classList.remove("account-insights--pulse");
+    }, 1200);
+    return;
+  }
+
+  const page = document.body ? document.body.getAttribute("data-page") : null;
+  if (page !== "profile-overview") {
+    window.location.href = "profile.html#profileOverview";
+  }
 }
 
 function isAccountSettingsOpen() {
@@ -619,6 +640,8 @@ function openAccountSettings(section = "profile") {
       displayNameInput.focus();
     }
   }, 60);
+
+  updateAccountUi(state.session);
 }
 
 function closeAccountSettings() {
@@ -638,6 +661,8 @@ function closeAccountSettings() {
     state.accountAvatarPreviewUrl = null;
   }
   state.accountRemoveAvatar = false;
+
+  updateAccountUi(state.session);
 }
 
 function populateAccountSettings() {
@@ -1717,9 +1742,29 @@ function updateAccountUi(session) {
   const accountAvatarImg = $("accountAvatarImg");
   const accountAvatarInitials = $("accountAvatarInitials");
   const accountMenu = $("accountMenu");
+  const activePage = document.body ? document.body.getAttribute("data-page") : null;
 
   if (!greeting || !loginLink || !accountProfile || !accountName || !accountPillSync || !accountAvatar || !accountAvatarImg || !accountAvatarInitials) {
     return;
+  }
+
+  if (accountMenu) {
+    const profileItem = accountMenu.querySelector('[data-action="profile"]');
+    if (profileItem) {
+      if (activePage === "profile-overview") {
+        profileItem.setAttribute("aria-current", "page");
+      } else {
+        profileItem.removeAttribute("aria-current");
+      }
+    }
+    const settingsItem = accountMenu.querySelector('[data-action="settings"]');
+    if (settingsItem) {
+      if (isAccountSettingsOpen()) {
+        settingsItem.setAttribute("aria-current", "page");
+      } else {
+        settingsItem.removeAttribute("aria-current");
+      }
+    }
   }
 
   const isSignedIn = Boolean(session && session.token);
@@ -1780,6 +1825,8 @@ function setSyncStatus(message, variant = "muted") {
 
 function updateSyncInsights(session) {
   const overviewSection = $("profileOverview");
+  const overviewSignedOut = $("profileOverviewSignedOut");
+  const preferencesValue = $("profileOverviewPreferencesValue");
   const watchedValue = $("profileOverviewWatchedValue");
   const favoritesValue = $("profileOverviewFavoritesValue");
   const timeline = $("syncTimeline");
@@ -1805,6 +1852,9 @@ function updateSyncInsights(session) {
   const watchedText = hasSession ? `${formatSyncTime(session.lastWatchedSync)}${watchedSuffix}` : "Sign in to sync";
   const favoritesText = hasSession ? `${formatSyncTime(session.lastFavoritesSync)}${favoritesSuffix}` : "Sign in to sync";
 
+  if (preferencesValue) {
+    preferencesValue.textContent = prefText;
+  }
   if (watchedValue) {
     watchedValue.textContent = watchedText;
   }
@@ -1813,10 +1863,22 @@ function updateSyncInsights(session) {
   }
 
   if (overviewSection) {
-    overviewSection.hidden = !hasSession;
+    const shouldHideOverview = !hasSession;
+    overviewSection.hidden = shouldHideOverview;
+    overviewSection.setAttribute("aria-hidden", shouldHideOverview ? "true" : "false");
+    overviewSection.style.display = shouldHideOverview ? "none" : "";
+  }
+  if (overviewSignedOut) {
+    const shouldHideSignedOut = hasSession;
+    overviewSignedOut.hidden = shouldHideSignedOut;
+    overviewSignedOut.setAttribute("aria-hidden", shouldHideSignedOut ? "true" : "false");
+    overviewSignedOut.style.display = shouldHideSignedOut ? "none" : "";
   }
   if (timeline) {
-    timeline.hidden = !hasSession;
+    const shouldHideTimeline = !hasSession;
+    timeline.hidden = shouldHideTimeline;
+    timeline.setAttribute("aria-hidden", shouldHideTimeline ? "true" : "false");
+    timeline.style.display = shouldHideTimeline ? "none" : "";
   }
   if (timelinePref) {
     timelinePref.textContent = prefText;
@@ -1887,6 +1949,7 @@ function hydrateFromSession(session) {
     state.favorites = [];
     refreshWatchedUi();
     refreshFavoritesUi();
+    updateSyncInsights(null);
     return;
   }
 
@@ -1927,6 +1990,8 @@ function hydrateFromSession(session) {
     lastWatchedSync: session.lastWatchedSync || null,
     lastFavoritesSync: session.lastFavoritesSync || null
   };
+
+  updateSyncInsights(session);
 }
 
 
