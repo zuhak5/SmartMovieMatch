@@ -931,9 +931,6 @@ function refreshProfileOverviewCallout(options = {}) {
   const progressFill = $("profileCalloutProgressFill");
   const progressText = $("profileCalloutProgressText");
   const progressContainer = $("profileCalloutProgress");
-  const highlightFavorites = $("profileCalloutHighlightFavorites");
-  const highlightWatched = $("profileCalloutHighlightWatched");
-  const highlightSnapshots = $("profileCalloutHighlightSnapshots");
   const favoritesList = $("profileCalloutFavoritesList");
   const watchedList = $("profileCalloutWatchedList");
   const favoritesSubtitle = $("profileCalloutFavoritesSubtitle");
@@ -1034,24 +1031,6 @@ function refreshProfileOverviewCallout(options = {}) {
     if (progressContainer && progressMessage) {
       progressContainer.setAttribute("aria-label", `Favorite milestone progress – ${progressMessage}`);
     }
-  }
-
-  if (highlightFavorites) {
-    highlightFavorites.textContent = favoritesCount
-      ? `${favoritesCount.toLocaleString()} favorite${favoritesCount === 1 ? "" : "s"} powering smarter picks.`
-      : "Favorites sync across every device you sign into.";
-  }
-
-  if (highlightWatched) {
-    highlightWatched.textContent = watchedCount
-      ? `${watchedCount.toLocaleString()} watched title${watchedCount === 1 ? "" : "s"} keeping discovery fresh.`
-      : "Watched titles keep discovery fresh and spoiler-free.";
-  }
-
-  if (highlightSnapshots) {
-    highlightSnapshots.textContent = isSignedIn
-      ? "Snapshots capture your preferences after each sync."
-      : "Sign in to capture cloud snapshots of your taste.";
   }
 
   const renderSnapshotList = (
