@@ -1166,7 +1166,7 @@ body[data-page="account-settings"] .app-main {
 }
 
 .settings-header {
-  align-items: center;
+  align-items: flex-start;
 }
 
 .settings-content {
