@@ -208,7 +208,7 @@ export function renderWatchedList(watchedMovies, options = {}) {
 }
 
 function applyCollectionCollapse(listEl, viewEl, items, options = {}) {
-  const MAX_VISIBLE = 2;
+  const MAX_VISIBLE = 3;
   const hiddenItems = [];
   const wasExpanded = options.wasExpanded === true;
   const total = items.length;

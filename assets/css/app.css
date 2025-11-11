@@ -1004,6 +1004,14 @@ h6 {
     grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
     align-items: start;
   }
+
+  .app-main > .panel-sticky {
+    order: -1;
+  }
+
+  .app-main > .right-column {
+    order: 0;
+  }
 }
 
 @media (max-width: 720px) {
