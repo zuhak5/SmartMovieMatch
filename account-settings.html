@@ -11,7 +11,7 @@
 <body data-page="account-settings">
 <div class="app">
   <header class="app-header">
-    <div class="account-bar" role="navigation">
+    <div class="account-bar" role="navigation" data-account-state="guest">
       <span id="accountGreeting" class="account-greeting">You’re browsing as guest.</span>
       <a id="accountLoginLink" class="account-link" href="login.html">Log in / Sign up</a>
       <div id="accountProfile" class="account-profile" hidden>
@@ -114,7 +114,7 @@
                 <div class="field-grid">
                   <span class="field-label">Avatar</span>
                   <div class="settings-avatar-row">
-                    <label class="settings-avatar" for="accountAvatarInput">
+                    <label class="settings-avatar" for="accountAvatarInput" aria-label="Upload new avatar">
                       <span class="settings-avatar-inner" id="settingsAvatarPreview">GM</span>
                     </label>
                     <input
@@ -124,7 +124,10 @@
                       name="avatar"
                       accept="image/*"
                     />
-                    <button type="button" id="accountAvatarRemove" class="btn-subtle">Remove</button>
+                    <button type="button" id="accountAvatarUpload" class="btn-secondary settings-avatar-upload">
+                      Upload new
+                    </button>
+                    <button type="button" id="accountAvatarRemove" class="btn-subtle" disabled>Remove</button>
                   </div>
                   <p class="field-hint">Square JPG or PNG up to 5 MB recommended.</p>
                 </div>
