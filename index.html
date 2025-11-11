@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="assets/css/app.css" />
 
 </head>
-<body>
+<body data-page="discovery">
 <div class="app">
   <header class="app-header">
     <div class="account-bar" role="navigation">
@@ -37,12 +37,12 @@
         <ul id="accountMenu" class="account-menu" role="menu" aria-label="Account actions">
           <li>
             <button class="account-menu-item" type="button" data-action="profile" role="menuitem">
-              Profile &amp; watch history
+              Profile overview
             </button>
           </li>
           <li>
             <button class="account-menu-item" type="button" data-action="settings" role="menuitem">
-              Preferences &amp; privacy controls
+              Account settings
             </button>
           </li>
           <li>
@@ -230,61 +230,24 @@
 
     <!-- Right column: collections + recommendations -->
     <div class="right-column">
-      <section class="panel collections-panel">
+      <section class="panel profile-callout">
         <div class="panel-inner">
-          <div class="panel-header collections-header">
+          <div class="panel-header">
             <div>
-              <div class="panel-title">Your collections</div>
+              <div class="panel-title">Profile overview</div>
               <div class="panel-subtitle">
-                Tap the heart or eye on any card to pin favorites or track your watched history.
+                See your synced favorites, watched history, and account snapshots in one place.
               </div>
             </div>
-            <div class="collection-tabs" role="tablist">
-              <button
-                type="button"
-                class="collection-tab active"
-                id="favoritesTab"
-                data-target="favorites"
-                role="tab"
-                aria-controls="favoritesView"
-                aria-selected="true"
-              >
-                Favorites
-              </button>
-              <button
-                type="button"
-                class="collection-tab"
-                id="watchedTab"
-                data-target="watched"
-                role="tab"
-                aria-controls="watchedView"
-                aria-selected="false"
-              >
-                Watched
-              </button>
-            </div>
+            <a class="btn-subtle btn-chip" href="profile.html#profileOverview">
+              <span>Open overview</span>
+              <span aria-hidden="true">→</span>
+            </a>
           </div>
-          <div class="collection-summary" id="favoritesSummary"></div>
-          <div class="collection-summary" id="watchedSummary"></div>
-          <div id="favoritesView" class="collection-view active" role="tabpanel" aria-labelledby="favoritesTab">
-            <div id="favoritesList" class="favorites-list"></div>
-            <div id="favoritesEmpty" class="empty-state">
-              Tap the heart on any recommendation to save it here for quick access.
-            </div>
-          </div>
-          <div id="watchedView" class="collection-view" role="tabpanel" aria-labelledby="watchedTab">
-            <div id="watchedList" class="watched-panel-list"></div>
-            <div id="watchedEmpty" class="empty-state">
-              You haven’t marked anything as watched yet. Use the
-              <strong>“I’ve watched this”</strong> button on any recommendation and I’ll reshape future suggestions around it.
-            </div>
-            <div class="collection-actions">
-              <button type="button" class="btn-subtle btn-subtle-danger" id="clearWatchedBtn">
-                <span>Clear history</span>
-                <span aria-hidden="true">🧹</span>
-              </button>
-            </div>
-          </div>
+          <p class="profile-callout-text">
+            Visit your overview whenever you want to review the titles you’ve saved, monitor recent sync activity,
+            or manage stored snapshots.
+          </p>
         </div>
       </section>
 

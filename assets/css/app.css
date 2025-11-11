@@ -1012,6 +1012,79 @@ h6 {
   }
 }
 
+.profile-main {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 960px;
+  margin: 0 auto 3rem;
+  width: 100%;
+}
+
+@media (min-width: 1100px) {
+  .profile-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.profile-main .panel {
+  width: 100%;
+}
+
+.profile-overview-panel .panel-header {
+  align-items: center;
+}
+
+.profile-panel-header .btn-subtle {
+  white-space: nowrap;
+}
+
+.profile-overview-lede {
+  margin: 0.75rem 0 1.2rem;
+  color: var(--text-subtle);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.profile-overview-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.profile-signed-out {
+  border: 1px dashed rgba(148, 163, 184, 0.45);
+  border-radius: var(--radius-lg);
+  padding: 1.4rem 1.6rem;
+  background: rgba(15, 23, 42, 0.75);
+  display: grid;
+  gap: 0.75rem;
+  max-width: 520px;
+}
+
+.profile-signed-out h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.profile-signed-out p {
+  margin: 0;
+  color: var(--text-subtle);
+  line-height: 1.6;
+}
+
+.profile-signed-out .btn-primary {
+  width: fit-content;
+}
+
+.profile-collections-panel {
+  margin-top: 1rem;
+}
+
+.profile-callout-text {
+  margin: 0.6rem 0 0;
+  color: var(--text-subtle);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
 .panel {
   background:
     radial-gradient(circle at 0% 0%, rgba(96, 165, 250, 0.16), transparent 58%),
