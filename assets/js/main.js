@@ -915,6 +915,10 @@ function refreshProfileOverviewCallout(options = {}) {
   const highlightFavorites = $("profileCalloutHighlightFavorites");
   const highlightWatched = $("profileCalloutHighlightWatched");
   const highlightSnapshots = $("profileCalloutHighlightSnapshots");
+  const favoritesList = $("profileCalloutFavoritesList");
+  const watchedList = $("profileCalloutWatchedList");
+  const favoritesSubtitle = $("profileCalloutFavoritesSubtitle");
+  const watchedSubtitle = $("profileCalloutWatchedSubtitle");
 
   const favoritesCount = Array.isArray(state.favorites) ? state.favorites.length : 0;
   const watchedCount = Array.isArray(state.watchedMovies) ? state.watchedMovies.length : 0;
@@ -1030,6 +1034,107 @@ function refreshProfileOverviewCallout(options = {}) {
       ? "Snapshots capture your preferences after each sync."
       : "Sign in to capture cloud snapshots of your taste.";
   }
+
+  const renderSnapshotList = (
+    listEl,
+    subtitleEl,
+    items,
+    totalCount,
+    emptyMessage,
+    singularLabel,
+    pluralLabel
+  ) => {
+    if (!listEl) {
+      return;
+    }
+    listEl.innerHTML = "";
+
+    if (!totalCount) {
+      if (subtitleEl) {
+        subtitleEl.textContent = emptyMessage;
+      }
+      const empty = document.createElement("li");
+      empty.className = "profile-callout-snapshot-empty";
+      empty.textContent = emptyMessage;
+      listEl.appendChild(empty);
+      return;
+    }
+
+    const limit = 3;
+    const recentItems = items.slice(-limit).reverse();
+
+    if (subtitleEl) {
+      const visibleCount = recentItems.length;
+      const overallLabel = totalCount === 1 ? singularLabel : pluralLabel;
+      subtitleEl.textContent = `${visibleCount} of ${totalCount} ${overallLabel}`;
+    }
+
+    const formatMeta = (entry) => {
+      if (!entry) {
+        return "";
+      }
+      const parts = [];
+      if (entry.year) {
+        parts.push(String(entry.year));
+      }
+      if (Array.isArray(entry.genres) && entry.genres.length) {
+        parts.push(entry.genres.slice(0, 2).join(" • "));
+      }
+      if (typeof entry.rating === "number" && Number.isFinite(entry.rating)) {
+        parts.push(`IMDb ${entry.rating.toFixed(1)}`);
+      }
+      return parts.join(" • ");
+    };
+
+    recentItems.forEach((entry) => {
+      if (!entry) {
+        return;
+      }
+      const item = document.createElement("li");
+      item.className = "profile-callout-snapshot-item";
+      const title = document.createElement("span");
+      title.className = "profile-callout-snapshot-item-title";
+      title.textContent = entry.title || "Untitled";
+      item.appendChild(title);
+      const meta = formatMeta(entry);
+      if (meta) {
+        const metaEl = document.createElement("span");
+        metaEl.className = "profile-callout-snapshot-item-meta";
+        metaEl.textContent = meta;
+        item.appendChild(metaEl);
+      }
+      listEl.appendChild(item);
+    });
+
+    if (totalCount > recentItems.length) {
+      const remainder = totalCount - recentItems.length;
+      const more = document.createElement("li");
+      more.className = "profile-callout-snapshot-item profile-callout-snapshot-more";
+      const label = remainder === 1 ? singularLabel : pluralLabel;
+      more.textContent = `+${remainder} more ${label}`;
+      listEl.appendChild(more);
+    }
+  };
+
+  renderSnapshotList(
+    favoritesList,
+    favoritesSubtitle,
+    Array.isArray(state.favorites) ? state.favorites : [],
+    favoritesCount,
+    "Save favorites to surface them here.",
+    "favorite",
+    "favorites"
+  );
+
+  renderSnapshotList(
+    watchedList,
+    watchedSubtitle,
+    Array.isArray(state.watchedMovies) ? state.watchedMovies : [],
+    watchedCount,
+    "Log watched titles to see recent activity.",
+    "watched title",
+    "watched titles"
+  );
 
   callout.classList.toggle("has-data", favoritesCount > 0 || watchedCount > 0);
 
