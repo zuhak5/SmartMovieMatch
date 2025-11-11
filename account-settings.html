@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Account settings – Smart Movie Match</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="assets/css/app.css" />
+</head>
+<body data-page="account-settings">
+<div class="app">
+  <header class="app-header">
+    <div class="account-bar" role="navigation">
+      <span id="accountGreeting" class="account-greeting">You’re browsing as guest.</span>
+      <a id="accountLoginLink" class="account-link" href="login.html">Log in / Sign up</a>
+      <div id="accountProfile" class="account-profile" hidden>
+        <button
+          id="accountProfileBtn"
+          class="account-pill"
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          aria-controls="accountMenu"
+        >
+          <span class="account-avatar" id="accountAvatar" aria-hidden="true">
+            <span id="accountAvatarInitials" class="account-avatar-initials">GM</span>
+            <img id="accountAvatarImg" alt="" />
+          </span>
+          <span class="account-pill-text">
+            <span id="accountName" class="account-name">Guest</span>
+            <span id="accountPillSync" class="account-pill-sub">Cloud sync inactive</span>
+          </span>
+          <span class="account-pill-caret" aria-hidden="true">▾</span>
+        </button>
+        <ul id="accountMenu" class="account-menu" role="menu" aria-label="Account actions">
+          <li>
+            <button class="account-menu-item" type="button" data-action="profile" role="menuitem">
+              Profile overview
+            </button>
+          </li>
+          <li>
+            <button class="account-menu-item" type="button" data-action="settings" role="menuitem">
+              Account settings
+            </button>
+          </li>
+          <li>
+            <button
+              class="account-menu-item account-menu-item--danger"
+              type="button"
+              data-action="logout"
+              role="menuitem"
+            >
+              Sign out
+            </button>
+          </li>
+        </ul>
+      </div>
+    </div>
+    <div class="app-title-row">
+      <h1 class="app-title">🔐 Account settings</h1>
+      <span class="pill-context">
+        <span class="pill-dot"></span>
+        Keep your profile and security in sync
+      </span>
+    </div>
+    <p class="app-subtitle">
+      Update how you appear across Smart Movie Match, keep your password fresh, and review your stored snapshots.
+    </p>
+  </header>
+
+  <main class="app-main settings-main">
+    <section class="panel settings-panel">
+      <div class="panel-inner">
+        <div class="panel-header settings-header">
+          <div>
+            <div class="panel-title">Profile & security</div>
+            <div class="panel-subtitle">Tailor your details and protect your account.</div>
+          </div>
+          <a class="btn-subtle btn-chip" href="profile.html#profileOverview">
+            <span aria-hidden="true">←</span>
+            <span>Back to overview</span>
+          </a>
+        </div>
+
+        <div id="accountSettingsSignedOut" class="settings-signed-out" hidden aria-hidden="true">
+          <h2>Sign in to manage settings</h2>
+          <p>Log in to update your profile, change your password, and review the latest sync snapshots.</p>
+          <a class="btn-primary" href="login.html">Log in / Sign up</a>
+        </div>
+
+        <div id="accountSettingsContent" class="settings-content" hidden aria-hidden="true">
+          <div id="profile" class="settings-anchor" aria-hidden="true"></div>
+          <div class="settings-grid">
+            <section class="settings-card" aria-labelledby="accountSettingsProfileHeading">
+              <div class="settings-card-header">
+                <h2 id="accountSettingsProfileHeading">Profile</h2>
+                <p>Change what other devices see when you sign in.</p>
+              </div>
+              <form id="accountProfileForm" class="settings-section" novalidate>
+                <div class="field-grid">
+                  <label class="field-label" for="accountDisplayName">Display name</label>
+                  <input
+                    id="accountDisplayName"
+                    class="input-base input-text"
+                    type="text"
+                    name="displayName"
+                    minlength="2"
+                    maxlength="120"
+                    autocomplete="name"
+                    required
+                  />
+                </div>
+                <div class="field-grid">
+                  <span class="field-label">Avatar</span>
+                  <div class="settings-avatar-row">
+                    <label class="settings-avatar" for="accountAvatarInput">
+                      <span class="settings-avatar-inner" id="settingsAvatarPreview">GM</span>
+                    </label>
+                    <input
+                      id="accountAvatarInput"
+                      class="input-base input-file"
+                      type="file"
+                      name="avatar"
+                      accept="image/*"
+                    />
+                    <button type="button" id="accountAvatarRemove" class="btn-subtle">Remove</button>
+                  </div>
+                  <p class="field-hint">Square JPG or PNG up to 5 MB recommended.</p>
+                </div>
+                <div class="settings-actions">
+                  <button type="submit" class="btn-primary">Save profile</button>
+                  <div id="accountProfileStatus" class="modal-status" role="status" aria-live="polite"></div>
+                </div>
+              </form>
+            </section>
+
+            <section class="settings-card" aria-labelledby="accountSettingsSecurityHeading">
+              <div class="settings-card-header">
+                <h2 id="accountSettingsSecurityHeading">Security</h2>
+                <p>Reset your password and prep for multi-factor prompts.</p>
+              </div>
+              <form id="accountSecurityForm" class="settings-section" novalidate>
+                <div class="field-grid">
+                  <label class="field-label" for="currentPasswordInput">Current password</label>
+                  <input
+                    id="currentPasswordInput"
+                    class="input-base input-text"
+                    type="password"
+                    name="currentPassword"
+                    autocomplete="current-password"
+                    required
+                  />
+                </div>
+                <div class="field-grid">
+                  <label class="field-label" for="newPasswordInput">New password</label>
+                  <input
+                    id="newPasswordInput"
+                    class="input-base input-text"
+                    type="password"
+                    name="newPassword"
+                    autocomplete="new-password"
+                    minlength="8"
+                    required
+                  />
+                  <p class="field-hint">Use 8+ characters with a mix of letters, numbers, and symbols.</p>
+                </div>
+                <div class="field-grid">
+                  <label class="field-label" for="confirmPasswordInput">Confirm new password</label>
+                  <input
+                    id="confirmPasswordInput"
+                    class="input-base input-text"
+                    type="password"
+                    name="confirmPassword"
+                    autocomplete="new-password"
+                    required
+                  />
+                </div>
+                <div class="security-prompts">
+                  <label class="security-option">
+                    <input id="emailVerificationToggle" type="checkbox" disabled checked />
+                    <span>
+                      Email verification is required for password recovery. We’ll send alerts to your inbox.
+                    </span>
+                  </label>
+                  <label class="security-option">
+                    <input id="mfaToggle" type="checkbox" disabled />
+                    <span>
+                      Multi-factor prompts are coming soon. We’ll notify you when they’re ready.
+                    </span>
+                  </label>
+                </div>
+                <div class="settings-actions">
+                  <button type="submit" class="btn-primary">Update password</button>
+                  <div id="accountSecurityStatus" class="modal-status" role="status" aria-live="polite"></div>
+                </div>
+              </form>
+            </section>
+          </div>
+
+          <div id="snapshots" class="settings-anchor" aria-hidden="true"></div>
+          <section class="settings-card settings-card-wide" id="accountSnapshotsSection" aria-labelledby="accountSnapshotsHeading">
+            <div class="settings-card-header">
+              <h2 id="accountSnapshotsHeading">Cloud snapshots</h2>
+              <p>These copies refresh every time Smart Movie Match syncs.</p>
+            </div>
+            <div class="snapshot-grid">
+              <article class="snapshot-card">
+                <h3>Preferences</h3>
+                <pre id="snapshotPreferences" class="snapshot-pre" aria-live="polite">No data synced yet.</pre>
+              </article>
+              <article class="snapshot-card">
+                <h3>Watched history</h3>
+                <pre id="snapshotWatched" class="snapshot-pre" aria-live="polite">No data synced yet.</pre>
+              </article>
+              <article class="snapshot-card">
+                <h3>Favorites</h3>
+                <pre id="snapshotFavorites" class="snapshot-pre" aria-live="polite">No data synced yet.</pre>
+              </article>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script type="module" src="assets/js/main.js"></script>
+</body>
+</html>
