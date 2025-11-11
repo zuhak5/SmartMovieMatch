@@ -1,7 +1,8 @@
 import {
   registerUser,
   loginUser,
-  subscribeToSession
+  subscribeToSession,
+  requestPasswordReset
 } from "./auth.js";
 import { $ } from "./dom.js";
 
@@ -32,6 +33,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const avatarGroup = $("avatarGroup");
   const submitBtn = $("authSubmit");
   const nameInput = $("displayNameInput");
+  const passwordInput = $("passwordInput");
+  const passwordStrength = $("passwordStrength");
+  const forgotPasswordBtn = $("forgotPasswordBtn");
 
   const avatarCircle = document.querySelector(".avatar-circle");
   const avatarPlaceholder = avatarCircle
@@ -114,11 +118,41 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  if (passwordInput) {
+    passwordInput.addEventListener("input", () => {
+      applyPasswordStrength(passwordInput.value);
+    });
+  }
+
+  if (forgotPasswordBtn) {
+    forgotPasswordBtn.addEventListener("click", async () => {
+      const username = window.prompt("Enter your username to reset your password:");
+      if (!username) {
+        return;
+      }
+      try {
+        forgotPasswordBtn.disabled = true;
+        status.innerHTML = '<span class="status-loading">Sending reset instructions…</span>';
+        const response = await requestPasswordReset(username.trim());
+        const message = response && response.message
+          ? response.message
+          : 'If that username exists, check your email for next steps.';
+        status.innerHTML = `<span class="status-success">${message}</span>`;
+      } catch (error) {
+        status.innerHTML = `<span class="status-error">${error.message || 'We couldn’t start a reset right now.'}</span>`;
+      } finally {
+        forgotPasswordBtn.disabled = false;
+      }
+    });
+  }
+
   updateModeUi();
+  applyPasswordStrength(passwordInput ? passwordInput.value : "");
 
   toggleBtn.addEventListener("click", () => {
     state.mode = state.mode === "login" ? "signup" : "login";
     updateModeUi();
+    applyPasswordStrength(passwordInput ? passwordInput.value : "");
     status.textContent = "";
   });
 
@@ -131,6 +165,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!username || !password) {
       status.innerHTML =
         '<span class="status-error">Enter both username and password.</span>';
+      return;
+    }
+
+    if (state.mode === "signup" && password.length < 8) {
+      status.innerHTML =
+        '<span class="status-error">Passwords need at least 8 characters when signing up.</span>';
       return;
     }
 
@@ -174,6 +214,33 @@ await registerUser({ username, password, name: displayNameValue, avatarBase64, a
       toggleBtn.disabled = false;
     }
   });
+
+  function applyPasswordStrength(value) {
+    if (!passwordStrength) {
+      return;
+    }
+    const password = value || "";
+    if (!password) {
+      passwordStrength.textContent = state.mode === "signup"
+        ? "Aim for 8+ characters with a mix of types."
+        : "";
+      passwordStrength.removeAttribute("data-level");
+      return;
+    }
+
+    const score = assessPasswordStrength(password);
+    let level = "weak";
+    let message = "Weak — add more characters and variety.";
+    if (score >= 4) {
+      level = "strong";
+      message = "Strong — great job keeping it secure.";
+    } else if (score === 3) {
+      level = "fair";
+      message = "Fair — add symbols or numbers to strengthen it.";
+    }
+    passwordStrength.textContent = message;
+    passwordStrength.dataset.level = level;
+  }
 });
 
   function updateModeUi() {
@@ -209,3 +276,13 @@ await registerUser({ username, password, name: displayNameValue, avatarBase64, a
       }
     }
   }
+});
+
+function assessPasswordStrength(password) {
+  let score = 0;
+  if (password.length >= 8) score += 1;
+  if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score += 1;
+  if (/\d/.test(password)) score += 1;
+  if (/[^A-Za-z0-9]/.test(password)) score += 1;
+  return score;
+}
