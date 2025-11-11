@@ -129,6 +129,64 @@ export async function persistFavoritesRemote(session, favorites) {
   return updatedSession;
 }
 
+export async function updateProfile({ displayName, avatarBase64 = null, avatarFileName = null, removeAvatar = false } = {}) {
+  const activeSession = ensureActiveSession();
+  const payload = {};
+
+  if (typeof displayName === "string") {
+    const trimmed = displayName.trim();
+    if (trimmed) {
+      payload.name = trimmed;
+    }
+  }
+
+  if (avatarBase64) {
+    payload.avatarBase64 = avatarBase64;
+    if (avatarFileName) {
+      payload.avatarFileName = avatarFileName;
+    }
+  }
+
+  if (removeAvatar) {
+    payload.removeAvatar = true;
+  }
+
+  const response = await authRequest("updateProfile", payload, activeSession.token);
+  const updatedSession = normalizeSession(response && response.session);
+  if (updatedSession) {
+    persistSession(updatedSession);
+    return updatedSession;
+  }
+  return activeSession;
+}
+
+export async function changePassword({ currentPassword, newPassword }) {
+  const activeSession = ensureActiveSession();
+  if (!currentPassword || !newPassword) {
+    throw new Error("Enter your current password and a new password to continue.");
+  }
+  const response = await authRequest(
+    "changePassword",
+    { currentPassword, newPassword },
+    activeSession.token
+  );
+  const updatedSession = normalizeSession(response && response.session);
+  if (updatedSession) {
+    persistSession(updatedSession);
+    return updatedSession;
+  }
+  return activeSession;
+}
+
+export async function requestPasswordReset(username) {
+  const sanitized = sanitizeUsername(username);
+  if (!sanitized) {
+    throw new Error("Enter the username you signed up with.");
+  }
+  const response = await authRequest("requestPasswordReset", { username: sanitized });
+  return response || { ok: true };
+}
+
 function notifySubscribers(session) {
   subscribers.forEach((callback) => {
     try {

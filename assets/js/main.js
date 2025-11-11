@@ -5,7 +5,9 @@ import {
   logoutSession,
   persistPreferencesRemote,
   persistWatchedRemote,
-  persistFavoritesRemote
+  persistFavoritesRemote,
+  updateProfile,
+  changePassword
 } from "./auth.js";
 import {
   discoverCandidateMovies,
@@ -34,6 +36,9 @@ const state = {
   lastRecSeed: Math.random(),
   activeCollectionView: "favorites",
   session: null,
+  accountMenuOpen: false,
+  accountAvatarPreviewUrl: null,
+  accountRemoveAvatar: false,
   watchedSyncTimer: null,
   favoritesSyncTimer: null,
   activeRecToken: null,
@@ -63,6 +68,74 @@ const GENRE_ICON_MAP = {
   "10749": "❤️", // Romance
   "10751": "👨‍👩‍👧", // Family
 };
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      const comma = result.indexOf(",");
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = (event) => reject(event);
+    reader.readAsDataURL(file);
+  });
+}
+
+function formatSyncTime(timestamp) {
+  if (!timestamp) {
+    return "Not synced yet";
+  }
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return "Not synced yet";
+  }
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 0) {
+    return "Scheduled soon";
+  }
+  const diffSeconds = Math.floor(diffMs / 1000);
+  if (diffSeconds < 45) {
+    return "Just now";
+  }
+  if (diffSeconds < 90) {
+    return "About a minute ago";
+  }
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) {
+    return `${diffMinutes} minute${diffMinutes === 1 ? "" : "s"} ago`;
+  }
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+  }
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 14) {
+    return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+  }
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function getMostRecentSync(session) {
+  if (!session) {
+    return null;
+  }
+  const timestamps = [session.lastPreferencesSync, session.lastWatchedSync, session.lastFavoritesSync]
+    .map((value) => {
+      const date = value ? new Date(value) : null;
+      return date && !Number.isNaN(date.getTime()) ? date.getTime() : 0;
+    })
+    .filter(Boolean);
+  if (!timestamps.length) {
+    return null;
+  }
+  return new Date(Math.max(...timestamps));
+}
 
 function getGenreIcon(genreId, label) {
   if (genreId && GENRE_ICON_MAP[genreId]) {
@@ -233,6 +306,7 @@ function init() {
   refreshFavoritesUi();
   switchCollectionView(state.activeCollectionView);
   updateAccountUi(state.session);
+  updateSnapshotPreviews(state.session);
   setSyncStatus(
     state.session
       ? "Signed in – your taste profile syncs automatically."
@@ -244,27 +318,120 @@ function init() {
     state.session = session;
     hydrateFromSession(session);
     updateAccountUi(session);
+    updateSnapshotPreviews(session);
     setSyncStatus(
       session
         ? "Signed in – your taste profile syncs automatically."
         : "Signed out. Preferences won’t sync until you sign in again.",
       session ? "success" : "muted"
     );
+    if (isAccountSettingsOpen()) {
+      populateAccountSettings();
+    }
   });
 
   wireEvents();
 }
 
 function wireEvents() {
-  const logoutBtn = $("accountLogoutBtn");
-  if (logoutBtn) {
-    logoutBtn.addEventListener("click", () => {
+  const accountProfileBtn = $("accountProfileBtn");
+  const accountMenu = $("accountMenu");
+  const accountProfile = $("accountProfile");
+  const viewSnapshotsBtn = $("viewSnapshotsBtn");
+  const timelineSnapshotsBtn = $("syncTimelineSnapshotsBtn");
+  const overlay = $("accountSettingsOverlay");
+  const closeSettingsBtn = $("accountSettingsClose");
+  const profileForm = $("accountProfileForm");
+  const securityForm = $("accountSecurityForm");
+  const avatarInput = $("accountAvatarInput");
+  const avatarRemoveBtn = $("accountAvatarRemove");
+
+  if (accountProfileBtn && accountMenu) {
+    accountProfileBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
       playUiClick();
-      logoutSession();
-      setSyncStatus(
-        "Signed out. Preferences won’t sync until you sign in again.",
-        "muted"
-      );
+      toggleAccountMenu();
+    });
+  }
+
+  if (accountMenu) {
+    accountMenu.querySelectorAll(".account-menu-item").forEach((item) => {
+      item.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const action = item.getAttribute("data-action");
+        handleAccountMenuAction(action);
+      });
+    });
+  }
+
+  document.addEventListener("click", (event) => {
+    if (!state.accountMenuOpen) {
+      return;
+    }
+    const container = accountProfile || (accountProfileBtn ? accountProfileBtn.parentElement : null);
+    if (container && container.contains(event.target)) {
+      return;
+    }
+    closeAccountMenu();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      if (state.accountMenuOpen) {
+        closeAccountMenu(true);
+        return;
+      }
+      if (isAccountSettingsOpen()) {
+        closeAccountSettings();
+      }
+    }
+  });
+
+  if (viewSnapshotsBtn) {
+    viewSnapshotsBtn.addEventListener("click", () => {
+      playUiClick();
+      openAccountSettings("snapshots");
+    });
+  }
+
+  if (timelineSnapshotsBtn) {
+    timelineSnapshotsBtn.addEventListener("click", () => {
+      playUiClick();
+      openAccountSettings("snapshots");
+    });
+  }
+
+  if (overlay) {
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) {
+        closeAccountSettings();
+      }
+    });
+  }
+
+  if (closeSettingsBtn) {
+    closeSettingsBtn.addEventListener("click", () => {
+      playUiClick();
+      closeAccountSettings();
+    });
+  }
+
+  if (profileForm) {
+    profileForm.addEventListener("submit", handleProfileSubmit);
+  }
+
+  if (securityForm) {
+    securityForm.addEventListener("submit", handleSecuritySubmit);
+  }
+
+  if (avatarInput) {
+    avatarInput.addEventListener("change", handleAvatarInputChange);
+  }
+
+  if (avatarRemoveBtn) {
+    avatarRemoveBtn.addEventListener("click", () => {
+      playUiClick();
+      handleAvatarRemove();
     });
   }
 
@@ -333,6 +500,352 @@ function wireEvents() {
       }
     });
   });
+}
+
+function toggleAccountMenu() {
+  if (state.accountMenuOpen) {
+    closeAccountMenu();
+  } else {
+    openAccountMenu();
+  }
+}
+
+function openAccountMenu() {
+  const accountMenu = $("accountMenu");
+  const accountProfileBtn = $("accountProfileBtn");
+  if (!accountMenu || !accountProfileBtn) {
+    return;
+  }
+  accountMenu.classList.add("is-open");
+  accountProfileBtn.setAttribute("aria-expanded", "true");
+  state.accountMenuOpen = true;
+  const firstItem = accountMenu.querySelector(".account-menu-item");
+  if (firstItem) {
+    window.requestAnimationFrame(() => {
+      if (!state.accountMenuOpen) {
+        return;
+      }
+      try {
+        firstItem.focus();
+      } catch (error) {
+        console.warn("Account menu focus failed", error);
+      }
+    });
+  }
+}
+
+function closeAccountMenu(focusButton = false) {
+  const accountMenu = $("accountMenu");
+  const accountProfileBtn = $("accountProfileBtn");
+  if (accountMenu) {
+    accountMenu.classList.remove("is-open");
+  }
+  if (accountProfileBtn) {
+    accountProfileBtn.setAttribute("aria-expanded", "false");
+    if (focusButton) {
+      accountProfileBtn.focus();
+    }
+  }
+  state.accountMenuOpen = false;
+}
+
+function handleAccountMenuAction(action) {
+  closeAccountMenu();
+  switch (action) {
+    case "profile":
+      highlightAccountInsights();
+      break;
+    case "settings":
+      openAccountSettings();
+      break;
+    case "logout":
+      logoutSession();
+      setSyncStatus(
+        "Signed out. Preferences won’t sync until you sign in again.",
+        "muted"
+      );
+      break;
+    default:
+      break;
+  }
+}
+
+function highlightAccountInsights() {
+  const section = $("accountInsights");
+  if (!section || section.hidden) {
+    return;
+  }
+  section.scrollIntoView({ behavior: "smooth", block: "start" });
+  section.classList.add("account-insights--pulse");
+  window.setTimeout(() => {
+    section.classList.remove("account-insights--pulse");
+  }, 1200);
+}
+
+function isAccountSettingsOpen() {
+  const overlay = $("accountSettingsOverlay");
+  return !!(overlay && overlay.classList.contains("is-visible"));
+}
+
+function openAccountSettings(section = "profile") {
+  if (!state.session || !state.session.token) {
+    window.location.href = "login.html";
+    return;
+  }
+  const overlay = $("accountSettingsOverlay");
+  const displayNameInput = $("accountDisplayName");
+  const avatarInput = $("accountAvatarInput");
+  if (!overlay) {
+    return;
+  }
+  overlay.hidden = false;
+  overlay.classList.add("is-visible");
+  overlay.setAttribute("open", "");
+
+  state.accountRemoveAvatar = false;
+  if (avatarInput) {
+    avatarInput.value = "";
+  }
+
+  populateAccountSettings();
+
+  window.setTimeout(() => {
+    if (section === "snapshots") {
+      const snapshots = $("accountSnapshotsSection");
+      if (snapshots) {
+        snapshots.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    } else if (displayNameInput) {
+      displayNameInput.focus();
+    }
+  }, 60);
+}
+
+function closeAccountSettings() {
+  const overlay = $("accountSettingsOverlay");
+  const accountProfileBtn = $("accountProfileBtn");
+  if (!overlay) {
+    return;
+  }
+  overlay.classList.remove("is-visible");
+  overlay.removeAttribute("open");
+  overlay.hidden = true;
+  if (accountProfileBtn) {
+    accountProfileBtn.focus();
+  }
+  if (state.accountAvatarPreviewUrl) {
+    URL.revokeObjectURL(state.accountAvatarPreviewUrl);
+    state.accountAvatarPreviewUrl = null;
+  }
+  state.accountRemoveAvatar = false;
+}
+
+function populateAccountSettings() {
+  const displayNameInput = $("accountDisplayName");
+  const settingsAvatar = document.querySelector(".settings-avatar");
+  const preview = $("settingsAvatarPreview");
+  const profileStatus = $("accountProfileStatus");
+  const securityStatus = $("accountSecurityStatus");
+
+  if (displayNameInput) {
+    displayNameInput.value = state.session && state.session.displayName ? state.session.displayName : "";
+  }
+  if (profileStatus) {
+    profileStatus.textContent = "";
+    profileStatus.removeAttribute("data-variant");
+  }
+  if (securityStatus) {
+    securityStatus.textContent = "";
+    securityStatus.removeAttribute("data-variant");
+  }
+
+  const initials = getActiveDisplayName().slice(0, 2).toUpperCase() || "SM";
+  if (settingsAvatar && preview) {
+    if (state.session && state.session.avatarUrl) {
+      settingsAvatar.style.backgroundImage = `url(${state.session.avatarUrl})`;
+      settingsAvatar.style.backgroundSize = "cover";
+      settingsAvatar.style.backgroundPosition = "center";
+      preview.textContent = "";
+    } else {
+      settingsAvatar.style.backgroundImage = "none";
+      preview.textContent = initials;
+    }
+  }
+}
+
+async function handleProfileSubmit(event) {
+  event.preventDefault();
+  if (!state.session || !state.session.token) {
+    window.location.href = "login.html";
+    return;
+  }
+  const displayNameInput = $("accountDisplayName");
+  const statusEl = $("accountProfileStatus");
+  const avatarInput = $("accountAvatarInput");
+
+  if (!displayNameInput || !statusEl) {
+    return;
+  }
+
+  const displayName = displayNameInput.value.trim();
+  if (displayName.length < 2) {
+    statusEl.textContent = "Display name should be at least 2 characters.";
+    statusEl.dataset.variant = "error";
+    return;
+  }
+
+  let avatarBase64 = null;
+  let avatarFileName = null;
+  if (state.accountRemoveAvatar) {
+    avatarBase64 = null;
+    avatarFileName = null;
+  } else if (avatarInput && avatarInput.files && avatarInput.files[0]) {
+    const file = avatarInput.files[0];
+    if (file.size > 5 * 1024 * 1024) {
+      statusEl.textContent = "Avatar must be 5 MB or smaller.";
+      statusEl.dataset.variant = "error";
+      return;
+    }
+    try {
+      avatarBase64 = await fileToBase64(file);
+      avatarFileName = file.name;
+    } catch (error) {
+      statusEl.textContent = "Couldn’t read that image file.";
+      statusEl.dataset.variant = "error";
+      return;
+    }
+  }
+
+  statusEl.textContent = "Saving profile…";
+  statusEl.dataset.variant = "loading";
+
+  try {
+    await updateProfile({
+      displayName,
+      avatarBase64,
+      avatarFileName,
+      removeAvatar: state.accountRemoveAvatar
+    });
+    statusEl.textContent = "Profile updated.";
+    statusEl.dataset.variant = "success";
+    state.accountRemoveAvatar = false;
+    if (avatarInput) {
+      avatarInput.value = "";
+    }
+    populateAccountSettings();
+  } catch (error) {
+    statusEl.textContent = error.message || "Couldn’t update your profile.";
+    statusEl.dataset.variant = "error";
+  }
+}
+
+async function handleSecuritySubmit(event) {
+  event.preventDefault();
+  if (!state.session || !state.session.token) {
+    window.location.href = "login.html";
+    return;
+  }
+  const currentInput = $("currentPasswordInput");
+  const newInput = $("newPasswordInput");
+  const confirmInput = $("confirmPasswordInput");
+  const statusEl = $("accountSecurityStatus");
+
+  if (!currentInput || !newInput || !confirmInput || !statusEl) {
+    return;
+  }
+
+  const currentPassword = currentInput.value;
+  const newPassword = newInput.value;
+  const confirmPassword = confirmInput.value;
+
+  if (newPassword !== confirmPassword) {
+    statusEl.textContent = "New passwords don’t match.";
+    statusEl.dataset.variant = "error";
+    return;
+  }
+
+  if (newPassword.length < 8) {
+    statusEl.textContent = "Use at least 8 characters for your new password.";
+    statusEl.dataset.variant = "error";
+    return;
+  }
+
+  statusEl.textContent = "Updating password…";
+  statusEl.dataset.variant = "loading";
+
+  try {
+    await changePassword({ currentPassword, newPassword });
+    statusEl.textContent = "Password updated. We’ve refreshed your session.";
+    statusEl.dataset.variant = "success";
+    currentInput.value = "";
+    newInput.value = "";
+    confirmInput.value = "";
+  } catch (error) {
+    statusEl.textContent = error.message || "Couldn’t update your password.";
+    statusEl.dataset.variant = "error";
+  }
+}
+
+function handleAvatarInputChange(event) {
+  const input = event.target;
+  const settingsAvatar = document.querySelector(".settings-avatar");
+  const preview = $("settingsAvatarPreview");
+  const statusEl = $("accountProfileStatus");
+  if (!input || !settingsAvatar || !preview) {
+    return;
+  }
+
+  if (!input.files || !input.files[0]) {
+    if (state.accountAvatarPreviewUrl) {
+      URL.revokeObjectURL(state.accountAvatarPreviewUrl);
+      state.accountAvatarPreviewUrl = null;
+    }
+    settingsAvatar.style.backgroundImage = "none";
+    preview.textContent = getActiveDisplayName().slice(0, 2).toUpperCase() || "SM";
+    state.accountRemoveAvatar = false;
+    return;
+  }
+
+  const file = input.files[0];
+  if (!file.type.startsWith("image/")) {
+    if (statusEl) {
+      statusEl.textContent = "Choose an image file for your avatar.";
+      statusEl.dataset.variant = "error";
+    }
+    input.value = "";
+    return;
+  }
+
+  if (state.accountAvatarPreviewUrl) {
+    URL.revokeObjectURL(state.accountAvatarPreviewUrl);
+  }
+  const objectUrl = URL.createObjectURL(file);
+  state.accountAvatarPreviewUrl = objectUrl;
+  settingsAvatar.style.backgroundImage = `url(${objectUrl})`;
+  settingsAvatar.style.backgroundSize = "cover";
+  settingsAvatar.style.backgroundPosition = "center";
+  preview.textContent = "";
+  state.accountRemoveAvatar = false;
+}
+
+function handleAvatarRemove() {
+  const settingsAvatar = document.querySelector(".settings-avatar");
+  const preview = $("settingsAvatarPreview");
+  const avatarInput = $("accountAvatarInput");
+  if (settingsAvatar) {
+    settingsAvatar.style.backgroundImage = "none";
+  }
+  if (preview) {
+    preview.textContent = getActiveDisplayName().slice(0, 2).toUpperCase() || "SM";
+  }
+  if (avatarInput) {
+    avatarInput.value = "";
+  }
+  if (state.accountAvatarPreviewUrl) {
+    URL.revokeObjectURL(state.accountAvatarPreviewUrl);
+    state.accountAvatarPreviewUrl = null;
+  }
+  state.accountRemoveAvatar = true;
 }
 
 function refreshWatchedUi() {
@@ -1197,25 +1710,63 @@ function updateCollectionVisibility() {
 function updateAccountUi(session) {
   const greeting = $("accountGreeting");
   const loginLink = $("accountLoginLink");
-  const logoutBtn = $("accountLogoutBtn");
+  const accountProfile = $("accountProfile");
+  const accountName = $("accountName");
+  const accountPillSync = $("accountPillSync");
+  const accountAvatar = document.getElementById("accountAvatar");
+  const accountAvatarImg = $("accountAvatarImg");
+  const accountAvatarInitials = $("accountAvatarInitials");
+  const accountMenu = $("accountMenu");
 
-  if (!greeting || !loginLink || !logoutBtn) {
+  if (!greeting || !loginLink || !accountProfile || !accountName || !accountPillSync || !accountAvatar || !accountAvatarImg || !accountAvatarInitials) {
     return;
   }
 
-  const displayName = session ? session.displayName || session.username || "" : "";
+  const isSignedIn = Boolean(session && session.token);
+  const displayName = isSignedIn
+    ? (session.displayName || session.username || "Member").trim()
+    : "";
 
-  if (displayName) {
-    greeting.textContent = `Signed in as ${displayName}`;
+  if (isSignedIn) {
+    greeting.textContent = `Welcome back, ${displayName}!`;
     greeting.classList.add("account-greeting-auth");
     loginLink.style.display = "none";
-    logoutBtn.style.display = "inline-flex";
+    accountProfile.hidden = false;
+    accountName.textContent = displayName;
+    const mostRecent = getMostRecentSync(session);
+    accountPillSync.textContent = mostRecent
+      ? `Last sync ${formatSyncTime(mostRecent.toISOString())}`
+      : "Sync pending";
+    const initials = displayName
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "SM";
+    accountAvatarInitials.textContent = initials;
+    const avatarUrl = session.avatarUrl || null;
+    if (avatarUrl) {
+      accountAvatarImg.src = avatarUrl;
+      accountAvatarImg.alt = `${displayName} avatar`;
+      accountAvatar.classList.add("has-image");
+    } else {
+      accountAvatarImg.removeAttribute("src");
+      accountAvatarImg.alt = "";
+      accountAvatar.classList.remove("has-image");
+    }
   } else {
     greeting.textContent = "You’re browsing as guest.";
     greeting.classList.remove("account-greeting-auth");
     loginLink.style.display = "inline-flex";
-    logoutBtn.style.display = "none";
+    accountProfile.hidden = true;
+    if (accountMenu) {
+      accountMenu.classList.remove("is-open");
+    }
+    state.accountMenuOpen = false;
   }
+
+  updateSyncInsights(session);
 }
 
 function setSyncStatus(message, variant = "muted") {
@@ -1225,6 +1776,99 @@ function setSyncStatus(message, variant = "muted") {
   }
   el.textContent = message;
   el.dataset.variant = variant;
+}
+
+function updateSyncInsights(session) {
+  const insightsSection = $("accountInsights");
+  const prefValue = $("accountInsightPreferencesValue");
+  const watchedValue = $("accountInsightWatchedValue");
+  const favoritesValue = $("accountInsightFavoritesValue");
+  const timeline = $("syncTimeline");
+  const timelinePref = $("syncTimelinePreferences");
+  const timelineWatched = $("syncTimelineWatched");
+  const timelineFavorites = $("syncTimelineFavorites");
+  const timelineBtn = $("syncTimelineSnapshotsBtn");
+  const viewSnapshotsBtn = $("viewSnapshotsBtn");
+
+  const hasSession = Boolean(session && session.token);
+
+  const prefCount = session && session.preferencesSnapshot && Array.isArray(session.preferencesSnapshot.selectedGenres)
+    ? session.preferencesSnapshot.selectedGenres.length
+    : 0;
+  const watchedCount = session && Array.isArray(session.watchedHistory) ? session.watchedHistory.length : 0;
+  const favoritesCount = session && Array.isArray(session.favoritesList) ? session.favoritesList.length : 0;
+
+  const prefSuffix = prefCount ? ` • ${prefCount} genre${prefCount === 1 ? "" : "s"}` : "";
+  const watchedSuffix = watchedCount ? ` • ${watchedCount} title${watchedCount === 1 ? "" : "s"}` : "";
+  const favoritesSuffix = favoritesCount ? ` • ${favoritesCount} favorite${favoritesCount === 1 ? "" : "s"}` : "";
+
+  const prefText = hasSession ? `${formatSyncTime(session.lastPreferencesSync)}${prefSuffix}` : "Sign in to sync";
+  const watchedText = hasSession ? `${formatSyncTime(session.lastWatchedSync)}${watchedSuffix}` : "Sign in to sync";
+  const favoritesText = hasSession ? `${formatSyncTime(session.lastFavoritesSync)}${favoritesSuffix}` : "Sign in to sync";
+
+  if (prefValue) {
+    prefValue.textContent = prefText;
+  }
+  if (watchedValue) {
+    watchedValue.textContent = watchedText;
+  }
+  if (favoritesValue) {
+    favoritesValue.textContent = favoritesText;
+  }
+
+  if (insightsSection) {
+    insightsSection.hidden = !hasSession;
+  }
+  if (timeline) {
+    timeline.hidden = !hasSession;
+  }
+  if (timelinePref) {
+    timelinePref.textContent = prefText;
+  }
+  if (timelineWatched) {
+    timelineWatched.textContent = watchedText;
+  }
+  if (timelineFavorites) {
+    timelineFavorites.textContent = favoritesText;
+  }
+  if (timelineBtn) {
+    timelineBtn.style.display = hasSession ? "inline-flex" : "none";
+  }
+  if (viewSnapshotsBtn) {
+    viewSnapshotsBtn.disabled = !hasSession;
+  }
+}
+
+function updateSnapshotPreviews(session) {
+  const preferencesEl = $("snapshotPreferences");
+  const watchedEl = $("snapshotWatched");
+  const favoritesEl = $("snapshotFavorites");
+
+  if (!preferencesEl || !watchedEl || !favoritesEl) {
+    return;
+  }
+
+  if (!session || !session.token) {
+    preferencesEl.textContent = "Sign in to sync your preferences.";
+    watchedEl.textContent = "Sign in to sync your watched history.";
+    favoritesEl.textContent = "Sign in to sync your favorites.";
+    return;
+  }
+
+  const prettify = (value, fallback) => {
+    if (!value || (Array.isArray(value) && value.length === 0)) {
+      return fallback;
+    }
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch (error) {
+      return fallback;
+    }
+  };
+
+  preferencesEl.textContent = prettify(session.preferencesSnapshot, "No preference snapshot stored yet.");
+  watchedEl.textContent = prettify(session.watchedHistory, "No watched history stored yet.");
+  favoritesEl.textContent = prettify(session.favoritesList, "No favorites stored yet.");
 }
 
 function hydrateFromSession(session) {

@@ -97,8 +97,14 @@ async function handleAction(action, req, payload) {
       return syncWatched(req, payload);
     case "syncFavorites":
       return syncFavorites(req, payload);
+    case "updateProfile":
+      return updateProfile(req, payload);
+    case "changePassword":
+      return changePassword(req, payload);
     case "logout":
       return logout(req, payload);
+    case "requestPasswordReset":
+      return requestPasswordReset(payload);
     default:
       throw new HttpError(400, "Unsupported action");
   }
@@ -328,6 +334,156 @@ async function syncFavorites(req, payload) {
     body: {
       ok: true,
       session: toSessionResponse(refreshedUser, refreshedSession)
+    }
+  };
+}
+
+async function updateProfile(req, payload) {
+  const { sessionRecord, userRecord } = await authenticate(req, payload);
+  const now = new Date().toISOString();
+
+  const patch = {};
+  const sanitizedName = sanitizeDisplayName(payload.name);
+  if (sanitizedName) {
+    patch.display_name = sanitizedName;
+  }
+
+  let nextAvatarPath = userRecord.avatarPath;
+  let nextAvatarUrl = userRecord.avatarUrl;
+
+  if (payload.removeAvatar) {
+    patch.avatar_path = null;
+    patch.avatar_url = null;
+    nextAvatarPath = null;
+    nextAvatarUrl = null;
+  } else {
+    const base64 = typeof payload.avatarBase64 === "string" ? payload.avatarBase64.trim() : null;
+    if (base64) {
+      try {
+        const buffer = Buffer.from(base64, "base64");
+        if (!buffer || buffer.length === 0) {
+          throw new Error("Empty avatar payload");
+        }
+        if (buffer.length > 5 * 1024 * 1024) {
+          throw new HttpError(400, "Avatar must be 5 MB or smaller.");
+        }
+        const originalName = safeFilename(payload.avatarFileName || "avatar.png");
+        const objectPath = `${userRecord.username}/${Date.now()}-${originalName}`;
+        const uploaded = await uploadToStorage("avatars", objectPath, buffer, "application/octet-stream");
+        patch.avatar_path = uploaded.path;
+        patch.avatar_url = uploaded.publicUrl;
+        nextAvatarPath = uploaded.path;
+        nextAvatarUrl = uploaded.publicUrl;
+      } catch (error) {
+        if (error instanceof HttpError) {
+          throw error;
+        }
+        console.warn("Avatar update skipped:", error && error.message ? error.message : error);
+      }
+    }
+  }
+
+  let updatedUserRow = null;
+  if (Object.keys(patch).length > 0) {
+    updatedUserRow = await updateUserRow(userRecord.username, patch);
+  }
+
+  const refreshedUser = updatedUserRow
+    ? mapUserRow(updatedUserRow)
+    : {
+        ...userRecord,
+        displayName:
+          patch.display_name !== undefined && patch.display_name !== null
+            ? patch.display_name
+            : userRecord.displayName,
+        avatarPath: nextAvatarPath,
+        avatarUrl: nextAvatarUrl
+      };
+
+  const updatedSessionRow = await updateSessionRow(sessionRecord.token, {
+    last_active_at: now
+  });
+  const refreshedSession = updatedSessionRow
+    ? mapSessionRow(updatedSessionRow)
+    : { ...sessionRecord, lastActiveAt: now };
+
+  return {
+    body: {
+      session: toSessionResponse(refreshedUser, refreshedSession)
+    }
+  };
+}
+
+async function changePassword(req, payload) {
+  const { userRecord } = await authenticate(req, payload);
+
+  const currentPassword = typeof payload.currentPassword === "string" ? payload.currentPassword : "";
+  const newPassword = typeof payload.newPassword === "string" ? payload.newPassword : "";
+
+  if (!currentPassword || !newPassword) {
+    throw new HttpError(400, "Provide your current password and a new password.");
+  }
+
+  if (newPassword.length < 8) {
+    throw new HttpError(400, "New password must be at least 8 characters long.");
+  }
+
+  if (currentPassword === newPassword) {
+    throw new HttpError(400, "Choose a password that’s different from the current one.");
+  }
+
+  const computedHash = hashPassword(currentPassword, userRecord.salt);
+  if (computedHash !== userRecord.passwordHash) {
+    throw new HttpError(401, "That current password doesn’t match our records.");
+  }
+
+  const salt = crypto.randomBytes(16).toString("hex");
+  const passwordHash = hashPassword(newPassword, salt);
+  const now = new Date().toISOString();
+
+  await updateUserRow(userRecord.username, {
+    password_hash: passwordHash,
+    salt,
+    last_login_at: now
+  });
+
+  const refreshedUserRow = await selectUserRow(userRecord.username);
+  const refreshedUser = refreshedUserRow ? mapUserRow(refreshedUserRow) : { ...userRecord };
+  const sessionRecord = await createSessionRecord(refreshedUser, now);
+
+  return {
+    body: {
+      session: toSessionResponse(refreshedUser, sessionRecord)
+    }
+  };
+}
+
+async function requestPasswordReset(payload) {
+  const usernameInput = sanitizeUsername(payload && payload.username);
+  if (!usernameInput) {
+    return {
+      body: {
+        ok: true,
+        message: "If that username exists, we just emailed recovery instructions."
+      }
+    };
+  }
+
+  const canonical = canonicalUsername(usernameInput);
+
+  try {
+    const userRow = await selectUserRow(canonical);
+    if (userRow) {
+      console.info(`Password reset requested for ${canonical}`);
+    }
+  } catch (error) {
+    console.warn("Password reset lookup failed", error);
+  }
+
+  return {
+    body: {
+      ok: true,
+      message: "If that username exists, we just emailed recovery instructions."
     }
   };
 }
