@@ -1940,6 +1940,7 @@ function hydrateFromSession(session) {
     state.favorites = [];
     refreshWatchedUi();
     refreshFavoritesUi();
+    updateSyncInsights(null);
     return;
   }
 
@@ -1980,6 +1981,8 @@ function hydrateFromSession(session) {
     lastWatchedSync: session.lastWatchedSync || null,
     lastFavoritesSync: session.lastFavoritesSync || null
   };
+
+  updateSyncInsights(session);
 }
 
 
