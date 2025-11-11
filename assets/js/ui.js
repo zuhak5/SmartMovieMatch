@@ -217,11 +217,12 @@ function applyCollectionCollapse(listEl, viewEl, items, options = {}) {
   const initialExpanded = shouldShowToggle && wasExpanded;
 
   items.forEach((item, index) => {
-    if (shouldShowToggle && index >= MAX_VISIBLE) {
+    const isHidden = shouldShowToggle && index >= MAX_VISIBLE;
+    if (isHidden) {
       hiddenItems.push(item);
-      item.hidden = !initialExpanded;
-    } else {
-      item.hidden = false;
+      if (!initialExpanded) {
+        return;
+      }
     }
     listEl.appendChild(item);
   });
@@ -246,9 +247,19 @@ function applyCollectionCollapse(listEl, viewEl, items, options = {}) {
   const iconEl = button.querySelector(".icon");
 
   const update = (expanded) => {
-    hiddenItems.forEach((item) => {
-      item.hidden = !expanded;
-    });
+    if (expanded) {
+      hiddenItems.forEach((item) => {
+        if (!item.isConnected) {
+          listEl.appendChild(item);
+        }
+      });
+    } else {
+      hiddenItems.forEach((item) => {
+        if (item.parentElement === listEl) {
+          listEl.removeChild(item);
+        }
+      });
+    }
     viewEl.dataset.collectionExpanded = expanded ? "true" : "false";
     if (labelEl) {
       if (expanded) {
