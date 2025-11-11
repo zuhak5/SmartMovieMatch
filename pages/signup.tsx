@@ -310,6 +310,7 @@ export default function SignupPage() {
           display: flex;
           align-items: center;
           gap: 1.5rem;
+          --avatar-size: clamp(110px, 22vw, 144px);
         }
 
         .avatar-circle {
@@ -455,6 +456,7 @@ export default function SignupPage() {
             flex-direction: column;
             gap: 1rem;
             align-items: center;
+            --avatar-size: 120px;
           }
 
           .avatar-actions {
