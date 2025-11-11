@@ -1166,7 +1166,7 @@ body[data-page="account-settings"] .app-main {
 }
 
 .settings-header {
-  align-items: center;
+  align-items: flex-start;
 }
 
 .settings-content {
@@ -1175,6 +1175,10 @@ body[data-page="account-settings"] .app-main {
 }
 
 .settings-content[hidden] {
+  display: none !important;
+}
+
+.settings-signed-out[hidden] {
   display: none !important;
 }
 
