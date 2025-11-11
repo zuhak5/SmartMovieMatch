@@ -230,6 +230,61 @@
 
     <!-- Right column: collections + recommendations -->
     <div class="right-column">
+      <section class="panel collections-panel">
+        <div class="panel-inner">
+          <div class="panel-header collections-header">
+            <div>
+              <div class="panel-title">Your saved lists</div>
+              <div class="panel-subtitle">Favorites and watched picks stay close while you explore.</div>
+            </div>
+            <div class="collection-tabs" role="tablist">
+              <button
+                type="button"
+                class="collection-tab active"
+                id="favoritesTab"
+                data-target="favorites"
+                role="tab"
+                aria-controls="favoritesView"
+                aria-selected="true"
+              >
+                Favorites
+              </button>
+              <button
+                type="button"
+                class="collection-tab"
+                id="watchedTab"
+                data-target="watched"
+                role="tab"
+                aria-controls="watchedView"
+                aria-selected="false"
+              >
+                Watched
+              </button>
+            </div>
+          </div>
+          <div class="collection-summary" id="favoritesSummary"></div>
+          <div class="collection-summary" id="watchedSummary"></div>
+          <div id="favoritesView" class="collection-view active" role="tabpanel" aria-labelledby="favoritesTab">
+            <div id="favoritesList" class="favorites-list"></div>
+            <div id="favoritesEmpty" class="empty-state">
+              Save favorites from the discovery grid to keep them handy here.
+            </div>
+          </div>
+          <div id="watchedView" class="collection-view" role="tabpanel" aria-labelledby="watchedTab">
+            <div id="watchedList" class="watched-panel-list"></div>
+            <div id="watchedEmpty" class="empty-state">
+              Mark recommendations as <strong>“I’ve watched this”</strong> to log them for future tuning.
+            </div>
+            <div class="collection-actions">
+              <button type="button" class="btn-subtle btn-subtle-danger" id="clearWatchedBtn">
+                <span>Clear history</span>
+                <span aria-hidden="true">🧹</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="panel">
         <div class="panel-inner">
           <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
