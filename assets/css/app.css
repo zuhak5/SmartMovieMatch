@@ -1750,7 +1750,7 @@ body[data-page="account-settings"] .app-main {
   padding: 1.55rem 1.3rem 1.7rem;
   backdrop-filter: blur(22px);
   position: relative;
-  overflow: hidden;
+  overflow: clip;
 }
 
 @media (min-width: 900px) {
