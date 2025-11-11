@@ -1821,10 +1821,6 @@ function updateSyncInsights(session) {
   const preferencesValue = $("profileOverviewPreferencesValue");
   const watchedValue = $("profileOverviewWatchedValue");
   const favoritesValue = $("profileOverviewFavoritesValue");
-  const timeline = $("syncTimeline");
-  const timelinePref = $("syncTimelinePreferences");
-  const timelineWatched = $("syncTimelineWatched");
-  const timelineFavorites = $("syncTimelineFavorites");
   const viewSnapshotsBtn = $("viewSnapshotsBtn");
 
   const hasSession = Boolean(session && session.token);
@@ -1867,21 +1863,6 @@ function updateSyncInsights(session) {
   }
   if (overviewSignedOut) {
     overviewSignedOut.hidden = hasSession;
-  }
-  if (timeline) {
-    const shouldHideTimeline = !hasSession;
-    timeline.hidden = shouldHideTimeline;
-    timeline.setAttribute("aria-hidden", shouldHideTimeline ? "true" : "false");
-    timeline.style.display = shouldHideTimeline ? "none" : "";
-  }
-  if (timelinePref) {
-    timelinePref.textContent = prefText;
-  }
-  if (timelineWatched) {
-    timelineWatched.textContent = watchedText;
-  }
-  if (timelineFavorites) {
-    timelineFavorites.textContent = favoritesText;
   }
   if (viewSnapshotsBtn) {
     viewSnapshotsBtn.disabled = !hasSession;
