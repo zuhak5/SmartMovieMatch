@@ -202,6 +202,12 @@ function initAuthPage() {
       return;
     }
 
+    if (state.mode === "signup" && password.length < 8) {
+      status.innerHTML =
+        '<span class="status-error">Passwords need at least 8 characters when signing up.</span>';
+      return;
+    }
+
     if (state.mode === "signup" && displayNameValue.length < 2) {
       setStatus("Add your name so we can personalize things.", "error");
       return;
