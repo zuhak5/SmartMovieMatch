@@ -15,7 +15,48 @@
     <div class="account-bar" role="navigation">
       <span id="accountGreeting" class="account-greeting">You’re browsing as guest.</span>
       <a id="accountLoginLink" class="account-link" href="login.html">Log in / Sign up</a>
-      <button id="accountLogoutBtn" class="account-logout" type="button">Log out</button>
+      <div id="accountProfile" class="account-profile" hidden>
+        <button
+          id="accountProfileBtn"
+          class="account-pill"
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          aria-controls="accountMenu"
+        >
+          <span class="account-avatar" id="accountAvatar" aria-hidden="true">
+            <span id="accountAvatarInitials" class="account-avatar-initials">GM</span>
+            <img id="accountAvatarImg" alt="" />
+          </span>
+          <span class="account-pill-text">
+            <span id="accountName" class="account-name">Guest</span>
+            <span id="accountPillSync" class="account-pill-sub">Cloud sync inactive</span>
+          </span>
+          <span class="account-pill-caret" aria-hidden="true">▾</span>
+        </button>
+        <ul id="accountMenu" class="account-menu" role="menu" aria-label="Account actions">
+          <li>
+            <button class="account-menu-item" type="button" data-action="profile" role="menuitem">
+              Profile overview
+            </button>
+          </li>
+          <li>
+            <button class="account-menu-item" type="button" data-action="settings" role="menuitem">
+              Account settings
+            </button>
+          </li>
+          <li>
+            <button
+              class="account-menu-item account-menu-item--danger"
+              type="button"
+              data-action="logout"
+              role="menuitem"
+            >
+              Sign out
+            </button>
+          </li>
+        </ul>
+      </div>
     </div>
     <div class="app-title-row">
       <h1 class="app-title">
@@ -30,6 +71,32 @@
       Tell me what you’re into and I’ll hunt for fresh movies online, then tailor the picks
       to your mood and what you’ve already watched.
     </p>
+
+    <section id="accountInsights" class="account-insights" hidden>
+      <header class="account-insights-header">
+        <div>
+          <h2 class="account-insights-title">Account sync health</h2>
+          <p class="account-insights-subtitle">Track when your profile last touched the cloud.</p>
+        </div>
+        <button id="viewSnapshotsBtn" type="button" class="btn-link btn-link-inline">
+          View cloud snapshots
+        </button>
+      </header>
+      <dl class="account-insights-grid">
+        <div class="account-insight" id="accountInsightPreferences">
+          <dt>Preferences</dt>
+          <dd id="accountInsightPreferencesValue">Not synced yet</dd>
+        </div>
+        <div class="account-insight" id="accountInsightWatched">
+          <dt>Watched history</dt>
+          <dd id="accountInsightWatchedValue">Not synced yet</dd>
+        </div>
+        <div class="account-insight" id="accountInsightFavorites">
+          <dt>Favorites</dt>
+          <dd id="accountInsightFavoritesValue">Not synced yet</dd>
+        </div>
+      </dl>
+    </section>
     <ul class="app-highlight-grid" aria-label="Highlights">
       <li class="highlight-card" tabindex="0">
         <span class="highlight-icon" aria-hidden="true">⚡</span>
@@ -249,6 +316,23 @@
       <section class="panel">
         <div class="panel-inner">
           <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
+          <div id="syncTimeline" class="sync-timeline" hidden>
+            <div class="sync-timeline-row">
+              <span class="sync-timeline-label">Preferences</span>
+              <span class="sync-timeline-value" id="syncTimelinePreferences">Not synced yet</span>
+            </div>
+            <div class="sync-timeline-row">
+              <span class="sync-timeline-label">Watched history</span>
+              <span class="sync-timeline-value" id="syncTimelineWatched">Not synced yet</span>
+            </div>
+            <div class="sync-timeline-row">
+              <span class="sync-timeline-label">Favorites</span>
+              <span class="sync-timeline-value" id="syncTimelineFavorites">Not synced yet</span>
+            </div>
+            <button id="syncTimelineSnapshotsBtn" type="button" class="btn-link btn-link-inline">
+              Review stored snapshots
+            </button>
+          </div>
           <div class="recommendations-header">
             <div>
               <div class="recommendations-title" id="recTitle">Recommendations</div>
@@ -292,6 +376,140 @@
     </div>
   </main>
 </div>
+
+  <div id="accountSettingsOverlay" class="modal-overlay" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="accountSettingsTitle">
+      <button id="accountSettingsClose" type="button" class="modal-close" aria-label="Close account settings">
+        ×
+      </button>
+      <header class="modal-header">
+        <div>
+          <h2 id="accountSettingsTitle" class="modal-title">Account settings</h2>
+          <p class="modal-subtitle">Update your profile and keep your sync secure.</p>
+        </div>
+      </header>
+
+      <form id="accountProfileForm" class="modal-section" novalidate>
+        <h3 class="modal-section-title">Profile</h3>
+        <p class="modal-section-help">Change what other devices see when you sign in.</p>
+        <div class="field-grid">
+          <label class="field-label" for="accountDisplayName">Display name</label>
+          <input
+            id="accountDisplayName"
+            class="input-base input-text"
+            type="text"
+            name="displayName"
+            minlength="2"
+            maxlength="120"
+            autocomplete="name"
+            required
+          />
+        </div>
+        <div class="field-grid">
+          <span class="field-label">Avatar</span>
+          <div class="settings-avatar-row">
+            <label class="settings-avatar" for="accountAvatarInput">
+              <span class="settings-avatar-inner" id="settingsAvatarPreview">GM</span>
+            </label>
+            <input
+              id="accountAvatarInput"
+              class="input-base input-file"
+              type="file"
+              name="avatar"
+              accept="image/*"
+            />
+            <button type="button" id="accountAvatarRemove" class="btn-subtle">Remove</button>
+          </div>
+          <p class="field-hint">Square JPG or PNG up to 5 MB recommended.</p>
+        </div>
+        <div class="modal-actions">
+          <button type="submit" class="btn-primary">Save profile</button>
+          <div id="accountProfileStatus" class="modal-status" role="status" aria-live="polite"></div>
+        </div>
+      </form>
+
+      <form id="accountSecurityForm" class="modal-section" novalidate>
+        <h3 class="modal-section-title">Security</h3>
+        <p class="modal-section-help">
+          Reset your password here and consider layering verification for extra protection.
+        </p>
+        <div class="field-grid">
+          <label class="field-label" for="currentPasswordInput">Current password</label>
+          <input
+            id="currentPasswordInput"
+            class="input-base input-text"
+            type="password"
+            name="currentPassword"
+            autocomplete="current-password"
+            required
+          />
+        </div>
+        <div class="field-grid">
+          <label class="field-label" for="newPasswordInput">New password</label>
+          <input
+            id="newPasswordInput"
+            class="input-base input-text"
+            type="password"
+            name="newPassword"
+            autocomplete="new-password"
+            minlength="8"
+            required
+          />
+          <p class="field-hint">Use 8+ characters with a mix of letters, numbers, and symbols.</p>
+        </div>
+        <div class="field-grid">
+          <label class="field-label" for="confirmPasswordInput">Confirm new password</label>
+          <input
+            id="confirmPasswordInput"
+            class="input-base input-text"
+            type="password"
+            name="confirmPassword"
+            autocomplete="new-password"
+            required
+          />
+        </div>
+        <div class="security-prompts">
+          <label class="security-option">
+            <input id="emailVerificationToggle" type="checkbox" disabled checked />
+            <span>
+              Email verification is required for password recovery. We’ll send alerts to your inbox.
+            </span>
+          </label>
+          <label class="security-option">
+            <input id="mfaToggle" type="checkbox" disabled />
+            <span>
+              Multi-factor prompts are coming soon. We’ll notify you when they’re ready.
+            </span>
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button type="submit" class="btn-primary">Update password</button>
+          <div id="accountSecurityStatus" class="modal-status" role="status" aria-live="polite"></div>
+        </div>
+      </form>
+
+      <section class="modal-section" id="accountSnapshotsSection">
+        <h3 class="modal-section-title">Cloud snapshots</h3>
+        <p class="modal-section-help">
+          These are the copies currently stored in Supabase. They refresh after each sync.
+        </p>
+        <div class="snapshot-grid">
+          <article class="snapshot-card">
+            <h4>Preferences</h4>
+            <pre id="snapshotPreferences" class="snapshot-pre" aria-live="polite">No data synced yet.</pre>
+          </article>
+          <article class="snapshot-card">
+            <h4>Watched history</h4>
+            <pre id="snapshotWatched" class="snapshot-pre" aria-live="polite">No data synced yet.</pre>
+          </article>
+          <article class="snapshot-card">
+            <h4>Favorites</h4>
+            <pre id="snapshotFavorites" class="snapshot-pre" aria-live="polite">No data synced yet.</pre>
+          </article>
+        </div>
+      </section>
+    </div>
+  </div>
 
   <script type="module" src="assets/js/main.js"></script>
 
