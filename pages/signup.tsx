@@ -114,39 +114,26 @@ export default function SignupPage() {
 
           <div className="field">
             <span>Avatar (optional)</span>
-            <div className="avatar-section">
-              <label className={`avatar-selector ${avatarPreview ? 'has-image' : ''}`} htmlFor="avatar">
-                {avatarPreview ? (
-                  <>
-                    <img src={avatarPreview} alt="Selected avatar preview" />
-                    <span className="avatar-overlay">Change photo</span>
-                    <span className="sr-only">Choose a different avatar</span>
-                  </>
-                ) : (
-                  <div className="avatar-placeholder">
-                    <span className="icon" aria-hidden="true">📷</span>
-                    <span className="upload-title">Add photo</span>
+            <label className={`upload-area ${avatarPreview ? 'has-preview' : ''}`} htmlFor="avatar">
+              {avatarPreview ? (
+                <div className="preview">
+                  <img src={avatarPreview} alt="Avatar preview" />
+                  <div className="preview-actions">
+                    <button type="button" onClick={clearAvatarSelection} className="secondary">
+                      Remove
+                    </button>
+                    <span className="hint">Upload a different photo</span>
                   </div>
-                )}
-              </label>
-
-              <div className="avatar-actions">
-                <p className="hint">PNG or JPG, up to 5 MB</p>
-                {avatarPreview ? (
-                  <button type="button" onClick={clearAvatarSelection} className="secondary">
-                    Remove photo
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="secondary"
-                  >
-                    Upload photo
-                  </button>
-                )}
-              </div>
-            </div>
+                </div>
+              ) : (
+                <div className="upload-content">
+                  <span className="icon" aria-hidden="true">📷</span>
+                  <p className="upload-title">Upload a profile photo</p>
+                  <p className="hint">PNG or JPG, up to 5 MB</p>
+                  <span className="upload-btn">Browse files</span>
+                </div>
+              )}
+            </label>
             <input
               id="avatar"
               name="avatar"
@@ -245,79 +232,40 @@ export default function SignupPage() {
           box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
         }
 
-        .avatar-section {
-          display: flex;
-          align-items: center;
-          gap: 1.5rem;
-        }
-
-        .avatar-selector {
-          width: 120px;
-          height: 120px;
-          border-radius: 50%;
+        .upload-area {
           border: 2px dashed #cbd5f5;
-          background: rgba(99, 102, 241, 0.06);
-          display: inline-flex;
+          border-radius: 16px;
+          padding: 1.75rem;
+          display: flex;
           align-items: center;
           justify-content: center;
+          background: rgba(99, 102, 241, 0.04);
           cursor: pointer;
-          transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+          transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
           position: relative;
-          overflow: hidden;
         }
 
-        .avatar-selector:hover,
-        .avatar-selector:focus-within {
+        .upload-area:hover {
           border-color: #6366f1;
-          background: rgba(99, 102, 241, 0.12);
-          box-shadow: 0 12px 24px rgba(99, 102, 241, 0.15);
+          background: rgba(99, 102, 241, 0.08);
+          transform: translateY(-1px);
         }
 
-        .avatar-selector.has-image {
-          border-style: solid;
-          border-color: transparent;
-          background: transparent;
-          box-shadow: 0 12px 25px rgba(15, 23, 42, 0.25);
-        }
-
-        .avatar-selector img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-        }
-
-        .avatar-overlay {
-          position: absolute;
-          inset: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: rgba(15, 23, 42, 0.55);
-          color: #fff;
-          font-weight: 600;
-          font-size: 0.9rem;
-          opacity: 0;
-          pointer-events: none;
-          transition: opacity 0.2s ease;
-        }
-
-        .avatar-selector:hover .avatar-overlay,
-        .avatar-selector:focus-within .avatar-overlay {
-          opacity: 1;
-        }
-
-        .avatar-placeholder {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 0.35rem;
-          color: #475569;
-          text-align: center;
+        .upload-area.has-preview {
           padding: 1rem;
         }
 
+        .upload-content {
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.5rem;
+          color: #475569;
+        }
+
         .icon {
-          font-size: 1.75rem;
+          font-size: 2rem;
         }
 
         .upload-title {
@@ -325,33 +273,28 @@ export default function SignupPage() {
           color: #1e293b;
         }
 
-        .avatar-actions {
-          display: flex;
-          flex-direction: column;
-          gap: 0.5rem;
-          align-items: flex-start;
-        }
-
         .hint {
           font-size: 0.85rem;
           color: #64748b;
         }
 
-        .secondary {
-          border: none;
-          background: rgba(15, 23, 42, 0.08);
-          color: #1e293b;
-          font-weight: 600;
+        .upload-btn {
+          margin-top: 0.5rem;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           padding: 0.5rem 1rem;
           border-radius: 999px;
-          cursor: pointer;
-          transition: background 0.2s ease, transform 0.2s ease;
-          width: fit-content;
+          background: #6366f1;
+          color: white;
+          font-weight: 600;
+          font-size: 0.9rem;
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
-        .secondary:hover {
-          background: rgba(15, 23, 42, 0.15);
+        .upload-area:hover .upload-btn {
           transform: translateY(-1px);
+          box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
         }
 
         .file-input {
@@ -365,16 +308,43 @@ export default function SignupPage() {
           border: 0;
         }
 
-        .sr-only {
-          position: absolute;
-          width: 1px;
-          height: 1px;
-          padding: 0;
-          margin: -1px;
-          overflow: hidden;
-          clip: rect(0, 0, 0, 0);
-          white-space: nowrap;
-          border: 0;
+        .preview {
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.75rem;
+        }
+
+        .preview img {
+          width: 120px;
+          height: 120px;
+          border-radius: 50%;
+          object-fit: cover;
+          box-shadow: 0 12px 25px rgba(15, 23, 42, 0.25);
+        }
+
+        .preview-actions {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.35rem;
+        }
+
+        .secondary {
+          border: none;
+          background: rgba(15, 23, 42, 0.08);
+          color: #1e293b;
+          font-weight: 600;
+          padding: 0.4rem 0.9rem;
+          border-radius: 999px;
+          cursor: pointer;
+          transition: background 0.2s ease, transform 0.2s ease;
+        }
+
+        .secondary:hover {
+          background: rgba(15, 23, 42, 0.15);
+          transform: translateY(-1px);
         }
 
         .submit {
@@ -416,17 +386,11 @@ export default function SignupPage() {
             border-radius: 20px;
           }
 
-          .avatar-section {
-            flex-direction: column;
-            gap: 1rem;
-            align-items: center;
+          .upload-area {
+            padding: 1.5rem;
           }
 
-          .avatar-actions {
-            align-items: center;
-          }
-
-          .avatar-selector {
+          .preview img {
             width: 100px;
             height: 100px;
           }
