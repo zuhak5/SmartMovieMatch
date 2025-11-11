@@ -4,12 +4,24 @@ const fs = require('fs');
 const url = require('url');
 
 const authHandler = require('./api/auth.js');
+const tmdbHandler = require('./api/tmdb.js');
+const omdbHandler = require('./api/omdb.js');
+const youtubeHandler = require('./api/youtube.js');
+
+const apiHandlers = new Map([
+  ['/api/tmdb', tmdbHandler],
+  ['/api/omdb', omdbHandler],
+  ['/api/youtube', youtubeHandler]
+]);
 
 const PORT = process.env.PORT || 3000;
 const ROOT_DIR = __dirname;
 
 const server = http.createServer(async (req, res) => {
-  if (req.url.startsWith('/api/auth')) {
+  const parsedUrl = url.parse(req.url, true);
+  const pathname = parsedUrl.pathname || '/';
+
+  if (pathname === '/api/auth') {
     let body = '';
     req.on('data', (chunk) => {
       body += chunk;
@@ -41,15 +53,30 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  serveStatic(req, res);
+  const handler = apiHandlers.get(pathname);
+  if (handler) {
+    try {
+      req.query = parsedUrl.query || {};
+      await handler(req, wrapResponse(res));
+    } catch (error) {
+      console.error(`Unhandled API error for ${pathname}`, error);
+      if (!res.headersSent) {
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ error: 'API service crashed unexpectedly.' }));
+      }
+    }
+    return;
+  }
+
+  serveStatic(req, res, parsedUrl);
 });
 
 server.listen(PORT, () => {
   console.log(`Smart Movie Match server running at http://localhost:${PORT}`);
 });
 
-function serveStatic(req, res) {
-  const parsed = url.parse(req.url);
+function serveStatic(req, res, parsed = url.parse(req.url)) {
   let pathname = decodeURIComponent(parsed.pathname);
   if (pathname === '/') {
     pathname = '/index.html';
