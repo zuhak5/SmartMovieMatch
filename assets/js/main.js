@@ -54,6 +54,15 @@ const state = {
   }
 };
 
+const PROFILE_CALLOUT_MILESTONE = 5;
+const PROFILE_CALLOUT_PULSE_DURATION = 2400;
+let profileCalloutSnapshot = {
+  favoritesCount: 0,
+  watchedCount: 0,
+  lastSyncToken: null
+};
+let profileCalloutPulseTimer = null;
+
 const GENRE_ICON_MAP = {
   "28": "💥", // Action
   "12": "🧭", // Adventure
@@ -870,6 +879,7 @@ function refreshWatchedUi() {
   updateWatchedSummary(state.watchedMovies);
   updateCollectionVisibility();
   updatePreferencesPreview();
+  refreshProfileOverviewCallout();
   if (state.recommendations.length && !state.activeRecAbort) {
     updateRecommendationsView();
   }
@@ -880,9 +890,174 @@ function refreshFavoritesUi() {
   updateFavoritesSummary(state.favorites);
   updateCollectionVisibility();
   updatePreferencesPreview();
+  refreshProfileOverviewCallout();
   if (state.recommendations.length && !state.activeRecAbort) {
     updateRecommendationsView();
   }
+}
+
+
+function refreshProfileOverviewCallout(options = {}) {
+  const callout = $("profileOverviewCallout");
+  if (!callout) {
+    return;
+  }
+
+  const favoritesValue = $("profileCalloutFavoritesValue");
+  const favoritesMeta = $("profileCalloutFavoritesMeta");
+  const watchedValue = $("profileCalloutWatchedValue");
+  const watchedMeta = $("profileCalloutWatchedMeta");
+  const syncValue = $("profileCalloutSyncValue");
+  const syncMeta = $("profileCalloutSyncMeta");
+  const progressFill = $("profileCalloutProgressFill");
+  const progressText = $("profileCalloutProgressText");
+  const progressContainer = $("profileCalloutProgress");
+  const highlightFavorites = $("profileCalloutHighlightFavorites");
+  const highlightWatched = $("profileCalloutHighlightWatched");
+  const highlightSnapshots = $("profileCalloutHighlightSnapshots");
+
+  const favoritesCount = Array.isArray(state.favorites) ? state.favorites.length : 0;
+  const watchedCount = Array.isArray(state.watchedMovies) ? state.watchedMovies.length : 0;
+  const session = state.session;
+  const isSignedIn = Boolean(session && session.token);
+  const mostRecentSync = getMostRecentSync(session);
+  const syncToken = mostRecentSync
+    ? mostRecentSync.toISOString()
+    : isSignedIn
+    ? "pending"
+    : "guest";
+
+  const describeSync = (timestamp, fallback) => {
+    if (!isSignedIn) {
+      return fallback;
+    }
+    if (!timestamp) {
+      return "Sync pending";
+    }
+    try {
+      return `Synced ${formatSyncTime(timestamp)}`;
+    } catch (error) {
+      return "Synced recently";
+    }
+  };
+
+  if (favoritesValue) {
+    favoritesValue.textContent = favoritesCount ? favoritesCount.toLocaleString() : "0";
+  }
+  if (watchedValue) {
+    watchedValue.textContent = watchedCount ? watchedCount.toLocaleString() : "0";
+  }
+  if (syncValue) {
+    syncValue.textContent = isSignedIn
+      ? mostRecentSync
+        ? formatSyncTime(mostRecentSync.toISOString())
+        : "Pending"
+      : "Guest mode";
+  }
+
+  const latestFavorite = favoritesCount ? state.favorites[favoritesCount - 1] : null;
+  const latestWatched = watchedCount ? state.watchedMovies[watchedCount - 1] : null;
+
+  if (favoritesMeta) {
+    const fallback = favoritesCount ? "Stored locally" : "Ready when you are";
+    const syncDescription = describeSync(session ? session.lastFavoritesSync : null, fallback);
+    if (latestFavorite && latestFavorite.title) {
+      favoritesMeta.textContent = `${syncDescription} • Latest: “${latestFavorite.title}”`;
+    } else {
+      favoritesMeta.textContent = syncDescription;
+    }
+  }
+
+  if (watchedMeta) {
+    const fallback = watchedCount ? "Stored locally" : "Log watched titles to tune picks.";
+    const syncDescription = describeSync(session ? session.lastWatchedSync : null, fallback);
+    if (latestWatched && latestWatched.title) {
+      watchedMeta.textContent = `${syncDescription} • Latest: “${latestWatched.title}”`;
+    } else {
+      watchedMeta.textContent = syncDescription;
+    }
+  }
+
+  if (syncMeta) {
+    syncMeta.textContent = isSignedIn
+      ? "Automatic sync keeps favorites and watched aligned."
+      : "Sign in to start syncing automatically.";
+  }
+
+  if (progressFill || progressText || progressContainer) {
+    const remainder = favoritesCount % PROFILE_CALLOUT_MILESTONE;
+    const progressSteps = favoritesCount === 0 ? 0 : remainder === 0 ? PROFILE_CALLOUT_MILESTONE : remainder;
+    const progressPercent = Math.min(1, progressSteps / PROFILE_CALLOUT_MILESTONE);
+    const nextMilestone =
+      favoritesCount === 0
+        ? PROFILE_CALLOUT_MILESTONE
+        : remainder === 0
+        ? PROFILE_CALLOUT_MILESTONE
+        : PROFILE_CALLOUT_MILESTONE - remainder;
+    let progressMessage = "";
+    if (progressFill) {
+      progressFill.style.width = `${Math.round(progressPercent * 100)}%`;
+    }
+    if (progressText) {
+      if (!favoritesCount) {
+        progressMessage = "Add 5 favorites to unlock smarter batches.";
+      } else if (nextMilestone === PROFILE_CALLOUT_MILESTONE) {
+        progressMessage = "Milestone reached! Keep adding favorites for sharper picks.";
+      } else {
+        progressMessage = `${nextMilestone} more favorite${nextMilestone === 1 ? "" : "s"} unlock a smarter batch.`;
+      }
+      progressText.textContent = progressMessage;
+    }
+    if (progressContainer && progressMessage) {
+      progressContainer.setAttribute("aria-label", `Favorite milestone progress – ${progressMessage}`);
+    }
+  }
+
+  if (highlightFavorites) {
+    highlightFavorites.textContent = favoritesCount
+      ? `${favoritesCount.toLocaleString()} favorite${favoritesCount === 1 ? "" : "s"} powering smarter picks.`
+      : "Favorites sync across every device you sign into.";
+  }
+
+  if (highlightWatched) {
+    highlightWatched.textContent = watchedCount
+      ? `${watchedCount.toLocaleString()} watched title${watchedCount === 1 ? "" : "s"} keeping discovery fresh.`
+      : "Watched titles keep discovery fresh and spoiler-free.";
+  }
+
+  if (highlightSnapshots) {
+    highlightSnapshots.textContent = isSignedIn
+      ? "Snapshots capture your preferences after each sync."
+      : "Sign in to capture cloud snapshots of your taste.";
+  }
+
+  callout.classList.toggle("has-data", favoritesCount > 0 || watchedCount > 0);
+
+  const syncChanged =
+    profileCalloutSnapshot.lastSyncToken !== null && syncToken !== profileCalloutSnapshot.lastSyncToken;
+
+  const shouldPulse =
+    options.forcePulse ||
+    favoritesCount > profileCalloutSnapshot.favoritesCount ||
+    watchedCount > profileCalloutSnapshot.watchedCount ||
+    syncChanged;
+
+  if (shouldPulse) {
+    callout.classList.add("has-updates");
+    if (profileCalloutPulseTimer) {
+      window.clearTimeout(profileCalloutPulseTimer);
+    }
+    profileCalloutPulseTimer = window.setTimeout(() => {
+      callout.classList.remove("has-updates");
+      profileCalloutPulseTimer = null;
+    }, PROFILE_CALLOUT_PULSE_DURATION);
+  }
+
+  profileCalloutSnapshot = {
+    favoritesCount,
+    watchedCount,
+    lastSyncToken: syncToken
+  };
 }
 
 
@@ -1867,6 +2042,8 @@ function updateSyncInsights(session) {
   if (viewSnapshotsBtn) {
     viewSnapshotsBtn.disabled = !hasSession;
   }
+
+  refreshProfileOverviewCallout();
 }
 
 function updateSnapshotPreviews(session) {
@@ -1964,6 +2141,7 @@ function hydrateFromSession(session) {
   };
 
   updateSyncInsights(session);
+  refreshProfileOverviewCallout();
 }
 
 
