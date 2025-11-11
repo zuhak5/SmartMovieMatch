@@ -1012,6 +1012,24 @@ h6 {
   }
 }
 
+@media (max-width: 720px) {
+  body[data-page="discovery"] .right-column {
+    display: contents;
+  }
+
+  body[data-page="discovery"] .collections-panel {
+    order: 1;
+  }
+
+  body[data-page="discovery"] .panel.panel-sticky {
+    order: 2;
+  }
+
+  body[data-page="discovery"] .recommendations-panel {
+    order: 3;
+  }
+}
+
 .profile-main {
   grid-template-columns: minmax(0, 1fr);
   max-width: 960px;
