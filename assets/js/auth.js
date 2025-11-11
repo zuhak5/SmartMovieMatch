@@ -1,4 +1,5 @@
 const AUTH_STORAGE_KEY = "smartMovieMatch.auth";
+const AUTH_SESSION_COOKIE_KEY = "smartMovieMatch.auth";
 const AUTH_ENDPOINT = "/api/auth";
 
 class AuthRequestError extends Error {
@@ -200,30 +201,56 @@ function notifySubscribers(session) {
 function persistSession(session) {
   const normalized = session ? normalizeSession(session) : null;
   currentSession = normalized;
-  try {
-    if (normalized) {
-      window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(normalized));
+
+  const localStorageRef = typeof window !== "undefined" ? window.localStorage : null;
+  const sessionStorageRef = typeof window !== "undefined" ? window.sessionStorage : null;
+
+  if (normalized) {
+    const serialized = JSON.stringify(normalized);
+    const storedLocally = writeSessionToStorage(localStorageRef, serialized, false, "localStorage");
+    if (!storedLocally) {
+      writeSessionToStorage(sessionStorageRef, serialized, false, "sessionStorage");
     } else {
-      window.localStorage.removeItem(AUTH_STORAGE_KEY);
+      // keep sessionStorage in sync but ignore failures
+      writeSessionToStorage(sessionStorageRef, serialized, true, "sessionStorage");
     }
-  } catch (error) {
-    console.warn("Failed to persist auth session", error);
+    writeSessionCookie(normalized);
+  } else {
+    clearSessionFromStorage(localStorageRef, "localStorage");
+    clearSessionFromStorage(sessionStorageRef, "sessionStorage");
+    clearSessionCookie();
   }
+
   notifySubscribers(currentSession);
 }
 
 function readStoredSession() {
-  try {
-    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
-    if (!raw) {
-      return null;
-    }
-    const parsed = JSON.parse(raw);
-    return normalizeSession(parsed);
-  } catch (error) {
-    console.warn("Failed to load auth session", error);
-    return null;
+  const localStorageRef = typeof window !== "undefined" ? window.localStorage : null;
+  const sessionStorageRef = typeof window !== "undefined" ? window.sessionStorage : null;
+
+  const fromLocal = readSessionFromStorage(localStorageRef, "localStorage");
+  if (fromLocal) {
+    return fromLocal;
   }
+
+  const fromSession = readSessionFromStorage(sessionStorageRef, "sessionStorage");
+  if (fromSession) {
+    return fromSession;
+  }
+
+  const fromCookie = readSessionFromCookie();
+  if (fromCookie) {
+    try {
+      const serialized = JSON.stringify(fromCookie);
+      writeSessionToStorage(localStorageRef, serialized, true, "localStorage");
+      writeSessionToStorage(sessionStorageRef, serialized, true, "sessionStorage");
+    } catch (error) {
+      console.warn("Failed to mirror cookie session into web storage", error);
+    }
+    return fromCookie;
+  }
+
+  return null;
 }
 
 function sanitizeUsername(username) {
@@ -231,6 +258,137 @@ function sanitizeUsername(username) {
     return "";
   }
   return username.trim();
+}
+
+function writeSessionToStorage(storage, serialized, silent = false, label = "storage") {
+  if (!storage || typeof storage.setItem !== "function") {
+    return false;
+  }
+  try {
+    storage.setItem(AUTH_STORAGE_KEY, serialized);
+    return true;
+  } catch (error) {
+    if (!silent) {
+      console.warn(`Failed to persist auth session to ${label}`, error);
+    }
+    return false;
+  }
+}
+
+function clearSessionFromStorage(storage, label = "storage") {
+  if (!storage || typeof storage.removeItem !== "function") {
+    return;
+  }
+  try {
+    storage.removeItem(AUTH_STORAGE_KEY);
+  } catch (error) {
+    console.warn(`Failed to clear auth session from ${label}`, error);
+  }
+}
+
+function readSessionFromStorage(storage, label = "storage") {
+  if (!storage || typeof storage.getItem !== "function") {
+    return null;
+  }
+  try {
+    const raw = storage.getItem(AUTH_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    return normalizeSession(parsed);
+  } catch (error) {
+    console.warn(`Failed to load auth session from ${label}`, error);
+    return null;
+  }
+}
+
+function writeSessionCookie(session) {
+  if (typeof document === "undefined" || !document) {
+    return;
+  }
+  const encoded = encodeSessionCookiePayload(session);
+  if (!encoded) {
+    return;
+  }
+  const secure = typeof window !== "undefined" && window.location && window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${AUTH_SESSION_COOKIE_KEY}=${encoded}; path=/; max-age=2592000; SameSite=Lax${secure}`;
+}
+
+function clearSessionCookie() {
+  if (typeof document === "undefined" || !document) {
+    return;
+  }
+  const secure = typeof window !== "undefined" && window.location && window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${AUTH_SESSION_COOKIE_KEY}=; path=/; max-age=0; SameSite=Lax${secure}`;
+}
+
+function readSessionFromCookie() {
+  if (typeof document === "undefined" || !document || !document.cookie) {
+    return null;
+  }
+  const prefix = `${AUTH_SESSION_COOKIE_KEY}=`;
+  const segments = document.cookie.split(";");
+  for (const segment of segments) {
+    const trimmed = segment.trim();
+    if (trimmed.startsWith(prefix)) {
+      const value = trimmed.slice(prefix.length);
+      const decoded = decodeSessionCookiePayload(value);
+      if (decoded) {
+        return normalizeSession(decoded);
+      }
+      break;
+    }
+  }
+  return null;
+}
+
+function encodeSessionCookiePayload(payload) {
+  try {
+    if (typeof window === "undefined" || typeof window.btoa !== "function") {
+      return null;
+    }
+    const json = JSON.stringify(payload);
+    if (typeof TextEncoder === "function") {
+      const encoder = new TextEncoder();
+      const bytes = encoder.encode(json);
+      let binary = "";
+      bytes.forEach((byte) => {
+        binary += String.fromCharCode(byte);
+      });
+      return window.btoa(binary);
+    }
+    if (typeof encodeURIComponent === "function" && typeof unescape === "function") {
+      return window.btoa(unescape(encodeURIComponent(json)));
+    }
+    return window.btoa(json);
+  } catch (error) {
+    console.warn("Failed to encode auth session for cookie storage", error);
+    return null;
+  }
+}
+
+function decodeSessionCookiePayload(value) {
+  try {
+    if (typeof window === "undefined" || typeof window.atob !== "function") {
+      return null;
+    }
+    const binary = window.atob(value);
+    if (typeof TextDecoder === "function") {
+      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+      const decoder = new TextDecoder();
+      const json = decoder.decode(bytes);
+      return JSON.parse(json);
+    }
+    if (typeof decodeURIComponent === "function" && typeof escape === "function") {
+      const json = decodeURIComponent(escape(binary));
+      return JSON.parse(json);
+    }
+    return JSON.parse(binary);
+  } catch (error) {
+    console.warn("Failed to decode auth session from cookie storage", error);
+    return null;
+  }
 }
 
 function validateCredentials(username, password) {
