@@ -317,6 +317,9 @@ function init() {
   switchCollectionView(state.activeCollectionView);
   updateAccountUi(state.session);
   updateSnapshotPreviews(state.session);
+  if (isAccountSettingsContext() && state.session && state.session.token) {
+    populateAccountSettings();
+  }
   setSyncStatus(
     state.session
       ? "Signed in – your taste profile syncs automatically."
@@ -335,8 +338,13 @@ function init() {
         : "Signed out. Preferences won’t sync until you sign in again.",
       session ? "success" : "muted"
     );
-    if (isAccountSettingsOpen()) {
+    if (isAccountSettingsContext()) {
       populateAccountSettings();
+      if (window.location.hash === "#snapshots" && session && session.token) {
+        window.requestAnimationFrame(() => {
+          openAccountSettings("snapshots");
+        });
+      }
     }
   });
 
@@ -347,6 +355,12 @@ function init() {
       highlightProfileOverview();
     });
   }
+
+  if (isAccountSettingsContext() && window.location.hash === "#snapshots" && state.session && state.session.token) {
+    window.requestAnimationFrame(() => {
+      openAccountSettings("snapshots");
+    });
+  }
 }
 
 function wireEvents() {
@@ -354,8 +368,6 @@ function wireEvents() {
   const accountMenu = $("accountMenu");
   const accountProfile = $("accountProfile");
   const viewSnapshotsBtn = $("viewSnapshotsBtn");
-  const overlay = $("accountSettingsOverlay");
-  const closeSettingsBtn = $("accountSettingsClose");
   const profileForm = $("accountProfileForm");
   const securityForm = $("accountSecurityForm");
   const avatarInput = $("accountAvatarInput");
@@ -394,10 +406,6 @@ function wireEvents() {
     if (event.key === "Escape") {
       if (state.accountMenuOpen) {
         closeAccountMenu(true);
-        return;
-      }
-      if (isAccountSettingsOpen()) {
-        closeAccountSettings();
       }
     }
   });
@@ -406,21 +414,6 @@ function wireEvents() {
     viewSnapshotsBtn.addEventListener("click", () => {
       playUiClick();
       openAccountSettings("snapshots");
-    });
-  }
-
-  if (overlay) {
-    overlay.addEventListener("click", (event) => {
-      if (event.target === overlay) {
-        closeAccountSettings();
-      }
-    });
-  }
-
-  if (closeSettingsBtn) {
-    closeSettingsBtn.addEventListener("click", () => {
-      playUiClick();
-      closeAccountSettings();
     });
   }
 
@@ -623,9 +616,13 @@ function highlightProfileOverview() {
   }
 }
 
+function isAccountSettingsContext() {
+  const page = document.body ? document.body.getAttribute("data-page") : null;
+  return page === "account-settings";
+}
+
 function isAccountSettingsOpen() {
-  const overlay = $("accountSettingsOverlay");
-  return !!(overlay && overlay.classList.contains("is-visible"));
+  return isAccountSettingsContext();
 }
 
 function openAccountSettings(section = "profile") {
@@ -633,56 +630,40 @@ function openAccountSettings(section = "profile") {
     window.location.href = "login.html";
     return;
   }
-  const overlay = $("accountSettingsOverlay");
-  const displayNameInput = $("accountDisplayName");
-  const avatarInput = $("accountAvatarInput");
-  if (!overlay) {
-    return;
-  }
-  overlay.hidden = false;
-  overlay.classList.add("is-visible");
-  overlay.setAttribute("open", "");
 
-  state.accountRemoveAvatar = false;
-  if (avatarInput) {
-    avatarInput.value = "";
-  }
+  const page = document.body ? document.body.getAttribute("data-page") : null;
 
-  populateAccountSettings();
-
-  window.setTimeout(() => {
-    if (section === "snapshots") {
-      const snapshots = $("accountSnapshotsSection");
-      if (snapshots) {
-        snapshots.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (page === "account-settings") {
+    populateAccountSettings();
+    window.setTimeout(() => {
+      if (section === "snapshots") {
+        const anchor = document.getElementById("snapshots");
+        if (anchor) {
+          anchor.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      } else {
+        const displayNameInput = $("accountDisplayName");
+        if (displayNameInput) {
+          displayNameInput.focus();
+        }
       }
-    } else if (displayNameInput) {
-      displayNameInput.focus();
-    }
-  }, 60);
-
-  updateAccountUi(state.session);
-}
-
-function closeAccountSettings() {
-  const overlay = $("accountSettingsOverlay");
-  const accountProfileBtn = $("accountProfileBtn");
-  if (!overlay) {
+      if (section === "snapshots" || section === "profile") {
+        const targetHash = `#${section}`;
+        if (window.location.hash !== targetHash) {
+          window.history.replaceState(null, "", targetHash);
+        }
+      }
+    }, 60);
     return;
   }
-  overlay.classList.remove("is-visible");
-  overlay.removeAttribute("open");
-  overlay.hidden = true;
-  if (accountProfileBtn) {
-    accountProfileBtn.focus();
-  }
-  if (state.accountAvatarPreviewUrl) {
-    URL.revokeObjectURL(state.accountAvatarPreviewUrl);
-    state.accountAvatarPreviewUrl = null;
-  }
-  state.accountRemoveAvatar = false;
 
-  updateAccountUi(state.session);
+  let target = "account-settings.html";
+  if (section === "snapshots") {
+    target += "#snapshots";
+  } else if (section === "profile") {
+    target += "#profile";
+  }
+  window.location.href = target;
 }
 
 function populateAccountSettings() {
@@ -691,6 +672,16 @@ function populateAccountSettings() {
   const preview = $("settingsAvatarPreview");
   const profileStatus = $("accountProfileStatus");
   const securityStatus = $("accountSecurityStatus");
+  const avatarInput = $("accountAvatarInput");
+
+  state.accountRemoveAvatar = false;
+  if (avatarInput) {
+    avatarInput.value = "";
+  }
+  if (state.accountAvatarPreviewUrl) {
+    URL.revokeObjectURL(state.accountAvatarPreviewUrl);
+    state.accountAvatarPreviewUrl = null;
+  }
 
   if (displayNameInput) {
     displayNameInput.value = state.session && state.session.displayName ? state.session.displayName : "";
@@ -2083,7 +2074,7 @@ function updateAccountUi(session) {
     }
     const settingsItem = accountMenu.querySelector('[data-action="settings"]');
     if (settingsItem) {
-      if (isAccountSettingsOpen()) {
+      if (isAccountSettingsContext()) {
         settingsItem.setAttribute("aria-current", "page");
       } else {
         settingsItem.removeAttribute("aria-current");
@@ -2133,6 +2124,15 @@ function updateAccountUi(session) {
       accountMenu.classList.remove("is-open");
     }
     state.accountMenuOpen = false;
+  }
+
+  const settingsContent = $("accountSettingsContent");
+  const settingsSignedOut = $("accountSettingsSignedOut");
+  if (settingsContent && settingsSignedOut) {
+    settingsContent.hidden = !isSignedIn;
+    settingsContent.setAttribute("aria-hidden", isSignedIn ? "false" : "true");
+    settingsSignedOut.hidden = isSignedIn;
+    settingsSignedOut.setAttribute("aria-hidden", isSignedIn ? "true" : "false");
   }
 
   updateSyncInsights(session);
