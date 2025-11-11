@@ -553,7 +553,7 @@ function handleAccountMenuAction(action) {
   closeAccountMenu();
   switch (action) {
     case "profile":
-      highlightAccountInsights();
+      highlightProfileOverview();
       break;
     case "settings":
       openAccountSettings();
@@ -570,8 +570,8 @@ function handleAccountMenuAction(action) {
   }
 }
 
-function highlightAccountInsights() {
-  const section = $("accountInsights");
+function highlightProfileOverview() {
+  const section = $("profileOverview");
   if (!section || section.hidden) {
     return;
   }
@@ -1779,10 +1779,9 @@ function setSyncStatus(message, variant = "muted") {
 }
 
 function updateSyncInsights(session) {
-  const insightsSection = $("accountInsights");
-  const prefValue = $("accountInsightPreferencesValue");
-  const watchedValue = $("accountInsightWatchedValue");
-  const favoritesValue = $("accountInsightFavoritesValue");
+  const overviewSection = $("profileOverview");
+  const watchedValue = $("profileOverviewWatchedValue");
+  const favoritesValue = $("profileOverviewFavoritesValue");
   const timeline = $("syncTimeline");
   const timelinePref = $("syncTimelinePreferences");
   const timelineWatched = $("syncTimelineWatched");
@@ -1806,9 +1805,6 @@ function updateSyncInsights(session) {
   const watchedText = hasSession ? `${formatSyncTime(session.lastWatchedSync)}${watchedSuffix}` : "Sign in to sync";
   const favoritesText = hasSession ? `${formatSyncTime(session.lastFavoritesSync)}${favoritesSuffix}` : "Sign in to sync";
 
-  if (prefValue) {
-    prefValue.textContent = prefText;
-  }
   if (watchedValue) {
     watchedValue.textContent = watchedText;
   }
@@ -1816,8 +1812,8 @@ function updateSyncInsights(session) {
     favoritesValue.textContent = favoritesText;
   }
 
-  if (insightsSection) {
-    insightsSection.hidden = !hasSession;
+  if (overviewSection) {
+    overviewSection.hidden = !hasSession;
   }
   if (timeline) {
     timeline.hidden = !hasSession;
