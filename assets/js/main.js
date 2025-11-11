@@ -531,7 +531,6 @@ function toggleAccountMenu() {
 
 function openAccountMenu() {
   const accountMenu = $("accountMenu");
-  const accountProfileBtn = $("accountProfileBtn");
   if (!accountMenu || !accountProfileBtn) {
     return;
   }
@@ -555,7 +554,6 @@ function openAccountMenu() {
 
 function closeAccountMenu(focusButton = false) {
   const accountMenu = $("accountMenu");
-  const accountProfileBtn = $("accountProfileBtn");
   if (accountMenu) {
     accountMenu.classList.remove("is-open");
   }
@@ -701,9 +699,13 @@ function populateAccountSettings() {
       settingsAvatar.style.backgroundImage = `url(${state.session.avatarUrl})`;
       settingsAvatar.style.backgroundSize = "cover";
       settingsAvatar.style.backgroundPosition = "center";
+      settingsAvatar.classList.add("has-image");
       preview.textContent = "";
     } else {
       settingsAvatar.style.backgroundImage = "none";
+      settingsAvatar.style.backgroundSize = "";
+      settingsAvatar.style.backgroundPosition = "";
+      settingsAvatar.classList.remove("has-image");
       preview.textContent = initials;
     }
   }
@@ -837,6 +839,9 @@ function handleAvatarInputChange(event) {
       state.accountAvatarPreviewUrl = null;
     }
     settingsAvatar.style.backgroundImage = "none";
+    settingsAvatar.style.backgroundSize = "";
+    settingsAvatar.style.backgroundPosition = "";
+    settingsAvatar.classList.remove("has-image");
     preview.textContent = getActiveDisplayName().slice(0, 2).toUpperCase() || "SM";
     state.accountRemoveAvatar = false;
     return;
@@ -860,6 +865,7 @@ function handleAvatarInputChange(event) {
   settingsAvatar.style.backgroundImage = `url(${objectUrl})`;
   settingsAvatar.style.backgroundSize = "cover";
   settingsAvatar.style.backgroundPosition = "center";
+  settingsAvatar.classList.add("has-image");
   preview.textContent = "";
   state.accountRemoveAvatar = false;
 }
@@ -870,6 +876,9 @@ function handleAvatarRemove() {
   const avatarInput = $("accountAvatarInput");
   if (settingsAvatar) {
     settingsAvatar.style.backgroundImage = "none";
+    settingsAvatar.style.backgroundSize = "";
+    settingsAvatar.style.backgroundPosition = "";
+    settingsAvatar.classList.remove("has-image");
   }
   if (preview) {
     preview.textContent = getActiveDisplayName().slice(0, 2).toUpperCase() || "SM";
@@ -2063,6 +2072,18 @@ function updateAccountUi(session) {
     return;
   }
 
+  const defaultAvatarInitials =
+    accountAvatarInitials.dataset.defaultInitials || accountAvatarInitials.textContent || "GM";
+  accountAvatarInitials.dataset.defaultInitials = defaultAvatarInitials;
+
+  const defaultPillText =
+    accountPillSync.dataset.defaultText || accountPillSync.textContent || "Cloud sync inactive";
+  accountPillSync.dataset.defaultText = defaultPillText;
+
+  const defaultAccountName =
+    accountName.dataset.defaultName || accountName.textContent || "Guest";
+  accountName.dataset.defaultName = defaultAccountName;
+
   if (accountMenu) {
     const profileItem = accountMenu.querySelector('[data-action="profile"]');
     if (profileItem) {
@@ -2083,15 +2104,23 @@ function updateAccountUi(session) {
   }
 
   const isSignedIn = Boolean(session && session.token);
-  const displayName = isSignedIn
-    ? (session.displayName || session.username || "Member").trim()
-    : "";
+  let displayName = "";
+  if (isSignedIn) {
+    const rawDisplayName =
+      typeof session.displayName === "string" ? session.displayName.trim() : "";
+    const fallbackUsername =
+      typeof session.username === "string" ? session.username.trim() : "";
+    displayName = rawDisplayName || fallbackUsername || "Member";
+  }
 
   if (isSignedIn) {
     greeting.textContent = `Welcome back, ${displayName}!`;
     greeting.classList.add("account-greeting-auth");
     loginLink.style.display = "none";
+    loginLink.hidden = true;
+    loginLink.setAttribute("aria-hidden", "true");
     accountProfile.hidden = false;
+    accountProfile.setAttribute("aria-hidden", "false");
     accountName.textContent = displayName;
     const mostRecent = getMostRecentSync(session);
     accountPillSync.textContent = mostRecent
@@ -2116,14 +2145,20 @@ function updateAccountUi(session) {
       accountAvatar.classList.remove("has-image");
     }
   } else {
+    closeAccountMenu();
     greeting.textContent = "You’re browsing as guest.";
     greeting.classList.remove("account-greeting-auth");
     loginLink.style.display = "inline-flex";
+    loginLink.hidden = false;
+    loginLink.setAttribute("aria-hidden", "false");
     accountProfile.hidden = true;
-    if (accountMenu) {
-      accountMenu.classList.remove("is-open");
-    }
-    state.accountMenuOpen = false;
+    accountProfile.setAttribute("aria-hidden", "true");
+    accountName.textContent = defaultAccountName;
+    accountPillSync.textContent = defaultPillText;
+    accountAvatarInitials.textContent = defaultAvatarInitials;
+    accountAvatarImg.removeAttribute("src");
+    accountAvatarImg.alt = "";
+    accountAvatar.classList.remove("has-image");
   }
 
   const settingsContent = $("accountSettingsContent");
