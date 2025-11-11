@@ -230,24 +230,67 @@
 
     <!-- Right column: collections + recommendations -->
     <div class="right-column">
-      <section class="panel profile-callout">
+      <section class="panel profile-callout" id="profileOverviewCallout">
         <div class="panel-inner">
-          <div class="panel-header">
+          <div class="panel-header profile-callout-header">
             <div>
+              <div class="panel-eyebrow">Stay in sync</div>
               <div class="panel-title">Profile overview</div>
               <div class="panel-subtitle">
-                See your synced favorites, watched history, and account snapshots in one place.
+                Track your favorites, watched history, and snapshot sync without leaving home.
               </div>
             </div>
-            <a class="btn-subtle btn-chip" href="profile.html#profileOverview">
+            <a class="btn-subtle btn-chip profile-callout-cta" href="profile.html#profileOverview">
               <span>Open overview</span>
               <span aria-hidden="true">→</span>
             </a>
           </div>
-          <p class="profile-callout-text">
-            Visit your overview whenever you want to review the titles you’ve saved, monitor recent sync activity,
-            or manage stored snapshots.
-          </p>
+          <div class="profile-callout-body">
+            <div class="profile-callout-stats" id="profileCalloutMetrics" aria-live="polite">
+              <article class="profile-callout-stat">
+                <div class="profile-callout-label">Favorites</div>
+                <div class="profile-callout-value" id="profileCalloutFavoritesValue">0</div>
+                <div class="profile-callout-meta" id="profileCalloutFavoritesMeta">Save movies you love to build momentum.</div>
+              </article>
+              <article class="profile-callout-stat">
+                <div class="profile-callout-label">Watched</div>
+                <div class="profile-callout-value" id="profileCalloutWatchedValue">0</div>
+                <div class="profile-callout-meta" id="profileCalloutWatchedMeta">Log what you’ve seen to sharpen picks.</div>
+              </article>
+              <article class="profile-callout-stat">
+                <div class="profile-callout-label">Last sync</div>
+                <div class="profile-callout-value" id="profileCalloutSyncValue">Guest mode</div>
+                <div class="profile-callout-meta" id="profileCalloutSyncMeta">Sign in to start syncing automatically.</div>
+              </article>
+            </div>
+            <div
+              class="profile-callout-progress"
+              id="profileCalloutProgress"
+              role="img"
+              aria-live="polite"
+              aria-label="Favorite milestone progress"
+            >
+              <div class="profile-callout-progress-track">
+                <div class="profile-callout-progress-fill" id="profileCalloutProgressFill" style="width: 0%"></div>
+              </div>
+              <div class="profile-callout-progress-text" id="profileCalloutProgressText">Add 5 favorites to unlock smarter batches.</div>
+            </div>
+            <ul class="profile-callout-highlights">
+              <li>
+                <span class="profile-callout-icon" aria-hidden="true">✔</span>
+                <span id="profileCalloutHighlightFavorites">Favorites sync across every device you sign into.</span>
+              </li>
+              <li>
+                <span class="profile-callout-icon" aria-hidden="true">✔</span>
+                <span id="profileCalloutHighlightWatched">Watched titles keep discovery fresh and spoiler-free.</span>
+              </li>
+              <li>
+                <span class="profile-callout-icon" aria-hidden="true">✔</span>
+                <span id="profileCalloutHighlightSnapshots">Snapshots capture your preferences after each sync.</span>
+              </li>
+            </ul>
+            <div class="profile-callout-illustration" aria-hidden="true">🍿</div>
+          </div>
         </div>
       </section>
 
