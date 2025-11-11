@@ -344,7 +344,6 @@ function wireEvents() {
   const accountMenu = $("accountMenu");
   const accountProfile = $("accountProfile");
   const viewSnapshotsBtn = $("viewSnapshotsBtn");
-  const timelineSnapshotsBtn = $("syncTimelineSnapshotsBtn");
   const overlay = $("accountSettingsOverlay");
   const closeSettingsBtn = $("accountSettingsClose");
   const profileForm = $("accountProfileForm");
@@ -395,13 +394,6 @@ function wireEvents() {
 
   if (viewSnapshotsBtn) {
     viewSnapshotsBtn.addEventListener("click", () => {
-      playUiClick();
-      openAccountSettings("snapshots");
-    });
-  }
-
-  if (timelineSnapshotsBtn) {
-    timelineSnapshotsBtn.addEventListener("click", () => {
       playUiClick();
       openAccountSettings("snapshots");
     });
@@ -1833,7 +1825,6 @@ function updateSyncInsights(session) {
   const timelinePref = $("syncTimelinePreferences");
   const timelineWatched = $("syncTimelineWatched");
   const timelineFavorites = $("syncTimelineFavorites");
-  const timelineBtn = $("syncTimelineSnapshotsBtn");
   const viewSnapshotsBtn = $("viewSnapshotsBtn");
 
   const hasSession = Boolean(session && session.token);
@@ -1891,9 +1882,6 @@ function updateSyncInsights(session) {
   }
   if (timelineFavorites) {
     timelineFavorites.textContent = favoritesText;
-  }
-  if (timelineBtn) {
-    timelineBtn.style.display = hasSession ? "inline-flex" : "none";
   }
   if (viewSnapshotsBtn) {
     viewSnapshotsBtn.disabled = !hasSession;
