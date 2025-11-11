@@ -302,15 +302,16 @@ export default function SignupPage() {
           display: flex;
           align-items: center;
           gap: 1.5rem;
+          --avatar-size: clamp(110px, 22vw, 144px);
         }
 
         .avatar-selector {
           appearance: none;
-          width: 120px;
-          height: 120px;
+          width: var(--avatar-size);
+          height: var(--avatar-size);
           border-radius: 50%;
           border: 2px dashed #cbd5f5;
-          background: rgba(99, 102, 241, 0.06);
+          background: #f4f5ff;
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -371,7 +372,7 @@ export default function SignupPage() {
           gap: 0.35rem;
           color: #475569;
           text-align: center;
-          padding: 1rem;
+          padding: 1.1rem;
         }
 
         .icon {
@@ -484,15 +485,11 @@ export default function SignupPage() {
             flex-direction: column;
             gap: 1rem;
             align-items: center;
+            --avatar-size: 120px;
           }
 
           .avatar-actions {
             align-items: center;
-          }
-
-          .avatar-selector {
-            width: 100px;
-            height: 100px;
           }
         }
       `}</style>
