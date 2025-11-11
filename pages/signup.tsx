@@ -1,11 +1,21 @@
-import React, { useState, FormEvent, ChangeEvent, useEffect, useRef } from 'react';
+import React, {
+  useState,
+  FormEvent,
+  ChangeEvent,
+  useEffect,
+  useRef,
+  KeyboardEvent,
+} from 'react';
 
 export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const allowedAvatarTypes = ['image/jpeg', 'image/png'];
 
   useEffect(() => {
     return () => {
@@ -23,20 +33,28 @@ export default function SignupPage() {
     }
 
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setError('Avatar must be 5 MB or smaller.');
+      if (!allowedAvatarTypes.includes(file.type)) {
+        setAvatarError('Only JPG or PNG images are supported. Please choose a different file under 5 MB.');
         event.target.value = '';
         setAvatarFile(null);
         setAvatarPreview(null);
         return;
       }
-      setError((prev) => (prev === 'Avatar must be 5 MB or smaller.' ? null : prev));
+      if (file.size > 5 * 1024 * 1024) {
+        setAvatarError('Avatar must be 5 MB or smaller. Only JPG or PNG images are supported.');
+        event.target.value = '';
+        setAvatarFile(null);
+        setAvatarPreview(null);
+        return;
+      }
+      setAvatarError(null);
       const previewUrl = URL.createObjectURL(file);
       setAvatarFile(file);
       setAvatarPreview(previewUrl);
     } else {
       setAvatarFile(null);
       setAvatarPreview(null);
+      setAvatarError(null);
     }
   }
 
@@ -49,12 +67,20 @@ export default function SignupPage() {
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-    setError((prev) => (prev === 'Avatar must be 5 MB or smaller.' ? null : prev));
+    setAvatarError(null);
+  }
+
+  function handleAvatarKeyDown(event: KeyboardEvent<HTMLLabelElement>) {
+    if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
+      event.preventDefault();
+      fileInputRef.current?.click();
+    }
   }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    setAvatarError(null);
     setLoading(true);
 
     const formData = new FormData(e.currentTarget);
@@ -105,7 +131,11 @@ export default function SignupPage() {
       setLoading(false);
 
       if (!res.ok) {
-        setError(data?.error || 'Signup failed');
+        if (data?.error === 'Avatar upload failed') {
+          setAvatarError('We couldn\'t upload that image. Only JPG or PNG images under 5 MB are supported.');
+        } else {
+          setError(data?.error || 'Signup failed');
+        }
         return;
       }
 
@@ -142,45 +172,49 @@ export default function SignupPage() {
           <div className="field">
             <span>Avatar (optional)</span>
             <div className="avatar-section">
-              <label className={`avatar-selector ${avatarPreview ? 'has-image' : ''}`} htmlFor="avatar">
+              <label
+                className={`avatar-circle ${avatarPreview ? 'has-image' : ''}`}
+                htmlFor="avatar"
+                aria-describedby={`avatar-hint${avatarError ? ' avatar-error' : ''}`}
+                role="button"
+                tabIndex={0}
+                onKeyDown={handleAvatarKeyDown}
+              >
                 {avatarPreview ? (
-                  <>
-                    <img src={avatarPreview} alt="Selected avatar preview" />
-                    <span className="avatar-overlay">Change photo</span>
-                    <span className="sr-only">Choose a different avatar</span>
-                  </>
+                  <img src={avatarPreview} alt="Selected avatar preview" />
                 ) : (
-                  <div className="avatar-placeholder">
-                    <span className="icon" aria-hidden="true">📷</span>
-                    <span className="upload-title">Add photo</span>
-                  </div>
+                  <span className="avatar-placeholder" aria-hidden="true">
+                    +
+                  </span>
                 )}
+                <span className="sr-only">
+                  {avatarPreview ? 'Change avatar photo' : 'Upload avatar photo'}
+                </span>
               </label>
 
               <div className="avatar-actions">
-                <p className="hint">PNG or JPG, up to 5 MB</p>
-                {avatarPreview ? (
+                <p className="hint" id="avatar-hint">
+                  Tap the photo to upload. Maximum size 5 MB.
+                </p>
+                {avatarPreview && (
                   <button type="button" onClick={clearAvatarSelection} className="secondary">
                     Remove photo
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="secondary"
-                  >
-                    Upload photo
                   </button>
                 )}
               </div>
             </div>
+            {avatarError && (
+              <p className="avatar-error" role="alert" id="avatar-error">
+                {avatarError}
+              </p>
+            )}
             <input
               id="avatar"
               name="avatar"
               type="file"
-              accept="image/*"
+              accept=".jpg,.jpeg,.png"
               onChange={handleAvatarChange}
-              className="file-input"
+              className="hidden-avatar-input"
               ref={fileInputRef}
             />
           </div>
@@ -278,78 +312,46 @@ export default function SignupPage() {
           gap: 1.5rem;
         }
 
-        .avatar-selector {
-          width: 120px;
-          height: 120px;
+        .avatar-circle {
+          width: 100px;
+          height: 100px;
           border-radius: 50%;
-          border: 2px dashed #cbd5f5;
-          background: rgba(99, 102, 241, 0.06);
-          display: inline-flex;
+          background-color: #ddd;
+          border: 2px dashed #aaa;
+          display: flex;
           align-items: center;
           justify-content: center;
           cursor: pointer;
-          transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
-          position: relative;
           overflow: hidden;
+          transition: border-color 0.2s ease, transform 0.2s ease;
         }
 
-        .avatar-selector:hover,
-        .avatar-selector:focus-within {
+        .avatar-circle:hover,
+        .avatar-circle:focus-within {
           border-color: #6366f1;
-          background: rgba(99, 102, 241, 0.12);
-          box-shadow: 0 12px 24px rgba(99, 102, 241, 0.15);
+          transform: translateY(-1px);
         }
 
-        .avatar-selector.has-image {
+        .avatar-circle.has-image {
+          background-color: transparent;
           border-style: solid;
           border-color: transparent;
-          background: transparent;
-          box-shadow: 0 12px 25px rgba(15, 23, 42, 0.25);
         }
 
-        .avatar-selector img {
+        .avatar-circle img {
           width: 100%;
           height: 100%;
           object-fit: cover;
         }
 
-        .avatar-overlay {
-          position: absolute;
-          inset: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: rgba(15, 23, 42, 0.55);
-          color: #fff;
-          font-weight: 600;
-          font-size: 0.9rem;
-          opacity: 0;
-          pointer-events: none;
-          transition: opacity 0.2s ease;
-        }
-
-        .avatar-selector:hover .avatar-overlay,
-        .avatar-selector:focus-within .avatar-overlay {
-          opacity: 1;
-        }
-
         .avatar-placeholder {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 0.35rem;
+          font-size: 2rem;
           color: #475569;
-          text-align: center;
-          padding: 1rem;
+          line-height: 1;
         }
 
-        .icon {
-          font-size: 1.75rem;
-        }
-
-        .upload-title {
-          font-weight: 600;
-          color: #1e293b;
+        .avatar-circle.has-image .avatar-placeholder {
+          display: none;
         }
 
         .avatar-actions {
@@ -362,6 +364,12 @@ export default function SignupPage() {
         .hint {
           font-size: 0.85rem;
           color: #64748b;
+        }
+
+        .avatar-error {
+          margin: 0.75rem 0 0;
+          font-size: 0.9rem;
+          color: #b91c1c;
         }
 
         .secondary {
@@ -381,7 +389,7 @@ export default function SignupPage() {
           transform: translateY(-1px);
         }
 
-        .file-input {
+        .hidden-avatar-input {
           position: absolute;
           width: 1px;
           height: 1px;
@@ -451,11 +459,6 @@ export default function SignupPage() {
 
           .avatar-actions {
             align-items: center;
-          }
-
-          .avatar-selector {
-            width: 100px;
-            height: 100px;
           }
         }
       `}</style>
