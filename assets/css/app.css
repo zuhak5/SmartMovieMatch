@@ -1178,6 +1178,10 @@ body[data-page="account-settings"] .app-main {
   display: none !important;
 }
 
+.settings-signed-out[hidden] {
+  display: none !important;
+}
+
 .settings-grid {
   display: grid;
   gap: 1.6rem;
