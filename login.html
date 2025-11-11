@@ -35,16 +35,30 @@
             />
             <p class="field-hint">We’ll personalize headings with this.</p>
           </div>
-<div class="field-group" id="avatarGroup" hidden>
-  <label class="field-label" for="avatarInput">Profile picture</label>
+<div class="field-group field-group--avatar" id="avatarGroup" hidden>
+  <span class="field-label">Profile picture</span>
+
+  <div class="avatar-row">
+    <label
+      class="avatar-circle"
+      for="avatarInput"
+      aria-label="Upload profile picture"
+    >
+      <span class="avatar-placeholder" aria-hidden="true">+</span>
+    </label>
+
+    <div class="avatar-text">
+      <p class="field-hint">Optional. JPG/PNG up to ~5 MB.</p>
+    </div>
+  </div>
+
   <input
     id="avatarInput"
-    class="input-base input-file"
+    class="input-base input-file avatar-input-hidden"
     type="file"
     name="avatar"
     accept="image/*"
   />
-  <p class="field-hint">Optional. JPG/PNG up to ~5 MB.</p>
 </div>
 
           <div class="field-group">

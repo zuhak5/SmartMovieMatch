@@ -33,6 +33,74 @@ document.addEventListener("DOMContentLoaded", () => {
   const submitBtn = $("authSubmit");
   const nameInput = $("displayNameInput");
 
+  const avatarCircle = document.querySelector(".avatar-circle");
+  const avatarPlaceholder = avatarCircle
+    ? avatarCircle.querySelector(".avatar-placeholder")
+    : null;
+
+  let avatarPreviewUrl = null;
+
+  function clearAvatarPreview() {
+    if (!avatarCircle) return;
+
+    if (avatarPreviewUrl) {
+      URL.revokeObjectURL(avatarPreviewUrl);
+      avatarPreviewUrl = null;
+    }
+
+    const existingImg = avatarCircle.querySelector("img");
+    if (existingImg) {
+      existingImg.remove();
+    }
+
+    avatarCircle.classList.remove("avatar-circle--has-image");
+    if (avatarPlaceholder) {
+      avatarPlaceholder.style.display = "";
+    }
+  }
+
+  if (avatarInput && avatarCircle) {
+    avatarInput.addEventListener("change", () => {
+      const file = avatarInput.files && avatarInput.files[0];
+      if (!file) {
+        clearAvatarPreview();
+        return;
+      }
+
+      if (!file.type.startsWith("image/")) {
+        status.innerHTML =
+          '<span class="status-error">Please choose an image file.</span>';
+        avatarInput.value = "";
+        clearAvatarPreview();
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        status.innerHTML =
+          '<span class="status-error">Image must be 5 MB or smaller.</span>';
+        avatarInput.value = "";
+        clearAvatarPreview();
+        return;
+      }
+
+      const objectUrl = URL.createObjectURL(file);
+      avatarPreviewUrl = objectUrl;
+
+      let img = avatarCircle.querySelector("img");
+      if (!img) {
+        img = document.createElement("img");
+        img.alt = "Selected profile picture preview";
+        avatarCircle.appendChild(img);
+      }
+      img.src = objectUrl;
+
+      avatarCircle.classList.add("avatar-circle--has-image");
+      if (avatarPlaceholder) {
+        avatarPlaceholder.style.display = "none";
+      }
+    });
+  }
+
   subscribeToSession((session) => {
     const displayName = session
       ? session.displayName || session.username || ""
@@ -108,27 +176,36 @@ await registerUser({ username, password, name: displayNameValue, avatarBase64, a
   });
 });
 
-function updateModeUi() {
-  const title = $("authTitle");
-  const toggleBtn = $("authModeToggle");
-  const form = $("authForm");
-  const nameGroup = $("displayNameGroup");
+  function updateModeUi() {
+    const title = $("authTitle");
+    const toggleBtn = $("authModeToggle");
+    const form = $("authForm");
+    const nameGroup = $("displayNameGroup");
+    const avatarGroup = $("avatarGroup");
 
-  if (state.mode === "signup") {
-    title.textContent = "Create your account";
-    toggleBtn.textContent = "Already have one? Log in";
-    form.setAttribute("aria-describedby", "authStatus");
-    if (nameGroup) {
-      nameGroup.hidden = false;
-      nameGroup.style.display = "flex";
-    }
-  } else {
-    title.textContent = "Welcome back";
-    toggleBtn.textContent = "Need an account? Sign up";
-    form.setAttribute("aria-describedby", "authStatus");
-    if (nameGroup) {
-      nameGroup.hidden = true;
-      nameGroup.style.display = "none";
+    if (state.mode === "signup") {
+      title.textContent = "Create your account";
+      toggleBtn.textContent = "Already have one? Log in";
+      form.setAttribute("aria-describedby", "authStatus");
+      if (nameGroup) {
+        nameGroup.hidden = false;
+        nameGroup.style.display = "flex";
+      }
+      if (avatarGroup) {
+        avatarGroup.hidden = false;
+        avatarGroup.style.display = "flex";
+      }
+    } else {
+      title.textContent = "Welcome back";
+      toggleBtn.textContent = "Need an account? Sign up";
+      form.setAttribute("aria-describedby", "authStatus");
+      if (nameGroup) {
+        nameGroup.hidden = true;
+        nameGroup.style.display = "none";
+      }
+      if (avatarGroup) {
+        avatarGroup.hidden = true;
+        avatarGroup.style.display = "none";
+      }
     }
   }
-}
