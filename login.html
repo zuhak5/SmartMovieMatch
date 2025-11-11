@@ -86,6 +86,8 @@
               required
               minlength="6"
             />
+            <p class="field-hint">Use a mix of letters, numbers, and symbols for a stronger password.</p>
+            <div id="passwordStrength" class="password-strength" role="status" aria-live="polite"></div>
           </div>
           <div class="auth-actions">
             <button id="authSubmit" type="submit" class="btn-primary">Continue</button>
@@ -93,6 +95,9 @@
               Need an account? Sign up
             </button>
           </div>
+          <button id="forgotPasswordBtn" type="button" class="btn-link btn-link-inline auth-forgot-password">
+            Forgot password?
+          </button>
         </form>
         <div id="authStatus" class="auth-status" role="status" aria-live="polite"></div>
       </section>

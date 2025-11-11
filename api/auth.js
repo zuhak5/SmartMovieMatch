@@ -1,11 +1,15 @@
 const crypto = require("crypto");
 const https = require("https");
+const path = require("path");
+const fs = require("fs/promises");
 
 const fetch = typeof global.fetch === "function" ? global.fetch.bind(global) : nodeFetch;
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const AUTH_SERVICE_CONFIGURED = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+const LOCAL_STORE_PATH = path.join(__dirname, "..", "data", "auth-users.json");
+const USING_LOCAL_STORE = !AUTH_SERVICE_CONFIGURED;
 
 function safeFilename(name) {
   return String(name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -43,11 +47,6 @@ class HttpError extends Error {
 
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
-
-  if (!AUTH_SERVICE_CONFIGURED) {
-    res.status(503).json({ error: "Authentication service is not configured." });
-    return;
-  }
 
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -97,8 +96,14 @@ async function handleAction(action, req, payload) {
       return syncWatched(req, payload);
     case "syncFavorites":
       return syncFavorites(req, payload);
+    case "updateProfile":
+      return updateProfile(req, payload);
+    case "changePassword":
+      return changePassword(req, payload);
     case "logout":
       return logout(req, payload);
+    case "requestPasswordReset":
+      return requestPasswordReset(payload);
     default:
       throw new HttpError(400, "Unsupported action");
   }
@@ -130,15 +135,24 @@ async function signup(payload) {
     const originalName = safeFilename(payload.avatarFileName || "avatar.png");
     if (base64) {
       const buffer = Buffer.from(base64, "base64");
-      const objectPath = `${canonical}/${Date.now()}-${originalName}`;
-      const uploaded = await uploadToStorage(
-        "avatars",
-        objectPath,
-        buffer,
-        "application/octet-stream"
-      );
-      avatar_path = uploaded.path;
-      avatar_url = uploaded.publicUrl;
+      if (buffer.length > 5 * 1024 * 1024) {
+        throw new HttpError(400, "Avatar must be 5 MB or smaller.");
+      }
+
+      if (AUTH_SERVICE_CONFIGURED) {
+        const objectPath = `${canonical}/${Date.now()}-${originalName}`;
+        const uploaded = await uploadToStorage(
+          "avatars",
+          objectPath,
+          buffer,
+          "application/octet-stream"
+        );
+        avatar_path = uploaded.path;
+        avatar_url = uploaded.publicUrl;
+      } else {
+        avatar_path = `local:${canonical}/${Date.now()}-${originalName}`;
+        avatar_url = buildDataUrlFromBase64(base64, originalName);
+      }
     }
   } catch (e) {
     console.warn("Avatar upload skipped:", e && e.message ? e.message : e);
@@ -332,6 +346,165 @@ async function syncFavorites(req, payload) {
   };
 }
 
+async function updateProfile(req, payload) {
+  const { sessionRecord, userRecord } = await authenticate(req, payload);
+  const now = new Date().toISOString();
+
+  const patch = {};
+  const sanitizedName = sanitizeDisplayName(payload.name);
+  if (sanitizedName) {
+    patch.display_name = sanitizedName;
+  }
+
+  let nextAvatarPath = userRecord.avatarPath;
+  let nextAvatarUrl = userRecord.avatarUrl;
+
+  if (payload.removeAvatar) {
+    patch.avatar_path = null;
+    patch.avatar_url = null;
+    nextAvatarPath = null;
+    nextAvatarUrl = null;
+  } else {
+    const base64 = typeof payload.avatarBase64 === "string" ? payload.avatarBase64.trim() : null;
+    if (base64) {
+      try {
+        const buffer = Buffer.from(base64, "base64");
+        if (!buffer || buffer.length === 0) {
+          throw new Error("Empty avatar payload");
+        }
+        if (buffer.length > 5 * 1024 * 1024) {
+          throw new HttpError(400, "Avatar must be 5 MB or smaller.");
+        }
+        const originalName = safeFilename(payload.avatarFileName || "avatar.png");
+        if (AUTH_SERVICE_CONFIGURED) {
+          const objectPath = `${userRecord.username}/${Date.now()}-${originalName}`;
+          const uploaded = await uploadToStorage("avatars", objectPath, buffer, "application/octet-stream");
+          patch.avatar_path = uploaded.path;
+          patch.avatar_url = uploaded.publicUrl;
+          nextAvatarPath = uploaded.path;
+          nextAvatarUrl = uploaded.publicUrl;
+        } else {
+          const localPath = `local:${userRecord.username}/${Date.now()}-${originalName}`;
+          const dataUrl = buildDataUrlFromBase64(base64, originalName);
+          patch.avatar_path = localPath;
+          patch.avatar_url = dataUrl;
+          nextAvatarPath = localPath;
+          nextAvatarUrl = dataUrl;
+        }
+      } catch (error) {
+        if (error instanceof HttpError) {
+          throw error;
+        }
+        console.warn("Avatar update skipped:", error && error.message ? error.message : error);
+      }
+    }
+  }
+
+  let updatedUserRow = null;
+  if (Object.keys(patch).length > 0) {
+    updatedUserRow = await updateUserRow(userRecord.username, patch);
+  }
+
+  const refreshedUser = updatedUserRow
+    ? mapUserRow(updatedUserRow)
+    : {
+        ...userRecord,
+        displayName:
+          patch.display_name !== undefined && patch.display_name !== null
+            ? patch.display_name
+            : userRecord.displayName,
+        avatarPath: nextAvatarPath,
+        avatarUrl: nextAvatarUrl
+      };
+
+  const updatedSessionRow = await updateSessionRow(sessionRecord.token, {
+    last_active_at: now
+  });
+  const refreshedSession = updatedSessionRow
+    ? mapSessionRow(updatedSessionRow)
+    : { ...sessionRecord, lastActiveAt: now };
+
+  return {
+    body: {
+      session: toSessionResponse(refreshedUser, refreshedSession)
+    }
+  };
+}
+
+async function changePassword(req, payload) {
+  const { userRecord } = await authenticate(req, payload);
+
+  const currentPassword = typeof payload.currentPassword === "string" ? payload.currentPassword : "";
+  const newPassword = typeof payload.newPassword === "string" ? payload.newPassword : "";
+
+  if (!currentPassword || !newPassword) {
+    throw new HttpError(400, "Provide your current password and a new password.");
+  }
+
+  if (newPassword.length < 8) {
+    throw new HttpError(400, "New password must be at least 8 characters long.");
+  }
+
+  if (currentPassword === newPassword) {
+    throw new HttpError(400, "Choose a password that’s different from the current one.");
+  }
+
+  const computedHash = hashPassword(currentPassword, userRecord.salt);
+  if (computedHash !== userRecord.passwordHash) {
+    throw new HttpError(401, "That current password doesn’t match our records.");
+  }
+
+  const salt = crypto.randomBytes(16).toString("hex");
+  const passwordHash = hashPassword(newPassword, salt);
+  const now = new Date().toISOString();
+
+  await updateUserRow(userRecord.username, {
+    password_hash: passwordHash,
+    salt,
+    last_login_at: now
+  });
+
+  const refreshedUserRow = await selectUserRow(userRecord.username);
+  const refreshedUser = refreshedUserRow ? mapUserRow(refreshedUserRow) : { ...userRecord };
+  const sessionRecord = await createSessionRecord(refreshedUser, now);
+
+  return {
+    body: {
+      session: toSessionResponse(refreshedUser, sessionRecord)
+    }
+  };
+}
+
+async function requestPasswordReset(payload) {
+  const usernameInput = sanitizeUsername(payload && payload.username);
+  if (!usernameInput) {
+    return {
+      body: {
+        ok: true,
+        message: "If that username exists, we just emailed recovery instructions."
+      }
+    };
+  }
+
+  const canonical = canonicalUsername(usernameInput);
+
+  try {
+    const userRow = await selectUserRow(canonical);
+    if (userRow) {
+      console.info(`Password reset requested for ${canonical}`);
+    }
+  } catch (error) {
+    console.warn("Password reset lookup failed", error);
+  }
+
+  return {
+    body: {
+      ok: true,
+      message: "If that username exists, we just emailed recovery instructions."
+    }
+  };
+}
+
 async function logout(req, payload) {
   const token = extractToken(req, payload);
   if (!token) {
@@ -369,6 +542,11 @@ async function selectUserRow(username) {
   if (!username) {
     return null;
   }
+  if (USING_LOCAL_STORE) {
+    const store = await readLocalStore();
+    const found = store.users.find((row) => row.username === username);
+    return found ? cloneObject(found) : null;
+  }
   const rows = await supabaseFetch("auth_users", {
     query: {
       select: "*",
@@ -383,12 +561,30 @@ async function selectUserRow(username) {
 }
 
 async function insertUserRow(values) {
+  if (USING_LOCAL_STORE) {
+    const store = await readLocalStore();
+    const next = cloneObject(values);
+    store.users.push(next);
+    await writeLocalStore(store);
+    return cloneObject(next);
+  }
   return await mutateRows("auth_users", values, "POST");
 }
 
 async function updateUserRow(username, patch) {
   if (!username) {
     return null;
+  }
+  if (USING_LOCAL_STORE) {
+    const store = await readLocalStore();
+    const index = store.users.findIndex((row) => row.username === username);
+    if (index === -1) {
+      return null;
+    }
+    const updated = { ...store.users[index], ...patch };
+    store.users[index] = updated;
+    await writeLocalStore(store);
+    return cloneObject(updated);
   }
   return await mutateRows(
     `auth_users?username=eq.${encodeURIComponent(username)}`,
@@ -400,6 +596,22 @@ async function updateUserRow(username, patch) {
 async function createSessionRecord(userRecord, timestamp) {
   const token = crypto.randomBytes(24).toString("hex");
   await deleteSessionsByUsername(userRecord.username);
+
+  if (USING_LOCAL_STORE) {
+    const store = await readLocalStore();
+    const sessionRow = {
+      token,
+      username: userRecord.username,
+      created_at: timestamp,
+      last_active_at: timestamp,
+      last_preferences_sync: userRecord.lastPreferencesSync || null,
+      last_watched_sync: userRecord.lastWatchedSync || null,
+      last_favorites_sync: userRecord.lastFavoritesSync || null
+    };
+    store.sessions.push(sessionRow);
+    await writeLocalStore(store);
+    return mapSessionRow(sessionRow);
+  }
 
   const sessionRow = await mutateRows("auth_sessions", {
     token,
@@ -418,6 +630,17 @@ async function updateSessionRow(token, patch) {
   if (!token) {
     return null;
   }
+  if (USING_LOCAL_STORE) {
+    const store = await readLocalStore();
+    const index = store.sessions.findIndex((row) => row.token === token);
+    if (index === -1) {
+      return null;
+    }
+    const updated = { ...store.sessions[index], ...patch };
+    store.sessions[index] = updated;
+    await writeLocalStore(store);
+    return mapSessionRow(updated);
+  }
   return await mutateRows(
     `auth_sessions?token=eq.${encodeURIComponent(token)}`,
     patch,
@@ -428,6 +651,11 @@ async function updateSessionRow(token, patch) {
 async function selectSessionRow(token) {
   if (!token) {
     return null;
+  }
+  if (USING_LOCAL_STORE) {
+    const store = await readLocalStore();
+    const found = store.sessions.find((row) => row.token === token);
+    return found ? cloneObject(found) : null;
   }
   const rows = await supabaseFetch("auth_sessions", {
     query: {
@@ -446,6 +674,12 @@ async function deleteSessionsByUsername(username) {
   if (!username) {
     return;
   }
+  if (USING_LOCAL_STORE) {
+    const store = await readLocalStore();
+    store.sessions = store.sessions.filter((row) => row.username !== username);
+    await writeLocalStore(store);
+    return;
+  }
   await supabaseFetch(`auth_sessions`, {
     method: "DELETE",
     query: {
@@ -456,6 +690,12 @@ async function deleteSessionsByUsername(username) {
 
 async function deleteSessionByToken(token) {
   if (!token) {
+    return;
+  }
+  if (USING_LOCAL_STORE) {
+    const store = await readLocalStore();
+    store.sessions = store.sessions.filter((row) => row.token !== token);
+    await writeLocalStore(store);
     return;
   }
   await supabaseFetch(`auth_sessions`, {
@@ -591,6 +831,65 @@ function nodeFetch(input, options = {}) {
 function handleSupabaseError(context, error) {
   console.error("Supabase error:", context, error);
   throw new HttpError(500, "Authentication storage service failure.");
+}
+
+async function readLocalStore() {
+  try {
+    const raw = await fs.readFile(LOCAL_STORE_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    return normalizeLocalStore(parsed);
+  } catch (error) {
+    if (error && error.code !== "ENOENT") {
+      console.warn("Failed to read local auth store", error);
+    }
+    return { users: [], sessions: [] };
+  }
+}
+
+async function writeLocalStore(store) {
+  const normalized = normalizeLocalStore(store);
+  const directory = path.dirname(LOCAL_STORE_PATH);
+  await fs.mkdir(directory, { recursive: true });
+  await fs.writeFile(LOCAL_STORE_PATH, JSON.stringify(normalized, null, 2), "utf8");
+  return normalized;
+}
+
+function normalizeLocalStore(value) {
+  const users = Array.isArray(value && value.users) ? value.users : [];
+  const sessions = Array.isArray(value && value.sessions) ? value.sessions : [];
+  return {
+    users: users.map((user) => ({ ...user })),
+    sessions: sessions.map((session) => ({ ...session }))
+  };
+}
+
+function cloneObject(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function buildDataUrlFromBase64(base64, fileName) {
+  const mimeType = inferMimeTypeFromName(fileName);
+  return `data:${mimeType};base64,${base64}`;
+}
+
+function inferMimeTypeFromName(fileName) {
+  if (typeof fileName !== "string") {
+    return "image/png";
+  }
+  const lower = fileName.toLowerCase();
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
+    return "image/jpeg";
+  }
+  if (lower.endsWith(".gif")) {
+    return "image/gif";
+  }
+  if (lower.endsWith(".webp")) {
+    return "image/webp";
+  }
+  if (lower.endsWith(".svg")) {
+    return "image/svg+xml";
+  }
+  return "image/png";
 }
 
 function sanitizeUsername(username) {
