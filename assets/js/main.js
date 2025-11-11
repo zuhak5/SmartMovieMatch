@@ -699,9 +699,13 @@ function populateAccountSettings() {
       settingsAvatar.style.backgroundImage = `url(${state.session.avatarUrl})`;
       settingsAvatar.style.backgroundSize = "cover";
       settingsAvatar.style.backgroundPosition = "center";
+      settingsAvatar.classList.add("has-image");
       preview.textContent = "";
     } else {
       settingsAvatar.style.backgroundImage = "none";
+      settingsAvatar.style.backgroundSize = "";
+      settingsAvatar.style.backgroundPosition = "";
+      settingsAvatar.classList.remove("has-image");
       preview.textContent = initials;
     }
   }
@@ -835,6 +839,9 @@ function handleAvatarInputChange(event) {
       state.accountAvatarPreviewUrl = null;
     }
     settingsAvatar.style.backgroundImage = "none";
+    settingsAvatar.style.backgroundSize = "";
+    settingsAvatar.style.backgroundPosition = "";
+    settingsAvatar.classList.remove("has-image");
     preview.textContent = getActiveDisplayName().slice(0, 2).toUpperCase() || "SM";
     state.accountRemoveAvatar = false;
     return;
@@ -858,6 +865,7 @@ function handleAvatarInputChange(event) {
   settingsAvatar.style.backgroundImage = `url(${objectUrl})`;
   settingsAvatar.style.backgroundSize = "cover";
   settingsAvatar.style.backgroundPosition = "center";
+  settingsAvatar.classList.add("has-image");
   preview.textContent = "";
   state.accountRemoveAvatar = false;
 }
@@ -868,6 +876,9 @@ function handleAvatarRemove() {
   const avatarInput = $("accountAvatarInput");
   if (settingsAvatar) {
     settingsAvatar.style.backgroundImage = "none";
+    settingsAvatar.style.backgroundSize = "";
+    settingsAvatar.style.backgroundPosition = "";
+    settingsAvatar.classList.remove("has-image");
   }
   if (preview) {
     preview.textContent = getActiveDisplayName().slice(0, 2).toUpperCase() || "SM";
@@ -2106,7 +2117,10 @@ function updateAccountUi(session) {
     greeting.textContent = `Welcome back, ${displayName}!`;
     greeting.classList.add("account-greeting-auth");
     loginLink.style.display = "none";
+    loginLink.hidden = true;
+    loginLink.setAttribute("aria-hidden", "true");
     accountProfile.hidden = false;
+    accountProfile.setAttribute("aria-hidden", "false");
     accountName.textContent = displayName;
     const mostRecent = getMostRecentSync(session);
     accountPillSync.textContent = mostRecent
@@ -2135,7 +2149,10 @@ function updateAccountUi(session) {
     greeting.textContent = "You’re browsing as guest.";
     greeting.classList.remove("account-greeting-auth");
     loginLink.style.display = "inline-flex";
+    loginLink.hidden = false;
+    loginLink.setAttribute("aria-hidden", "false");
     accountProfile.hidden = true;
+    accountProfile.setAttribute("aria-hidden", "true");
     accountName.textContent = defaultAccountName;
     accountPillSync.textContent = defaultPillText;
     accountAvatarInitials.textContent = defaultAvatarInitials;
