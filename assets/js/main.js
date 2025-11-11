@@ -371,6 +371,7 @@ function wireEvents() {
   const profileForm = $("accountProfileForm");
   const securityForm = $("accountSecurityForm");
   const avatarInput = $("accountAvatarInput");
+  const avatarUploadBtn = $("accountAvatarUpload");
   const avatarRemoveBtn = $("accountAvatarRemove");
 
   if (accountProfileBtn && accountMenu) {
@@ -427,6 +428,13 @@ function wireEvents() {
 
   if (avatarInput) {
     avatarInput.addEventListener("change", handleAvatarInputChange);
+  }
+
+  if (avatarUploadBtn && avatarInput) {
+    avatarUploadBtn.addEventListener("click", () => {
+      playUiClick();
+      avatarInput.click();
+    });
   }
 
   if (avatarRemoveBtn) {
@@ -664,6 +672,13 @@ function openAccountSettings(section = "profile") {
   window.location.href = target;
 }
 
+function updateAvatarRemoveAvailability(canRemove) {
+  const removeBtn = $("accountAvatarRemove");
+  if (removeBtn) {
+    removeBtn.disabled = !canRemove;
+  }
+}
+
 function populateAccountSettings() {
   const displayNameInput = $("accountDisplayName");
   const settingsAvatar = document.querySelector(".settings-avatar");
@@ -701,12 +716,14 @@ function populateAccountSettings() {
       settingsAvatar.style.backgroundPosition = "center";
       settingsAvatar.classList.add("has-image");
       preview.textContent = "";
+      updateAvatarRemoveAvailability(true);
     } else {
       settingsAvatar.style.backgroundImage = "none";
       settingsAvatar.style.backgroundSize = "";
       settingsAvatar.style.backgroundPosition = "";
       settingsAvatar.classList.remove("has-image");
       preview.textContent = initials;
+      updateAvatarRemoveAvailability(false);
     }
   }
 }
@@ -844,6 +861,7 @@ function handleAvatarInputChange(event) {
     settingsAvatar.classList.remove("has-image");
     preview.textContent = getActiveDisplayName().slice(0, 2).toUpperCase() || "SM";
     state.accountRemoveAvatar = false;
+    updateAvatarRemoveAvailability(false);
     return;
   }
 
@@ -854,6 +872,7 @@ function handleAvatarInputChange(event) {
       statusEl.dataset.variant = "error";
     }
     input.value = "";
+    updateAvatarRemoveAvailability(settingsAvatar.classList.contains("has-image"));
     return;
   }
 
@@ -868,6 +887,7 @@ function handleAvatarInputChange(event) {
   settingsAvatar.classList.add("has-image");
   preview.textContent = "";
   state.accountRemoveAvatar = false;
+  updateAvatarRemoveAvailability(true);
 }
 
 function handleAvatarRemove() {
@@ -891,6 +911,7 @@ function handleAvatarRemove() {
     state.accountAvatarPreviewUrl = null;
   }
   state.accountRemoveAvatar = true;
+  updateAvatarRemoveAvailability(false);
 }
 
 function refreshWatchedUi() {
@@ -2066,6 +2087,7 @@ function updateAccountUi(session) {
   const accountAvatarImg = $("accountAvatarImg");
   const accountAvatarInitials = $("accountAvatarInitials");
   const accountMenu = $("accountMenu");
+  const accountBar = document.querySelector(".account-bar");
   const activePage = document.body ? document.body.getAttribute("data-page") : null;
 
   if (!greeting || !loginLink || !accountProfile || !accountName || !accountPillSync || !accountAvatar || !accountAvatarImg || !accountAvatarInitials) {
@@ -2105,6 +2127,10 @@ function updateAccountUi(session) {
 
   const isSignedIn = Boolean(session && session.token);
   let displayName = "";
+  if (accountBar) {
+    accountBar.dataset.accountState = isSignedIn ? "signed-in" : "guest";
+  }
+
   if (isSignedIn) {
     const rawDisplayName =
       typeof session.displayName === "string" ? session.displayName.trim() : "";

@@ -293,6 +293,10 @@ h6 {
   outline-offset: 3px;
 }
 
+.account-bar[data-account-state="signed-in"] .account-link {
+  display: none !important;
+}
+
 .account-profile {
   position: relative;
   display: inline-flex;
@@ -654,6 +658,27 @@ h6 {
   display: flex;
   align-items: center;
   gap: 0.65rem;
+  flex-wrap: wrap;
+  position: relative;
+}
+
+.settings-avatar-row > * {
+  flex-shrink: 0;
+}
+
+.settings-avatar-row .settings-avatar-upload {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.settings-avatar-row .btn-subtle {
+  margin-left: 0;
+}
+
+@media (max-width: 540px) {
+  .settings-avatar-row .settings-avatar-upload {
+    margin-left: 0;
+  }
 }
 
 .settings-avatar {
@@ -692,6 +717,20 @@ h6 {
 
 .settings-avatar.has-image .settings-avatar-inner {
   opacity: 0;
+}
+
+.input-file {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  border: 0;
 }
 
 .modal-actions {
@@ -1821,6 +1860,17 @@ form {
   }
 }
 
+form.settings-section {
+  display: grid;
+  gap: 1.2rem;
+}
+
+@media (max-width: 720px) {
+  form.settings-section {
+    gap: 1rem;
+  }
+}
+
     .field-group {
       display: flex;
       flex-direction: column;
@@ -2335,6 +2385,13 @@ form {
       border-color: rgba(148, 163, 184, 0.7);
       color: var(--text-main);
       transform: translateY(-1px);
+    }
+
+    .btn-secondary:disabled,
+    .btn-subtle:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      pointer-events: none;
     }
 
     .btn-subtle {
