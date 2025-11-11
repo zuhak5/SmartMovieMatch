@@ -57,18 +57,29 @@ export function renderWatchedList(watchedMovies, options = {}) {
   listEl.innerHTML = "";
 
   const onRemove = typeof options.onRemove === "function" ? options.onRemove : null;
+  const viewEl = listEl.closest(".collection-view");
+  const wasExpanded = viewEl ? viewEl.dataset.collectionExpanded === "true" : false;
+  if (viewEl) {
+    const previousToggle = viewEl.querySelector(".collection-collapse");
+    if (previousToggle) {
+      previousToggle.remove();
+    }
+  }
 
   if (!watchedMovies.length) {
+    if (viewEl) {
+      delete viewEl.dataset.collectionExpanded;
+    }
     emptyEl.style.display = "block";
     return;
   }
 
   emptyEl.style.display = "none";
 
-  watchedMovies
+  const items = watchedMovies
     .slice()
     .reverse()
-    .forEach((movie) => {
+    .map((movie) => {
       const item = document.createElement("div");
       item.className = "favorite-chip watched-chip";
       item.setAttribute("role", "button");
@@ -190,8 +201,89 @@ export function renderWatchedList(watchedMovies, options = {}) {
         }
       });
 
-      listEl.appendChild(item);
+      return item;
     });
+
+  applyCollectionCollapse(listEl, viewEl, items, { wasExpanded });
+}
+
+function applyCollectionCollapse(listEl, viewEl, items, options = {}) {
+  const MAX_VISIBLE = 3;
+  const hiddenItems = [];
+  const wasExpanded = options.wasExpanded === true;
+  const total = items.length;
+  const hiddenCount = Math.max(0, total - MAX_VISIBLE);
+  const shouldShowToggle = hiddenCount > 0 && Boolean(viewEl);
+  const initialExpanded = shouldShowToggle && wasExpanded;
+
+  items.forEach((item, index) => {
+    const isHidden = shouldShowToggle && index >= MAX_VISIBLE;
+    if (isHidden) {
+      hiddenItems.push(item);
+      if (!initialExpanded) {
+        return;
+      }
+    }
+    listEl.appendChild(item);
+  });
+
+  if (!shouldShowToggle || !viewEl) {
+    if (viewEl) {
+      delete viewEl.dataset.collectionExpanded;
+    }
+    return;
+  }
+
+  const toggleContainer = document.createElement("div");
+  toggleContainer.className = "collection-collapse";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "btn-subtle btn-chip collection-collapse-btn";
+  button.innerHTML = '<span class="label"></span><span class="icon" aria-hidden="true"></span>';
+  toggleContainer.appendChild(button);
+  listEl.insertAdjacentElement("afterend", toggleContainer);
+
+  const labelEl = button.querySelector(".label");
+  const iconEl = button.querySelector(".icon");
+
+  const update = (expanded) => {
+    if (expanded) {
+      hiddenItems.forEach((item) => {
+        if (!item.isConnected) {
+          listEl.appendChild(item);
+        }
+      });
+    } else {
+      hiddenItems.forEach((item) => {
+        if (item.parentElement === listEl) {
+          listEl.removeChild(item);
+        }
+      });
+    }
+    viewEl.dataset.collectionExpanded = expanded ? "true" : "false";
+    if (labelEl) {
+      if (expanded) {
+        labelEl.textContent = "Show less";
+      } else if (hiddenCount === 1) {
+        labelEl.textContent = "Show 1 more";
+      } else {
+        labelEl.textContent = `Show ${hiddenCount} more`;
+      }
+    }
+    if (iconEl) {
+      iconEl.textContent = expanded ? "▴" : "▾";
+    }
+  };
+
+  update(initialExpanded);
+
+  button.addEventListener("click", () => {
+    const expanded = viewEl.dataset.collectionExpanded === "true";
+    const next = !expanded;
+    playUiClick();
+    update(next);
+    playExpandSound(next);
+  });
 }
 
 export function updateWatchedSummary(watchedMovies) {
@@ -234,18 +326,29 @@ export function renderFavoritesList(favorites, options = {}) {
   listEl.innerHTML = "";
 
   const onRemove = typeof options.onRemove === "function" ? options.onRemove : null;
+  const viewEl = listEl.closest(".collection-view");
+  const wasExpanded = viewEl ? viewEl.dataset.collectionExpanded === "true" : false;
+  if (viewEl) {
+    const previousToggle = viewEl.querySelector(".collection-collapse");
+    if (previousToggle) {
+      previousToggle.remove();
+    }
+  }
 
   if (!favorites.length) {
+    if (viewEl) {
+      delete viewEl.dataset.collectionExpanded;
+    }
     emptyEl.style.display = "block";
     return;
   }
 
   emptyEl.style.display = "none";
 
-  favorites
+  const items = favorites
     .slice()
     .reverse()
-    .forEach((movie) => {
+    .map((movie) => {
       const item = document.createElement("div");
       item.className = "favorite-chip";
       item.setAttribute("role", "button");
@@ -369,8 +472,10 @@ export function renderFavoritesList(favorites, options = {}) {
         }
       });
 
-      listEl.appendChild(item);
+      return item;
     });
+
+  applyCollectionCollapse(listEl, viewEl, items, { wasExpanded });
 }
 
 export function updateFavoritesSummary(favorites) {
