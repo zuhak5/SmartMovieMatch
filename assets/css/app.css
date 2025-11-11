@@ -1004,6 +1004,14 @@ h6 {
     grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
     align-items: start;
   }
+
+  .app-main > .panel-sticky {
+    order: -1;
+  }
+
+  .app-main > .right-column {
+    order: 0;
+  }
 }
 
 @media (max-width: 720px) {
@@ -3257,6 +3265,21 @@ form {
       display: flex;
       flex-direction: column;
       gap: 0.6rem;
+    }
+
+    .collection-collapse {
+      display: flex;
+      justify-content: flex-start;
+      margin-top: -0.1rem;
+    }
+
+    .collection-collapse-btn {
+      font-size: 0.75rem;
+      letter-spacing: 0.04em;
+    }
+
+    .collection-collapse-btn .icon {
+      font-size: 0.72rem;
     }
 
 .favorite-chip {
