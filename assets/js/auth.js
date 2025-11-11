@@ -215,6 +215,10 @@ function normalizeSession(value) {
     lastPreferencesSync: value.lastPreferencesSync || null,
     lastWatchedSync: value.lastWatchedSync || null,
     lastFavoritesSync: value.lastFavoritesSync || null,
+    avatarUrl:
+      typeof value.avatarUrl === "string" && value.avatarUrl.trim()
+        ? value.avatarUrl
+        : null,
     preferencesSnapshot: value.preferencesSnapshot || null,
     watchedHistory: Array.isArray(value.watchedHistory) ? value.watchedHistory : [],
     favoritesList: Array.isArray(value.favoritesList) ? value.favoritesList : []
