@@ -1863,13 +1863,25 @@ function updateSyncInsights(session) {
   }
 
   if (overviewSection) {
-    overviewSection.hidden = !hasSession;
+    const shouldHideOverview = !hasSession;
+    overviewSection.hidden = shouldHideOverview;
+    overviewSection.setAttribute("aria-hidden", shouldHideOverview ? "true" : "false");
+    overviewSection.style.display = shouldHideOverview ? "none" : "";
+  }
+  if (overviewSignedOut) {
+    const shouldHideSignedOut = hasSession;
+    overviewSignedOut.hidden = shouldHideSignedOut;
+    overviewSignedOut.setAttribute("aria-hidden", shouldHideSignedOut ? "true" : "false");
+    overviewSignedOut.style.display = shouldHideSignedOut ? "none" : "";
   }
   if (overviewSignedOut) {
     overviewSignedOut.hidden = hasSession;
   }
   if (timeline) {
-    timeline.hidden = !hasSession;
+    const shouldHideTimeline = !hasSession;
+    timeline.hidden = shouldHideTimeline;
+    timeline.setAttribute("aria-hidden", shouldHideTimeline ? "true" : "false");
+    timeline.style.display = shouldHideTimeline ? "none" : "";
   }
   if (timelinePref) {
     timelinePref.textContent = prefText;
