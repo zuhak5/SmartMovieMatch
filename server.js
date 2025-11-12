@@ -7,11 +7,13 @@ const authHandler = require('./api/auth.js');
 const tmdbHandler = require('./api/tmdb.js');
 const omdbHandler = require('./api/omdb.js');
 const youtubeHandler = require('./api/youtube.js');
+const socialHandler = require('./api/social.js');
 
 const apiHandlers = new Map([
   ['/api/tmdb', tmdbHandler],
   ['/api/omdb', omdbHandler],
-  ['/api/youtube', youtubeHandler]
+  ['/api/youtube', youtubeHandler],
+  ['/api/social', socialHandler]
 ]);
 
 const PORT = process.env.PORT || 3000;

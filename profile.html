@@ -176,6 +176,47 @@
         </div>
       </div>
     </section>
+
+    <section class="panel social-panel" id="socialConnectionsSection">
+      <div class="panel-inner">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Social circle</div>
+            <div class="panel-subtitle">Follow friends to spotlight their reviews in discovery.</div>
+          </div>
+        </div>
+        <div id="socialConnectionsSignedOut" class="social-signed-out">
+          <h3>Sign in to follow friends</h3>
+          <p>Log in to follow reviewers you trust and see their notes highlighted in recommendations.</p>
+          <a class="btn-primary" href="login.html">Log in / Sign up</a>
+        </div>
+        <div id="socialConnectionsContent" class="social-content" hidden aria-hidden="true">
+          <form id="socialFollowForm" class="social-follow-form" novalidate>
+            <div class="field-grid">
+              <label class="field-label" for="socialFollowUsername">Follow by username</label>
+              <div class="social-follow-input-row">
+                <input
+                  id="socialFollowUsername"
+                  class="input-base input-text"
+                  type="text"
+                  name="username"
+                  autocomplete="off"
+                  minlength="3"
+                  placeholder="friend_username"
+                  required
+                />
+                <button type="submit" id="socialFollowSubmit" class="btn-secondary">Follow</button>
+              </div>
+            </div>
+            <div id="socialFollowStatus" class="community-status" role="status" aria-live="polite"></div>
+          </form>
+          <div id="socialFollowingEmpty" class="empty-state">
+            You’re not following anyone yet. Follow a friend to highlight their community notes.
+          </div>
+          <div id="socialFollowingList" class="social-following-list" hidden></div>
+        </div>
+      </div>
+    </section>
   </main>
 </div>
 

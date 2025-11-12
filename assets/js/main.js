@@ -16,6 +16,14 @@ import {
   fetchTrailersForMovies
 } from "./recommendations.js";
 import {
+  initSocialFeatures,
+  buildCommunitySection,
+  subscribeToFollowing,
+  followUserByUsername,
+  unfollowUserByUsername,
+  getFollowingSnapshot
+} from "./social.js";
+import {
   renderWatchedList,
   updateWatchedSummary,
   renderRecommendations,
@@ -33,6 +41,7 @@ const RECOMMENDATIONS_PAGE_SIZE = 20;
 const state = {
   watchedMovies: [],
   favorites: [],
+  followingUsers: [],
   lastRecSeed: Math.random(),
   activeCollectionView: "favorites",
   session: null,
@@ -63,6 +72,7 @@ let profileCalloutSnapshot = {
   lastSyncToken: null
 };
 let profileCalloutPulseTimer = null;
+let unsubscribeFollowing = null;
 
 const GENRE_ICON_MAP = {
   "28": "💥", // Action
@@ -311,12 +321,14 @@ function init() {
   state.watchedMovies = [];
   state.favorites = [];
   state.session = loadSession();
+  setupSocialFeatures();
   hydrateFromSession(state.session);
   refreshWatchedUi();
   refreshFavoritesUi();
   switchCollectionView(state.activeCollectionView);
   updateAccountUi(state.session);
   updateSnapshotPreviews(state.session);
+  updateSocialSectionVisibility(state.session);
   if (isAccountSettingsContext() && state.session && state.session.token) {
     populateAccountSettings();
   }
@@ -332,6 +344,7 @@ function init() {
     hydrateFromSession(session);
     updateAccountUi(session);
     updateSnapshotPreviews(session);
+    updateSocialSectionVisibility(session);
     setSyncStatus(
       session
         ? "Signed in – your taste profile syncs automatically."
@@ -1800,7 +1813,10 @@ function updateRecommendationsView() {
   renderRecommendations(items, state.watchedMovies, {
     favorites: state.favorites,
     onMarkWatched: handleMarkWatched,
-    onToggleFavorite: handleToggleFavorite
+    onToggleFavorite: handleToggleFavorite,
+    community: {
+      buildSection: buildCommunitySection
+    }
   });
   updateShowMoreButton();
   updateRecommendationsMeta();
@@ -2294,6 +2310,171 @@ function updateSnapshotPreviews(session) {
   preferencesEl.textContent = prettify(session.preferencesSnapshot, "No preference snapshot stored yet.");
   watchedEl.textContent = prettify(session.watchedHistory, "No watched history stored yet.");
   favoritesEl.textContent = prettify(session.favoritesList, "No favorites stored yet.");
+}
+
+function setupSocialFeatures() {
+  initSocialFeatures();
+  if (unsubscribeFollowing) {
+    unsubscribeFollowing();
+  }
+  unsubscribeFollowing = subscribeToFollowing((list) => {
+    state.followingUsers = Array.isArray(list) ? list.slice() : [];
+    renderFollowingList();
+  });
+  state.followingUsers = getFollowingSnapshot();
+  renderFollowingList();
+  wireFollowForm();
+}
+
+function wireFollowForm() {
+  const form = $("socialFollowForm");
+  const input = $("socialFollowUsername");
+  const submitBtn = $("socialFollowSubmit");
+  const statusEl = $("socialFollowStatus");
+  if (!form || !input || !submitBtn || !statusEl) {
+    return;
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!state.session || !state.session.token) {
+      window.location.href = "login.html";
+      return;
+    }
+
+    const username = input.value.trim();
+    if (username.length < 3) {
+      statusEl.textContent = "Enter at least 3 characters to follow someone.";
+      statusEl.dataset.variant = "error";
+      input.focus();
+      return;
+    }
+
+    submitBtn.disabled = true;
+    statusEl.textContent = "Following…";
+    statusEl.dataset.variant = "loading";
+
+    try {
+      await followUserByUsername(username);
+      statusEl.textContent = `Now following ${username.toLowerCase()}.`;
+      statusEl.dataset.variant = "success";
+      input.value = "";
+    } catch (error) {
+      statusEl.textContent =
+        error instanceof Error ? error.message : "Couldn’t follow that user right now.";
+      statusEl.dataset.variant = "error";
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+}
+
+function renderFollowingList() {
+  const listEl = $("socialFollowingList");
+  const emptyEl = $("socialFollowingEmpty");
+  if (!listEl || !emptyEl) {
+    return;
+  }
+
+  listEl.innerHTML = "";
+  const followers = Array.isArray(state.followingUsers) ? state.followingUsers : [];
+  if (!followers.length) {
+    listEl.hidden = true;
+    emptyEl.hidden = false;
+    return;
+  }
+
+  listEl.hidden = false;
+  emptyEl.hidden = true;
+
+  followers.forEach((username) => {
+    const item = document.createElement("div");
+    item.className = "social-follow-item";
+
+    const name = document.createElement("span");
+    name.className = "social-follow-name";
+    name.textContent = username;
+    item.appendChild(name);
+
+    const badge = document.createElement("span");
+    badge.className = "social-follow-badge";
+    badge.textContent = "Following";
+    item.appendChild(badge);
+
+    const action = document.createElement("button");
+    action.type = "button";
+    action.className = "btn-subtle social-unfollow-btn";
+    action.textContent = "Unfollow";
+    action.addEventListener("click", () => {
+      playUiClick();
+      handleUnfollowUser(username, action);
+    });
+    item.appendChild(action);
+
+    listEl.appendChild(item);
+  });
+}
+
+async function handleUnfollowUser(username, button) {
+  if (!state.session || !state.session.token) {
+    window.location.href = "login.html";
+    return;
+  }
+
+  const statusEl = $("socialFollowStatus");
+  if (button) {
+    button.disabled = true;
+  }
+  if (statusEl) {
+    statusEl.textContent = `Removing ${username.toLowerCase()}…`;
+    statusEl.dataset.variant = "loading";
+  }
+
+  try {
+    await unfollowUserByUsername(username);
+    if (statusEl) {
+      statusEl.textContent = `Unfollowed ${username.toLowerCase()}.`;
+      statusEl.dataset.variant = "success";
+    }
+  } catch (error) {
+    if (statusEl) {
+      statusEl.textContent =
+        error instanceof Error ? error.message : "Couldn’t unfollow that user right now.";
+      statusEl.dataset.variant = "error";
+    }
+  } finally {
+    if (button) {
+      button.disabled = false;
+    }
+  }
+}
+
+function updateSocialSectionVisibility(session) {
+  const section = $("socialConnectionsSection");
+  if (!section) {
+    return;
+  }
+  const signedOutCard = $("socialConnectionsSignedOut");
+  const content = $("socialConnectionsContent");
+  const submitBtn = $("socialFollowSubmit");
+  const statusEl = $("socialFollowStatus");
+  const hasSession = Boolean(session && session.token);
+
+  if (signedOutCard) {
+    signedOutCard.hidden = hasSession;
+    signedOutCard.style.display = hasSession ? "none" : "";
+  }
+  if (content) {
+    content.hidden = !hasSession;
+    content.style.display = hasSession ? "" : "none";
+  }
+  if (submitBtn) {
+    submitBtn.disabled = !hasSession;
+  }
+  if (!hasSession && statusEl) {
+    statusEl.textContent = "";
+    statusEl.removeAttribute("data-variant");
+  }
 }
 
 function hydrateFromSession(session) {
