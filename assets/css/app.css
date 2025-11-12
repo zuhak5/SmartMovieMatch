@@ -3017,6 +3017,23 @@ body[data-theme="light"] .pill-context {
   --sync-badge-color: rgba(191, 219, 254, 0.95);
   --sync-badge-dot: linear-gradient(135deg, rgba(56, 189, 248, 0.85), rgba(59, 130, 246, 0.85));
   --sync-badge-dot-glow: rgba(56, 189, 248, 0.6);
+  --callout-text-strong: rgba(226, 232, 240, 0.94);
+  --callout-text-soft: rgba(203, 213, 225, 0.82);
+  --callout-text-muted: rgba(148, 163, 184, 0.8);
+  --callout-value-empty-color: rgba(226, 232, 240, 0.75);
+  --callout-meta-empty-color: rgba(148, 163, 184, 0.72);
+  --callout-progress-label-color: rgba(148, 163, 184, 0.78);
+  --callout-progress-tooltip-color: rgba(226, 232, 240, 0.78);
+  --callout-progress-text-color: rgba(226, 232, 240, 0.9);
+  --callout-chip-text: rgba(226, 232, 240, 0.88);
+  --callout-link-color: rgba(226, 232, 240, 0.92);
+  --callout-link-hover-color: #f8fafc;
+  --callout-footnote-color: rgba(148, 163, 184, 0.88);
+  --callout-overview-color: rgba(203, 213, 225, 0.78);
+  --callout-thumb-fallback-color: rgba(226, 232, 240, 0.85);
+  --callout-empty-color: rgba(148, 163, 184, 0.8);
+  --callout-toggle-color: rgba(148, 163, 184, 0.9);
+  --callout-toggle-hover-color: #f8fafc;
 }
 
 .profile-callout[data-sync-state="guest"] {
@@ -3041,6 +3058,26 @@ body[data-theme="light"] .pill-context {
   --sync-badge-color: rgba(209, 250, 229, 0.92);
   --sync-badge-dot: linear-gradient(135deg, rgba(16, 185, 129, 0.95), rgba(34, 197, 94, 0.95));
   --sync-badge-dot-glow: rgba(34, 197, 94, 0.45);
+}
+
+body[data-theme="light"] .profile-callout {
+  --callout-text-strong: #0f172a;
+  --callout-text-soft: #334155;
+  --callout-text-muted: #64748b;
+  --callout-value-empty-color: #475569;
+  --callout-meta-empty-color: #94a3b8;
+  --callout-progress-label-color: #64748b;
+  --callout-progress-tooltip-color: #475569;
+  --callout-progress-text-color: #1e293b;
+  --callout-chip-text: #1f2937;
+  --callout-link-color: #1e293b;
+  --callout-link-hover-color: #0f172a;
+  --callout-footnote-color: #475569;
+  --callout-overview-color: #475569;
+  --callout-thumb-fallback-color: #1f2937;
+  --callout-empty-color: #64748b;
+  --callout-toggle-color: #475569;
+  --callout-toggle-hover-color: #0f172a;
 }
 
 body[data-page="account-settings"] .app-main {
@@ -3567,7 +3604,7 @@ body[data-theme="light"] .settings-nav-btn[aria-selected="true"] {
   font-size: 0.7rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: rgba(148, 163, 184, 0.85);
+  color: var(--callout-text-muted);
   margin-bottom: 0.35rem;
   display: inline-flex;
   align-items: center;
@@ -3672,7 +3709,7 @@ body[data-theme="light"] .settings-nav-btn[aria-selected="true"] {
 
 .profile-callout-summary-caption {
   font-size: 0.82rem;
-  color: rgba(226, 232, 240, 0.82);
+  color: var(--callout-text-soft);
   letter-spacing: 0.02em;
 }
 
@@ -3697,13 +3734,13 @@ body[data-theme="light"] .settings-nav-btn[aria-selected="true"] {
   font-size: 0.7rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(148, 163, 184, 0.8);
+  color: var(--callout-text-muted);
 }
 
 .profile-callout-value {
   font-size: 1.8rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--callout-text-strong);
   line-height: 1.1;
 }
 
@@ -3714,11 +3751,11 @@ body[data-theme="light"] .settings-nav-btn[aria-selected="true"] {
 }
 
 .profile-callout:not(.has-data) .profile-callout-value {
-  color: rgba(226, 232, 240, 0.75);
+  color: var(--callout-value-empty-color);
 }
 
 .profile-callout:not(.has-data) .profile-callout-meta {
-  color: rgba(148, 163, 184, 0.72);
+  color: var(--callout-meta-empty-color);
 }
 
 .profile-callout-progress-card {
@@ -3751,7 +3788,7 @@ body[data-theme="light"] .settings-nav-btn[aria-selected="true"] {
   font-size: 0.7rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(148, 163, 184, 0.78);
+  color: var(--callout-progress-label-color);
 }
 
 .profile-callout-progress::after {
@@ -3761,7 +3798,7 @@ body[data-theme="light"] .settings-nav-btn[aria-selected="true"] {
   right: 0;
   top: calc(100% + 0.3rem);
   font-size: 0.72rem;
-  color: rgba(226, 232, 240, 0.78);
+  color: var(--callout-progress-tooltip-color);
   opacity: 0;
   transform: translateY(-6px);
   transition: opacity 0.2s ease, transform 0.2s ease;
@@ -3800,7 +3837,7 @@ body[data-theme="light"] .settings-nav-btn[aria-selected="true"] {
 .profile-callout-progress-text {
   margin: 0;
   font-size: 0.82rem;
-  color: rgba(226, 232, 240, 0.9);
+  color: var(--callout-progress-text-color);
 }
 
 .profile-callout-taste {
@@ -3854,7 +3891,7 @@ body[data-theme="light"] .settings-nav-btn[aria-selected="true"] {
   border-radius: 999px;
   border: 1px solid rgba(96, 165, 250, 0.28);
   background: rgba(15, 23, 42, 0.72);
-  color: rgba(226, 232, 240, 0.88);
+  color: var(--callout-chip-text);
   font-size: 0.78rem;
   box-shadow: 0 12px 24px rgba(2, 6, 23, 0.5);
 }
@@ -3899,18 +3936,18 @@ body[data-theme="light"] .settings-nav-btn[aria-selected="true"] {
 
 .profile-callout-taste-title {
   font-weight: 600;
-  color: rgba(226, 232, 240, 0.94);
+  color: var(--callout-text-strong);
   font-size: 0.85rem;
 }
 
 .profile-callout-taste-meta {
   font-size: 0.78rem;
-  color: rgba(148, 163, 184, 0.85);
+  color: var(--callout-text-muted);
 }
 
 .profile-callout-taste-empty {
   font-size: 0.8rem;
-  color: rgba(148, 163, 184, 0.85);
+  color: var(--callout-text-muted);
   padding: 0.55rem 0.65rem;
   border-radius: calc(var(--radius-md) - 2px);
   background: rgba(15, 23, 42, 0.45);
@@ -3938,7 +3975,7 @@ body[data-theme="light"] .settings-nav-btn[aria-selected="true"] {
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.22);
   background: rgba(15, 23, 42, 0.5);
-  color: rgba(226, 232, 240, 0.92);
+  color: var(--callout-link-color);
   font-size: 0.82rem;
   text-decoration: none;
   cursor: pointer;
@@ -3949,7 +3986,7 @@ body[data-theme="light"] .settings-nav-btn[aria-selected="true"] {
 .profile-callout-quick-link:focus-visible {
   border-color: rgba(96, 165, 250, 0.5);
   background: rgba(37, 99, 235, 0.22);
-  color: #fff;
+  color: var(--callout-link-hover-color);
   transform: translateY(-1px);
   outline: none;
 }
@@ -3984,7 +4021,7 @@ body[data-theme="light"] .settings-nav-btn[aria-selected="true"] {
   gap: 0.45rem 0.9rem;
   align-items: center;
   font-size: 0.8rem;
-  color: rgba(148, 163, 184, 0.88);
+  color: var(--callout-footnote-color);
 }
 
 .profile-callout-footnote {
@@ -4059,13 +4096,13 @@ body[data-theme="light"] .settings-nav-btn[aria-selected="true"] {
 
 .profile-callout-snapshot-title {
   font-weight: 600;
-  color: rgba(226, 232, 240, 0.94);
+  color: var(--callout-text-strong);
   font-size: 0.95rem;
 }
 
 .profile-callout-snapshot-subtitle {
   font-size: 0.78rem;
-  color: rgba(148, 163, 184, 0.85);
+  color: var(--callout-text-muted);
 }
 
 .profile-callout-snapshot-list {
@@ -4115,7 +4152,7 @@ body[data-theme="light"] .settings-nav-btn[aria-selected="true"] {
 
 .profile-callout-snapshot-thumb-fallback {
   font-size: 1.4rem;
-  color: rgba(226, 232, 240, 0.85);
+  color: var(--callout-thumb-fallback-color);
 }
 
 .profile-callout-snapshot-content {
@@ -4126,17 +4163,17 @@ body[data-theme="light"] .settings-nav-btn[aria-selected="true"] {
 .profile-callout-snapshot-item-title {
   font-size: 0.85rem;
   font-weight: 500;
-  color: rgba(226, 232, 240, 0.95);
+  color: var(--callout-text-strong);
 }
 
 .profile-callout-snapshot-item-meta {
   font-size: 0.75rem;
-  color: rgba(148, 163, 184, 0.85);
+  color: var(--callout-text-muted);
 }
 
 .profile-callout-snapshot-item-overview {
   font-size: 0.75rem;
-  color: rgba(203, 213, 225, 0.78);
+  color: var(--callout-overview-color);
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -4146,7 +4183,7 @@ body[data-theme="light"] .settings-nav-btn[aria-selected="true"] {
 
 .profile-callout-snapshot-empty {
   font-size: 0.78rem;
-  color: rgba(148, 163, 184, 0.8);
+  color: var(--callout-empty-color);
   padding: 0.4rem 0.5rem;
   border-radius: calc(var(--radius-md) - 4px);
   background: rgba(15, 23, 42, 0.32);
@@ -4186,7 +4223,7 @@ body[data-theme="light"] .settings-nav-btn[aria-selected="true"] {
 body[data-theme="light"] .profile-callout-genre-chip {
   background: rgba(248, 250, 252, 0.9);
   border-color: rgba(148, 163, 184, 0.38);
-  color: rgba(30, 41, 59, 0.82);
+  color: var(--callout-chip-text);
   box-shadow: 0 10px 20px rgba(148, 163, 184, 0.22);
 }
 
@@ -4207,7 +4244,7 @@ body[data-theme="light"] .profile-callout-empty-cta:focus-visible {
   margin-top: 0.6rem;
   align-self: flex-start;
   background: rgba(15, 23, 42, 0.55);
-  color: rgba(148, 163, 184, 0.9);
+  color: var(--callout-toggle-color);
   border: 1px solid rgba(148, 163, 184, 0.3);
   border-radius: 999px;
   padding: 0.45rem 0.9rem;
@@ -4218,7 +4255,7 @@ body[data-theme="light"] .profile-callout-empty-cta:focus-visible {
 
 .profile-callout-toggle:hover,
 .profile-callout-toggle:focus-visible {
-  color: #f8fafc;
+  color: var(--callout-toggle-hover-color);
   border-color: rgba(96, 165, 250, 0.6);
   background: rgba(37, 99, 235, 0.18);
   outline: none;
