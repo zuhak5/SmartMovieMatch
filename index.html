@@ -462,6 +462,35 @@
 
   <div id="globalToastRegion" class="global-toast-region" role="status" aria-live="polite"></div>
 
+  <div
+    id="socialProfileOverlay"
+    class="modal-overlay"
+    hidden
+    aria-hidden="true"
+  >
+    <div
+      class="modal social-profile-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="socialProfileTitle"
+    >
+      <button
+        type="button"
+        class="modal-close"
+        id="socialProfileClose"
+        aria-label="Close profile preview"
+      >
+        ✕
+      </button>
+      <header class="modal-header">
+        <h2 id="socialProfileTitle" class="modal-title">Profile preview</h2>
+        <p id="socialProfileSubtitle" class="modal-subtitle"></p>
+      </header>
+      <div id="socialProfileStatus" class="modal-status" role="status" aria-live="polite"></div>
+      <div id="socialProfileBody" class="modal-section social-profile-body"></div>
+    </div>
+  </div>
+
   <nav class="mobile-toolbar" aria-label="Smart Movie Match navigation">
     <a class="mobile-toolbar-action" href="index.html" aria-current="page">
       <span class="mobile-toolbar-icon" aria-hidden="true">🏠</span>

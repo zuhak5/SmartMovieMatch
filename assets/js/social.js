@@ -1,4 +1,5 @@
 import { loadSession, subscribeToSession } from './auth.js';
+import { createInlineProfileLink } from './profile-overlay.js';
 
 const SOCIAL_ENDPOINT = '/api/social';
 const MAX_REVIEW_LENGTH = 600;
@@ -938,10 +939,20 @@ function renderReviewItem(review, sectionState) {
   const header = document.createElement('header');
   header.className = 'community-review-header';
 
-  const name = document.createElement('span');
-  name.className = 'community-review-author';
-  name.textContent = review.isSelf ? 'You' : review.username;
-  header.appendChild(name);
+  const rawUsername = typeof review.username === 'string' ? review.username : '';
+  const authorLabel = review.isSelf ? 'You' : rawUsername || 'Unknown reviewer';
+  const author = createInlineProfileLink(rawUsername, {
+    label: authorLabel,
+    className: 'community-review-author'
+  });
+  if (author) {
+    header.appendChild(author);
+  } else {
+    const fallback = document.createElement('span');
+    fallback.className = 'community-review-author';
+    fallback.textContent = authorLabel;
+    header.appendChild(fallback);
+  }
 
   const presenceKey = canonicalUsername(review.username);
   const presence = presenceKey && state.presence ? state.presence[presenceKey] : null;
@@ -1218,9 +1229,20 @@ function renderCommentNode(comment, review, sectionState, depth) {
   }
   const header = document.createElement('div');
   header.className = 'community-comment-header';
-  const author = document.createElement('span');
-  author.className = 'community-comment-author';
-  author.textContent = comment.username === state.session?.username ? 'You' : comment.username;
+  const rawUsername = typeof comment.username === 'string' ? comment.username : '';
+  const isSelfComment = state.session?.username
+    ? rawUsername === state.session.username
+    : false;
+  const commentLabel = isSelfComment ? 'You' : rawUsername || 'Anonymous';
+  let author = createInlineProfileLink(rawUsername, {
+    label: commentLabel,
+    className: 'community-comment-author'
+  });
+  if (!author) {
+    author = document.createElement('span');
+    author.className = 'community-comment-author';
+    author.textContent = commentLabel;
+  }
   header.appendChild(author);
   const timestamp = document.createElement('span');
   timestamp.className = 'community-comment-timestamp';
