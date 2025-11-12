@@ -1333,6 +1333,111 @@ function refreshProfileOverviewCallout(options = {}) {
     tasteSubtitle.textContent = "We’ll summarize your taste once you start saving titles.";
   }
 
+  if (tasteList) {
+    tasteList.innerHTML = "";
+    const genreMap = new Map();
+    const addGenresFrom = (items) => {
+      if (!Array.isArray(items)) {
+        return;
+      }
+      items.forEach((entry) => {
+        if (!entry || !Array.isArray(entry.genres)) {
+          return;
+        }
+        entry.genres.forEach((genre) => {
+          if (!genre) {
+            return;
+          }
+          const normalized = genre.trim().toLowerCase();
+          if (!normalized) {
+            return;
+          }
+          if (!genreMap.has(normalized)) {
+            genreMap.set(normalized, { label: genre.trim(), count: 0 });
+          }
+          const data = genreMap.get(normalized);
+          data.count += 1;
+        });
+      });
+    };
+
+    addGenresFrom(state.favorites);
+    addGenresFrom(state.watchedMovies);
+
+    const topGenres = Array.from(genreMap.values()).sort((a, b) => b.count - a.count).slice(0, 3);
+    const highlightItems = [];
+
+    if (topGenres.length) {
+      const labels = topGenres.map((entry) => entry.label);
+      highlightItems.push({
+        icon: getGenreIconByLabel(labels[0]),
+        title: labels.length > 1 ? "Comfort genres" : `${labels[0]} focus`,
+        meta: labels.join(" • ")
+      });
+    }
+
+    const avgRating = getWatchedRatingPreference(
+      Array.isArray(state.watchedMovies) ? state.watchedMovies : []
+    );
+    if (typeof avgRating === "number" && Number.isFinite(avgRating)) {
+      highlightItems.push({
+        icon: "⭐",
+        title: "Average IMDb rating",
+        meta: `${avgRating.toFixed(1)} across watched titles`
+      });
+    }
+
+    if (!highlightItems.length && (favoritesCount || watchedCount)) {
+      const prefersFavorites = favoritesCount >= watchedCount;
+      const count = prefersFavorites ? favoritesCount : watchedCount;
+      const noun = prefersFavorites ? "favorite" : "watched title";
+      highlightItems.push({
+        icon: prefersFavorites ? "💾" : "🎬",
+        title: prefersFavorites ? "Favorites saved" : "Watched logged",
+        meta: `${count.toLocaleString()} ${noun}${count === 1 ? "" : "s"} so far`
+      });
+    }
+
+    if (!highlightItems.length) {
+      const empty = document.createElement("li");
+      empty.className = "profile-callout-taste-empty";
+      empty.textContent = "Add favorites or log watched titles to unlock taste highlights.";
+      tasteList.appendChild(empty);
+    } else {
+      highlightItems.slice(0, 3).forEach((item) => {
+        const li = document.createElement("li");
+        li.className = "profile-callout-taste-item";
+        const iconEl = document.createElement("span");
+        iconEl.className = "profile-callout-taste-icon";
+        iconEl.textContent = item.icon;
+        iconEl.setAttribute("aria-hidden", "true");
+        const textWrap = document.createElement("div");
+        textWrap.className = "profile-callout-taste-text";
+        const titleEl = document.createElement("span");
+        titleEl.className = "profile-callout-taste-title";
+        titleEl.textContent = item.title;
+        textWrap.appendChild(titleEl);
+        if (item.meta) {
+          const metaEl = document.createElement("span");
+          metaEl.className = "profile-callout-taste-meta";
+          metaEl.textContent = item.meta;
+          textWrap.appendChild(metaEl);
+        }
+        li.appendChild(iconEl);
+        li.appendChild(textWrap);
+        tasteList.appendChild(li);
+      });
+    }
+
+    if (tasteSubtitle) {
+      tasteSubtitle.textContent = highlightItems.length
+        ? "Based on your recent favorites and watched history."
+        : "We’ll summarize your taste once you start saving titles.";
+    }
+  } else if (tasteSubtitle) {
+    tasteSubtitle.textContent = "We’ll summarize your taste once you start saving titles.";
+  }
+
   const renderSnapshotList = (
     listEl,
     subtitleEl,
