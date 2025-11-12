@@ -129,21 +129,34 @@ function serveStatic(req, res, parsed = url.parse(req.url)) {
 }
 
 function buildPathCandidates(pathname) {
-  if (!pathname || pathname === '/') {
-    return ['/index.html'];
+  const normalized = path.posix.normalize(pathname || '/');
+
+  if (!normalized || normalized === '/' || normalized === '.') {
+    return ['index.html'];
   }
 
-  if (path.extname(pathname)) {
-    return [pathname];
+  const withoutLeadingSlash = normalized.startsWith('/')
+    ? normalized.slice(1)
+    : normalized;
+
+  if (!withoutLeadingSlash) {
+    return ['index.html'];
   }
 
-  const trimmed = pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+  if (path.extname(withoutLeadingSlash)) {
+    return [withoutLeadingSlash];
+  }
+
+  const trimmed = withoutLeadingSlash.endsWith('/')
+    ? withoutLeadingSlash.slice(0, -1)
+    : withoutLeadingSlash;
+
   if (!trimmed) {
-    return ['/index.html'];
+    return ['index.html'];
   }
 
   const candidates = [`${trimmed}.html`];
-  candidates.push(`${trimmed}/index.html`);
+  candidates.push(path.posix.join(trimmed, 'index.html'));
   return candidates;
 }
 
