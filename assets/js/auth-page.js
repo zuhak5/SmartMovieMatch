@@ -11,6 +11,60 @@ const state = {
   mode: "login"
 };
 
+const THEME_STORAGE_KEY = "smm.theme.v1";
+
+const THEME_COLOR_MAP = {
+  dark: "#05071a",
+  light: "#f4f6ff"
+};
+
+const COLOR_SCHEME_META_CONTENT = {
+  dark: "dark light",
+  light: "light dark"
+};
+
+const authMetaThemeColor = document.querySelector('meta[name="theme-color"]');
+const authMetaColorScheme = document.querySelector('meta[name="color-scheme"]');
+const authRootElement = document.documentElement;
+
+function resolveStoredTheme() {
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === "light" || stored === "dark") {
+      return stored;
+    }
+  } catch (error) {
+    console.warn("Failed to read stored theme", error);
+  }
+  if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) {
+    return "light";
+  }
+  return "dark";
+}
+
+function applyResolvedTheme(theme) {
+  const normalized = theme === "light" ? "light" : "dark";
+  if (authRootElement) {
+    authRootElement.dataset.theme = normalized;
+    authRootElement.style.setProperty("color-scheme", normalized);
+  }
+  if (document.body) {
+    document.body.dataset.theme = normalized;
+    document.body.style.setProperty("color-scheme", normalized);
+  }
+  if (authMetaColorScheme) {
+    const content =
+      COLOR_SCHEME_META_CONTENT[normalized] || COLOR_SCHEME_META_CONTENT.dark;
+    authMetaColorScheme.setAttribute("content", content);
+  }
+  if (authMetaThemeColor) {
+    const color = THEME_COLOR_MAP[normalized] || THEME_COLOR_MAP.dark;
+    authMetaThemeColor.setAttribute("content", color);
+  }
+}
+
+applyResolvedTheme(resolveStoredTheme());
+
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

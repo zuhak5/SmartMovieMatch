@@ -102,6 +102,20 @@ const state = {
   }
 };
 
+const THEME_COLOR_MAP = {
+  dark: "#05071a",
+  light: "#f4f6ff"
+};
+
+const COLOR_SCHEME_META_CONTENT = {
+  dark: "dark light",
+  light: "light dark"
+};
+
+const metaThemeColorEl = document.querySelector('meta[name="theme-color"]');
+const metaColorSchemeEl = document.querySelector('meta[name="color-scheme"]');
+const rootElement = document.documentElement;
+
 const PROFILE_CALLOUT_MILESTONE = 5;
 const PROFILE_CALLOUT_PULSE_DURATION = 2400;
 const PROFILE_CALLOUT_SNAPSHOT_LIMIT = 3;
@@ -254,12 +268,31 @@ function updateThemeToggle(theme) {
   }
 }
 
+function updateDocumentThemeAttributes(theme) {
+  const normalized = theme === "light" ? "light" : "dark";
+  if (rootElement) {
+    rootElement.dataset.theme = normalized;
+    rootElement.style.setProperty("color-scheme", normalized);
+  }
+  if (document.body) {
+    document.body.dataset.theme = normalized;
+    document.body.style.setProperty("color-scheme", normalized);
+  }
+  if (metaColorSchemeEl) {
+    const content =
+      COLOR_SCHEME_META_CONTENT[normalized] || COLOR_SCHEME_META_CONTENT.dark;
+    metaColorSchemeEl.setAttribute("content", content);
+  }
+  if (metaThemeColorEl) {
+    const color = THEME_COLOR_MAP[normalized] || THEME_COLOR_MAP.dark;
+    metaThemeColorEl.setAttribute("content", color);
+  }
+}
+
 function applyTheme(theme, { persist = true } = {}) {
   const normalized = theme === "light" ? "light" : "dark";
   state.theme = normalized;
-  if (document.body) {
-    document.body.dataset.theme = normalized;
-  }
+  updateDocumentThemeAttributes(normalized);
   updateThemeToggle(normalized);
   if (persist) {
     try {
