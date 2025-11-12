@@ -121,11 +121,16 @@ async function handleGetMovieReviews(req, payload) {
 
   const resolvedMovie = await resolveMovieIdentifiers(movie);
   const following = new Set(await listFollowing(user.username));
-  const { reviews, myReview } = await fetchMovieReviews(resolvedMovie, following, user.username);
+  const { reviews, myReview, stats } = await fetchMovieReviews(
+    resolvedMovie,
+    following,
+    user.username
+  );
   return {
     body: {
       reviews,
-      myReview
+      myReview,
+      stats
     }
   };
 }
@@ -158,12 +163,17 @@ async function handleUpsertReview(req, payload) {
   });
 
   const following = new Set(await listFollowing(user.username));
-  const { reviews, myReview } = await fetchMovieReviews(resolvedMovie, following, user.username);
+  const { reviews, myReview, stats } = await fetchMovieReviews(
+    resolvedMovie,
+    following,
+    user.username
+  );
   return {
     body: {
       ok: true,
       myReview,
-      reviews
+      reviews,
+      stats
     }
   };
 }
@@ -286,7 +296,8 @@ async function fetchMovieReviews(movie, followingSet, currentUsername) {
       .sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
     const reviews = rows.map((row) => mapReviewRow(row, followingSet, currentUsername));
     const myReview = reviews.find((review) => review.username === currentUsername) || null;
-    return { reviews, myReview };
+    const stats = calculateReviewStats(reviews);
+    return { reviews, myReview, stats };
   }
   if (!movie.imdbId) {
     return { reviews: [], myReview: null };
@@ -303,7 +314,8 @@ async function fetchMovieReviews(movie, followingSet, currentUsername) {
   }
   const reviews = rows.map((row) => mapReviewRow(row, followingSet, currentUsername));
   const myReview = reviews.find((review) => review.username === currentUsername) || null;
-  return { reviews, myReview };
+  const stats = calculateReviewStats(reviews);
+  return { reviews, myReview, stats };
 }
 
 async function upsertReview({ username, movie, rating, body, hasSpoilers }) {
@@ -388,6 +400,77 @@ function mapReviewRow(row, followingSet, currentUsername) {
     updatedAt: row.updated_at || row.updatedAt || row.created_at || row.createdAt || null,
     isFriend: username !== currentUsername && followingSet.has(username),
     isSelf: username === currentUsername
+  };
+}
+
+function calculateReviewStats(reviews) {
+  if (!Array.isArray(reviews) || reviews.length === 0) {
+    return {
+      totalReviews: 0,
+      totalRatings: 0,
+      averageRating: null,
+      friendReviews: 0,
+      friendRatings: 0,
+      friendAverageRating: null,
+      lastReviewAt: null
+    };
+  }
+
+  let totalReviews = 0;
+  let totalRatings = 0;
+  let ratingSum = 0;
+  let friendReviews = 0;
+  let friendRatings = 0;
+  let friendRatingSum = 0;
+  let latestTimestamp = null;
+  let friendLatestTimestamp = null;
+
+  reviews.forEach((review) => {
+    if (!review) {
+      return;
+    }
+    totalReviews += 1;
+
+    const ratingValue =
+      typeof review.rating === 'number'
+        ? review.rating
+        : typeof review.rating === 'string'
+        ? Number(review.rating)
+        : null;
+    if (Number.isFinite(ratingValue)) {
+      totalRatings += 1;
+      ratingSum += ratingValue;
+      if (review.isFriend) {
+        friendRatings += 1;
+        friendRatingSum += ratingValue;
+      }
+    }
+
+    const timestamp = review.updatedAt || review.createdAt || null;
+    if (review.isFriend) {
+      friendReviews += 1;
+      if (timestamp && typeof timestamp === 'string') {
+        if (!friendLatestTimestamp || timestamp > friendLatestTimestamp) {
+          friendLatestTimestamp = timestamp;
+        }
+      }
+    }
+    if (timestamp && typeof timestamp === 'string') {
+      if (!latestTimestamp || timestamp > latestTimestamp) {
+        latestTimestamp = timestamp;
+      }
+    }
+  });
+
+  return {
+    totalReviews,
+    totalRatings,
+    averageRating: totalRatings ? Math.round((ratingSum / totalRatings) * 10) / 10 : null,
+    friendReviews,
+    friendRatings,
+    friendAverageRating: friendRatings ? Math.round((friendRatingSum / friendRatings) * 10) / 10 : null,
+    lastReviewAt: latestTimestamp,
+    friendLastReviewAt: friendLatestTimestamp
   };
 }
 

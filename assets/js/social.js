@@ -9,6 +9,7 @@ const state = {
   followingLoaded: false,
   followingLoading: false,
   sections: new Set(),
+  sectionsByKey: new Map(),
   reviewCache: new Map()
 };
 
@@ -46,6 +47,18 @@ export function buildCommunitySection(movieContext) {
     return null;
   }
 
+  const headerSummary = movieContext && movieContext.headerSummary ? movieContext.headerSummary : null;
+  const condensedContainer =
+    headerSummary && headerSummary.container instanceof HTMLElement ? headerSummary.container : null;
+  const condensedOverall =
+    headerSummary && headerSummary.overall instanceof HTMLElement ? headerSummary.overall : null;
+  const condensedFriends =
+    headerSummary && headerSummary.friends instanceof HTMLElement ? headerSummary.friends : null;
+  const condensedActivity =
+    headerSummary && headerSummary.activity instanceof HTMLElement ? headerSummary.activity : null;
+  const condensedBadge =
+    headerSummary && headerSummary.badge instanceof HTMLElement ? headerSummary.badge : null;
+
   const section = document.createElement('section');
   section.className = 'community-notes';
   section.hidden = true;
@@ -62,6 +75,9 @@ export function buildCommunitySection(movieContext) {
   helper.textContent = 'Swap quick takes with friends and see how they rated it.';
   header.appendChild(helper);
   section.appendChild(header);
+
+  const summary = createSummaryElements();
+  section.appendChild(summary.container);
 
   const form = document.createElement('form');
   form.className = 'community-form';
@@ -164,6 +180,21 @@ export function buildCommunitySection(movieContext) {
     spoilerInput,
     submitBtn,
     statusEl,
+    summaryEl: summary.container,
+    summaryOverallValue: summary.overallValue,
+    summaryOverallMeta: summary.overallMeta,
+    summaryFriendsCard: summary.friendCard,
+    summaryFriendsValue: summary.friendValue,
+    summaryFriendsMeta: summary.friendMeta,
+    summaryUpdated: summary.updated,
+    condensedEl: condensedContainer,
+    condensedOverall,
+    condensedFriends,
+    condensedActivity,
+    condensedBadge,
+    friendActivityInitialized: false,
+    friendActivitySeenAt: null,
+    lastFriendActivity: null,
     list,
     empty,
     loadingIndicator,
@@ -178,6 +209,7 @@ export function buildCommunitySection(movieContext) {
   });
 
   state.sections.add(sectionState);
+  state.sectionsByKey.set(sectionState.key, sectionState);
   if (state.session && state.session.token) {
     showSection(sectionState);
   }
@@ -188,6 +220,7 @@ export function buildCommunitySection(movieContext) {
       sectionState.unsubscribe = null;
     }
     state.sections.delete(sectionState);
+    state.sectionsByKey.delete(sectionState.key);
   });
 
   return section;
@@ -232,6 +265,24 @@ export function getFollowingSnapshot() {
   return state.following.slice();
 }
 
+export function acknowledgeFriendActivity(key) {
+  const normalized = normalizeId(key);
+  if (!normalized) {
+    return;
+  }
+  const sectionState = state.sectionsByKey.get(normalized);
+  if (!sectionState) {
+    return;
+  }
+  sectionState.friendActivityInitialized = true;
+  sectionState.friendActivitySeenAt = sectionState.lastFriendActivity || null;
+  if (sectionState.condensedBadge) {
+    sectionState.condensedBadge.hidden = true;
+    sectionState.condensedBadge.classList.remove('is-visible');
+    sectionState.condensedBadge.removeAttribute('aria-label');
+  }
+}
+
 function hideSection(sectionState) {
   sectionState.visible = false;
   sectionState.container.hidden = true;
@@ -240,6 +291,27 @@ function hideSection(sectionState) {
   sectionState.loadingIndicator.hidden = true;
   sectionState.errorMessage.textContent = '';
   sectionState.statusEl.textContent = '';
+  if (sectionState.summaryEl) {
+    sectionState.summaryEl.hidden = true;
+  }
+  if (sectionState.summaryUpdated) {
+    sectionState.summaryUpdated.textContent = '';
+    sectionState.summaryUpdated.hidden = true;
+  }
+  if (sectionState.condensedEl) {
+    sectionState.condensedEl.hidden = true;
+  }
+  if (sectionState.condensedActivity) {
+    sectionState.condensedActivity.hidden = true;
+    sectionState.condensedActivity.textContent = '';
+  }
+  if (sectionState.condensedBadge) {
+    sectionState.condensedBadge.hidden = true;
+    sectionState.condensedBadge.classList.remove('is-visible');
+  }
+  sectionState.friendActivityInitialized = false;
+  sectionState.friendActivitySeenAt = null;
+  sectionState.lastFriendActivity = null;
   if (sectionState.unsubscribe) {
     sectionState.unsubscribe();
     sectionState.unsubscribe = null;
@@ -274,7 +346,7 @@ async function fetchReviews(key, movie, force = false) {
   }
   let cache = state.reviewCache.get(key);
   if (!cache) {
-    cache = { loading: false, error: null, reviews: [], myReview: null };
+    cache = { loading: false, error: null, reviews: [], myReview: null, stats: null };
     state.reviewCache.set(key, cache);
   }
   if (cache.loading && !force) {
@@ -287,6 +359,7 @@ async function fetchReviews(key, movie, force = false) {
     const response = await callSocial('getMovieReviews', { movie });
     cache.reviews = Array.isArray(response.reviews) ? response.reviews : [];
     cache.myReview = response.myReview || null;
+    cache.stats = response.stats || computeReviewStats(cache.reviews);
   } catch (error) {
     cache.error = error instanceof Error ? error.message : 'Unable to load reviews.';
   } finally {
@@ -341,7 +414,13 @@ function renderSection(sectionState, cache) {
     return;
   }
   const data = cache || state.reviewCache.get(sectionState.key) || {};
-  const { reviews = [], myReview = null, loading = false, error = null } = data;
+  const {
+    reviews = [],
+    myReview = null,
+    loading = false,
+    error = null,
+    stats = null
+  } = data;
 
   if (loading) {
     sectionState.loadingIndicator.hidden = false;
@@ -351,6 +430,9 @@ function renderSection(sectionState, cache) {
 
   sectionState.errorMessage.textContent = error ? String(error) : '';
   sectionState.errorMessage.hidden = !error;
+
+  const summaryStats = stats || computeReviewStats(reviews);
+  renderSummary(sectionState, summaryStats);
 
   if (myReview) {
     sectionState.ratingInput.value = myReview.rating != null ? String(myReview.rating) : '';
@@ -438,6 +520,294 @@ function renderReviewItem(review) {
   }
 
   return item;
+}
+
+function renderSummary(sectionState, stats) {
+  if (!sectionState.summaryEl) {
+    return;
+  }
+
+  if (!stats || !stats.totalReviews) {
+    sectionState.summaryEl.hidden = true;
+    if (sectionState.summaryUpdated) {
+      sectionState.summaryUpdated.textContent = '';
+      sectionState.summaryUpdated.hidden = true;
+    }
+    updateCondensedHeader(sectionState, null);
+    updateFriendBadge(sectionState, null);
+    return;
+  }
+
+  sectionState.summaryEl.hidden = false;
+
+  if (sectionState.summaryOverallValue) {
+    sectionState.summaryOverallValue.textContent = formatSummaryScore(stats.averageRating);
+  }
+  if (sectionState.summaryOverallMeta) {
+    const reviewLabel = stats.totalReviews === 1 ? 'review' : 'reviews';
+    sectionState.summaryOverallMeta.textContent = `Based on ${stats.totalReviews} ${reviewLabel}`;
+  }
+
+  if (sectionState.summaryFriendsValue) {
+    sectionState.summaryFriendsValue.textContent = formatSummaryScore(stats.friendAverageRating);
+  }
+  if (sectionState.summaryFriendsMeta) {
+    if (stats.friendReviews > 0) {
+      const friendLabel = stats.friendReviews === 1 ? 'friend review' : 'friend reviews';
+      sectionState.summaryFriendsMeta.textContent = `${stats.friendReviews} ${friendLabel}`;
+    } else {
+      sectionState.summaryFriendsMeta.textContent = 'No friend reviews yet';
+    }
+  }
+  if (sectionState.summaryFriendsCard) {
+    sectionState.summaryFriendsCard.dataset.empty = stats.friendReviews > 0 ? 'false' : 'true';
+  }
+
+  if (sectionState.summaryUpdated) {
+    const activityTimestamp = stats.friendLastReviewAt || stats.lastReviewAt;
+    if (activityTimestamp) {
+      const label = stats.friendLastReviewAt ? 'Friend review' : 'Last activity';
+      sectionState.summaryUpdated.textContent = `${label} ${formatRelativeTime(activityTimestamp)}`;
+      sectionState.summaryUpdated.hidden = false;
+    } else {
+      sectionState.summaryUpdated.textContent = '';
+      sectionState.summaryUpdated.hidden = true;
+    }
+  }
+
+  updateCondensedHeader(sectionState, stats);
+  updateFriendBadge(sectionState, stats.friendLastReviewAt || null);
+}
+
+function updateCondensedHeader(sectionState, stats) {
+  const container = sectionState.condensedEl;
+  const overall = sectionState.condensedOverall;
+  const friends = sectionState.condensedFriends;
+  const activity = sectionState.condensedActivity;
+  const hasStats = Boolean(stats && stats.totalReviews);
+
+  if (!hasStats) {
+    if (container) {
+      container.hidden = true;
+    }
+    if (activity) {
+      activity.hidden = true;
+      activity.textContent = '';
+    }
+    if (friends) {
+      friends.dataset.empty = 'true';
+    }
+    return;
+  }
+
+  if (container) {
+    container.hidden = false;
+    if (overall) {
+      overall.textContent = `Community ${formatCondensedScore(stats.averageRating)}`;
+    }
+    if (friends) {
+      if (stats.friendReviews > 0) {
+        friends.textContent = `Friends ${formatCondensedScore(stats.friendAverageRating)}`;
+        friends.dataset.empty = 'false';
+      } else {
+        friends.textContent = 'Friends —';
+        friends.dataset.empty = 'true';
+      }
+    }
+  }
+
+  if (activity) {
+    const activityTimestamp = stats.friendLastReviewAt || stats.lastReviewAt;
+    if (activityTimestamp) {
+      const prefix = stats.friendLastReviewAt ? 'Friend review' : 'Last review';
+      activity.textContent = `${prefix} ${formatRelativeTime(activityTimestamp)}`;
+      activity.hidden = false;
+    } else {
+      activity.textContent = '';
+      activity.hidden = true;
+    }
+  }
+}
+
+function updateFriendBadge(sectionState, friendTimestamp) {
+  const badge = sectionState.condensedBadge;
+  const wasInitialized = sectionState.friendActivityInitialized;
+  let seen = sectionState.friendActivitySeenAt;
+
+  sectionState.lastFriendActivity = friendTimestamp || null;
+
+  if (!wasInitialized) {
+    sectionState.friendActivityInitialized = true;
+    sectionState.friendActivitySeenAt = friendTimestamp || null;
+    seen = sectionState.friendActivitySeenAt;
+  }
+
+  if (!badge) {
+    return;
+  }
+
+  const card = sectionState.container.closest('.movie-card');
+  if (card && card.classList.contains('expanded') && friendTimestamp) {
+    sectionState.friendActivitySeenAt = friendTimestamp;
+    seen = sectionState.friendActivitySeenAt;
+  }
+
+  if (!friendTimestamp) {
+    badge.hidden = true;
+    badge.classList.remove('is-visible');
+    badge.removeAttribute('aria-label');
+    return;
+  }
+
+  let shouldShow = false;
+  if (!wasInitialized) {
+    shouldShow = false;
+  } else if (!seen) {
+    shouldShow = true;
+  } else if (friendTimestamp > seen) {
+    shouldShow = true;
+  }
+
+  if (shouldShow) {
+    badge.hidden = false;
+    badge.classList.add('is-visible');
+    badge.setAttribute('aria-label', 'New friend review');
+  } else {
+    badge.hidden = true;
+    badge.classList.remove('is-visible');
+    badge.removeAttribute('aria-label');
+  }
+}
+
+function createSummaryElements() {
+  const container = document.createElement('div');
+  container.className = 'community-summary';
+  container.hidden = true;
+
+  const grid = document.createElement('div');
+  grid.className = 'community-summary-grid';
+
+  const overall = createSummaryCard('All reviewers');
+  grid.appendChild(overall.card);
+
+  const friends = createSummaryCard('Friends');
+  friends.card.dataset.variant = 'friends';
+  friends.metaEl.textContent = 'No friend reviews yet';
+  friends.card.dataset.empty = 'true';
+  grid.appendChild(friends.card);
+
+  container.appendChild(grid);
+
+  const updated = document.createElement('div');
+  updated.className = 'community-summary-updated';
+  updated.hidden = true;
+  container.appendChild(updated);
+
+  return {
+    container,
+    overallValue: overall.valueEl,
+    overallMeta: overall.metaEl,
+    friendCard: friends.card,
+    friendValue: friends.valueEl,
+    friendMeta: friends.metaEl,
+    updated
+  };
+}
+
+function createSummaryCard(labelText) {
+  const card = document.createElement('div');
+  card.className = 'community-summary-card';
+
+  const label = document.createElement('div');
+  label.className = 'community-summary-label';
+  label.textContent = labelText;
+  card.appendChild(label);
+
+  const value = document.createElement('div');
+  value.className = 'community-summary-value';
+  value.textContent = '–';
+  card.appendChild(value);
+
+  const meta = document.createElement('div');
+  meta.className = 'community-summary-meta';
+  card.appendChild(meta);
+
+  return {
+    card,
+    valueEl: value,
+    metaEl: meta
+  };
+}
+
+function computeReviewStats(reviews) {
+  if (!Array.isArray(reviews) || reviews.length === 0) {
+    return {
+      totalReviews: 0,
+      totalRatings: 0,
+      averageRating: null,
+      friendReviews: 0,
+      friendRatings: 0,
+      friendAverageRating: null,
+      lastReviewAt: null
+    };
+  }
+
+  let totalReviews = 0;
+  let totalRatings = 0;
+  let ratingSum = 0;
+  let friendReviews = 0;
+  let friendRatings = 0;
+  let friendRatingSum = 0;
+  let lastReviewAt = null;
+  let friendLastReviewAt = null;
+
+  reviews.forEach((review) => {
+    if (!review) {
+      return;
+    }
+    totalReviews += 1;
+
+    const ratingValue =
+      typeof review.rating === 'number'
+        ? review.rating
+        : typeof review.rating === 'string'
+        ? Number(review.rating)
+        : null;
+    if (Number.isFinite(ratingValue)) {
+      totalRatings += 1;
+      ratingSum += ratingValue;
+      if (review.isFriend) {
+        friendRatings += 1;
+        friendRatingSum += ratingValue;
+      }
+    }
+
+    const timestamp = review.updatedAt || review.createdAt || null;
+    if (review.isFriend) {
+      friendReviews += 1;
+      if (timestamp && typeof timestamp === 'string') {
+        if (!friendLastReviewAt || timestamp > friendLastReviewAt) {
+          friendLastReviewAt = timestamp;
+        }
+      }
+    }
+    if (timestamp && typeof timestamp === 'string') {
+      if (!lastReviewAt || timestamp > lastReviewAt) {
+        lastReviewAt = timestamp;
+      }
+    }
+  });
+
+  return {
+    totalReviews,
+    totalRatings,
+    averageRating: totalRatings ? Math.round((ratingSum / totalRatings) * 10) / 10 : null,
+    friendReviews,
+    friendRatings,
+    friendAverageRating: friendRatings ? Math.round((friendRatingSum / friendRatings) * 10) / 10 : null,
+    lastReviewAt,
+    friendLastReviewAt
+  };
 }
 
 function subscribeToReviews(key, callback) {
@@ -568,6 +938,23 @@ function normalizeId(value) {
   }
   const str = String(value).trim();
   return str;
+}
+
+function formatCondensedScore(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return '–';
+  }
+  const number = Math.max(0, Math.min(10, Number(value)));
+  return (Math.round(number * 10) / 10).toFixed(1);
+}
+
+function formatSummaryScore(value) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return '–';
+  }
+  const number = Math.max(0, Math.min(10, Number(value)));
+  const rounded = (Math.round(number * 10) / 10).toFixed(1);
+  return `${rounded} / 10`;
 }
 
 function formatRating(value) {
