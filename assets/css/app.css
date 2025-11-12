@@ -41,37 +41,50 @@ body[data-theme="light"] {
 
 body,
 body[data-theme="dark"] {
-  --bg-base: #05071a;
-  --bg-gradient: radial-gradient(circle at 14% -8%, rgba(56, 189, 248, 0.24), transparent 55%),
-    radial-gradient(circle at 92% 12%, rgba(139, 92, 246, 0.22), transparent 58%),
-    linear-gradient(180deg, #040718 0%, #060a1f 46%, #030618 100%);
+  --bg-base: #020617;
+  --bg-gradient: radial-gradient(circle at 14% -8%, rgba(14, 165, 233, 0.32), transparent 55%),
+    radial-gradient(circle at 90% 12%, rgba(168, 85, 247, 0.28), transparent 58%),
+    linear-gradient(180deg, #020617 0%, #030b1a 46%, #010414 100%);
   --bg-noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.78' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
-  --panel-bg: rgba(9, 15, 35, 0.88);
-  --panel-border: rgba(59, 130, 246, 0.32);
-  --panel-highlight: rgba(45, 212, 191, 0.38);
-  --accent: #38bdf8;
-  --accent-soft: rgba(56, 189, 248, 0.18);
-  --accent-strong: #22d3ee;
-  --accent-muted: rgba(56, 189, 248, 0.32);
+  --panel-bg: rgba(6, 11, 27, 0.92);
+  --panel-border: rgba(45, 212, 191, 0.32);
+  --panel-highlight: rgba(56, 189, 248, 0.32);
+  --accent: #22d3ee;
+  --accent-soft: rgba(34, 211, 238, 0.22);
+  --accent-strong: #5eead4;
+  --accent-muted: rgba(56, 189, 248, 0.35);
   --accent-secondary: #a855f7;
-  --text-main: #eef2ff;
-  --text-subtle: rgba(199, 210, 254, 0.82);
+  --text-main: #f8fafc;
+  --text-subtle: rgba(203, 213, 225, 0.82);
   --text-strong: #ffffff;
   --error: #fb7185;
   --success: #34d399;
+  --highlight-card-bg:
+    linear-gradient(150deg, rgba(15, 118, 255, 0.2), rgba(45, 212, 191, 0.18) 45%, rgba(244, 114, 182, 0.14));
+  --highlight-card-border: rgba(94, 234, 212, 0.35);
+  --highlight-card-shadow: 0 12px 28px rgba(2, 6, 23, 0.45);
+  --highlight-card-hover-border: rgba(94, 234, 212, 0.65);
+  --highlight-card-hover-shadow: 0 18px 42px rgba(2, 6, 23, 0.6);
+  --highlight-card-active-border: rgba(129, 140, 248, 0.85);
+  --highlight-card-active-shadow: 0 26px 56px rgba(99, 102, 241, 0.4);
+  --highlight-card-overlay: linear-gradient(120deg, rgba(191, 219, 254, 0.24), transparent 55%);
+  --highlight-card-text: rgba(226, 232, 240, 0.9);
+  --highlight-icon-bg: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.45), transparent 60%),
+    linear-gradient(160deg, rgba(15, 23, 42, 0.85), rgba(30, 41, 59, 0.6));
+  --highlight-icon-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.25);
 }
 
 body[data-theme="light"] {
-  --bg-base: #f5f7ff;
-  --bg-gradient: radial-gradient(circle at 12% -10%, rgba(14, 165, 233, 0.16), transparent 60%),
-    radial-gradient(circle at 92% 6%, rgba(168, 85, 247, 0.18), transparent 58%),
-    linear-gradient(180deg, #f8fafc 0%, #ecf3ff 55%, #f6f4ff 100%);
+  --bg-base: #f3f5ff;
+  --bg-gradient: radial-gradient(circle at 12% -10%, rgba(56, 189, 248, 0.2), transparent 60%),
+    radial-gradient(circle at 92% 6%, rgba(236, 72, 153, 0.2), transparent 58%),
+    linear-gradient(180deg, #f8fafc 0%, #e6eefc 55%, #f7f4ff 100%);
   --bg-noise: none;
-  --panel-bg: rgba(255, 255, 255, 0.92);
+  --panel-bg: rgba(255, 255, 255, 0.94);
   --panel-border: rgba(14, 165, 233, 0.18);
   --panel-highlight: rgba(99, 102, 241, 0.12);
-  --accent: #0284c7;
-  --accent-soft: rgba(14, 165, 233, 0.12);
+  --accent: #0ea5e9;
+  --accent-soft: rgba(14, 165, 233, 0.16);
   --accent-strong: #0ea5e9;
   --accent-muted: rgba(2, 132, 199, 0.24);
   --accent-secondary: #7c3aed;
@@ -82,6 +95,19 @@ body[data-theme="light"] {
   --success: #16a34a;
   --shadow-soft: 0 40px 70px rgba(15, 23, 42, 0.18);
   --shadow-subtle: 0 24px 48px rgba(15, 23, 42, 0.12);
+  --highlight-card-bg:
+    linear-gradient(150deg, rgba(191, 219, 254, 0.9), rgba(224, 231, 255, 0.7) 45%, rgba(251, 191, 36, 0.25));
+  --highlight-card-border: rgba(148, 163, 184, 0.35);
+  --highlight-card-shadow: 0 14px 34px rgba(148, 163, 184, 0.25);
+  --highlight-card-hover-border: rgba(14, 165, 233, 0.45);
+  --highlight-card-hover-shadow: 0 20px 44px rgba(148, 163, 184, 0.32);
+  --highlight-card-active-border: rgba(99, 102, 241, 0.55);
+  --highlight-card-active-shadow: 0 30px 52px rgba(129, 140, 248, 0.32);
+  --highlight-card-overlay: linear-gradient(120deg, rgba(148, 163, 184, 0.38), transparent 55%);
+  --highlight-card-text: rgba(15, 23, 42, 0.75);
+  --highlight-icon-bg: radial-gradient(circle at 42% 32%, rgba(255, 255, 255, 0.75), transparent 60%),
+    linear-gradient(150deg, rgba(191, 219, 254, 0.95), rgba(224, 231, 255, 0.78));
+  --highlight-icon-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.35);
 }
 
 @media (max-width: 600px) {
@@ -1670,10 +1696,9 @@ body[data-theme="light"] .account-insights-timeline-empty {
   gap: 0.8rem;
   padding: 0.75rem 0.95rem;
   border-radius: calc(var(--radius-md) * 1.05);
-  background:
-    linear-gradient(140deg, rgba(34, 211, 238, 0.22), rgba(129, 140, 248, 0.16) 45%, rgba(236, 72, 153, 0.12));
-  border: 1px solid rgba(56, 189, 248, 0.28);
-  box-shadow: 0 12px 28px rgba(2, 6, 23, 0.45);
+  background: var(--highlight-card-bg);
+  border: 1px solid var(--highlight-card-border);
+  box-shadow: var(--highlight-card-shadow);
   backdrop-filter: blur(var(--panel-blur));
   position: relative;
   overflow: hidden;
@@ -1685,7 +1710,6 @@ body[data-theme="light"] .account-insights-timeline-empty {
   transform: translateY(0);
   z-index: 0;
   width: 100%;
-  border: none;
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -1704,22 +1728,11 @@ body[data-theme="light"] .account-insights-timeline-empty {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(120deg, rgba(191, 219, 254, 0.22), transparent 55%);
+  background: var(--highlight-card-overlay);
   opacity: 0;
   transition: opacity var(--transition-fast);
   pointer-events: none;
   z-index: -1;
-}
-
-body[data-theme="light"] .highlight-card {
-  background:
-    linear-gradient(150deg, rgba(191, 219, 254, 0.65), rgba(224, 231, 255, 0.55) 45%, rgba(251, 191, 36, 0.18));
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.14);
-}
-
-body[data-theme="light"] .highlight-card::after {
-  background: linear-gradient(120deg, rgba(148, 163, 184, 0.38), transparent 55%);
 }
 
 .highlight-card:hover::after,
@@ -1729,15 +1742,15 @@ body[data-theme="light"] .highlight-card::after {
 
 .highlight-card:hover,
 .highlight-card:focus-within {
-  border-color: rgba(56, 189, 248, 0.6);
-  box-shadow: 0 16px 40px rgba(8, 17, 35, 0.75);
+  border-color: var(--highlight-card-hover-border);
+  box-shadow: var(--highlight-card-hover-shadow);
   transform: translateY(-1px);
 }
 
 .highlight-card[aria-pressed="true"],
 .highlight-card[aria-pressed="true"]:hover {
-  border-color: rgba(99, 102, 241, 0.85);
-  box-shadow: 0 24px 50px rgba(99, 102, 241, 0.38);
+  border-color: var(--highlight-card-active-border);
+  box-shadow: var(--highlight-card-active-shadow);
   transform: translateY(-2px);
 }
 
@@ -1754,9 +1767,8 @@ body[data-theme="light"] .highlight-card::after {
   border-radius: 12px;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.45), transparent 60%),
-    linear-gradient(160deg, rgba(15, 23, 42, 0.85), rgba(30, 41, 59, 0.6));
-  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.25);
+  background: var(--highlight-icon-bg);
+  box-shadow: var(--highlight-icon-shadow);
 }
 
 @media (max-width: 540px) {
@@ -1789,7 +1801,7 @@ body[data-theme="light"] .highlight-card::after {
 
 .highlight-text {
   font-size: 0.8rem;
-  color: rgba(203, 213, 225, 0.82);
+  color: var(--highlight-card-text);
 }
 
 @media (max-width: 540px) {

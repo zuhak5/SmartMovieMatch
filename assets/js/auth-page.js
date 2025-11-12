@@ -14,8 +14,8 @@ const state = {
 const THEME_STORAGE_KEY = "smm.theme.v1";
 
 const THEME_COLOR_MAP = {
-  dark: "#05071a",
-  light: "#f4f6ff"
+  dark: "#020617",
+  light: "#f3f5ff"
 };
 
 const COLOR_SCHEME_META_CONTENT = {
@@ -35,9 +35,6 @@ function resolveStoredTheme() {
     }
   } catch (error) {
     console.warn("Failed to read stored theme", error);
-  }
-  if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) {
-    return "light";
   }
   return "dark";
 }
