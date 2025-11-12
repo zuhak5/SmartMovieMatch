@@ -79,21 +79,12 @@ server.listen(PORT, () => {
 });
 
 function serveStatic(req, res, parsed = url.parse(req.url)) {
-  let pathname = decodeURIComponent(parsed.pathname);
-  if (pathname === '/') {
-    pathname = '/index.html';
-  }
-  const filePath = path.join(ROOT_DIR, pathname);
-  if (!filePath.startsWith(ROOT_DIR)) {
-    res.statusCode = 403;
-    applySecurityHeaders(res);
-    res.setHeader('Cache-Control', 'no-cache');
-    res.end('Forbidden');
-    return;
-  }
+  const pathname = decodeURIComponent(parsed.pathname || '/');
+  const candidates = buildPathCandidates(pathname);
 
-  fs.stat(filePath, (err, stats) => {
-    if (err || !stats.isFile()) {
+  const tryNext = () => {
+    const candidate = candidates.shift();
+    if (!candidate) {
       res.statusCode = 404;
       applySecurityHeaders(res);
       res.setHeader('Cache-Control', 'no-cache');
@@ -101,22 +92,72 @@ function serveStatic(req, res, parsed = url.parse(req.url)) {
       return;
     }
 
-    const stream = fs.createReadStream(filePath);
-    stream.on('error', () => {
-      res.statusCode = 500;
+    const filePath = path.resolve(ROOT_DIR, `.${candidate}`);
+    if (!filePath.startsWith(ROOT_DIR)) {
+      res.statusCode = 403;
       applySecurityHeaders(res);
       res.setHeader('Cache-Control', 'no-cache');
-      res.end('Server error');
-    });
-    res.statusCode = 200;
-    applySecurityHeaders(res);
-    res.setHeader('Content-Type', getContentType(filePath));
-    const cacheControl = getCacheControl(filePath);
-    if (cacheControl) {
-      res.setHeader('Cache-Control', cacheControl);
+      res.end('Forbidden');
+      return;
     }
-    stream.pipe(res);
-  });
+
+    fs.stat(filePath, (err, stats) => {
+      if (err || !stats.isFile()) {
+        tryNext();
+        return;
+      }
+
+      const stream = fs.createReadStream(filePath);
+      stream.on('error', () => {
+        res.statusCode = 500;
+        applySecurityHeaders(res);
+        res.setHeader('Cache-Control', 'no-cache');
+        res.end('Server error');
+      });
+      res.statusCode = 200;
+      applySecurityHeaders(res);
+      res.setHeader('Content-Type', getContentType(filePath));
+      const cacheControl = getCacheControl(filePath);
+      if (cacheControl) {
+        res.setHeader('Cache-Control', cacheControl);
+      }
+      stream.pipe(res);
+    });
+  };
+
+  tryNext();
+}
+
+function buildPathCandidates(pathname) {
+  const normalized = path.posix.normalize(pathname || '/');
+
+  if (!normalized || normalized === '/' || normalized === '.') {
+    return ['index.html'];
+  }
+
+  const withoutLeadingSlash = normalized.startsWith('/')
+    ? normalized.slice(1)
+    : normalized;
+
+  if (!withoutLeadingSlash) {
+    return ['index.html'];
+  }
+
+  if (path.extname(withoutLeadingSlash)) {
+    return [withoutLeadingSlash];
+  }
+
+  const trimmed = withoutLeadingSlash.endsWith('/')
+    ? withoutLeadingSlash.slice(0, -1)
+    : withoutLeadingSlash;
+
+  if (!trimmed) {
+    return ['index.html'];
+  }
+
+  const candidates = [`${trimmed}.html`];
+  candidates.push(path.posix.join(trimmed, 'index.html'));
+  return candidates;
 }
 
 function wrapResponse(res) {
