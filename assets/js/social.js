@@ -368,6 +368,27 @@ export async function unfollowUserByUsername(username) {
   refreshAllSections();
 }
 
+export async function searchSocialUsers(query) {
+  const trimmed = typeof query === 'string' ? query.trim() : '';
+  if (!trimmed) {
+    return [];
+  }
+  const response = await callSocial('searchUsers', { query: trimmed });
+  if (!response || !Array.isArray(response.results)) {
+    return [];
+  }
+  return response.results.map((entry) => ({
+    username: entry.username,
+    displayName: entry.displayName,
+    tagline: entry.tagline || '',
+    sharedInterests: Array.isArray(entry.sharedInterests) ? entry.sharedInterests.slice() : [],
+    sharedFavorites: Array.isArray(entry.sharedFavorites) ? entry.sharedFavorites.slice() : [],
+    mutualFollowers: Array.isArray(entry.mutualFollowers) ? entry.mutualFollowers.slice() : [],
+    followsYou: entry.followsYou === true,
+    reason: typeof entry.reason === 'string' ? entry.reason : ''
+  }));
+}
+
 export function getFollowingSnapshot() {
   return state.following.slice();
 }

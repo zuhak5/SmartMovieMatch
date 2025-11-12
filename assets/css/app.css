@@ -1518,6 +1518,149 @@ h6 {
   padding: 1rem 1.1rem;
 }
 
+.social-follow-assist {
+  display: grid;
+  gap: 1rem;
+}
+
+.social-follow-search {
+  display: grid;
+  gap: 0.75rem;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1rem;
+}
+
+.social-follow-search[hidden] {
+  display: none;
+}
+
+.social-follow-search-status {
+  font-size: 0.86rem;
+  color: var(--text-subtle);
+}
+
+.social-follow-search[data-state="loading"] .social-follow-search-status {
+  color: rgba(96, 165, 250, 0.9);
+}
+
+.social-follow-search[data-state="error"] .social-follow-search-status {
+  color: rgba(248, 113, 113, 0.92);
+}
+
+.social-follow-search-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.social-follow-search[data-state="idle"] .social-follow-search-list,
+.social-follow-search[data-state="hint"] .social-follow-search-list {
+  display: none;
+}
+
+.social-follow-search-item {
+  display: flex;
+  align-items: stretch;
+  gap: 0.75rem;
+}
+
+.social-follow-search-info {
+  flex: 1;
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: calc(var(--radius-md) - 2px);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(8, 12, 26, 0.8);
+  color: var(--text-main);
+  text-align: left;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.social-follow-search-info:hover,
+.social-follow-search-info:focus {
+  border-color: rgba(96, 165, 250, 0.45);
+  background: rgba(15, 23, 42, 0.9);
+  cursor: pointer;
+}
+
+.social-follow-search-info:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.35);
+}
+
+.social-follow-search-reason {
+  font-size: 0.82rem;
+  color: var(--text-subtle);
+}
+
+.social-follow-search-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.social-follow-search-follow {
+  align-self: center;
+}
+
+.social-follow-search-empty {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--text-subtle);
+}
+
+.social-follow-search[data-state="empty"] .social-follow-search-empty {
+  display: block;
+}
+
+.social-follow-search[data-state="idle"] .social-follow-search-empty,
+.social-follow-search[data-state="results"] .social-follow-search-empty,
+.social-follow-search[data-state="loading"] .social-follow-search-empty,
+.social-follow-search[data-state="hint"] .social-follow-search-empty,
+.social-follow-search[data-state="error"] .social-follow-search-empty {
+  display: none;
+}
+
+.social-invite-card {
+  display: grid;
+  gap: 0.6rem;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: var(--radius-md);
+  padding: 0.9rem 1rem;
+}
+
+.social-invite-title {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.social-invite-text {
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--text-subtle);
+}
+
+.social-invite-link-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.social-invite-link-row .social-invite-link {
+  flex: 1;
+}
+
+.social-invite-status {
+  font-size: 0.82rem;
+  color: var(--text-subtle);
+}
+
 .social-follow-input-row {
   display: flex;
   gap: 0.65rem;
