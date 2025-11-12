@@ -193,7 +193,7 @@ export function showToast({ title, text, variant = "info", icon = "🔔", durati
   });
 }
 
-export function setRecStatus(text, loading) {
+export function setRecStatus(text, loading, progress) {
   const statusText = $("recStatusText");
   if (statusText) {
     statusText.textContent = text;
@@ -204,6 +204,42 @@ export function setRecStatus(text, loading) {
       dot.classList.add("loading");
     } else {
       dot.classList.remove("loading");
+    }
+  }
+  const progressEl = $("recStatusProgress");
+  const stageEl = $("recStatusStage");
+  if (progressEl) {
+    if (progress && typeof progress.total === "number" && progress.total > 0) {
+      const total = Math.max(1, progress.total);
+      const step = Math.min(total, Math.max(0, Number(progress.step) || 0));
+      const percent = Math.min(100, Math.max(0, (step / total) * 100));
+      progressEl.hidden = false;
+      progressEl.setAttribute("aria-valuemin", "0");
+      progressEl.setAttribute("aria-valuemax", String(total));
+      progressEl.setAttribute("aria-valuenow", String(step));
+      progressEl.setAttribute("aria-hidden", "false");
+      const fill = progressEl.querySelector(".status-progress-fill");
+      if (fill) {
+        fill.style.width = `${percent}%`;
+      }
+      if (stageEl) {
+        stageEl.hidden = false;
+        stageEl.textContent = progress.label || "";
+      }
+    } else {
+      progressEl.hidden = true;
+      progressEl.removeAttribute("aria-valuemin");
+      progressEl.removeAttribute("aria-valuemax");
+      progressEl.removeAttribute("aria-valuenow");
+      progressEl.setAttribute("aria-hidden", "true");
+      const fill = progressEl.querySelector(".status-progress-fill");
+      if (fill) {
+        fill.style.width = "0%";
+      }
+      if (stageEl) {
+        stageEl.hidden = true;
+        stageEl.textContent = "";
+      }
     }
   }
 }

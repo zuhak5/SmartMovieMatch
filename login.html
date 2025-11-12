@@ -16,10 +16,30 @@
         <div class="auth-card-header">
           <a class="auth-logo" href="index.html">🎬 Smart Movie Match</a>
           <h1 id="authTitle" class="auth-card-title">Welcome back</h1>
-          <p class="auth-card-subtitle">
+          <p id="authSubtitle" class="auth-card-subtitle">
             Sign in or create an account to sync your taste profile and watched history
             across devices.
           </p>
+        </div>
+        <div class="auth-mode-tabs" role="tablist" aria-label="Authentication mode">
+          <button
+            type="button"
+            class="auth-mode-tab is-active"
+            data-auth-mode="login"
+            role="tab"
+            aria-selected="true"
+          >
+            Sign in
+          </button>
+          <button
+            type="button"
+            class="auth-mode-tab"
+            data-auth-mode="signup"
+            role="tab"
+            aria-selected="false"
+          >
+            Create account
+          </button>
         </div>
         <form id="authForm" class="auth-form" novalidate>
           <div class="field-group" id="displayNameGroup" hidden>
@@ -127,15 +147,24 @@
           <div class="auth-socials" aria-label="Social sign-in coming soon">
             <button type="button" class="auth-social-btn" data-provider="google">
               <span class="auth-social-icon" aria-hidden="true">🔒</span>
-              <span class="auth-social-text">Google (coming soon)</span>
+              <span class="auth-social-text">
+                Google
+                <span class="auth-social-badge">Coming soon</span>
+              </span>
             </button>
             <button type="button" class="auth-social-btn" data-provider="apple">
               <span class="auth-social-icon" aria-hidden="true">🍎</span>
-              <span class="auth-social-text">Apple (coming soon)</span>
+              <span class="auth-social-text">
+                Apple
+                <span class="auth-social-badge">Coming soon</span>
+              </span>
             </button>
             <button type="button" class="auth-social-btn" data-provider="github">
               <span class="auth-social-icon" aria-hidden="true">🐙</span>
-              <span class="auth-social-text">GitHub (coming soon)</span>
+              <span class="auth-social-text">
+                GitHub
+                <span class="auth-social-badge">Coming soon</span>
+              </span>
             </button>
           </div>
         </form>

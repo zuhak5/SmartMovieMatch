@@ -178,231 +178,241 @@
           </section>
 
           <div id="profile" class="settings-anchor" aria-hidden="true"></div>
-          <nav class="settings-nav" role="tablist">
-            <button
-              type="button"
-              class="settings-nav-btn is-active"
-              data-settings-target="profile"
-              role="tab"
-              aria-selected="true"
-            >
-              Profile
-            </button>
-            <button
-              type="button"
-              class="settings-nav-btn"
-              data-settings-target="security"
-              role="tab"
-              aria-selected="false"
-            >
-              Security
-            </button>
-            <button
-              type="button"
-              class="settings-nav-btn"
-              data-settings-target="snapshots"
-              role="tab"
-              aria-selected="false"
-            >
-              Snapshots
-            </button>
-          </nav>
-          <div class="settings-views">
-            <section
-              class="settings-card is-active"
-              data-settings-section="profile"
-              aria-labelledby="accountSettingsProfileHeading"
-            >
-              <div class="settings-card-header">
-                <h2 id="accountSettingsProfileHeading">Profile</h2>
-                <p>Change what other devices see when you sign in.</p>
-              </div>
-              <form id="accountProfileForm" class="settings-section" novalidate>
-                <div class="field-grid">
-                  <label class="field-label" for="accountDisplayName">Display name</label>
-                  <input
-                    id="accountDisplayName"
-                    class="input-base input-text"
-                    type="text"
-                    name="displayName"
-                    minlength="2"
-                    maxlength="120"
-                    autocomplete="name"
-                    required
-                  />
+          <div class="settings-layout">
+            <aside class="settings-rail" aria-label="Settings navigation">
+              <div class="settings-rail-inner">
+                <p class="settings-rail-label">Sections</p>
+                <nav class="settings-nav" role="tablist" aria-orientation="vertical">
+                  <button
+                    type="button"
+                    class="settings-nav-btn is-active"
+                    data-settings-target="profile"
+                    role="tab"
+                    aria-selected="true"
+                  >
+                    Profile
+                  </button>
+                  <button
+                    type="button"
+                    class="settings-nav-btn"
+                    data-settings-target="security"
+                    role="tab"
+                    aria-selected="false"
+                  >
+                    Security
+                  </button>
+                  <button
+                    type="button"
+                    class="settings-nav-btn"
+                    data-settings-target="snapshots"
+                    role="tab"
+                    aria-selected="false"
+                  >
+                    Snapshots
+                  </button>
+                </nav>
+                <div id="settingsSaveIndicator" class="settings-save-indicator" role="status" aria-live="polite">
+                  All changes saved
                 </div>
-                <div class="field-grid">
-                  <span class="field-label">Avatar</span>
-                  <div class="settings-avatar-row">
-                    <label class="settings-avatar" for="accountAvatarInput" aria-label="Upload new avatar">
-                      <span class="settings-avatar-inner" id="settingsAvatarPreview">GM</span>
+              </div>
+            </aside>
+            <div class="settings-views">
+              <section
+                class="settings-card is-active"
+                data-settings-section="profile"
+                aria-labelledby="accountSettingsProfileHeading"
+              >
+                <div class="settings-card-header">
+                  <h2 id="accountSettingsProfileHeading">Profile</h2>
+                  <p>Change what other devices see when you sign in.</p>
+                </div>
+                <form id="accountProfileForm" class="settings-section" novalidate>
+                  <div class="field-grid">
+                    <label class="field-label" for="accountDisplayName">Display name</label>
+                    <input
+                      id="accountDisplayName"
+                      class="input-base input-text"
+                      type="text"
+                      name="displayName"
+                      minlength="2"
+                      maxlength="120"
+                      autocomplete="name"
+                      required
+                    />
+                  </div>
+                  <div class="field-grid">
+                    <span class="field-label">Avatar</span>
+                    <div class="settings-avatar-row">
+                      <label class="settings-avatar" for="accountAvatarInput" aria-label="Upload new avatar">
+                        <span class="settings-avatar-inner" id="settingsAvatarPreview">GM</span>
+                      </label>
+                      <input
+                        id="accountAvatarInput"
+                        class="input-base input-file"
+                        type="file"
+                        name="avatar"
+                        accept="image/*"
+                      />
+                      <button type="button" id="accountAvatarUpload" class="btn-secondary settings-avatar-upload">
+                        Upload new
+                      </button>
+                      <button type="button" id="accountAvatarRemove" class="btn-subtle" disabled>Remove</button>
+                    </div>
+                    <p class="field-hint">Preview updates instantly. Square JPG or PNG up to 5 MB recommended.</p>
+                  </div>
+                  <div class="settings-actions">
+                    <button type="submit" class="btn-primary">Save profile</button>
+                    <div id="accountProfileStatus" class="modal-status" role="status" aria-live="polite"></div>
+                  </div>
+                </form>
+              </section>
+
+              <section
+                class="settings-card"
+                data-settings-section="security"
+                aria-labelledby="accountSettingsSecurityHeading"
+              >
+                <div id="security" class="settings-anchor" aria-hidden="true"></div>
+                <div class="settings-card-header">
+                  <h2 id="accountSettingsSecurityHeading">Security</h2>
+                  <p>Reset your password and prep for multi-factor prompts.</p>
+                </div>
+                <form id="accountSecurityForm" class="settings-section" novalidate>
+                  <div class="field-grid">
+                    <label class="field-label" for="currentPasswordInput">Current password</label>
+                    <div class="input-with-addon">
+                      <input
+                        id="currentPasswordInput"
+                        class="input-base input-text"
+                        type="password"
+                        name="currentPassword"
+                        autocomplete="current-password"
+                        required
+                      />
+                      <button
+                        type="button"
+                        class="input-visibility-toggle"
+                        data-password-toggle="currentPasswordInput"
+                        data-label-show="Show"
+                        data-label-hide="Hide"
+                        data-aria-show="Show current password"
+                        data-aria-hide="Hide current password"
+                        aria-pressed="false"
+                      >
+                        <span class="input-visibility-icon" aria-hidden="true">👁</span>
+                        <span class="input-visibility-label" data-toggle-label>Show</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="field-grid">
+                    <label class="field-label" for="newPasswordInput">New password</label>
+                    <div class="input-with-addon">
+                      <input
+                        id="newPasswordInput"
+                        class="input-base input-text"
+                        type="password"
+                        name="newPassword"
+                        autocomplete="new-password"
+                        minlength="8"
+                        required
+                      />
+                      <button
+                        type="button"
+                        class="input-visibility-toggle"
+                        data-password-toggle="newPasswordInput"
+                        data-label-show="Show"
+                        data-label-hide="Hide"
+                        data-aria-show="Show new password"
+                        data-aria-hide="Hide new password"
+                        aria-pressed="false"
+                      >
+                        <span class="input-visibility-icon" aria-hidden="true">👁</span>
+                        <span class="input-visibility-label" data-toggle-label>Show</span>
+                      </button>
+                    </div>
+                    <p class="field-hint">Use 8+ characters with a mix of letters, numbers, and symbols.</p>
+                  </div>
+                  <div class="field-grid">
+                    <label class="field-label" for="confirmPasswordInput">Confirm new password</label>
+                    <div class="input-with-addon">
+                      <input
+                        id="confirmPasswordInput"
+                        class="input-base input-text"
+                        type="password"
+                        name="confirmPassword"
+                        autocomplete="new-password"
+                        required
+                      />
+                      <button
+                        type="button"
+                        class="input-visibility-toggle"
+                        data-password-toggle="confirmPasswordInput"
+                        data-label-show="Show"
+                        data-label-hide="Hide"
+                        data-aria-show="Show confirmation"
+                        data-aria-hide="Hide confirmation"
+                        aria-pressed="false"
+                      >
+                        <span class="input-visibility-icon" aria-hidden="true">👁</span>
+                        <span class="input-visibility-label" data-toggle-label>Show</span>
+                      </button>
+                    </div>
+                  </div>
+                  <ul id="settingsPasswordChecklist" class="password-checklist password-checklist--compact">
+                    <li data-password-rule="length">At least 8 characters</li>
+                    <li data-password-rule="upper">Upper &amp; lower case mix</li>
+                    <li data-password-rule="number">Includes a number</li>
+                    <li data-password-rule="symbol">Includes a symbol</li>
+                    <li data-password-rule="match">Matches confirmation</li>
+                  </ul>
+                  <div class="security-prompts">
+                    <label class="security-option">
+                      <input id="emailVerificationToggle" type="checkbox" disabled checked />
+                      <span>
+                        Email verification is required for password recovery. We’ll send alerts to your inbox.
+                      </span>
                     </label>
-                    <input
-                      id="accountAvatarInput"
-                      class="input-base input-file"
-                      type="file"
-                      name="avatar"
-                      accept="image/*"
-                    />
-                    <button type="button" id="accountAvatarUpload" class="btn-secondary settings-avatar-upload">
-                      Upload new
-                    </button>
-                    <button type="button" id="accountAvatarRemove" class="btn-subtle" disabled>Remove</button>
+                    <label class="security-option">
+                      <input id="mfaToggle" type="checkbox" disabled />
+                      <span>
+                        Multi-factor prompts are coming soon. We’ll notify you when they’re ready.
+                      </span>
+                    </label>
                   </div>
-                  <p class="field-hint">Preview updates instantly. Square JPG or PNG up to 5 MB recommended.</p>
-                </div>
-                <div class="settings-actions">
-                  <button type="submit" class="btn-primary">Save profile</button>
-                  <div id="accountProfileStatus" class="modal-status" role="status" aria-live="polite"></div>
-                </div>
-              </form>
-            </section>
+                  <div class="settings-actions">
+                    <button type="submit" class="btn-primary">Update password</button>
+                    <div id="accountSecurityStatus" class="modal-status" role="status" aria-live="polite"></div>
+                  </div>
+                </form>
+              </section>
 
-            <section
-              class="settings-card"
-              data-settings-section="security"
-              aria-labelledby="accountSettingsSecurityHeading"
-            >
-              <div id="security" class="settings-anchor" aria-hidden="true"></div>
-              <div class="settings-card-header">
-                <h2 id="accountSettingsSecurityHeading">Security</h2>
-                <p>Reset your password and prep for multi-factor prompts.</p>
-              </div>
-              <form id="accountSecurityForm" class="settings-section" novalidate>
-                <div class="field-grid">
-                  <label class="field-label" for="currentPasswordInput">Current password</label>
-                  <div class="input-with-addon">
-                    <input
-                      id="currentPasswordInput"
-                      class="input-base input-text"
-                      type="password"
-                      name="currentPassword"
-                      autocomplete="current-password"
-                      required
-                    />
-                    <button
-                      type="button"
-                      class="input-visibility-toggle"
-                      data-password-toggle="currentPasswordInput"
-                      data-label-show="Show"
-                      data-label-hide="Hide"
-                      data-aria-show="Show current password"
-                      data-aria-hide="Hide current password"
-                      aria-pressed="false"
-                    >
-                      <span class="input-visibility-icon" aria-hidden="true">👁</span>
-                      <span class="input-visibility-label" data-toggle-label>Show</span>
-                    </button>
-                  </div>
+              <section
+                class="settings-card settings-card-wide"
+                data-settings-section="snapshots"
+                id="accountSnapshotsSection"
+                aria-labelledby="accountSnapshotsHeading"
+              >
+                <div id="snapshots" class="settings-anchor" aria-hidden="true"></div>
+                <div class="settings-card-header">
+                  <h2 id="accountSnapshotsHeading">Cloud snapshots</h2>
+                  <p>These copies refresh every time Smart Movie Match syncs.</p>
                 </div>
-                <div class="field-grid">
-                  <label class="field-label" for="newPasswordInput">New password</label>
-                  <div class="input-with-addon">
-                    <input
-                      id="newPasswordInput"
-                      class="input-base input-text"
-                      type="password"
-                      name="newPassword"
-                      autocomplete="new-password"
-                      minlength="8"
-                      required
-                    />
-                    <button
-                      type="button"
-                      class="input-visibility-toggle"
-                      data-password-toggle="newPasswordInput"
-                      data-label-show="Show"
-                      data-label-hide="Hide"
-                      data-aria-show="Show new password"
-                      data-aria-hide="Hide new password"
-                      aria-pressed="false"
-                    >
-                      <span class="input-visibility-icon" aria-hidden="true">👁</span>
-                      <span class="input-visibility-label" data-toggle-label>Show</span>
-                    </button>
-                  </div>
-                  <p class="field-hint">Use 8+ characters with a mix of letters, numbers, and symbols.</p>
+                <div class="snapshot-grid">
+                  <article class="snapshot-card">
+                    <h3>Preferences</h3>
+                    <pre id="snapshotPreferences" class="snapshot-pre" aria-live="polite">No data synced yet.</pre>
+                  </article>
+                  <article class="snapshot-card">
+                    <h3>Watched history</h3>
+                    <pre id="snapshotWatched" class="snapshot-pre" aria-live="polite">No data synced yet.</pre>
+                  </article>
+                  <article class="snapshot-card">
+                    <h3>Favorites</h3>
+                    <pre id="snapshotFavorites" class="snapshot-pre" aria-live="polite">No data synced yet.</pre>
+                  </article>
                 </div>
-                <div class="field-grid">
-                  <label class="field-label" for="confirmPasswordInput">Confirm new password</label>
-                  <div class="input-with-addon">
-                    <input
-                      id="confirmPasswordInput"
-                      class="input-base input-text"
-                      type="password"
-                      name="confirmPassword"
-                      autocomplete="new-password"
-                      required
-                    />
-                    <button
-                      type="button"
-                      class="input-visibility-toggle"
-                      data-password-toggle="confirmPasswordInput"
-                      data-label-show="Show"
-                      data-label-hide="Hide"
-                      data-aria-show="Show confirmation"
-                      data-aria-hide="Hide confirmation"
-                      aria-pressed="false"
-                    >
-                      <span class="input-visibility-icon" aria-hidden="true">👁</span>
-                      <span class="input-visibility-label" data-toggle-label>Show</span>
-                    </button>
-                  </div>
-                </div>
-                <ul id="settingsPasswordChecklist" class="password-checklist password-checklist--compact">
-                  <li data-password-rule="length">At least 8 characters</li>
-                  <li data-password-rule="upper">Upper &amp; lower case mix</li>
-                  <li data-password-rule="number">Includes a number</li>
-                  <li data-password-rule="symbol">Includes a symbol</li>
-                  <li data-password-rule="match">Matches confirmation</li>
-                </ul>
-                <div class="security-prompts">
-                  <label class="security-option">
-                    <input id="emailVerificationToggle" type="checkbox" disabled checked />
-                    <span>
-                      Email verification is required for password recovery. We’ll send alerts to your inbox.
-                    </span>
-                  </label>
-                  <label class="security-option">
-                    <input id="mfaToggle" type="checkbox" disabled />
-                    <span>
-                      Multi-factor prompts are coming soon. We’ll notify you when they’re ready.
-                    </span>
-                  </label>
-                </div>
-                <div class="settings-actions">
-                  <button type="submit" class="btn-primary">Update password</button>
-                  <div id="accountSecurityStatus" class="modal-status" role="status" aria-live="polite"></div>
-                </div>
-              </form>
-            </section>
-
-            <section
-              class="settings-card settings-card-wide"
-              data-settings-section="snapshots"
-              id="accountSnapshotsSection"
-              aria-labelledby="accountSnapshotsHeading"
-            >
-              <div id="snapshots" class="settings-anchor" aria-hidden="true"></div>
-              <div class="settings-card-header">
-                <h2 id="accountSnapshotsHeading">Cloud snapshots</h2>
-                <p>These copies refresh every time Smart Movie Match syncs.</p>
-              </div>
-              <div class="snapshot-grid">
-                <article class="snapshot-card">
-                  <h3>Preferences</h3>
-                  <pre id="snapshotPreferences" class="snapshot-pre" aria-live="polite">No data synced yet.</pre>
-                </article>
-                <article class="snapshot-card">
-                  <h3>Watched history</h3>
-                  <pre id="snapshotWatched" class="snapshot-pre" aria-live="polite">No data synced yet.</pre>
-                </article>
-                <article class="snapshot-card">
-                  <h3>Favorites</h3>
-                  <pre id="snapshotFavorites" class="snapshot-pre" aria-live="polite">No data synced yet.</pre>
-                </article>
-              </div>
-            </section>
+              </section>
+            </div>
           </div>
         </div>
       </div>
