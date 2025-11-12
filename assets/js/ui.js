@@ -3,6 +3,196 @@ import { $ } from "./dom.js";
 import { playExpandSound, playFavoriteSound, playUiClick } from "./sound.js";
 import { acknowledgeFriendActivity } from "./social.js";
 
+const COLLECTION_STATE_KEY = "smm.collection-state.v1";
+const COLLECTION_DEFAULT_STATE = {
+  expandedItems: { favorites: [], watched: [] },
+  viewExpanded: { favorites: false, watched: false }
+};
+const TOAST_DURATION = 4200;
+
+function formatRelativeTime(timestamp) {
+  if (!timestamp) {
+    return "";
+  }
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 0) {
+    return "moments ago";
+  }
+  const diffSeconds = Math.floor(diffMs / 1000);
+  if (diffSeconds < 45) {
+    return "moments ago";
+  }
+  if (diffSeconds < 90) {
+    return "About a minute ago";
+  }
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) {
+    return `${diffMinutes} minute${diffMinutes === 1 ? "" : "s"} ago`;
+  }
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+  }
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) {
+    return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+  }
+  return date.toLocaleDateString();
+}
+
+function cloneCollectionState(state) {
+  return {
+    expandedItems: {
+      favorites: Array.isArray(state.expandedItems?.favorites)
+        ? [...state.expandedItems.favorites]
+        : [],
+      watched: Array.isArray(state.expandedItems?.watched)
+        ? [...state.expandedItems.watched]
+        : []
+    },
+    viewExpanded: {
+      favorites: Boolean(state.viewExpanded?.favorites),
+      watched: Boolean(state.viewExpanded?.watched)
+    }
+  };
+}
+
+function readCollectionState() {
+  try {
+    const raw = localStorage.getItem(COLLECTION_STATE_KEY);
+    if (!raw) {
+      return cloneCollectionState(COLLECTION_DEFAULT_STATE);
+    }
+    const parsed = JSON.parse(raw);
+    return cloneCollectionState({ ...COLLECTION_DEFAULT_STATE, ...parsed });
+  } catch (error) {
+    console.warn("Failed to read collection state", error);
+    return cloneCollectionState(COLLECTION_DEFAULT_STATE);
+  }
+}
+
+function writeCollectionState(state) {
+  try {
+    localStorage.setItem(COLLECTION_STATE_KEY, JSON.stringify(state));
+  } catch (error) {
+    console.warn("Failed to persist collection state", error);
+  }
+}
+
+function updateCollectionState(updater) {
+  const current = readCollectionState();
+  const next = updater(cloneCollectionState(current));
+  writeCollectionState(next);
+  return next;
+}
+
+function getCollectionItemKey(movie) {
+  if (!movie || typeof movie !== "object") {
+    return null;
+  }
+  return (
+    movie.id ||
+    movie.tmdbId ||
+    movie.tmdb_id ||
+    movie.imdbID ||
+    movie.slug ||
+    movie.externalId ||
+    movie.title ||
+    null
+  );
+}
+
+function getExpandedSet(collection) {
+  const state = readCollectionState();
+  const list = state.expandedItems?.[collection];
+  return new Set(Array.isArray(list) ? list : []);
+}
+
+function setExpandedValue(collection, key, expanded) {
+  if (!key) {
+    return;
+  }
+  updateCollectionState((draft) => {
+    const list = draft.expandedItems[collection] || [];
+    const idx = list.indexOf(key);
+    if (expanded) {
+      if (idx === -1) {
+        list.push(key);
+      }
+    } else if (idx >= 0) {
+      list.splice(idx, 1);
+    }
+    draft.expandedItems[collection] = list;
+    return draft;
+  });
+}
+
+function getViewExpanded(collection) {
+  const state = readCollectionState();
+  return Boolean(state.viewExpanded?.[collection]);
+}
+
+function setViewExpanded(collection, expanded) {
+  updateCollectionState((draft) => {
+    draft.viewExpanded[collection] = Boolean(expanded);
+    return draft;
+  });
+}
+
+export function showToast({ title, text, variant = "info", icon = "🔔", duration = TOAST_DURATION } = {}) {
+  const region = $("globalToastRegion");
+  if (!region) {
+    return;
+  }
+  const toast = document.createElement("div");
+  toast.className = "global-toast";
+  toast.dataset.variant = variant;
+
+  const iconEl = document.createElement("span");
+  iconEl.className = "global-toast-icon";
+  iconEl.textContent = icon;
+  toast.appendChild(iconEl);
+
+  const content = document.createElement("div");
+  content.className = "global-toast-content";
+  const titleEl = document.createElement("div");
+  titleEl.className = "global-toast-title";
+  titleEl.textContent = title || "Updated";
+  const textEl = document.createElement("div");
+  textEl.className = "global-toast-text";
+  textEl.textContent = text || "Your changes were saved.";
+  content.appendChild(titleEl);
+  content.appendChild(textEl);
+  toast.appendChild(content);
+
+  region.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.dataset.state = "visible";
+  });
+
+  const removeToast = () => {
+    toast.dataset.state = "hidden";
+    setTimeout(() => {
+      if (toast.parentElement === region) {
+        region.removeChild(toast);
+      }
+    }, 260);
+  };
+
+  const timeout = typeof duration === "number" && duration > 0 ? duration : TOAST_DURATION;
+  const timer = setTimeout(removeToast, timeout);
+
+  toast.addEventListener("click", () => {
+    clearTimeout(timer);
+    removeToast();
+  });
+}
+
 export function setRecStatus(text, loading) {
   const statusText = $("recStatusText");
   if (statusText) {
@@ -38,14 +228,46 @@ export function showSkeletons(count) {
     return;
   }
   grid.innerHTML = "";
-  const n = typeof count === "number" && count > 0 ? count : 4;
+  const n = typeof count === "number" && count > 0 ? Math.min(count, 12) : 4;
   for (let i = 0; i < n; i += 1) {
-    const sk = document.createElement("div");
-    sk.className = "skeleton-card";
+    const card = document.createElement("article");
+    card.className = "skeleton-card";
+
+    const poster = document.createElement("div");
+    poster.className = "skeleton-poster";
+    card.appendChild(poster);
+
+    const body = document.createElement("div");
+    body.className = "skeleton-stack";
+
+    const titleLine = document.createElement("div");
+    titleLine.className = "skeleton-line lg";
+    body.appendChild(titleLine);
+
+    const subtitleLine = document.createElement("div");
+    subtitleLine.className = "skeleton-line";
+    body.appendChild(subtitleLine);
+
+    const metaRow = document.createElement("div");
+    metaRow.className = "skeleton-meta";
+    for (let chip = 0; chip < 3; chip += 1) {
+      const chipEl = document.createElement("div");
+      chipEl.className = "skeleton-chip";
+      metaRow.appendChild(chipEl);
+    }
+    body.appendChild(metaRow);
+
+    const plotLine = document.createElement("div");
+    plotLine.className = "skeleton-line";
+    body.appendChild(plotLine);
+
+    card.appendChild(body);
+
     const shimmer = document.createElement("div");
     shimmer.className = "skeleton-shimmer";
-    sk.appendChild(shimmer);
-    grid.appendChild(sk);
+    card.appendChild(shimmer);
+
+    grid.appendChild(card);
   }
 }
 
@@ -59,7 +281,8 @@ export function renderWatchedList(watchedMovies, options = {}) {
 
   const onRemove = typeof options.onRemove === "function" ? options.onRemove : null;
   const viewEl = listEl.closest(".collection-view");
-  const wasExpanded = viewEl ? viewEl.dataset.collectionExpanded === "true" : false;
+  const storedExpanded = getViewExpanded("watched");
+  const expandedSet = getExpandedSet("watched");
   if (viewEl) {
     const previousToggle = viewEl.querySelector(".collection-collapse");
     if (previousToggle) {
@@ -77,15 +300,17 @@ export function renderWatchedList(watchedMovies, options = {}) {
 
   emptyEl.style.display = "none";
 
-  const items = watchedMovies
-    .slice()
-    .reverse()
-    .map((movie) => {
+  const items = watchedMovies.map((movie) => {
       const item = document.createElement("div");
       item.className = "favorite-chip watched-chip";
       item.setAttribute("role", "button");
       item.setAttribute("tabindex", "0");
       item.setAttribute("aria-expanded", "false");
+
+      const itemKey = getCollectionItemKey(movie);
+      if (itemKey) {
+        item.dataset.collectionKey = String(itemKey);
+      }
 
       const posterWrap = document.createElement("div");
       posterWrap.className = "favorite-poster";
@@ -149,6 +374,12 @@ export function renderWatchedList(watchedMovies, options = {}) {
       if (Array.isArray(movie.genres) && movie.genres.length) {
         detailMeta.push(`Genres: ${movie.genres.join(", ")}`);
       }
+      if (typeof movie.loggedAt === "number" && Number.isFinite(movie.loggedAt)) {
+        const relative = formatRelativeTime(movie.loggedAt);
+        if (relative) {
+          detailMeta.push(`Logged ${relative}`);
+        }
+      }
       if (detailMeta.length) {
         const metaLine = document.createElement("div");
         metaLine.className = "favorite-details-meta";
@@ -169,6 +400,9 @@ export function renderWatchedList(watchedMovies, options = {}) {
         removeBtn.addEventListener("click", (event) => {
           event.stopPropagation();
           playUiClick();
+          if (itemKey) {
+            setExpandedValue("favorites", itemKey, false);
+          }
           onRemove(movie);
         });
         item.appendChild(removeBtn);
@@ -176,12 +410,26 @@ export function renderWatchedList(watchedMovies, options = {}) {
 
       item.appendChild(detail);
 
-      const toggleExpansion = () => {
-        const expanded = item.classList.toggle("expanded");
+      const setExpanded = (expanded, { persist = true, silent = false } = {}) => {
+        item.classList.toggle("expanded", expanded);
         detail.hidden = !expanded;
         item.setAttribute("aria-expanded", expanded ? "true" : "false");
-        playExpandSound(expanded);
+        if (persist && itemKey) {
+          setExpandedValue("watched", itemKey, expanded);
+        }
+        if (!silent) {
+          playExpandSound(expanded);
+        }
       };
+
+      const toggleExpansion = () => {
+        const next = !item.classList.contains("expanded");
+        setExpanded(next);
+      };
+
+      if (itemKey && expandedSet.has(itemKey)) {
+        setExpanded(true, { persist: false, silent: true });
+      }
 
       item.addEventListener("click", (event) => {
         if (event.target.closest(".favorite-remove")) {
@@ -205,7 +453,10 @@ export function renderWatchedList(watchedMovies, options = {}) {
       return item;
     });
 
-  applyCollectionCollapse(listEl, viewEl, items, { wasExpanded });
+  applyCollectionCollapse(listEl, viewEl, items, {
+    wasExpanded: storedExpanded,
+    onToggle: (expanded) => setViewExpanded("favorites", expanded)
+  });
 }
 
 function applyCollectionCollapse(listEl, viewEl, items, options = {}) {
@@ -216,6 +467,7 @@ function applyCollectionCollapse(listEl, viewEl, items, options = {}) {
   const hiddenCount = Math.max(0, total - MAX_VISIBLE);
   const shouldShowToggle = hiddenCount > 0 && Boolean(viewEl);
   const initialExpanded = shouldShowToggle && wasExpanded;
+  const onToggle = typeof options.onToggle === "function" ? options.onToggle : null;
 
   items.forEach((item, index) => {
     const isHidden = shouldShowToggle && index >= MAX_VISIBLE;
@@ -247,7 +499,7 @@ function applyCollectionCollapse(listEl, viewEl, items, options = {}) {
   const labelEl = button.querySelector(".label");
   const iconEl = button.querySelector(".icon");
 
-  const update = (expanded) => {
+  const update = (expanded, { emit = true } = {}) => {
     if (expanded) {
       hiddenItems.forEach((item) => {
         if (!item.isConnected) {
@@ -274,9 +526,12 @@ function applyCollectionCollapse(listEl, viewEl, items, options = {}) {
     if (iconEl) {
       iconEl.textContent = expanded ? "▴" : "▾";
     }
+    if (emit && onToggle) {
+      onToggle(expanded);
+    }
   };
 
-  update(initialExpanded);
+  update(initialExpanded, { emit: false });
 
   button.addEventListener("click", () => {
     const expanded = viewEl.dataset.collectionExpanded === "true";
@@ -328,7 +583,8 @@ export function renderFavoritesList(favorites, options = {}) {
 
   const onRemove = typeof options.onRemove === "function" ? options.onRemove : null;
   const viewEl = listEl.closest(".collection-view");
-  const wasExpanded = viewEl ? viewEl.dataset.collectionExpanded === "true" : false;
+  const storedExpanded = getViewExpanded("favorites");
+  const expandedSet = getExpandedSet("favorites");
   if (viewEl) {
     const previousToggle = viewEl.querySelector(".collection-collapse");
     if (previousToggle) {
@@ -346,15 +602,17 @@ export function renderFavoritesList(favorites, options = {}) {
 
   emptyEl.style.display = "none";
 
-  const items = favorites
-    .slice()
-    .reverse()
-    .map((movie) => {
+  const items = favorites.map((movie) => {
       const item = document.createElement("div");
       item.className = "favorite-chip";
       item.setAttribute("role", "button");
       item.setAttribute("tabindex", "0");
       item.setAttribute("aria-expanded", "false");
+
+      const itemKey = getCollectionItemKey(movie);
+      if (itemKey) {
+        item.dataset.collectionKey = String(itemKey);
+      }
 
       const posterWrap = document.createElement("div");
       posterWrap.className = "favorite-poster";
@@ -440,6 +698,9 @@ export function renderFavoritesList(favorites, options = {}) {
         removeBtn.addEventListener("click", (event) => {
           event.stopPropagation();
           playUiClick();
+          if (itemKey) {
+            setExpandedValue("favorites", itemKey, false);
+          }
           onRemove(movie);
         });
         item.appendChild(removeBtn);
@@ -447,12 +708,26 @@ export function renderFavoritesList(favorites, options = {}) {
 
       item.appendChild(detail);
 
-      const toggleExpansion = () => {
-        const expanded = item.classList.toggle("expanded");
+      const setExpanded = (expanded, { persist = true, silent = false } = {}) => {
+        item.classList.toggle("expanded", expanded);
         detail.hidden = !expanded;
         item.setAttribute("aria-expanded", expanded ? "true" : "false");
-        playExpandSound(expanded);
+        if (persist && itemKey) {
+          setExpandedValue("favorites", itemKey, expanded);
+        }
+        if (!silent) {
+          playExpandSound(expanded);
+        }
       };
+
+      const toggleExpansion = () => {
+        const next = !item.classList.contains("expanded");
+        setExpanded(next);
+      };
+
+      if (itemKey && expandedSet.has(itemKey)) {
+        setExpanded(true, { persist: false, silent: true });
+      }
 
       item.addEventListener("click", (event) => {
         if (event.target.closest(".favorite-remove")) {
@@ -476,7 +751,10 @@ export function renderFavoritesList(favorites, options = {}) {
       return item;
     });
 
-  applyCollectionCollapse(listEl, viewEl, items, { wasExpanded });
+  applyCollectionCollapse(listEl, viewEl, items, {
+    wasExpanded: storedExpanded,
+    onToggle: (expanded) => setViewExpanded("watched", expanded)
+  });
 }
 
 export function updateFavoritesSummary(favorites) {

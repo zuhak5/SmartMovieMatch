@@ -5,6 +5,7 @@ import {
   requestPasswordReset
 } from "./auth.js";
 import { $ } from "./dom.js";
+import { playUiClick } from "./sound.js";
 
 const state = {
   mode: "login"
@@ -35,6 +36,11 @@ function initAuthPage() {
   const passwordInput = $("passwordInput");
   const passwordStrength = $("passwordStrength");
   const forgotPasswordBtn = $("forgotPasswordBtn");
+  const passwordChecklist = document.getElementById("authPasswordChecklist");
+  const passwordToggleButtons = Array.from(
+    document.querySelectorAll('[data-password-toggle]')
+  );
+  const socialButtons = Array.from(document.querySelectorAll(".auth-social-btn"));
 
   if (!form || !toggleBtn || !status || !submitBtn || !passwordInput) {
     return;
@@ -133,8 +139,23 @@ function initAuthPage() {
   if (passwordInput) {
     passwordInput.addEventListener("input", () => {
       applyPasswordStrength(passwordInput.value, passwordStrength);
+      applyPasswordChecklist(passwordInput.value, passwordChecklist);
     });
   }
+
+  passwordToggleButtons.forEach((button) => setupPasswordToggle(button));
+
+  socialButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const provider = button.getAttribute("data-provider") || "social";
+      const providerLabel = formatProviderLabel(provider);
+      playUiClick();
+      setStatus(
+        `${providerLabel} sign-in is coming soon. Use your username and password for now.`,
+        "info"
+      );
+    });
+  });
 
   if (forgotPasswordBtn) {
     forgotPasswordBtn.addEventListener("click", async () => {
@@ -164,8 +185,9 @@ function initAuthPage() {
     });
   }
 
-  updateModeUi({ nameGroup, avatarGroup });
+  updateModeUi({ nameGroup, avatarGroup, passwordChecklist });
   applyPasswordStrength(passwordInput.value, passwordStrength);
+  applyPasswordChecklist(passwordInput.value, passwordChecklist);
 
   toggleBtn.addEventListener("click", () => {
     state.mode = state.mode === "login" ? "signup" : "login";
@@ -178,8 +200,9 @@ function initAuthPage() {
       }
       clearAvatarPreview();
     }
-    updateModeUi({ nameGroup, avatarGroup });
+    updateModeUi({ nameGroup, avatarGroup, passwordChecklist });
     applyPasswordStrength(passwordInput.value, passwordStrength);
+    applyPasswordChecklist(passwordInput.value, passwordChecklist);
     status.innerHTML = "";
   });
 
@@ -199,12 +222,6 @@ function initAuthPage() {
 
     if (state.mode === "signup" && password.length < 8) {
       setStatus("Passwords need at least 8 characters when signing up.", "error");
-      return;
-    }
-
-    if (state.mode === "signup" && password.length < 8) {
-      status.innerHTML =
-        '<span class="status-error">Passwords need at least 8 characters when signing up.</span>';
       return;
     }
 
@@ -257,7 +274,7 @@ if (document.readyState === "loading") {
   initAuthPage();
 }
 
-function updateModeUi({ nameGroup, avatarGroup }) {
+function updateModeUi({ nameGroup, avatarGroup, passwordChecklist }) {
   const title = $("authTitle");
   const toggleBtn = $("authModeToggle");
   const form = $("authForm");
@@ -278,6 +295,10 @@ function updateModeUi({ nameGroup, avatarGroup }) {
       avatarGroup.hidden = false;
       avatarGroup.style.display = "flex";
     }
+    if (passwordChecklist) {
+      passwordChecklist.hidden = false;
+      passwordChecklist.setAttribute("aria-hidden", "false");
+    }
   } else {
     title.textContent = "Welcome back";
     toggleBtn.textContent = "Need an account? Sign up";
@@ -289,6 +310,10 @@ function updateModeUi({ nameGroup, avatarGroup }) {
     if (avatarGroup) {
       avatarGroup.hidden = true;
       avatarGroup.style.display = "none";
+    }
+    if (passwordChecklist) {
+      passwordChecklist.hidden = true;
+      passwordChecklist.setAttribute("aria-hidden", "true");
     }
   }
 }
@@ -327,4 +352,97 @@ function assessPasswordStrength(password) {
   if (/\d/.test(password)) score += 1;
   if (/[^A-Za-z0-9]/.test(password)) score += 1;
   return score;
+}
+
+function evaluatePasswordRules(password) {
+  const value = typeof password === "string" ? password : "";
+  return {
+    length: value.length >= 8,
+    upper: /[a-z]/.test(value) && /[A-Z]/.test(value),
+    number: /\d/.test(value),
+    symbol: /[^A-Za-z0-9]/.test(value)
+  };
+}
+
+function applyPasswordChecklist(password, listEl) {
+  if (!listEl) {
+    return;
+  }
+  const isSignup = state.mode === "signup";
+  if (!isSignup) {
+    listEl.hidden = true;
+    listEl.setAttribute("aria-hidden", "true");
+    listEl.querySelectorAll("[data-password-rule]").forEach((item) => {
+      item.dataset.state = "pending";
+    });
+    return;
+  }
+
+  listEl.hidden = false;
+  listEl.setAttribute("aria-hidden", "false");
+  const rules = evaluatePasswordRules(password);
+  listEl.querySelectorAll("[data-password-rule]").forEach((item) => {
+    const key = item.getAttribute("data-password-rule");
+    if (!key) {
+      return;
+    }
+    item.dataset.state = rules[key] ? "met" : "pending";
+  });
+}
+
+function setupPasswordToggle(button) {
+  if (!button) {
+    return;
+  }
+  const targetId = button.getAttribute("data-password-toggle");
+  if (!targetId) {
+    return;
+  }
+  const input = document.getElementById(targetId);
+  if (!input) {
+    return;
+  }
+  const labelNode = button.querySelector("[data-toggle-label]");
+  const showLabel = button.getAttribute("data-label-show") || "Show";
+  const hideLabel = button.getAttribute("data-label-hide") || "Hide";
+  const showAria = button.getAttribute("data-aria-show") || "Show password";
+  const hideAria = button.getAttribute("data-aria-hide") || "Hide password";
+
+  const syncState = () => {
+    const isPassword = input.getAttribute("type") === "password";
+    button.setAttribute("aria-pressed", isPassword ? "false" : "true");
+    button.setAttribute("aria-label", isPassword ? showAria : hideAria);
+    if (labelNode) {
+      labelNode.textContent = isPassword ? showLabel : hideLabel;
+    } else {
+      button.textContent = isPassword ? showLabel : hideLabel;
+    }
+  };
+
+  syncState();
+
+  button.addEventListener("click", () => {
+    const isPassword = input.getAttribute("type") === "password";
+    input.setAttribute("type", isPassword ? "text" : "password");
+    syncState();
+    playUiClick();
+    input.focus();
+  });
+}
+
+function formatProviderLabel(provider) {
+  const value = String(provider || "").toLowerCase();
+  if (!value) {
+    return "Social";
+  }
+  if (value === "google") {
+    return "Google";
+  }
+  if (value === "apple") {
+    return "Apple";
+  }
+  if (value === "github") {
+    return "GitHub";
+  }
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }

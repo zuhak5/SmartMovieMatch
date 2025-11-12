@@ -141,6 +141,15 @@
                     </li>
                   </ul>
                 </div>
+                <div class="profile-callout-preferences">
+                  <div class="profile-callout-preferences-header">
+                    <span class="profile-callout-label">Saved genres</span>
+                    <p id="profileCalloutGenreEmpty" class="profile-callout-meta">
+                      Select genres from discovery to see them here.
+                    </p>
+                  </div>
+                  <ul id="profileCalloutGenreChips" class="profile-callout-genre-list" hidden></ul>
+                </div>
               </div>
               <div class="profile-callout-actions">
                 <button type="button" class="btn-secondary profile-callout-cta" data-profile-action="snapshots">
@@ -722,6 +731,8 @@
     </section>
   </main>
 </div>
+
+<div id="globalToastRegion" class="global-toast-region" role="status" aria-live="polite"></div>
 
 <nav class="mobile-toolbar" aria-label="Profile navigation">
   <a class="mobile-toolbar-action" href="index.html">
