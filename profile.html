@@ -259,6 +259,39 @@
             </div>
           </div>
 
+          <section class="social-highlights" id="socialHighlights" aria-label="Social highlights" aria-live="polite">
+            <article class="social-highlight" id="socialHighlightActive" data-state="empty">
+              <div class="social-highlight-top">
+                <span class="social-highlight-label">
+                  <span class="social-highlight-icon" aria-hidden="true">🟢</span>
+                  Active now
+                </span>
+                <span id="socialHighlightActiveCount" class="social-highlight-count">0</span>
+              </div>
+              <p id="socialHighlightActiveNote" class="social-highlight-note">No friends online right now.</p>
+            </article>
+            <article class="social-highlight" id="socialHighlightInvites" data-state="empty">
+              <div class="social-highlight-top">
+                <span class="social-highlight-label">
+                  <span class="social-highlight-icon" aria-hidden="true">📬</span>
+                  Pending invites
+                </span>
+                <span id="socialHighlightInvitesCount" class="social-highlight-count">0</span>
+              </div>
+              <p id="socialHighlightInvitesNote" class="social-highlight-note">You’re all caught up on invites.</p>
+            </article>
+            <article class="social-highlight" id="socialHighlightSuggestions" data-state="empty">
+              <div class="social-highlight-top">
+                <span class="social-highlight-label">
+                  <span class="social-highlight-icon" aria-hidden="true">✨</span>
+                  New suggestions
+                </span>
+                <span id="socialHighlightSuggestionsCount" class="social-highlight-count">0</span>
+              </div>
+              <p id="socialHighlightSuggestionsNote" class="social-highlight-note">Follow more friends to get fresh matches.</p>
+            </article>
+          </section>
+
           <div class="social-extras-grid">
             <section class="social-badges-block">
               <header class="social-section-header">
@@ -532,13 +565,13 @@
         <section class="social-mutuals">
           <header class="social-section-header">
             <h3>Mutual followers</h3>
-              <p>People you follow who follow you back.</p>
-            </header>
-            <div id="socialMutualList" class="social-chip-list" hidden></div>
-            <div id="socialMutualEmpty" class="empty-state empty-state--subtle">
-              Follow and follow back to build your circle.
-            </div>
-          </section>
+            <p>People you follow who follow you back.</p>
+          </header>
+          <div id="socialMutualList" class="social-chip-list" hidden></div>
+          <div id="socialMutualEmpty" class="empty-state empty-state--subtle">
+            Follow and follow back to build your circle.
+          </div>
+        </section>
 
           <div class="social-lists-grid">
             <section class="social-list-block">

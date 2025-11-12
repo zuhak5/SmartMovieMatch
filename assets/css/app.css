@@ -1487,6 +1487,76 @@ h6 {
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
+.social-highlights {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.social-highlight {
+  display: grid;
+  gap: 0.45rem;
+  padding: 1rem 1.1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(96, 165, 250, 0.18);
+  background: rgba(8, 12, 26, 0.72);
+  position: relative;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast),
+    transform var(--transition-fast), background var(--transition-fast);
+}
+
+.social-highlight[data-state='active'] {
+  border-color: rgba(96, 165, 250, 0.42);
+  background: linear-gradient(160deg, rgba(30, 64, 175, 0.35), rgba(8, 12, 26, 0.78));
+  box-shadow: 0 22px 44px rgba(15, 23, 42, 0.35);
+}
+
+.social-highlight[data-state='active']:hover {
+  transform: translateY(-2px);
+  border-color: rgba(147, 197, 253, 0.55);
+}
+
+.social-highlight[data-state='empty'] {
+  border-color: rgba(148, 163, 184, 0.24);
+  background: rgba(8, 12, 26, 0.6);
+  box-shadow: none;
+}
+
+.social-highlight-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.social-highlight-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.83rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(191, 219, 254, 0.82);
+}
+
+.social-highlight-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.social-highlight-count {
+  font-size: 1.65rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.social-highlight-note {
+  margin: 0;
+  font-size: 0.87rem;
+  line-height: 1.5;
+  color: rgba(203, 213, 225, 0.9);
+}
+
 .social-stat {
   background: rgba(8, 12, 26, 0.72);
   border: 1px solid rgba(148, 163, 184, 0.24);
@@ -6648,6 +6718,18 @@ body.auth-body {
 @media (max-width: 600px) {
   body.has-mobile-toolbar {
     padding-bottom: 5.5rem;
+  }
+
+  .social-highlights {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .social-highlight {
+    padding: 0.85rem 0.95rem;
+  }
+
+  .social-highlight-count {
+    font-size: 1.45rem;
   }
 
   .app-header {
