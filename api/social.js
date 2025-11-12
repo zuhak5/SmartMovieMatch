@@ -955,6 +955,13 @@ async function enqueueNotification({ store, username, type, actor, movie, timest
     createdAt,
     readAt: null
   };
+  const payload = {
+    actor: entry.actor,
+    movieTitle: entry.movieTitle,
+    movieTmdbId: entry.movieTmdbId,
+    movieImdbId: entry.movieImdbId,
+    message: entry.message
+  };
 
   if (usingLocalStore()) {
     if (store) {
@@ -973,15 +980,11 @@ async function enqueueNotification({ store, username, type, actor, movie, timest
       body: [
         {
           id: entry.id,
-          username: entry.username,
+          recipient_username: entry.username,
           type: entry.type,
-          actor: entry.actor,
-          movie_title: entry.movieTitle,
-          movie_tmdb_id: entry.movieTmdbId,
-          movie_imdb_id: entry.movieImdbId,
-          message: entry.message,
-          created_at: entry.createdAt,
-          read_at: null
+          payload,
+          is_read: false,
+          created_at: entry.createdAt
         }
       ]
     });
@@ -1011,6 +1014,39 @@ function formatNotificationMessage(type, context = {}) {
     default:
       return `New activity from ${actor}.`;
   }
+}
+
+function normalizeNotificationPayload(row) {
+  const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+  const actor = typeof payload.actor === 'string' && payload.actor ? payload.actor : null;
+  const movieTitle = typeof payload.movieTitle === 'string' && payload.movieTitle ? payload.movieTitle : null;
+  const movieTmdbId = payload.movieTmdbId || null;
+  const movieImdbId = payload.movieImdbId || null;
+  const messageRaw = typeof payload.message === 'string' ? payload.message.trim() : '';
+  const message = messageRaw
+    ? messageRaw
+    : formatNotificationMessage(row && row.type ? row.type : 'activity', {
+        actor,
+        movie: { title: movieTitle, tmdbId: movieTmdbId, imdbId: movieImdbId }
+      });
+  return {
+    actor,
+    movieTitle,
+    movieTmdbId,
+    movieImdbId,
+    message
+  };
+}
+
+function normalizeNotificationReadTimestamp(row) {
+  const payload = row && row.payload && typeof row.payload === 'object' ? row.payload : {};
+  if (typeof payload.readAt === 'string' && payload.readAt) {
+    return payload.readAt;
+  }
+  if (typeof payload.read_at === 'string' && payload.read_at) {
+    return payload.read_at;
+  }
+  return row && row.created_at ? row.created_at : new Date().toISOString();
 }
 
 function summarizeLikes(entries, currentUsername) {
@@ -1152,9 +1188,8 @@ async function listNotifications(username, { limit = 50 } = {}) {
   try {
     const rows = await supabaseFetch('user_notifications', {
       query: {
-        select:
-          'id,type,actor,movie_title,movie_tmdb_id,movie_imdb_id,message,created_at,read_at',
-        username: `eq.${username}`,
+        select: 'id,type,payload,created_at,is_read',
+        recipient_username: `eq.${username}`,
         order: 'created_at.desc',
         limit: String(limit)
       }
@@ -1162,14 +1197,14 @@ async function listNotifications(username, { limit = 50 } = {}) {
     if (!Array.isArray(rows)) {
       return { notifications: [], unreadCount: 0 };
     }
-    let unreadCount = rows.filter((row) => !row.read_at).length;
+    let unreadCount = rows.filter((row) => !row.is_read).length;
     if (unreadCount < rows.length) {
       try {
         const unreadRows = await supabaseFetch('user_notifications', {
           query: {
             select: 'id',
-            username: `eq.${username}`,
-            read_at: 'is.null'
+            recipient_username: `eq.${username}`,
+            is_read: 'eq.false'
           }
         });
         if (Array.isArray(unreadRows)) {
@@ -1183,13 +1218,9 @@ async function listNotifications(username, { limit = 50 } = {}) {
       notifications: rows.map((row) => ({
         id: row.id,
         type: row.type,
-        actor: row.actor,
-        movieTitle: row.movie_title,
-        movieTmdbId: row.movie_tmdb_id,
-        movieImdbId: row.movie_imdb_id,
-        message: row.message,
+        ...normalizeNotificationPayload(row),
         createdAt: row.created_at,
-        readAt: row.read_at || null
+        readAt: row.is_read ? normalizeNotificationReadTimestamp(row) : null
       })),
       unreadCount
     };
@@ -1211,8 +1242,8 @@ async function markNotificationsRead(username) {
   try {
     await supabaseFetch('user_notifications', {
       method: 'PATCH',
-      query: { username: `eq.${username}` },
-      body: { read_at: now }
+      query: { recipient_username: `eq.${username}` },
+      body: { is_read: true }
     });
   } catch (error) {
     enableLocalFallback('marking notifications read', error);
