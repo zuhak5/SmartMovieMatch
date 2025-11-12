@@ -8,4 +8,4 @@
 - If existing code or tests reference a table absent from the schema file defined in `supabase/migrations/supabase_tables_schema.sql`., correct the code to resolve the mismatch and mention the fix in the PR summary.
 
 ## Environment Variables
-- Use only the API environment variables declared in `api/apikey.sql` when writing configuration or documentation.
+- Use the API environment variables declared in `api/apikey.sql` when writing configuration or documentation.
