@@ -1703,7 +1703,7 @@ function openAccountSettings(section = "profile") {
     return;
   }
 
-  let target = "account-settings";
+  let target = "account-settings.html";
   if (section === "snapshots") {
     target += "#snapshots";
   } else if (section === "security") {
@@ -6104,7 +6104,7 @@ function openSocialProfile(username) {
   }
   initSocialProfileOverlay();
   if (!socialProfileOverlay) {
-    window.location.href = "profile";
+    window.location.href = "profile.html";
     return;
   }
   if (!state.session || !state.session.token) {
