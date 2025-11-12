@@ -1,9 +1,10 @@
 const fs = require('fs/promises');
 const path = require('path');
-const https = require('https');
 const QRCode = require('qrcode');
 const { randomUUID } = require('crypto');
 const { setInterval: nodeSetInterval, clearInterval: nodeClearInterval } = require('timers');
+
+const { fetchWithTimeout } = require('../lib/http-client');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -4062,9 +4063,9 @@ async function supabaseFetch(pathname, { method = 'GET', headers = {}, query, bo
 
   let response;
   try {
-    response = await fetch(url, requestInit);
+    response = await fetchWithTimeout(url, { timeoutMs: 15000, ...requestInit });
   } catch (networkError) {
-    response = await nodeFetch(url, requestInit);
+    throw new HttpError(503, networkError && networkError.message ? networkError.message : 'Unable to reach Supabase');
   }
 
   if (!response.ok) {
@@ -4093,51 +4094,4 @@ async function safeReadResponse(response) {
   } catch (error) {
     return '';
   }
-}
-
-function nodeFetch(input, options = {}) {
-  return new Promise((resolve, reject) => {
-    try {
-      const requestUrl = typeof input === 'string' ? new URL(input) : input;
-      const method = options.method || 'GET';
-      const headers = options.headers || {};
-      const body = options.body;
-
-      const requestOptions = {
-        method,
-        headers,
-        hostname: requestUrl.hostname,
-        port: requestUrl.port || (requestUrl.protocol === 'http:' ? 80 : 443),
-        path: `${requestUrl.pathname}${requestUrl.search}`
-      };
-
-      const transport = requestUrl.protocol === 'http:' ? require('http') : https;
-
-      const req = transport.request(requestOptions, (resp) => {
-        const chunks = [];
-        resp.on('data', (chunk) => chunks.push(chunk));
-        resp.on('end', () => {
-          const buffer = Buffer.concat(chunks);
-          const text = buffer.toString('utf8');
-          resolve({
-            ok: resp.statusCode >= 200 && resp.statusCode < 300,
-            status: resp.statusCode || 0,
-            statusText: resp.statusMessage || '',
-            headers: resp.headers,
-            text: async () => text
-          });
-        });
-      });
-
-      req.on('error', reject);
-
-      if (body !== undefined && body !== null) {
-        req.write(typeof body === 'string' ? body : Buffer.from(body));
-      }
-
-      req.end();
-    } catch (error) {
-      reject(error);
-    }
-  });
 }

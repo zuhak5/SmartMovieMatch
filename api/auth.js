@@ -1,9 +1,10 @@
 const crypto = require("crypto");
-const https = require("https");
 const path = require("path");
 const fs = require("fs/promises");
 
-const fetch = typeof global.fetch === "function" ? global.fetch.bind(global) : nodeFetch;
+const { fetchWithTimeout } = require("../lib/http-client");
+
+const fetch = (input, init = {}) => fetchWithTimeout(input, { timeoutMs: 15000, ...init });
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -779,53 +780,6 @@ async function safeReadResponse(response) {
   } catch (error) {
     return "";
   }
-}
-
-function nodeFetch(input, options = {}) {
-  return new Promise((resolve, reject) => {
-    try {
-      const requestUrl = typeof input === "string" ? new URL(input) : input;
-      const method = options.method || "GET";
-      const headers = options.headers || {};
-      const body = options.body;
-
-      const requestOptions = {
-        method,
-        headers,
-        hostname: requestUrl.hostname,
-        port: requestUrl.port || (requestUrl.protocol === "http:" ? 80 : 443),
-        path: `${requestUrl.pathname}${requestUrl.search}`
-      };
-
-      const transport = requestUrl.protocol === "http:" ? require("http") : https;
-
-      const req = transport.request(requestOptions, (res) => {
-        const chunks = [];
-        res.on("data", (chunk) => chunks.push(chunk));
-        res.on("end", () => {
-          const buffer = Buffer.concat(chunks);
-          const text = buffer.toString("utf8");
-          resolve({
-            ok: res.statusCode >= 200 && res.statusCode < 300,
-            status: res.statusCode || 0,
-            statusText: res.statusMessage || "",
-            headers: res.headers,
-            text: async () => text
-          });
-        });
-      });
-
-      req.on("error", reject);
-
-      if (body !== undefined && body !== null) {
-        req.write(typeof body === "string" ? body : Buffer.from(body));
-      }
-
-      req.end();
-    } catch (error) {
-      reject(error);
-    }
-  });
 }
 
 function handleSupabaseError(context, error) {
