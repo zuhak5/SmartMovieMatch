@@ -1063,12 +1063,15 @@ async function recordLibraryActivity({ username, action, movie }) {
 
   if (usingLocalStore()) {
     const store = await readSocialStore();
-    store.library.push({
+    store.activity.push({
       username,
-      action,
-      movieTmdbId: movie.tmdbId,
-      movieImdbId: movie.imdbId || null,
-      movieTitle: movie.title || '',
+      verb: action,
+      objectType: 'movie',
+      metadata: {
+        movie_tmdb_id: movie.tmdbId,
+        movie_imdb_id: movie.imdbId || null,
+        movie_title: movie.title || ''
+      },
       createdAt: timestamp
     });
     store.follows
@@ -1090,21 +1093,24 @@ async function recordLibraryActivity({ username, action, movie }) {
   }
 
   try {
-    await supabaseFetch('library_activity', {
+    await supabaseFetch('user_activity', {
       method: 'POST',
       body: [
         {
           username,
-          action,
-          movie_tmdb_id: movie.tmdbId,
-          movie_imdb_id: movie.imdbId,
-          movie_title: movie.title,
+          verb: action,
+          object_type: 'movie',
+          metadata: {
+            movie_tmdb_id: movie.tmdbId,
+            movie_imdb_id: movie.imdbId || null,
+            movie_title: movie.title || ''
+          },
           created_at: timestamp
         }
       ]
     });
   } catch (error) {
-    enableLocalFallback('recording library activity', error);
+    enableLocalFallback('recording user activity', error);
     await recordLibraryActivity({ username, action, movie });
     return;
   }
@@ -1753,15 +1759,28 @@ async function readSocialStore() {
   try {
     const text = await fs.readFile(SOCIAL_STORE_PATH, 'utf8');
     const parsed = JSON.parse(text);
+    const legacyLibrary = Array.isArray(parsed.library)
+      ? parsed.library.map((row) => ({
+          username: row.username,
+          verb: row.action,
+          objectType: 'movie',
+          metadata: {
+            movie_tmdb_id: row.movieTmdbId,
+            movie_imdb_id: row.movieImdbId || null,
+            movie_title: row.movieTitle || ''
+          },
+          createdAt: row.createdAt
+        }))
+      : [];
     return {
       follows: Array.isArray(parsed.follows) ? parsed.follows.slice() : [],
       reviews: Array.isArray(parsed.reviews) ? parsed.reviews.slice() : [],
       reviewLikes: Array.isArray(parsed.reviewLikes) ? parsed.reviewLikes.slice() : [],
       notifications: Array.isArray(parsed.notifications) ? parsed.notifications.slice() : [],
-      library: Array.isArray(parsed.library) ? parsed.library.slice() : []
+      activity: Array.isArray(parsed.activity) ? parsed.activity.slice() : legacyLibrary
     };
   } catch (error) {
-    return { follows: [], reviews: [], reviewLikes: [], notifications: [], library: [] };
+    return { follows: [], reviews: [], reviewLikes: [], notifications: [], activity: [] };
   }
 }
 
@@ -1772,7 +1791,7 @@ async function writeSocialStore(store) {
       reviews: Array.isArray(store.reviews) ? store.reviews : [],
       reviewLikes: Array.isArray(store.reviewLikes) ? store.reviewLikes : [],
       notifications: Array.isArray(store.notifications) ? store.notifications : [],
-      library: Array.isArray(store.library) ? store.library : []
+      activity: Array.isArray(store.activity) ? store.activity : []
     },
     null,
     2
