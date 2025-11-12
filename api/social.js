@@ -8,6 +8,19 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SOCIAL_STORE_PATH = path.join(__dirname, '..', 'data', 'social.json');
 const AUTH_STORE_PATH = path.join(__dirname, '..', 'data', 'auth-users.json');
 const USING_LOCAL_STORE = !(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+let forceLocalStore = false;
+
+function usingLocalStore() {
+  return USING_LOCAL_STORE || forceLocalStore;
+}
+
+function enableLocalFallback(reason, error) {
+  if (!forceLocalStore && !USING_LOCAL_STORE) {
+    const details = error instanceof Error ? error.message : String(error);
+    console.warn(`Falling back to local social store after ${reason}: ${details}`);
+  }
+  forceLocalStore = true;
+}
 
 const MAX_REVIEW_LENGTH = 600;
 
@@ -172,7 +185,7 @@ async function handleUpsertReview(req, payload) {
   const body = typeof reviewInput.body === 'string' ? reviewInput.body.trim() : '';
   const hasSpoilers = Boolean(reviewInput.hasSpoilers);
   const resolvedMovie = await resolveMovieIdentifiers(movie);
-  if (!USING_LOCAL_STORE && !resolvedMovie.imdbId) {
+  if (!usingLocalStore() && !resolvedMovie.imdbId) {
     throw new HttpError(400, 'Missing IMDb ID for this movie. Try another recommendation.');
   }
   await upsertReview({
@@ -221,44 +234,19 @@ async function handleLikeReview(req, payload) {
   const resolvedMovie = await resolveMovieIdentifiers(movie);
   const timestamp = new Date().toISOString();
 
-  if (USING_LOCAL_STORE) {
-    const store = await readSocialStore();
-    const exists = store.reviewLikes.some(
-      (entry) =>
-        entry.movieTmdbId === resolvedMovie.tmdbId &&
-        entry.reviewUsername === reviewUsername &&
-        entry.likedBy === user.username
-    );
-    if (!exists) {
-      store.reviewLikes.push({
-        movieTmdbId: resolvedMovie.tmdbId,
-        movieImdbId: resolvedMovie.imdbId || null,
-        reviewUsername,
-        likedBy: user.username,
-        createdAt: timestamp
-      });
-      await enqueueNotification({
-        store,
-        username: reviewUsername,
-        type: 'review_like',
-        actor: user.username,
-        movie: resolvedMovie,
-        timestamp
-      });
-      await writeSocialStore(store);
-    }
-    const likes = summarizeLikes(
-      store.reviewLikes.filter(
-        (entry) =>
-          entry.movieTmdbId === resolvedMovie.tmdbId && entry.reviewUsername === reviewUsername
-      ),
-      user.username
-    );
+  if (usingLocalStore()) {
+    const likes = await likeReviewLocal({
+      movie: resolvedMovie,
+      reviewUsername,
+      likedBy: user.username,
+      timestamp
+    });
     return { body: { ok: true, likes } };
   }
 
-  await ensureMovieRecord(resolvedMovie);
+  let created = true;
   try {
+    await ensureMovieRecord(resolvedMovie);
     await supabaseFetch('review_likes', {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates' },
@@ -273,15 +261,30 @@ async function handleLikeReview(req, payload) {
       ]
     });
   } catch (error) {
-    throw new HttpError(500, 'Unable to like this review right now.');
+    if (error instanceof HttpError && error.status === 409) {
+      created = false;
+    } else {
+      enableLocalFallback('liking a review', error);
+      const likes = await likeReviewLocal({
+        movie: resolvedMovie,
+        reviewUsername,
+        likedBy: user.username,
+        timestamp
+      });
+      return { body: { ok: true, likes } };
+    }
   }
-  await enqueueNotification({
-    username: reviewUsername,
-    type: 'review_like',
-    actor: user.username,
-    movie: resolvedMovie,
-    timestamp
-  });
+
+  if (created) {
+    await enqueueNotification({
+      username: reviewUsername,
+      type: 'review_like',
+      actor: user.username,
+      movie: resolvedMovie,
+      timestamp
+    });
+  }
+
   const likes = await fetchReviewLikeSummary(resolvedMovie, reviewUsername, user.username);
   return { body: { ok: true, likes } };
 }
@@ -299,27 +302,12 @@ async function handleUnlikeReview(req, payload) {
 
   const resolvedMovie = await resolveMovieIdentifiers(movie);
 
-  if (USING_LOCAL_STORE) {
-    const store = await readSocialStore();
-    const before = store.reviewLikes.length;
-    store.reviewLikes = store.reviewLikes.filter(
-      (entry) =>
-        !(
-          entry.movieTmdbId === resolvedMovie.tmdbId &&
-          entry.reviewUsername === reviewUsername &&
-          entry.likedBy === user.username
-        )
-    );
-    if (store.reviewLikes.length !== before) {
-      await writeSocialStore(store);
-    }
-    const likes = summarizeLikes(
-      store.reviewLikes.filter(
-        (entry) =>
-          entry.movieTmdbId === resolvedMovie.tmdbId && entry.reviewUsername === reviewUsername
-      ),
-      user.username
-    );
+  if (usingLocalStore()) {
+    const likes = await unlikeReviewLocal({
+      movie: resolvedMovie,
+      reviewUsername,
+      likedBy: user.username
+    });
     return { body: { ok: true, likes } };
   }
 
@@ -333,7 +321,13 @@ async function handleUnlikeReview(req, payload) {
       }
     });
   } catch (error) {
-    throw new HttpError(500, 'Unable to remove your like right now.');
+    enableLocalFallback('removing a review like', error);
+    const likes = await unlikeReviewLocal({
+      movie: resolvedMovie,
+      reviewUsername,
+      likedBy: user.username
+    });
+    return { body: { ok: true, likes } };
   }
   const likes = await fetchReviewLikeSummary(resolvedMovie, reviewUsername, user.username);
   return { body: { ok: true, likes } };
@@ -378,7 +372,7 @@ async function authenticate(req, payload) {
     throw new HttpError(401, 'Missing session token.');
   }
 
-  if (USING_LOCAL_STORE) {
+  if (usingLocalStore()) {
     const store = await readAuthStore();
     const sessionRow = store.sessions.find((row) => row.token === token);
     if (!sessionRow) {
@@ -422,7 +416,7 @@ async function listFollowing(username) {
   if (!username) {
     return [];
   }
-  if (USING_LOCAL_STORE) {
+  if (usingLocalStore()) {
     const store = await readSocialStore();
     return store.follows
       .filter((entry) => entry.follower === username)
@@ -430,12 +424,18 @@ async function listFollowing(username) {
       .filter(Boolean)
       .sort();
   }
-  const rows = await supabaseFetch('user_follows', {
-    query: {
-      select: 'followed_username',
-      follower_username: `eq.${username}`
-    }
-  });
+  let rows;
+  try {
+    rows = await supabaseFetch('user_follows', {
+      query: {
+        select: 'followed_username',
+        follower_username: `eq.${username}`
+      }
+    });
+  } catch (error) {
+    enableLocalFallback('loading following list', error);
+    return listFollowing(username);
+  }
   if (!Array.isArray(rows)) {
     return [];
   }
@@ -446,7 +446,7 @@ async function listFollowing(username) {
 }
 
 async function upsertFollow(follower, followee) {
-  if (USING_LOCAL_STORE) {
+  if (usingLocalStore()) {
     const store = await readSocialStore();
     const exists = store.follows.find(
       (entry) => entry.follower === follower && entry.followee === followee
@@ -457,15 +457,20 @@ async function upsertFollow(follower, followee) {
     }
     return;
   }
-  await supabaseFetch('user_follows', {
-    method: 'POST',
-    headers: { Prefer: 'resolution=merge-duplicates' },
-    body: [{ follower_username: follower, followed_username: followee }]
-  });
+  try {
+    await supabaseFetch('user_follows', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates' },
+      body: [{ follower_username: follower, followed_username: followee }]
+    });
+  } catch (error) {
+    enableLocalFallback('following a user', error);
+    await upsertFollow(follower, followee);
+  }
 }
 
 async function deleteFollow(follower, followee) {
-  if (USING_LOCAL_STORE) {
+  if (usingLocalStore()) {
     const store = await readSocialStore();
     store.follows = store.follows.filter(
       (entry) => !(entry.follower === follower && entry.followee === followee)
@@ -473,17 +478,22 @@ async function deleteFollow(follower, followee) {
     await writeSocialStore(store);
     return;
   }
-  await supabaseFetch('user_follows', {
-    method: 'DELETE',
-    query: {
-      follower_username: `eq.${follower}`,
-      followed_username: `eq.${followee}`
-    }
-  });
+  try {
+    await supabaseFetch('user_follows', {
+      method: 'DELETE',
+      query: {
+        follower_username: `eq.${follower}`,
+        followed_username: `eq.${followee}`
+      }
+    });
+  } catch (error) {
+    enableLocalFallback('unfollowing a user', error);
+    await deleteFollow(follower, followee);
+  }
 }
 
 async function fetchMovieReviews(movie, followingSet, currentUsername) {
-  if (USING_LOCAL_STORE) {
+  if (usingLocalStore()) {
     const store = await readSocialStore();
     const rows = store.reviews
       .filter((entry) => entry.movieTmdbId === movie.tmdbId)
@@ -510,13 +520,19 @@ async function fetchMovieReviews(movie, followingSet, currentUsername) {
   if (!movie.imdbId) {
     return { reviews: [], myReview: null };
   }
-  const rows = await supabaseFetch('movie_reviews', {
-    query: {
-      select: 'username,rating,body,is_spoiler,created_at,updated_at',
-      movie_imdb_id: `eq.${movie.imdbId}`,
-      order: 'updated_at.desc'
-    }
-  });
+  let rows;
+  try {
+    rows = await supabaseFetch('movie_reviews', {
+      query: {
+        select: 'username,rating,body,is_spoiler,created_at,updated_at',
+        movie_imdb_id: `eq.${movie.imdbId}`,
+        order: 'updated_at.desc'
+      }
+    });
+  } catch (error) {
+    enableLocalFallback('loading reviews', error);
+    return fetchMovieReviews(movie, followingSet, currentUsername);
+  }
   if (!Array.isArray(rows)) {
     return { reviews: [], myReview: null };
   }
@@ -557,7 +573,7 @@ async function fetchMovieReviews(movie, followingSet, currentUsername) {
 
 async function upsertReview({ username, movie, rating, body, hasSpoilers }) {
   const timestamp = new Date().toISOString();
-  if (USING_LOCAL_STORE) {
+  if (usingLocalStore()) {
     const store = await readSocialStore();
     const existingIndex = store.reviews.findIndex(
       (entry) => entry.movieTmdbId === movie.tmdbId && entry.username === username
@@ -590,40 +606,50 @@ async function upsertReview({ username, movie, rating, body, hasSpoilers }) {
     await writeSocialStore(store);
     return;
   }
-  await ensureMovieRecord(movie);
-  await supabaseFetch('movie_reviews', {
-    method: 'POST',
-    headers: { Prefer: 'resolution=merge-duplicates' },
-    query: { on_conflict: 'username,movie_imdb_id' },
-    body: [
-      {
-        username,
-        movie_imdb_id: movie.imdbId,
-        rating,
-        body: body || null,
-        is_spoiler: hasSpoilers,
-        updated_at: timestamp
-      }
-    ]
-  });
+  try {
+    await ensureMovieRecord(movie);
+    await supabaseFetch('movie_reviews', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates' },
+      query: { on_conflict: 'username,movie_imdb_id' },
+      body: [
+        {
+          username,
+          movie_imdb_id: movie.imdbId,
+          rating,
+          body: body || null,
+          is_spoiler: hasSpoilers,
+          updated_at: timestamp
+        }
+      ]
+    });
+  } catch (error) {
+    enableLocalFallback('saving a review', error);
+    return upsertReview({ username, movie, rating, body, hasSpoilers });
+  }
 }
 
 async function userExists(username) {
   if (!username) {
     return false;
   }
-  if (USING_LOCAL_STORE) {
+  if (usingLocalStore()) {
     const store = await readAuthStore();
     return store.users.some((row) => row.username === username);
   }
-  const rows = await supabaseFetch('auth_users', {
-    query: {
-      select: 'username',
-      username: `eq.${username}`,
-      limit: '1'
-    }
-  });
-  return Array.isArray(rows) && rows.length > 0;
+  try {
+    const rows = await supabaseFetch('auth_users', {
+      query: {
+        select: 'username',
+        username: `eq.${username}`,
+        limit: '1'
+      }
+    });
+    return Array.isArray(rows) && rows.length > 0;
+  } catch (error) {
+    enableLocalFallback('looking up a user', error);
+    return userExists(username);
+  }
 }
 
 function mapReviewRow(row, followingSet, currentUsername) {
@@ -719,7 +745,7 @@ async function broadcastReviewActivity({ actor, movie, body }) {
   const followers = await listFollowers(actor);
   const mentionTargets = await resolveMentionTargets(body, actor);
 
-  if (USING_LOCAL_STORE) {
+  if (usingLocalStore()) {
     const store = await readSocialStore();
     followers
       .filter((username) => username && username !== actor)
@@ -784,7 +810,7 @@ async function recordLibraryActivity({ username, action, movie }) {
   const timestamp = new Date().toISOString();
   const notificationType = action === 'watchlist_add' ? 'friend_watchlist' : 'friend_favorite';
 
-  if (USING_LOCAL_STORE) {
+  if (usingLocalStore()) {
     const store = await readSocialStore();
     store.library.push({
       username,
@@ -827,7 +853,9 @@ async function recordLibraryActivity({ username, action, movie }) {
       ]
     });
   } catch (error) {
-    console.warn('Failed to persist library activity', error);
+    enableLocalFallback('recording library activity', error);
+    await recordLibraryActivity({ username, action, movie });
+    return;
   }
 
   const followers = await listFollowers(username);
@@ -850,7 +878,7 @@ async function listFollowers(username) {
   if (!username) {
     return [];
   }
-  if (USING_LOCAL_STORE) {
+  if (usingLocalStore()) {
     const store = await readSocialStore();
     return store.follows
       .filter((entry) => entry.followee === username)
@@ -873,8 +901,8 @@ async function listFollowers(username) {
       .filter(Boolean)
       .sort();
   } catch (error) {
-    console.warn('Failed to load followers', error);
-    return [];
+    enableLocalFallback('loading followers', error);
+    return listFollowers(username);
   }
 }
 
@@ -928,7 +956,7 @@ async function enqueueNotification({ store, username, type, actor, movie, timest
     readAt: null
   };
 
-  if (USING_LOCAL_STORE) {
+  if (usingLocalStore()) {
     if (store) {
       store.notifications.push(entry);
       return entry;
@@ -958,7 +986,8 @@ async function enqueueNotification({ store, username, type, actor, movie, timest
       ]
     });
   } catch (error) {
-    console.warn('Failed to enqueue notification', error);
+    enableLocalFallback('queuing a notification', error);
+    return enqueueNotification({ store, username, type, actor, movie, timestamp });
   }
   return entry;
 }
@@ -996,11 +1025,63 @@ function summarizeLikes(entries, currentUsername) {
   return { count, hasLiked };
 }
 
+async function likeReviewLocal({ movie, reviewUsername, likedBy, timestamp }) {
+  const store = await readSocialStore();
+  const exists = store.reviewLikes.some(
+    (entry) =>
+      entry.movieTmdbId === movie.tmdbId &&
+      entry.reviewUsername === reviewUsername &&
+      entry.likedBy === likedBy
+  );
+  if (!exists) {
+    store.reviewLikes.push({
+      movieTmdbId: movie.tmdbId,
+      movieImdbId: movie.imdbId || null,
+      reviewUsername,
+      likedBy,
+      createdAt: timestamp
+    });
+    await enqueueNotification({
+      store,
+      username: reviewUsername,
+      type: 'review_like',
+      actor: likedBy,
+      movie,
+      timestamp
+    });
+    await writeSocialStore(store);
+  }
+  const likes = store.reviewLikes.filter(
+    (entry) => entry.movieTmdbId === movie.tmdbId && entry.reviewUsername === reviewUsername
+  );
+  return summarizeLikes(likes, likedBy);
+}
+
+async function unlikeReviewLocal({ movie, reviewUsername, likedBy }) {
+  const store = await readSocialStore();
+  const before = store.reviewLikes.length;
+  store.reviewLikes = store.reviewLikes.filter(
+    (entry) =>
+      !(
+        entry.movieTmdbId === movie.tmdbId &&
+        entry.reviewUsername === reviewUsername &&
+        entry.likedBy === likedBy
+      )
+  );
+  if (store.reviewLikes.length !== before) {
+    await writeSocialStore(store);
+  }
+  const likes = store.reviewLikes.filter(
+    (entry) => entry.movieTmdbId === movie.tmdbId && entry.reviewUsername === reviewUsername
+  );
+  return summarizeLikes(likes, likedBy);
+}
+
 async function fetchReviewLikeSummary(movie, reviewUsername, currentUsername) {
   if (!movie || !movie.tmdbId) {
     return { count: 0, hasLiked: false };
   }
-  if (USING_LOCAL_STORE) {
+  if (usingLocalStore()) {
     const store = await readSocialStore();
     const likes = store.reviewLikes.filter(
       (entry) => entry.movieTmdbId === movie.tmdbId && entry.reviewUsername === reviewUsername
@@ -1025,30 +1106,48 @@ async function fetchReviewLikeSummary(movie, reviewUsername, currentUsername) {
   }
 }
 
+async function listLocalNotifications(username, limit) {
+  const store = await readSocialStore();
+  const all = store.notifications
+    .filter((entry) => entry.username === username)
+    .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  const unreadCount = all.filter((entry) => !entry.readAt).length;
+  return {
+    notifications: all.slice(0, limit).map((entry) => ({
+      id: entry.id,
+      type: entry.type,
+      actor: entry.actor,
+      movieTitle: entry.movieTitle,
+      movieTmdbId: entry.movieTmdbId,
+      movieImdbId: entry.movieImdbId,
+      message: entry.message,
+      createdAt: entry.createdAt,
+      readAt: entry.readAt || null
+    })),
+    unreadCount
+  };
+}
+
+async function markLocalNotificationsRead(username, timestamp = new Date().toISOString()) {
+  const store = await readSocialStore();
+  let changed = false;
+  store.notifications.forEach((entry) => {
+    if (entry.username === username && !entry.readAt) {
+      entry.readAt = timestamp;
+      changed = true;
+    }
+  });
+  if (changed) {
+    await writeSocialStore(store);
+  }
+}
+
 async function listNotifications(username, { limit = 50 } = {}) {
   if (!username) {
     return { notifications: [], unreadCount: 0 };
   }
-  if (USING_LOCAL_STORE) {
-    const store = await readSocialStore();
-    const all = store.notifications
-      .filter((entry) => entry.username === username)
-      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-    const unreadCount = all.filter((entry) => !entry.readAt).length;
-    return {
-      notifications: all.slice(0, limit).map((entry) => ({
-        id: entry.id,
-        type: entry.type,
-        actor: entry.actor,
-        movieTitle: entry.movieTitle,
-        movieTmdbId: entry.movieTmdbId,
-        movieImdbId: entry.movieImdbId,
-        message: entry.message,
-        createdAt: entry.createdAt,
-        readAt: entry.readAt || null
-      })),
-      unreadCount
-    };
+  if (usingLocalStore()) {
+    return listLocalNotifications(username, limit);
   }
   try {
     const rows = await supabaseFetch('user_notifications', {
@@ -1095,8 +1194,8 @@ async function listNotifications(username, { limit = 50 } = {}) {
       unreadCount
     };
   } catch (error) {
-    console.warn('Failed to load notifications', error);
-    return { notifications: [], unreadCount: 0 };
+    enableLocalFallback('loading notifications', error);
+    return listNotifications(username, { limit });
   }
 }
 
@@ -1105,18 +1204,8 @@ async function markNotificationsRead(username) {
     return;
   }
   const now = new Date().toISOString();
-  if (USING_LOCAL_STORE) {
-    const store = await readSocialStore();
-    let changed = false;
-    store.notifications.forEach((entry) => {
-      if (entry.username === username && !entry.readAt) {
-        entry.readAt = now;
-        changed = true;
-      }
-    });
-    if (changed) {
-      await writeSocialStore(store);
-    }
+  if (usingLocalStore()) {
+    await markLocalNotificationsRead(username, now);
     return;
   }
   try {
@@ -1126,7 +1215,8 @@ async function markNotificationsRead(username) {
       body: { read_at: now }
     });
   } catch (error) {
-    console.warn('Failed to mark notifications read', error);
+    enableLocalFallback('marking notifications read', error);
+    await markLocalNotificationsRead(username, now);
   }
 }
 
@@ -1134,7 +1224,7 @@ async function resolveMovieIdentifiers(movie) {
   if (!movie || typeof movie !== 'object') {
     return { tmdbId: null, imdbId: null, title: '' };
   }
-  if (USING_LOCAL_STORE) {
+  if (usingLocalStore()) {
     return movie;
   }
 
@@ -1184,7 +1274,7 @@ function buildFallbackMovieId(tmdbId) {
 }
 
 async function ensureMovieRecord(movie) {
-  if (USING_LOCAL_STORE || !movie.imdbId) {
+  if (usingLocalStore() || !movie.imdbId) {
     return;
   }
   const payload = {
@@ -1192,12 +1282,16 @@ async function ensureMovieRecord(movie) {
     tmdb_id: movie.tmdbId || null,
     title: movie.title || movie.imdbId
   };
-  await supabaseFetch('movies', {
-    method: 'POST',
-    headers: { Prefer: 'resolution=merge-duplicates' },
-    query: { on_conflict: 'imdb_id' },
-    body: [payload]
-  });
+  try {
+    await supabaseFetch('movies', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates' },
+      query: { on_conflict: 'imdb_id' },
+      body: [payload]
+    });
+  } catch (error) {
+    enableLocalFallback('ensuring movie record', error);
+  }
 }
 
 function normalizeMovieInput(movie) {
