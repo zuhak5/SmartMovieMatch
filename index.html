@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="assets/css/app.css" />
 
 </head>
-<body data-page="discovery">
+<body class="has-mobile-toolbar" data-page="discovery">
 <div class="app">
   <header class="app-header">
     <div class="account-bar" role="navigation" data-account-state="guest">
@@ -124,7 +124,7 @@
 
   <main class="app-main">
     <!-- Preferences -->
-    <section class="panel panel-sticky">
+    <section id="preferencesPanel" class="panel panel-sticky">
       <div class="panel-inner">
         <div class="panel-header">
           <div>
@@ -255,7 +255,7 @@
 
     <!-- Right column: collections + recommendations -->
     <div class="right-column">
-      <section class="panel collections-panel">
+      <section id="collectionsPanel" class="panel collections-panel">
         <div class="panel-inner">
           <div class="panel-header collections-header">
             <div>
@@ -310,7 +310,7 @@
         </div>
       </section>
 
-      <section class="panel recommendations-panel">
+      <section id="recommendationsPanel" class="panel recommendations-panel">
         <div class="panel-inner">
           <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
           <div class="recommendations-header">
@@ -356,6 +356,21 @@
     </div>
   </main>
 </div>
+
+  <nav class="mobile-toolbar" aria-label="Smart Movie Match navigation">
+    <a class="mobile-toolbar-action" href="index.html" aria-current="page">
+      <span class="mobile-toolbar-icon" aria-hidden="true">🏠</span>
+      <span class="mobile-toolbar-label">Discover</span>
+    </a>
+    <a class="mobile-toolbar-action" href="#preferencesPanel">
+      <span class="mobile-toolbar-icon" aria-hidden="true">🎛️</span>
+      <span class="mobile-toolbar-label">Preferences</span>
+    </a>
+    <a class="mobile-toolbar-action" href="#recommendationsPanel">
+      <span class="mobile-toolbar-icon" aria-hidden="true">🎬</span>
+      <span class="mobile-toolbar-label">Results</span>
+    </a>
+  </nav>
 
   <script type="module" src="assets/js/main.js"></script>
 

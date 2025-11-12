@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="assets/css/app.css" />
 </head>
-<body data-page="account-settings">
+<body class="has-mobile-toolbar" data-page="account-settings">
 <div class="app">
   <header class="app-header">
     <div class="account-bar" role="navigation" data-account-state="guest">
@@ -140,6 +140,7 @@
               </form>
             </section>
 
+            <div id="security" class="settings-anchor" aria-hidden="true"></div>
             <section class="settings-card" aria-labelledby="accountSettingsSecurityHeading">
               <div class="settings-card-header">
                 <h2 id="accountSettingsSecurityHeading">Security</h2>
@@ -229,6 +230,21 @@
     </section>
   </main>
 </div>
+
+<nav class="mobile-toolbar" aria-label="Account navigation">
+  <a class="mobile-toolbar-action" href="index.html">
+    <span class="mobile-toolbar-icon" aria-hidden="true">🏠</span>
+    <span class="mobile-toolbar-label">Discover</span>
+  </a>
+  <a class="mobile-toolbar-action" href="#profile" aria-current="page">
+    <span class="mobile-toolbar-icon" aria-hidden="true">🧑‍💼</span>
+    <span class="mobile-toolbar-label">Profile</span>
+  </a>
+  <a class="mobile-toolbar-action" href="#security">
+    <span class="mobile-toolbar-icon" aria-hidden="true">🔒</span>
+    <span class="mobile-toolbar-label">Security</span>
+  </a>
+</nav>
 
 <script type="module" src="assets/js/main.js"></script>
 </body>
