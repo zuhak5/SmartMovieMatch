@@ -395,28 +395,53 @@ async function resolveMovieIdentifiers(movie) {
   if (!movie || typeof movie !== 'object') {
     return { tmdbId: null, imdbId: null, title: '' };
   }
-  if (USING_LOCAL_STORE || movie.imdbId) {
+  if (USING_LOCAL_STORE) {
     return movie;
   }
-  try {
-    const rows = await supabaseFetch('movies', {
-      query: {
-        select: 'imdb_id,title',
-        tmdb_id: `eq.${movie.tmdbId}`,
-        limit: '1'
+
+  const normalized = {
+    tmdbId: movie.tmdbId,
+    imdbId: movie.imdbId || null,
+    title: movie.title || ''
+  };
+
+  let supabaseTitle = '';
+
+  if (!normalized.imdbId) {
+    try {
+      const rows = await supabaseFetch('movies', {
+        query: {
+          select: 'imdb_id,title',
+          tmdb_id: `eq.${normalized.tmdbId}`,
+          limit: '1'
+        }
+      });
+      if (Array.isArray(rows) && rows.length) {
+        normalized.imdbId = rows[0].imdb_id || null;
+        supabaseTitle = rows[0].title || '';
       }
-    });
-    if (Array.isArray(rows) && rows.length) {
-      return {
-        tmdbId: movie.tmdbId,
-        imdbId: rows[0].imdb_id || movie.imdbId || null,
-        title: movie.title || rows[0].title || ''
-      };
+    } catch (error) {
+      // Ignore lookup failure and fall back to existing identifiers.
     }
-  } catch (error) {
-    // Ignore lookup failure and fall back to existing identifiers.
   }
-  return movie;
+
+  if (!normalized.imdbId) {
+    const fallbackId = buildFallbackMovieId(normalized.tmdbId);
+    if (fallbackId) {
+      normalized.imdbId = fallbackId;
+    }
+  }
+
+  if (!normalized.title && supabaseTitle) {
+    normalized.title = supabaseTitle;
+  }
+
+  return normalized;
+}
+
+function buildFallbackMovieId(tmdbId) {
+  const safeId = typeof tmdbId === 'string' ? tmdbId.trim() : tmdbId != null ? String(tmdbId) : '';
+  return safeId ? `tmdb-${safeId}` : null;
 }
 
 async function ensureMovieRecord(movie) {
