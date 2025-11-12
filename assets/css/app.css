@@ -1465,7 +1465,7 @@ h6 {
   background: rgba(15, 23, 42, 0.72);
   display: grid;
   gap: 0.7rem;
-  max-width: 520px;
+  width: min(520px, 100%);
   margin-inline: auto;
   justify-self: center;
 }
@@ -6731,6 +6731,11 @@ body.auth-body {
 @media (max-width: 600px) {
   body.has-mobile-toolbar {
     padding-bottom: 5.5rem;
+  }
+
+  .social-signed-out {
+    margin-inline: 0;
+    justify-self: stretch;
   }
 
   .social-highlights {
