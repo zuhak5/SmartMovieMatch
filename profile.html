@@ -101,6 +101,26 @@
             </div>
           </div>
 
+          <div class="social-extras-grid">
+            <section class="social-badges-block">
+              <header class="social-section-header">
+                <h3>Recognition badges</h3>
+                <p>Celebrate how you contribute to the community.</p>
+              </header>
+              <div id="socialBadgeList" class="social-badge-list" hidden></div>
+              <div id="socialBadgeEmpty" class="empty-state empty-state--subtle">
+                Earn badges by sharing thoughtful reviews and hosting watch parties.
+              </div>
+            </section>
+            <section class="social-presence-block">
+              <header class="social-section-header">
+                <h3>Friends online</h3>
+                <p>See who’s around for a movie night.</p>
+              </header>
+              <div id="socialPresenceList" class="social-presence-list"></div>
+            </section>
+          </div>
+
           <form id="socialFollowForm" class="social-follow-form" novalidate>
             <div class="field-grid">
               <label class="field-label" for="socialFollowUsername">Follow by username</label>
@@ -117,13 +137,184 @@
                 />
                 <button type="submit" id="socialFollowSubmit" class="btn-secondary">Follow</button>
               </div>
-            </div>
-            <div id="socialFollowStatus" class="community-status" role="status" aria-live="polite"></div>
-          </form>
+          </div>
+          <div id="socialFollowStatus" class="community-status" role="status" aria-live="polite"></div>
+          <div class="social-follow-assist">
+            <section
+              id="socialFollowSearchPanel"
+              class="social-follow-search"
+              hidden
+              data-state="idle"
+              aria-live="polite"
+            >
+              <p id="socialFollowSearchStatus" class="social-follow-search-status"></p>
+              <ul id="socialFollowSearchList" class="social-follow-search-list" role="listbox"></ul>
+              <p id="socialFollowSearchEmpty" class="social-follow-search-empty">
+                Start typing to find friends by name or handle.
+              </p>
+            </section>
+            <section class="social-invite-card">
+              <span class="social-invite-title">Share your profile</span>
+              <p class="social-invite-text">
+                Copy your link so friends can follow you instantly.
+              </p>
+              <div class="social-invite-link-row">
+                <input
+                  id="socialInviteLink"
+                  class="input-base social-invite-link"
+                  type="text"
+                  readonly
+                  value=""
+                  aria-label="Profile invite link"
+                />
+                <button type="button" id="socialInviteCopyBtn" class="btn-subtle" disabled>
+                  Copy link
+                </button>
+              </div>
+              <div
+                id="socialInviteStatus"
+                class="community-status social-invite-status"
+                role="status"
+                aria-live="polite"
+              ></div>
+            </section>
+          </div>
+        </form>
 
-          <section class="social-mutuals">
-            <header class="social-section-header">
-              <h3>Mutual followers</h3>
+        <section class="social-collab">
+          <header class="social-section-header">
+            <h3>Collaborative lists &amp; watch parties</h3>
+            <p>Build shared collections and plan nights in with friends.</p>
+          </header>
+          <div id="socialCollabStatus" class="community-status" role="status" aria-live="polite"></div>
+          <div id="socialCollabSummary" class="social-collab-summary"></div>
+          <div class="social-collab-actions">
+            <form id="collabCreateForm" class="collab-form" novalidate>
+              <div class="field-grid">
+                <label class="field-label" for="collabListName">Create a new collaborative list</label>
+                <input
+                  id="collabListName"
+                  class="input-base input-text"
+                  type="text"
+                  placeholder="Weekend double-feature"
+                  minlength="3"
+                  required
+                />
+              </div>
+              <div class="field-grid">
+                <label class="field-label" for="collabListDescription">Description (optional)</label>
+                <textarea id="collabListDescription" class="input-base collab-textarea" rows="2" maxlength="200"></textarea>
+              </div>
+              <div class="collab-form-footer">
+                <label class="field-label" for="collabListVisibility">Visibility</label>
+                <select id="collabListVisibility" class="input-base input-select">
+                  <option value="friends" selected>Friends can view</option>
+                  <option value="private">Private</option>
+                </select>
+                <button type="submit" class="btn-secondary">Create list</button>
+              </div>
+            </form>
+            <form id="watchPartyForm" class="collab-form" novalidate>
+              <div class="field-grid">
+                <label class="field-label" for="watchPartyTitle">Schedule a watch party</label>
+                <input
+                  id="watchPartyTitle"
+                  class="input-base input-text"
+                  type="text"
+                  placeholder="Movie title"
+                  required
+                />
+              </div>
+              <div class="collab-form-grid">
+                <div>
+                  <label class="field-label" for="watchPartyTmdbId">TMDB ID</label>
+                  <input id="watchPartyTmdbId" class="input-base input-text" type="text" placeholder="e.g. 603" />
+                </div>
+                <div>
+                  <label class="field-label" for="watchPartyImdbId">IMDb ID</label>
+                  <input id="watchPartyImdbId" class="input-base input-text" type="text" placeholder="Optional" />
+                </div>
+                <div>
+                  <label class="field-label" for="watchPartyDatetime">When</label>
+                  <input id="watchPartyDatetime" class="input-base input-text" type="datetime-local" required />
+                </div>
+              </div>
+              <div class="field-grid">
+                <label class="field-label" for="watchPartyInvitees">Invite handles</label>
+                <input
+                  id="watchPartyInvitees"
+                  class="input-base input-text"
+                  type="text"
+                  placeholder="Comma-separated usernames"
+                />
+              </div>
+              <div class="field-grid">
+                <label class="field-label" for="watchPartyNote">Personal note (optional)</label>
+                <textarea id="watchPartyNote" class="input-base collab-textarea" rows="2" maxlength="200"></textarea>
+              </div>
+              <div class="collab-form-footer collab-form-footer--actions">
+                <button type="submit" class="btn-secondary">Schedule party</button>
+                <button type="button" id="collabRefreshBtn" class="btn-subtle">Refresh status</button>
+              </div>
+            </form>
+          </div>
+          <div class="social-collab-grid">
+            <section class="social-collab-column">
+              <header class="social-section-header">
+                <h4>Your collaborative lists</h4>
+                <p>Lists you own and manage.</p>
+              </header>
+              <div id="collabOwnedEmpty" class="empty-state empty-state--subtle">
+                Start a collaborative list to plan watch nights together.
+              </div>
+              <div id="collabOwnedList" class="collab-list-container" hidden></div>
+            </section>
+            <section class="social-collab-column">
+              <header class="social-section-header">
+                <h4>Shared with you</h4>
+                <p>Lists where you’re a collaborator.</p>
+              </header>
+              <div id="collabSharedEmpty" class="empty-state empty-state--subtle">
+                Accept an invite to begin editing together.
+              </div>
+              <div id="collabSharedList" class="collab-list-container" hidden></div>
+            </section>
+            <section class="social-collab-column">
+              <header class="social-section-header">
+                <h4>Invites waiting</h4>
+                <p>Approve or decline collaboration invites.</p>
+              </header>
+              <div id="collabInviteEmpty" class="empty-state empty-state--subtle">No new invites yet.</div>
+              <div id="collabInviteList" class="collab-list-container" hidden></div>
+            </section>
+          </div>
+          <div class="social-watch-grid">
+            <section class="social-collab-column">
+              <header class="social-section-header">
+                <h4>Upcoming watch parties</h4>
+                <p>Stay in the loop on shared movie nights.</p>
+              </header>
+              <div id="watchPartyEmpty" class="empty-state empty-state--subtle">
+                Schedule a watch party to see it here.
+              </div>
+              <div id="watchPartyList" class="watch-party-container" hidden></div>
+            </section>
+            <section class="social-collab-column">
+              <header class="social-section-header">
+                <h4>Party invites</h4>
+                <p>Respond so hosts can plan.</p>
+              </header>
+              <div id="watchPartyInviteEmpty" class="empty-state empty-state--subtle">
+                No pending watch-party invitations.
+              </div>
+              <div id="watchPartyInviteList" class="watch-party-container" hidden></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="social-mutuals">
+          <header class="social-section-header">
+            <h3>Mutual followers</h3>
               <p>People you follow who follow you back.</p>
             </header>
             <div id="socialMutualList" class="social-chip-list" hidden></div>

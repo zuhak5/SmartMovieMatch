@@ -22,11 +22,20 @@ import {
   subscribeToSocialOverview,
   followUserByUsername,
   unfollowUserByUsername,
+  searchSocialUsers,
   getFollowingSnapshot,
   getSocialOverviewSnapshot,
   subscribeToNotifications,
   acknowledgeNotifications,
-  recordLibraryActivity
+  recordLibraryActivity,
+  refreshCollaborativeState,
+  createCollaborativeListRemote,
+  inviteCollaboratorRemote,
+  respondCollaboratorInviteRemote,
+  scheduleWatchPartyRemote,
+  respondWatchPartyRemote,
+  subscribeToCollaborativeState,
+  getCollaborativeStateSnapshot
 } from "./social.js";
 import {
   renderWatchedList,
@@ -48,6 +57,7 @@ const state = {
   favorites: [],
   followingUsers: [],
   socialOverview: getSocialOverviewSnapshot(),
+  collaborativeState: getCollaborativeStateSnapshot(),
   lastRecSeed: Math.random(),
   activeCollectionView: "favorites",
   session: null,
@@ -56,6 +66,7 @@ const state = {
   notifications: [],
   accountAvatarPreviewUrl: null,
   accountRemoveAvatar: false,
+  socialSearchReset: null,
   watchedSyncTimer: null,
   favoritesSyncTimer: null,
   activeRecToken: null,
@@ -83,6 +94,7 @@ let profileCalloutPulseTimer = null;
 let unsubscribeFollowing = null;
 let unsubscribeNotifications = null;
 let unsubscribeSocialOverview = null;
+let unsubscribeCollaborative = null;
 
 const GENRE_ICON_MAP = {
   "28": "💥", // Action
@@ -355,6 +367,14 @@ function init() {
     updateAccountUi(session);
     updateSnapshotPreviews(session);
     updateSocialSectionVisibility(session);
+    updateSocialInviteLink(session);
+    if (!session || !session.token) {
+      if (typeof state.socialSearchReset === "function") {
+        state.socialSearchReset({ hidePanel: true });
+      }
+    } else if (typeof state.socialSearchReset === "function") {
+      state.socialSearchReset({ showPrompt: true });
+    }
     if (!session || !session.token) {
       state.notifications = [];
       closeNotificationPanel();
@@ -2408,8 +2428,17 @@ function setupSocialFeatures() {
     renderSocialConnections();
   });
   state.socialOverview = getSocialOverviewSnapshot();
+  if (unsubscribeCollaborative) {
+    unsubscribeCollaborative();
+  }
+  unsubscribeCollaborative = subscribeToCollaborativeState((collabState) => {
+    state.collaborativeState = collabState;
+    renderSocialConnections();
+  });
+  state.collaborativeState = getCollaborativeStateSnapshot();
   renderSocialConnections();
   wireFollowForm();
+  wireCollaborativeForms();
   if (unsubscribeNotifications) {
     unsubscribeNotifications();
   }
@@ -2423,9 +2452,24 @@ function wireFollowForm() {
   const input = $("socialFollowUsername");
   const submitBtn = $("socialFollowSubmit");
   const statusEl = $("socialFollowStatus");
+  const searchPanel = $("socialFollowSearchPanel");
+  const searchList = $("socialFollowSearchList");
+  const searchStatus = $("socialFollowSearchStatus");
+  const searchEmpty = $("socialFollowSearchEmpty");
+  const inviteCopyBtn = $("socialInviteCopyBtn");
+  const inviteStatus = $("socialInviteStatus");
   if (!form || !input || !submitBtn || !statusEl) {
     return;
   }
+
+  const SEARCH_MIN_CHARS = 2;
+  let searchTimer = null;
+  let searchRequestId = 0;
+  let lastQuery = "";
+
+  prefillFollowFromQuery();
+  updateSocialInviteLink();
+  resetSearchPanel();
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -2448,6 +2492,7 @@ function wireFollowForm() {
       await followUserByUsername(username);
       setSocialStatus(`Now following @${username.toLowerCase()}.`, "success");
       input.value = "";
+      clearSearchResults({ hidePanel: true });
     } catch (error) {
       setSocialStatus(
         error instanceof Error ? error.message : "Couldn’t follow that user right now.",
@@ -2457,15 +2502,547 @@ function wireFollowForm() {
       submitBtn.disabled = false;
     }
   });
+
+  input.addEventListener("input", () => {
+    if (!state.session || !state.session.token) {
+      clearSearchResults({ hidePanel: true });
+      return;
+    }
+    const value = input.value.trim();
+    if (searchTimer) {
+      window.clearTimeout(searchTimer);
+      searchTimer = null;
+    }
+    if (value.length < SEARCH_MIN_CHARS) {
+      lastQuery = "";
+      resetSearchPanel();
+      return;
+    }
+    searchTimer = window.setTimeout(() => {
+      runSearch(value);
+    }, 220);
+  });
+
+  input.addEventListener("focus", () => {
+    if (!state.session || !state.session.token) {
+      return;
+    }
+    const value = input.value.trim();
+    if (value.length >= SEARCH_MIN_CHARS) {
+      runSearch(value);
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!searchPanel || searchPanel.hidden) {
+      return;
+    }
+    const target = event.target;
+    if (!target) {
+      return;
+    }
+    if (
+      target === input ||
+      searchPanel.contains(target) ||
+      (typeof target.closest === "function" && target.closest(".social-follow-search-item"))
+    ) {
+      return;
+    }
+    clearSearchResults({ hidePanel: true });
+  });
+
+  if (inviteCopyBtn && inviteStatus) {
+    inviteCopyBtn.addEventListener("click", async () => {
+      if (!state.session || !state.session.token) {
+        window.location.href = "login.html";
+        return;
+      }
+      const inviteLinkEl = $("socialInviteLink");
+      if (!inviteLinkEl || !inviteLinkEl.value) {
+        updateSocialInviteLink();
+      }
+      const linkValue = inviteLinkEl ? inviteLinkEl.value.trim() : "";
+      if (!linkValue) {
+        setInviteStatus("Invite link not ready yet. Try again in a moment.", "error");
+        return;
+      }
+      try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+          await navigator.clipboard.writeText(linkValue);
+        } else if (inviteLinkEl) {
+          inviteLinkEl.focus();
+          inviteLinkEl.select();
+          document.execCommand("copy");
+          inviteLinkEl.setSelectionRange(inviteLinkEl.value.length, inviteLinkEl.value.length);
+        }
+        setInviteStatus("Link copied! Share it with friends.", "success");
+      } catch (error) {
+        setInviteStatus("Copy failed. Select the link and copy it manually.", "error");
+      }
+    });
+  }
+
+  state.socialSearchReset = (options = {}) => {
+    if (options.hidePanel) {
+      clearSearchResults({ hidePanel: true });
+      return;
+    }
+    if (options.showPrompt) {
+      resetSearchPanel();
+      return;
+    }
+    clearSearchResults();
+    resetSearchPanel();
+  };
+
+  function runSearch(query) {
+    if (!state.session || !state.session.token) {
+      return;
+    }
+    const trimmed = query.trim();
+    if (trimmed.length < SEARCH_MIN_CHARS) {
+      resetSearchPanel();
+      return;
+    }
+    lastQuery = trimmed;
+    const currentRequest = ++searchRequestId;
+    setSearchState("loading", `Searching for “${trimmed}”…`);
+    searchSocialUsers(trimmed)
+      .then((results) => {
+        if (currentRequest !== searchRequestId) {
+          return;
+        }
+        if (!Array.isArray(results) || !results.length) {
+          setSearchState(
+            "empty",
+            `No members matched “${trimmed}” yet. Try a different name or handle.`
+          );
+          return;
+        }
+        renderSearchResults(results);
+      })
+      .catch((error) => {
+        if (currentRequest !== searchRequestId) {
+          return;
+        }
+        const message =
+          error instanceof Error
+            ? error.message
+            : "We couldn’t search right now. Try again.";
+        setSearchState("error", message);
+      });
+  }
+
+  function renderSearchResults(results) {
+    if (!searchPanel || !searchList) {
+      return;
+    }
+    searchList.innerHTML = "";
+    results.forEach((result) => {
+      if (!result || !result.username) {
+        return;
+      }
+      const item = document.createElement("li");
+      item.className = "social-follow-search-item";
+      item.role = "option";
+
+      const infoButton = document.createElement("button");
+      infoButton.type = "button";
+      infoButton.className = "social-follow-search-info";
+      infoButton.addEventListener("click", () => {
+        input.value = result.username;
+        input.focus();
+        setSearchState(
+          "hint",
+          `Press Follow to add @${result.username.toLowerCase()} or keep browsing results.`
+        );
+      });
+
+      const name = document.createElement("span");
+      name.className = "social-follow-name";
+      name.textContent = result.displayName || formatSocialDisplayName(result.username);
+      const handle = document.createElement("span");
+      handle.className = "social-follow-handle";
+      handle.textContent = `@${result.username}`;
+
+      infoButton.appendChild(name);
+      infoButton.appendChild(handle);
+
+      if (result.reason) {
+        const reason = document.createElement("span");
+        reason.className = "social-follow-search-reason";
+        reason.textContent = result.reason;
+        infoButton.appendChild(reason);
+      }
+
+      if (Array.isArray(result.sharedInterests) && result.sharedInterests.length) {
+        const tags = document.createElement("div");
+        tags.className = "social-follow-search-tags";
+        result.sharedInterests.slice(0, 2).forEach((interest) => {
+          const tag = document.createElement("span");
+          tag.className = "social-suggestion-tag";
+          tag.dataset.variant = "interest";
+          tag.textContent = interest;
+          tags.appendChild(tag);
+        });
+        infoButton.appendChild(tags);
+      }
+
+      if (Array.isArray(result.sharedFavorites) && result.sharedFavorites.length) {
+        const favs = document.createElement("div");
+        favs.className = "social-follow-search-tags";
+        result.sharedFavorites.slice(0, 2).forEach((favorite) => {
+          const tag = document.createElement("span");
+          tag.className = "social-suggestion-tag";
+          tag.dataset.variant = "favorite";
+          tag.textContent = favorite;
+          favs.appendChild(tag);
+        });
+        infoButton.appendChild(favs);
+      }
+
+      item.appendChild(infoButton);
+
+      const followBtn = document.createElement("button");
+      followBtn.type = "button";
+      followBtn.className = "btn-secondary social-follow-search-follow";
+      followBtn.textContent = "Follow";
+      followBtn.addEventListener("click", async () => {
+        if (!state.session || !state.session.token) {
+          window.location.href = "login.html";
+          return;
+        }
+        playUiClick();
+        followBtn.disabled = true;
+        setSocialStatus(`Following @${result.username.toLowerCase()}…`, "loading");
+        try {
+          await followUserByUsername(result.username);
+          setSocialStatus(`Now following @${result.username.toLowerCase()}.`, "success");
+          runSearch(lastQuery);
+        } catch (error) {
+          setSocialStatus(
+            error instanceof Error
+              ? error.message
+              : "Couldn’t follow that user right now.",
+            "error"
+          );
+        } finally {
+          followBtn.disabled = false;
+        }
+      });
+      item.appendChild(followBtn);
+
+      searchList.appendChild(item);
+    });
+    setSearchState(
+      "results",
+      results.length === 1
+        ? "Found 1 member you might know."
+        : `Found ${results.length} members who match.`
+    );
+  }
+
+  function setSearchState(state, message) {
+    if (!searchPanel) {
+      return;
+    }
+    searchPanel.hidden = false;
+    searchPanel.dataset.state = state;
+    if (searchStatus) {
+      if (message) {
+        searchStatus.hidden = false;
+        searchStatus.textContent = message;
+      } else {
+        searchStatus.hidden = true;
+        searchStatus.textContent = "";
+      }
+    }
+    if (searchList) {
+      searchList.hidden = state !== "results";
+    }
+    if (searchEmpty) {
+      if (state === "empty") {
+        searchEmpty.hidden = false;
+        if (message) {
+          searchEmpty.textContent = message;
+        }
+      } else {
+        searchEmpty.hidden = true;
+      }
+    }
+  }
+
+  function clearSearchResults({ hidePanel = false } = {}) {
+    if (searchTimer) {
+      window.clearTimeout(searchTimer);
+      searchTimer = null;
+    }
+    searchRequestId++;
+    lastQuery = "";
+    if (searchList) {
+      searchList.innerHTML = "";
+      searchList.hidden = true;
+    }
+    if (searchEmpty) {
+      searchEmpty.hidden = true;
+    }
+    if (searchStatus) {
+      searchStatus.textContent = "";
+      searchStatus.hidden = true;
+    }
+    if (searchPanel) {
+      searchPanel.dataset.state = "idle";
+      if (hidePanel) {
+        searchPanel.hidden = true;
+      }
+    }
+  }
+
+  function resetSearchPanel() {
+    if (!searchPanel) {
+      return;
+    }
+    if (!state.session || !state.session.token) {
+      clearSearchResults({ hidePanel: true });
+      return;
+    }
+    searchPanel.hidden = false;
+    searchPanel.dataset.state = "idle";
+    if (searchStatus) {
+      searchStatus.hidden = false;
+      searchStatus.textContent = "Start typing to find friends by name or handle.";
+    }
+    if (searchList) {
+      searchList.hidden = true;
+    }
+    if (searchEmpty) {
+      searchEmpty.hidden = true;
+    }
+  }
+
+  function prefillFollowFromQuery() {
+    const params = new URLSearchParams(window.location.search);
+    const followValue = params.get("follow");
+    if (!followValue) {
+      return;
+    }
+    input.value = followValue;
+    if (state.session && state.session.token && followValue.trim().length >= SEARCH_MIN_CHARS) {
+      runSearch(followValue.trim());
+    }
+    if (typeof window.history.replaceState === "function") {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.delete("follow");
+      const newSearch = currentUrl.searchParams.toString();
+      const next = `${currentUrl.pathname}${newSearch ? `?${newSearch}` : ""}${currentUrl.hash}`;
+      window.history.replaceState({}, document.title, next);
+    }
+  }
+
+  function setInviteStatus(message, variant) {
+    if (!inviteStatus) {
+      return;
+    }
+    if (!message) {
+      inviteStatus.textContent = "";
+      inviteStatus.removeAttribute("data-variant");
+      return;
+    }
+    inviteStatus.textContent = message;
+    if (variant) {
+      inviteStatus.dataset.variant = variant;
+    } else {
+      inviteStatus.removeAttribute("data-variant");
+    }
+    window.setTimeout(() => {
+      if (inviteStatus.textContent === message) {
+        inviteStatus.textContent = "";
+        inviteStatus.removeAttribute("data-variant");
+      }
+    }, 4000);
+  }
+}
+
+function wireCollaborativeForms() {
+  const createForm = $("collabCreateForm");
+  const listNameInput = $("collabListName");
+  const listDescriptionInput = $("collabListDescription");
+  const visibilitySelect = $("collabListVisibility");
+  if (createForm && !createForm.dataset.wired) {
+    createForm.dataset.wired = "true";
+    createForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!state.session || !state.session.token) {
+        window.location.href = "login.html";
+        return;
+      }
+      const name = listNameInput ? listNameInput.value.trim() : "";
+      if (name.length < 3) {
+        setCollabStatus("Name your list with at least 3 characters.", "error");
+        if (listNameInput) {
+          listNameInput.focus();
+        }
+        return;
+      }
+      const description = listDescriptionInput ? listDescriptionInput.value.trim() : "";
+      const visibility = visibilitySelect && visibilitySelect.value === "private" ? "private" : "friends";
+      const submitButton = createForm.querySelector("button[type=\"submit\"]");
+      if (submitButton) {
+        submitButton.disabled = true;
+      }
+      setCollabStatus("Creating collaborative list…", "loading");
+      try {
+        await createCollaborativeListRemote({ name, description, visibility });
+        setCollabStatus(`Created “${name}”.`, "success");
+        createForm.reset();
+        if (visibilitySelect) {
+          visibilitySelect.value = "friends";
+        }
+        await refreshCollaborativeState();
+      } catch (error) {
+        setCollabStatus(
+          error instanceof Error ? error.message : "Couldn’t create that list right now.",
+          "error"
+        );
+      } finally {
+        if (submitButton) {
+          submitButton.disabled = false;
+        }
+      }
+    });
+  }
+
+  const watchForm = $("watchPartyForm");
+  const watchTitleInput = $("watchPartyTitle");
+  const watchTmdbInput = $("watchPartyTmdbId");
+  const watchImdbInput = $("watchPartyImdbId");
+  const watchDateInput = $("watchPartyDatetime");
+  const watchNoteInput = $("watchPartyNote");
+  const watchInviteInput = $("watchPartyInvitees");
+  if (watchForm && !watchForm.dataset.wired) {
+    watchForm.dataset.wired = "true";
+    watchForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!state.session || !state.session.token) {
+        window.location.href = "login.html";
+        return;
+      }
+      const title = watchTitleInput ? watchTitleInput.value.trim() : "";
+      if (title.length < 2) {
+        setCollabStatus("Add a movie title for your watch party.", "error");
+        if (watchTitleInput) {
+          watchTitleInput.focus();
+        }
+        return;
+      }
+      const tmdbId = watchTmdbInput ? watchTmdbInput.value.trim() : "";
+      const imdbId = watchImdbInput ? watchImdbInput.value.trim() : "";
+      if (!tmdbId && !imdbId) {
+        setCollabStatus("Provide a TMDB or IMDb ID so we can match the movie.", "error");
+        if (watchTmdbInput) {
+          watchTmdbInput.focus();
+        }
+        return;
+      }
+      const whenRaw = watchDateInput ? watchDateInput.value.trim() : "";
+      if (!whenRaw) {
+        setCollabStatus("Choose a date and time for your watch party.", "error");
+        if (watchDateInput) {
+          watchDateInput.focus();
+        }
+        return;
+      }
+      const whenDate = new Date(whenRaw);
+      if (Number.isNaN(whenDate.getTime())) {
+        setCollabStatus("Enter a valid date and time.", "error");
+        if (watchDateInput) {
+          watchDateInput.focus();
+        }
+        return;
+      }
+      const note = watchNoteInput ? watchNoteInput.value.trim() : "";
+      const invitees = parseInviteHandles(watchInviteInput ? watchInviteInput.value : "");
+      const submitButton = watchForm.querySelector("button[type=\"submit\"]");
+      if (submitButton) {
+        submitButton.disabled = true;
+      }
+      setCollabStatus("Scheduling watch party…", "loading");
+      try {
+        await scheduleWatchPartyRemote({
+          movie: { title, tmdbId: tmdbId || null, imdbId: imdbId || null },
+          scheduledFor: whenDate.toISOString(),
+          note,
+          invitees
+        });
+        setCollabStatus("Watch party scheduled!", "success");
+        watchForm.reset();
+        await refreshCollaborativeState();
+      } catch (error) {
+        setCollabStatus(
+          error instanceof Error ? error.message : "Couldn’t schedule that watch party right now.",
+          "error"
+        );
+      } finally {
+        if (submitButton) {
+          submitButton.disabled = false;
+        }
+      }
+    });
+  }
+
+  const refreshBtn = $("collabRefreshBtn");
+  if (refreshBtn && !refreshBtn.dataset.wired) {
+    refreshBtn.dataset.wired = "true";
+    refreshBtn.addEventListener("click", async () => {
+      if (!state.session || !state.session.token) {
+        window.location.href = "login.html";
+        return;
+      }
+      playUiClick();
+      refreshBtn.disabled = true;
+      setCollabStatus("Refreshing collaborative state…", "loading");
+      try {
+        await refreshCollaborativeState();
+        setCollabStatus("Collaborative lists updated.", "success");
+      } catch (error) {
+        setCollabStatus(
+          error instanceof Error ? error.message : "Couldn’t refresh collaborative data right now.",
+          "error"
+        );
+      } finally {
+        refreshBtn.disabled = false;
+      }
+    });
+  }
+
+  function parseInviteHandles(raw) {
+    if (!raw) {
+      return [];
+    }
+    const currentUser = state.session && state.session.username ? canonicalHandle(state.session.username) : null;
+    return raw
+      .split(/[\s,]+/)
+      .map((value) => canonicalHandle(value))
+      .filter((value) => value && value !== currentUser);
+  }
 }
 
 function renderSocialConnections() {
   const overview = state.socialOverview || getSocialOverviewSnapshot();
+  const collabState = state.collaborativeState || getCollaborativeStateSnapshot();
   const following = Array.isArray(overview.following) ? overview.following : [];
   const followers = Array.isArray(overview.followers) ? overview.followers : [];
   const mutualFollowers = Array.isArray(overview.mutualFollowers) ? overview.mutualFollowers : [];
   const suggestions = Array.isArray(overview.suggestions) ? overview.suggestions : [];
   const counts = overview && overview.counts ? overview.counts : {};
+  const presence = overview && overview.presence && typeof overview.presence === 'object' ? overview.presence : {};
+  const badges = Array.isArray(overview.badges) ? overview.badges : state.socialOverview?.badges || [];
+  const collabLists = collabState && collabState.lists ? collabState.lists : { owned: [], shared: [], invites: [] };
+  const collaborations = {
+    owned: Array.isArray(collabLists.owned) ? collabLists.owned.length : 0,
+    shared: Array.isArray(collabLists.shared) ? collabLists.shared.length : 0,
+    invites: Array.isArray(collabLists.invites) ? collabLists.invites.length : 0
+  };
 
   const followingSet = new Set(following);
   const followersSet = new Set(followers);
@@ -2488,6 +3065,87 @@ function renderSocialConnections() {
     "socialFollowersHeadingCount",
     Number.isFinite(counts.followers) ? counts.followers : followers.length
   );
+
+  const badgeListEl = $("socialBadgeList");
+  const badgeEmptyEl = $("socialBadgeEmpty");
+  if (badgeListEl && badgeEmptyEl) {
+    badgeListEl.innerHTML = "";
+    if (!badges.length) {
+      badgeListEl.hidden = true;
+      badgeEmptyEl.hidden = false;
+    } else {
+      badges.forEach((badge) => {
+        const chip = document.createElement("div");
+        chip.className = "social-badge";
+        const title = document.createElement("span");
+        title.className = "social-badge-title";
+        title.textContent = badge.label;
+        const description = document.createElement("span");
+        description.className = "social-badge-desc";
+        description.textContent = badge.description || "";
+        chip.appendChild(title);
+        chip.appendChild(description);
+        badgeListEl.appendChild(chip);
+      });
+      badgeListEl.hidden = false;
+      badgeEmptyEl.hidden = true;
+    }
+  }
+
+  const presenceListEl = $("socialPresenceList");
+  if (presenceListEl) {
+    presenceListEl.innerHTML = "";
+    const activeEntries = following
+      .map((username) => ({ username, presence: presence[username] }))
+      .filter((entry) => entry.presence && entry.presence.state);
+    if (!activeEntries.length) {
+      const empty = document.createElement("p");
+      empty.className = "social-presence-empty";
+      empty.textContent = "No friends online right now.";
+      presenceListEl.appendChild(empty);
+    } else {
+      activeEntries.forEach((entry) => {
+        const row = document.createElement("div");
+        row.className = "social-presence-row";
+        const name = document.createElement("span");
+        name.className = "social-presence-name";
+        name.textContent = formatSocialDisplayName(entry.username);
+        const state = document.createElement("span");
+        state.className = "social-presence-state";
+        state.dataset.state = entry.presence.state;
+        if (entry.presence.state === "watching" && entry.presence.movieTitle) {
+          state.textContent = `Watching ${entry.presence.movieTitle}`;
+        } else if (entry.presence.state === "away") {
+          state.textContent = "Away";
+        } else {
+          state.textContent = "Online";
+        }
+        row.appendChild(name);
+        row.appendChild(state);
+        presenceListEl.appendChild(row);
+      });
+    }
+  }
+
+  const collabSummaryEl = $("socialCollabSummary");
+  if (collabSummaryEl) {
+    collabSummaryEl.innerHTML = "";
+    const summary = collaborations || { owned: 0, shared: 0, invites: 0 };
+    const owned = document.createElement("div");
+    owned.className = "social-collab-pill";
+    owned.innerHTML = `<strong>${summary.owned || 0}</strong> owned lists`;
+    const shared = document.createElement("div");
+    shared.className = "social-collab-pill";
+    shared.innerHTML = `<strong>${summary.shared || 0}</strong> shared lists`;
+    const invites = document.createElement("div");
+    invites.className = "social-collab-pill";
+    invites.innerHTML = `<strong>${summary.invites || 0}</strong> invites waiting`;
+    collabSummaryEl.appendChild(owned);
+    collabSummaryEl.appendChild(shared);
+    collabSummaryEl.appendChild(invites);
+  }
+
+  renderCollaborativeSections(collabState);
 
   const mutualListEl = $("socialMutualList");
   const mutualEmptyEl = $("socialMutualEmpty");
@@ -2588,6 +3246,464 @@ function renderSocialConnections() {
   }
 }
 
+function renderCollaborativeSections(collabStateInput) {
+  const collab = collabStateInput && typeof collabStateInput === "object"
+    ? collabStateInput
+    : getCollaborativeStateSnapshot();
+  const lists = collab && typeof collab === "object" && collab.lists ? collab.lists : {};
+  const watchParties = collab && typeof collab === "object" && collab.watchParties ? collab.watchParties : {};
+
+  renderCollaborativeListCollection(lists.owned, "collabOwnedList", "collabOwnedEmpty", "owner");
+  renderCollaborativeListCollection(lists.shared, "collabSharedList", "collabSharedEmpty", "shared");
+  renderCollaborativeInviteCollection(lists.invites, "collabInviteList", "collabInviteEmpty");
+  renderWatchPartyCollection(watchParties.upcoming, "watchPartyList", "watchPartyEmpty", "upcoming");
+  renderWatchPartyCollection(watchParties.invites, "watchPartyInviteList", "watchPartyInviteEmpty", "invite");
+}
+
+function renderCollaborativeListCollection(entries, listId, emptyId, mode) {
+  const container = $(listId);
+  const empty = $(emptyId);
+  if (!container || !empty) {
+    return;
+  }
+  container.innerHTML = "";
+  const list = Array.isArray(entries) ? entries.slice() : [];
+  if (!list.length) {
+    container.hidden = true;
+    empty.hidden = false;
+    return;
+  }
+  list.sort((a, b) => {
+    const aTime = Math.max(toTimestamp(a?.updatedAt), toTimestamp(a?.createdAt));
+    const bTime = Math.max(toTimestamp(b?.updatedAt), toTimestamp(b?.createdAt));
+    return bTime - aTime;
+  });
+  container.hidden = false;
+  empty.hidden = true;
+  list.forEach((entry) => {
+    const card = buildCollaborativeListCard(entry, mode);
+    container.appendChild(card);
+  });
+}
+
+function renderCollaborativeInviteCollection(entries, listId, emptyId) {
+  const container = $(listId);
+  const empty = $(emptyId);
+  if (!container || !empty) {
+    return;
+  }
+  container.innerHTML = "";
+  const list = Array.isArray(entries) ? entries.slice() : [];
+  if (!list.length) {
+    container.hidden = true;
+    empty.hidden = false;
+    return;
+  }
+  list.sort((a, b) => {
+    return toTimestamp(b?.invitedAt) - toTimestamp(a?.invitedAt);
+  });
+  container.hidden = false;
+  empty.hidden = true;
+  list.forEach((entry) => {
+    const card = buildCollaborativeInviteCard(entry);
+    container.appendChild(card);
+  });
+}
+
+function renderWatchPartyCollection(entries, listId, emptyId, mode) {
+  const container = $(listId);
+  const empty = $(emptyId);
+  if (!container || !empty) {
+    return;
+  }
+  container.innerHTML = "";
+  const list = Array.isArray(entries) ? entries.slice() : [];
+  if (!list.length) {
+    container.hidden = true;
+    empty.hidden = false;
+    return;
+  }
+  list.sort((a, b) => {
+    const aTime = toTimestamp(a?.scheduledFor || a?.createdAt);
+    const bTime = toTimestamp(b?.scheduledFor || b?.createdAt);
+    return aTime - bTime;
+  });
+  container.hidden = false;
+  empty.hidden = true;
+  list.forEach((entry) => {
+    const card = buildWatchPartyCard(entry, mode);
+    container.appendChild(card);
+  });
+}
+
+function buildCollaborativeListCard(entry, mode) {
+  const card = document.createElement("article");
+  card.className = "collab-list-card";
+  card.dataset.role = mode;
+
+  const header = document.createElement("header");
+  header.className = "collab-list-card-header";
+  const title = document.createElement("h4");
+  title.textContent = entry.name || "Untitled list";
+  header.appendChild(title);
+  const count = document.createElement("span");
+  count.className = "collab-list-count";
+  count.textContent = formatMovieCount(entry.movieCount);
+  header.appendChild(count);
+  card.appendChild(header);
+
+  if (entry.description) {
+    const desc = document.createElement("p");
+    desc.className = "collab-list-desc";
+    desc.textContent = entry.description;
+    card.appendChild(desc);
+  }
+
+  const meta = document.createElement("div");
+  meta.className = "collab-list-meta";
+  const metaParts = [];
+  if (mode === "owner") {
+    metaParts.push("You own this list");
+  } else if (entry.owner) {
+    metaParts.push(`Owner: @${entry.owner}`);
+  }
+  if (entry.visibility === "private") {
+    metaParts.push("Private access");
+  } else {
+    metaParts.push("Friends can view");
+  }
+  const updatedLabel = formatTimeAgo(entry.updatedAt || entry.createdAt);
+  if (updatedLabel) {
+    metaParts.push(`Updated ${updatedLabel}`);
+  }
+  meta.textContent = metaParts.join(" • ");
+  card.appendChild(meta);
+
+  if (Array.isArray(entry.preview) && entry.preview.length) {
+    const preview = document.createElement("div");
+    preview.className = "collab-list-preview";
+    entry.preview.forEach((item) => {
+      if (!item || !item.title) {
+        return;
+      }
+      const pill = document.createElement("span");
+      pill.className = "collab-chip";
+      pill.dataset.variant = "movie";
+      pill.textContent = item.title;
+      preview.appendChild(pill);
+    });
+    card.appendChild(preview);
+  }
+
+  const collaborators = Array.isArray(entry.collaborators)
+    ? entry.collaborators.filter((handle) => canonicalHandle(handle) && canonicalHandle(handle) !== canonicalHandle(entry.owner))
+    : [];
+  if (collaborators.length) {
+    const row = document.createElement("div");
+    row.className = "collab-list-collaborators";
+    const label = document.createElement("span");
+    label.className = "collab-chip collab-chip--label";
+    label.textContent = "Collaborators";
+    row.appendChild(label);
+    collaborators.forEach((handle) => {
+      const chip = document.createElement("span");
+      chip.className = "collab-chip";
+      chip.textContent = formatSocialDisplayName(handle);
+      row.appendChild(chip);
+    });
+    card.appendChild(row);
+  }
+
+  if (mode === "owner" && Array.isArray(entry.pendingInvites) && entry.pendingInvites.length) {
+    const pending = document.createElement("p");
+    pending.className = "collab-list-pending";
+    pending.textContent = `Pending invites: ${entry.pendingInvites.map((handle) => `@${handle}`).join(", ")}`;
+    card.appendChild(pending);
+  }
+
+  if (mode === "owner") {
+    const actions = document.createElement("div");
+    actions.className = "collab-list-actions";
+    const inviteBtn = document.createElement("button");
+    inviteBtn.type = "button";
+    inviteBtn.className = "btn-subtle";
+    inviteBtn.textContent = "Invite collaborator";
+    inviteBtn.addEventListener("click", () => {
+      playUiClick();
+      handleInviteCollaboratorAction(entry, inviteBtn);
+    });
+    actions.appendChild(inviteBtn);
+    card.appendChild(actions);
+  }
+
+  return card;
+}
+
+function buildCollaborativeInviteCard(entry) {
+  const card = document.createElement("article");
+  card.className = "collab-list-card collab-list-card--invite";
+
+  const header = document.createElement("header");
+  header.className = "collab-list-card-header";
+  const title = document.createElement("h4");
+  title.textContent = entry.name || "Collaborative list invite";
+  header.appendChild(title);
+  card.appendChild(header);
+
+  const meta = document.createElement("div");
+  meta.className = "collab-list-meta";
+  const parts = [];
+  if (entry.owner) {
+    parts.push(`Owner: @${entry.owner}`);
+  }
+  const invitedAt = formatTimeAgo(entry.invitedAt);
+  if (invitedAt) {
+    parts.push(`Invited ${invitedAt}`);
+  }
+  meta.textContent = parts.join(" • ");
+  card.appendChild(meta);
+
+  if (entry.description) {
+    const desc = document.createElement("p");
+    desc.className = "collab-list-desc";
+    desc.textContent = entry.description;
+    card.appendChild(desc);
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "collab-list-actions";
+  const acceptBtn = document.createElement("button");
+  acceptBtn.type = "button";
+  acceptBtn.className = "btn-secondary";
+  acceptBtn.textContent = "Accept";
+  acceptBtn.addEventListener("click", () => {
+    playUiClick();
+    handleCollaboratorInviteDecision(entry.id, "accept", acceptBtn, actions);
+  });
+  const declineBtn = document.createElement("button");
+  declineBtn.type = "button";
+  declineBtn.className = "btn-subtle btn-subtle-danger";
+  declineBtn.textContent = "Decline";
+  declineBtn.addEventListener("click", () => {
+    playUiClick();
+    handleCollaboratorInviteDecision(entry.id, "decline", declineBtn, actions);
+  });
+  actions.appendChild(acceptBtn);
+  actions.appendChild(declineBtn);
+  card.appendChild(actions);
+
+  return card;
+}
+
+function buildWatchPartyCard(entry, mode) {
+  const card = document.createElement("article");
+  card.className = "watch-party-card";
+  card.dataset.mode = mode;
+
+  const header = document.createElement("header");
+  header.className = "watch-party-card-header";
+  const title = document.createElement("h4");
+  title.textContent = entry.movie && entry.movie.title ? entry.movie.title : "Watch party";
+  header.appendChild(title);
+  card.appendChild(header);
+
+  const meta = document.createElement("div");
+  meta.className = "watch-party-meta";
+  const metaParts = [];
+  const schedule = formatWatchPartyDate(entry.scheduledFor);
+  if (schedule) {
+    metaParts.push(schedule);
+  }
+  if (entry.host) {
+    metaParts.push(`Host: @${entry.host}`);
+  }
+  meta.textContent = metaParts.join(" • ");
+  card.appendChild(meta);
+
+  if (entry.note) {
+    const note = document.createElement("p");
+    note.className = "watch-party-note";
+    note.textContent = entry.note;
+    card.appendChild(note);
+  }
+
+  if (mode === "upcoming" && Array.isArray(entry.invitees) && entry.invitees.length) {
+    const roster = document.createElement("div");
+    roster.className = "watch-party-roster";
+    entry.invitees.forEach((invite) => {
+      if (!invite || !invite.username) {
+        return;
+      }
+      const chip = document.createElement("span");
+      chip.className = "watch-party-chip";
+      chip.dataset.state = invite.response || "pending";
+      chip.textContent = `${formatSocialDisplayName(invite.username)} – ${formatPartyResponse(invite.response)}`;
+      roster.appendChild(chip);
+    });
+    card.appendChild(roster);
+  }
+
+  const username = state.session && state.session.username ? canonicalHandle(state.session.username) : null;
+  if (mode === "upcoming" && username && entry.host !== username) {
+    const mine = Array.isArray(entry.invitees)
+      ? entry.invitees.find((invite) => canonicalHandle(invite.username) === username)
+      : null;
+    if (mine) {
+      const response = document.createElement("p");
+      response.className = "watch-party-response";
+      response.textContent = `You responded: ${formatPartyResponse(mine.response)}`;
+      card.appendChild(response);
+    }
+  }
+
+  if (mode === "invite") {
+    const actions = document.createElement("div");
+    actions.className = "watch-party-actions";
+    const acceptBtn = document.createElement("button");
+    acceptBtn.type = "button";
+    acceptBtn.className = "btn-secondary";
+    acceptBtn.textContent = "Accept";
+    acceptBtn.addEventListener("click", () => {
+      playUiClick();
+      handleWatchPartyResponseAction(entry.id, "accept", acceptBtn, actions);
+    });
+    const maybeBtn = document.createElement("button");
+    maybeBtn.type = "button";
+    maybeBtn.className = "btn-subtle";
+    maybeBtn.textContent = "Maybe";
+    maybeBtn.addEventListener("click", () => {
+      playUiClick();
+      handleWatchPartyResponseAction(entry.id, "maybe", maybeBtn, actions);
+    });
+    const declineBtn = document.createElement("button");
+    declineBtn.type = "button";
+    declineBtn.className = "btn-subtle btn-subtle-danger";
+    declineBtn.textContent = "Decline";
+    declineBtn.addEventListener("click", () => {
+      playUiClick();
+      handleWatchPartyResponseAction(entry.id, "decline", declineBtn, actions);
+    });
+    actions.appendChild(acceptBtn);
+    actions.appendChild(maybeBtn);
+    actions.appendChild(declineBtn);
+    card.appendChild(actions);
+  }
+
+  return card;
+}
+
+async function handleInviteCollaboratorAction(entry, button) {
+  if (!entry || !entry.id) {
+    return;
+  }
+  const username = window.prompt("Invite which username to collaborate?");
+  if (!username) {
+    return;
+  }
+  const trimmed = username.trim();
+  if (!trimmed) {
+    return;
+  }
+  const previousDisabled = button.disabled;
+  button.disabled = true;
+  setCollabStatus(`Inviting @${trimmed.toLowerCase()}…`, "loading");
+  try {
+    await inviteCollaboratorRemote({ listId: entry.id, username: trimmed });
+    setCollabStatus(`Invite sent to @${trimmed.toLowerCase()}.`, "success");
+    await refreshCollaborativeState();
+  } catch (error) {
+    setCollabStatus(error instanceof Error ? error.message : "Couldn’t send that invite.", "error");
+  } finally {
+    button.disabled = previousDisabled;
+  }
+}
+
+async function handleCollaboratorInviteDecision(listId, decision, button, actionGroup) {
+  if (!listId) {
+    return;
+  }
+  const buttons = actionGroup ? Array.from(actionGroup.querySelectorAll("button")) : [button];
+  buttons.forEach((btn) => {
+    btn.disabled = true;
+  });
+  setCollabStatus(
+    decision === "accept" ? "Joining collaborative list…" : "Declining invite…",
+    "loading"
+  );
+  try {
+    await respondCollaboratorInviteRemote({ listId, decision });
+    setCollabStatus(
+      decision === "accept" ? "You’re now a collaborator!" : "Invite declined.",
+      "success"
+    );
+    await refreshCollaborativeState();
+  } catch (error) {
+    setCollabStatus(
+      error instanceof Error ? error.message : "Couldn’t update the invite right now.",
+      "error"
+    );
+  } finally {
+    buttons.forEach((btn) => {
+      btn.disabled = false;
+    });
+  }
+}
+
+async function handleWatchPartyResponseAction(partyId, response, button, actionGroup) {
+  if (!partyId) {
+    return;
+  }
+  const buttons = actionGroup ? Array.from(actionGroup.querySelectorAll("button")) : [button];
+  buttons.forEach((btn) => {
+    btn.disabled = true;
+  });
+  setCollabStatus("Updating watch party RSVP…", "loading");
+  try {
+    await respondWatchPartyRemote({ partyId, response });
+    setCollabStatus("Response recorded.", "success");
+    await refreshCollaborativeState();
+  } catch (error) {
+    setCollabStatus(
+      error instanceof Error ? error.message : "Couldn’t update your RSVP right now.",
+      "error"
+    );
+  } finally {
+    buttons.forEach((btn) => {
+      btn.disabled = false;
+    });
+  }
+}
+
+function setCollabStatus(message, variant) {
+  const statusEl = $("socialCollabStatus");
+  if (!statusEl) {
+    return;
+  }
+  if (message) {
+    statusEl.textContent = message;
+  } else {
+    statusEl.textContent = "";
+  }
+  if (variant) {
+    statusEl.dataset.variant = variant;
+  } else {
+    statusEl.removeAttribute("data-variant");
+  }
+  if (message) {
+    const stamp = String(Date.now());
+    statusEl.dataset.stamp = stamp;
+    window.setTimeout(() => {
+      if (statusEl.dataset.stamp === stamp) {
+        statusEl.textContent = "";
+        statusEl.removeAttribute("data-variant");
+        delete statusEl.dataset.stamp;
+      }
+    }, 5000);
+  } else {
+    delete statusEl.dataset.stamp;
+  }
+}
+
 function setSocialStatus(message, variant) {
   const statusEl = $("socialFollowStatus");
   if (!statusEl) {
@@ -2602,6 +3718,39 @@ function setSocialStatus(message, variant) {
     statusEl.dataset.variant = variant;
   } else {
     statusEl.removeAttribute("data-variant");
+  }
+}
+
+function updateSocialInviteLink(session = state.session) {
+  const inviteLinkEl = $("socialInviteLink");
+  const inviteCopyBtn = $("socialInviteCopyBtn");
+  const inviteStatus = $("socialInviteStatus");
+  if (!inviteLinkEl || !inviteCopyBtn) {
+    return;
+  }
+  const hasSession = Boolean(session && session.token);
+  if (!hasSession) {
+    inviteLinkEl.value = "";
+    inviteLinkEl.placeholder = "Sign in to get your invite link";
+    inviteLinkEl.readOnly = true;
+    inviteCopyBtn.disabled = true;
+    if (inviteStatus) {
+      inviteStatus.textContent = "";
+      inviteStatus.removeAttribute("data-variant");
+    }
+    return;
+  }
+  const shareUrl = new URL(window.location.href);
+  shareUrl.hash = "";
+  shareUrl.search = "";
+  shareUrl.searchParams.set("follow", session.username);
+  inviteLinkEl.value = shareUrl.toString();
+  inviteLinkEl.readOnly = true;
+  inviteLinkEl.placeholder = "";
+  inviteCopyBtn.disabled = false;
+  if (inviteStatus) {
+    inviteStatus.textContent = "";
+    inviteStatus.removeAttribute("data-variant");
   }
 }
 
@@ -2820,6 +3969,105 @@ function summarizeNames(list, max = 2) {
   }
   const visible = formatted.slice(0, max);
   return `${visible.join(", ")} +${formatted.length - max} more`;
+}
+
+function toTimestamp(value) {
+  if (!value) {
+    return 0;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return 0;
+  }
+  return date.getTime();
+}
+
+function canonicalHandle(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.trim().toLowerCase();
+}
+
+function formatMovieCount(count) {
+  const number = Number.isFinite(count) ? Number(count) : 0;
+  const safe = Math.max(0, number);
+  return `${safe} film${safe === 1 ? "" : "s"}`;
+}
+
+function formatTimeAgo(value) {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 0) {
+    return date.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit"
+    });
+  }
+  const diffSeconds = Math.floor(diffMs / 1000);
+  if (diffSeconds < 45) {
+    return "moments ago";
+  }
+  if (diffSeconds < 90) {
+    return "about a minute ago";
+  }
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) {
+    return `${diffMinutes} minute${diffMinutes === 1 ? "" : "s"} ago`;
+  }
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+  }
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 14) {
+    return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+  }
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric"
+  });
+}
+
+function formatWatchPartyDate(value) {
+  if (!value) {
+    return "Scheduled soon";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Scheduled soon";
+  }
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function formatPartyResponse(response) {
+  switch (response) {
+    case "accept":
+    case "accepted":
+      return "Attending";
+    case "maybe":
+      return "Maybe";
+    case "decline":
+    case "declined":
+      return "Declined";
+    case "host":
+      return "Host";
+    default:
+      return "Pending";
+  }
 }
 
 function renderNotificationCenter(payload = {}) {

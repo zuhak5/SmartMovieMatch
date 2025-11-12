@@ -3,5 +3,9 @@
   "reviews": [],
   "reviewLikes": [],
   "notifications": [],
-  "activity": []
+  "activity": [],
+  "reviewComments": [],
+  "reviewReactions": [],
+  "collabLists": [],
+  "watchParties": []
 }
