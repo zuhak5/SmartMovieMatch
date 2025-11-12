@@ -1409,6 +1409,43 @@ function wireEvents() {
       }
     });
   });
+
+  document.querySelectorAll("[data-settings-sync-now]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const target = button.getAttribute("data-settings-sync-now");
+      if (!target) {
+        return;
+      }
+      playUiClick();
+      handleManualSyncRequest(target);
+    });
+  });
+
+  document.querySelectorAll("[data-settings-section-trigger]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const section = button.getAttribute("data-settings-section-trigger");
+      if (!section) {
+        return;
+      }
+      playUiClick();
+      setActiveSettingsSection(section);
+      const panel = document.querySelector(`[data-settings-section="${section}"]`);
+      if (panel) {
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  });
+
+  document.addEventListener("click", (event) => {
+    const settingsButton = event.target.closest("[data-profile-settings-action]");
+    if (!settingsButton) {
+      return;
+    }
+    const section = settingsButton.getAttribute("data-profile-settings-action") || "profile";
+    event.preventDefault();
+    playUiClick();
+    openAccountSettings(section);
+  });
 }
 
 function toggleAccountMenu() {
@@ -1611,6 +1648,8 @@ function populateAccountSettings() {
   const profileStatus = $("accountProfileStatus");
   const securityStatus = $("accountSecurityStatus");
   const avatarInput = $("accountAvatarInput");
+
+  updateSettingsSyncCards(state.session);
 
   state.accountRemoveAvatar = false;
   if (avatarInput) {
@@ -3471,12 +3510,102 @@ function updateAccountUi(session) {
 }
 
 function setSyncStatus(message, variant = "muted") {
-  const el = $("syncStatus");
-  if (!el) {
-    return;
+  ["syncStatus", "settingsSyncStatus"].forEach((id) => {
+    const el = $(id);
+    if (el) {
+      el.textContent = message;
+      el.dataset.variant = variant;
+    }
+  });
+}
+
+function updateSettingsSyncCards(session) {
+  const hasSession = Boolean(session && session.token);
+  const prefCount = session && session.preferencesSnapshot && Array.isArray(session.preferencesSnapshot.selectedGenres)
+    ? session.preferencesSnapshot.selectedGenres.length
+    : 0;
+  const watchedCount = session && Array.isArray(session.watchedHistory) ? session.watchedHistory.length : 0;
+  const favoritesCount = session && Array.isArray(session.favoritesList) ? session.favoritesList.length : 0;
+
+  const syncAllBtn = document.querySelector('[data-settings-sync-now="all"]');
+  if (syncAllBtn) {
+    syncAllBtn.disabled = !hasSession;
+    syncAllBtn.setAttribute("aria-disabled", syncAllBtn.disabled ? "true" : "false");
   }
-  el.textContent = message;
-  el.dataset.variant = variant;
+
+  const cards = [
+    {
+      key: "preferences",
+      card: document.querySelector('[data-sync-card="preferences"]'),
+      valueEl: $("settingsSyncPreferences"),
+      metaEl: $("settingsSyncPreferencesMeta"),
+      timestamp: session ? session.lastPreferencesSync : null,
+      count: prefCount,
+      signedOutMeta: "Preferences stay local until you sign in.",
+      emptyMeta: "Select genres to build your taste profile.",
+      activeMeta: prefCount
+        ? `${prefCount} genre${prefCount === 1 ? "" : "s"} tracked`
+        : "Select genres to build your taste profile.",
+      syncButton: document.querySelector('[data-settings-sync-now="preferences"]'),
+      canSync: hasSession && Boolean(session && session.preferencesSnapshot)
+    },
+    {
+      key: "watched",
+      card: document.querySelector('[data-sync-card="watched"]'),
+      valueEl: $("settingsSyncWatched"),
+      metaEl: $("settingsSyncWatchedMeta"),
+      timestamp: session ? session.lastWatchedSync : null,
+      count: watchedCount,
+      signedOutMeta: "Sign in to back up your watched history.",
+      emptyMeta: "Log watched titles to keep progress in sync.",
+      activeMeta: watchedCount
+        ? `${watchedCount} title${watchedCount === 1 ? "" : "s"} logged`
+        : "Log watched titles to keep progress in sync.",
+      syncButton: document.querySelector('[data-settings-sync-now="watched"]'),
+      canSync: hasSession
+    },
+    {
+      key: "favorites",
+      card: document.querySelector('[data-sync-card="favorites"]'),
+      valueEl: $("settingsSyncFavorites"),
+      metaEl: $("settingsSyncFavoritesMeta"),
+      timestamp: session ? session.lastFavoritesSync : null,
+      count: favoritesCount,
+      signedOutMeta: "Sign in to save favorites across devices.",
+      emptyMeta: "Save movies you love so they’re backed up everywhere.",
+      activeMeta: favoritesCount
+        ? `${favoritesCount} favorite${favoritesCount === 1 ? "" : "s"} saved`
+        : "Save movies you love so they’re backed up everywhere.",
+      syncButton: document.querySelector('[data-settings-sync-now="favorites"]'),
+      canSync: hasSession
+    }
+  ];
+
+  cards.forEach((entry) => {
+    if (entry.card) {
+      let state = "guest";
+      if (hasSession) {
+        state = entry.count > 0 ? "active" : "empty";
+      }
+      entry.card.dataset.state = state;
+    }
+
+    const valueEl = entry.valueEl;
+    if (valueEl) {
+      valueEl.textContent = hasSession ? formatSyncTime(entry.timestamp) : "Sign in to sync";
+    }
+
+    const metaEl = entry.metaEl;
+    if (metaEl) {
+      metaEl.textContent = hasSession ? (entry.count > 0 ? entry.activeMeta : entry.emptyMeta) : entry.signedOutMeta;
+    }
+
+    if (entry.syncButton) {
+      const disabled = !entry.canSync;
+      entry.syncButton.disabled = disabled;
+      entry.syncButton.setAttribute("aria-disabled", disabled ? "true" : "false");
+    }
+  });
 }
 
 function updateSyncInsights(session) {
@@ -3530,6 +3659,98 @@ function updateSyncInsights(session) {
   }
   if (viewSnapshotsBtn) {
     viewSnapshotsBtn.disabled = !hasSession;
+  }
+
+  const timeline = $("profileOverviewTimeline");
+  if (timeline) {
+    timeline.innerHTML = "";
+    if (!hasSession) {
+      const empty = document.createElement("li");
+      empty.className = "account-insights-timeline-empty";
+      empty.textContent = "Sign in to start tracking sync activity.";
+      timeline.appendChild(empty);
+    } else {
+      const entries = [
+        {
+          icon: "🧠",
+          title: "Taste profile",
+          timestamp: session ? session.lastPreferencesSync : null,
+          count: prefCount,
+          activeMeta: prefCount
+            ? `${prefCount} genre${prefCount === 1 ? "" : "s"} tracked`
+            : "Select genres to build your taste profile.",
+          emptyMeta: "Select genres to build your taste profile.",
+          action: "profile",
+          cta: "Adjust profile"
+        },
+        {
+          icon: "🎬",
+          title: "Watched history",
+          timestamp: session ? session.lastWatchedSync : null,
+          count: watchedCount,
+          activeMeta: watchedCount
+            ? `${watchedCount} title${watchedCount === 1 ? "" : "s"} logged`
+            : "Log watched titles to keep progress in sync.",
+          emptyMeta: "Log watched titles to keep progress in sync.",
+          action: "snapshots",
+          cta: "View snapshots"
+        },
+        {
+          icon: "⭐",
+          title: "Favorites library",
+          timestamp: session ? session.lastFavoritesSync : null,
+          count: favoritesCount,
+          activeMeta: favoritesCount
+            ? `${favoritesCount} favorite${favoritesCount === 1 ? "" : "s"} saved`
+            : "Save movies you love so they’re backed up everywhere.",
+          emptyMeta: "Save movies you love so they’re backed up everywhere.",
+          action: "snapshots",
+          cta: "View snapshots"
+        }
+      ];
+
+      entries.forEach((entry) => {
+        const item = document.createElement("li");
+        item.className = "account-insights-timeline-item";
+        item.dataset.state = entry.count > 0 && entry.timestamp ? "active" : "empty";
+
+        const iconEl = document.createElement("span");
+        iconEl.className = "account-insights-timeline-icon";
+        iconEl.textContent = entry.icon;
+        iconEl.setAttribute("aria-hidden", "true");
+        item.appendChild(iconEl);
+
+        const body = document.createElement("div");
+        body.className = "account-insights-timeline-body";
+        const row = document.createElement("div");
+        row.className = "account-insights-timeline-row";
+        const titleEl = document.createElement("span");
+        titleEl.className = "account-insights-timeline-title";
+        titleEl.textContent = entry.title;
+        row.appendChild(titleEl);
+        const timeEl = document.createElement("span");
+        timeEl.className = "account-insights-timeline-time";
+        timeEl.textContent = formatSyncTime(entry.timestamp);
+        row.appendChild(timeEl);
+        body.appendChild(row);
+        const metaEl = document.createElement("p");
+        metaEl.className = "account-insights-timeline-meta";
+        metaEl.textContent = entry.count > 0 ? entry.activeMeta : entry.emptyMeta;
+        body.appendChild(metaEl);
+        item.appendChild(body);
+
+        if (entry.action) {
+          const actionBtn = document.createElement("button");
+          actionBtn.type = "button";
+          actionBtn.className = "btn-subtle account-insights-timeline-action";
+          actionBtn.setAttribute("data-profile-settings-action", entry.action);
+          actionBtn.textContent = entry.cta || "Manage";
+          item.appendChild(actionBtn);
+        }
+
+        timeline.appendChild(item);
+      });
+    }
   }
 
   refreshProfileOverviewCallout();
@@ -6241,4 +6462,46 @@ function scheduleFavoritesSync() {
       state.favoritesSyncTimer = null;
     }
   }, 600);
+}
+
+function handleManualSyncRequest(target) {
+  if (!target) {
+    return;
+  }
+
+  if (!state.session || !state.session.token) {
+    setSyncStatus("Sign in to sync your account data.", "muted");
+    return;
+  }
+
+  switch (target) {
+    case "preferences": {
+      const snapshot = state.session && state.session.preferencesSnapshot;
+      if (snapshot) {
+        const payload = { ...snapshot, timestamp: new Date().toISOString() };
+        syncPreferencesSnapshot(payload);
+      } else {
+        setSyncStatus("Adjust your taste profile to create a snapshot before syncing.", "muted");
+      }
+      break;
+    }
+    case "watched":
+      scheduleWatchedSync();
+      break;
+    case "favorites":
+      scheduleFavoritesSync();
+      break;
+    case "all": {
+      const snapshot = state.session && state.session.preferencesSnapshot;
+      if (snapshot) {
+        const payload = { ...snapshot, timestamp: new Date().toISOString() };
+        syncPreferencesSnapshot(payload);
+      }
+      scheduleWatchedSync();
+      scheduleFavoritesSync();
+      break;
+    }
+    default:
+      break;
+  }
 }
