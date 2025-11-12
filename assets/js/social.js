@@ -7,6 +7,44 @@ const MAX_LONG_REVIEW_LENGTH = 2400;
 const NOTIFICATION_POLL_INTERVAL = 45000;
 const REVIEW_REACTIONS = ['👍', '❤️', '😂', '😮'];
 
+export const PRESENCE_STATUS_PRESETS = [
+  {
+    key: 'default',
+    label: 'Just browsing',
+    description: 'Keep it casual and appear online without extra context.',
+    highlight: 'is online now.',
+    shortLabel: 'Online',
+    icon: '👀'
+  },
+  {
+    key: 'available',
+    label: 'Available for watch party',
+    description: 'Ping me to co-host or jump into a movie night.',
+    highlight: 'is ready for a watch party.',
+    shortLabel: 'Available for watch party',
+    icon: '🎉'
+  },
+  {
+    key: 'comedy',
+    label: 'In the mood for comedies',
+    description: 'Serve up the funniest picks you can find.',
+    highlight: 'is in the mood for comedies.',
+    shortLabel: 'In the mood for comedies',
+    icon: '😂'
+  },
+  {
+    key: 'rewatch',
+    label: 'Rewatching comfort classics',
+    description: 'Cozy night with familiar favorites and throwbacks.',
+    highlight: 'is rewatching comfort classics.',
+    shortLabel: 'Rewatching comfort classics',
+    icon: '🔁'
+  }
+];
+
+const DEFAULT_PRESENCE_STATUS = 'default';
+const PRESENCE_STATUS_PRESET_MAP = new Map(PRESENCE_STATUS_PRESETS.map((preset) => [preset.key, preset]));
+
 const state = {
   session: loadSession(),
   following: [],
@@ -30,7 +68,8 @@ const state = {
     lists: { owned: [], shared: [], invites: [] },
     watchParties: { upcoming: [], invites: [] }
   },
-  presenceTicker: null
+  presenceTicker: null,
+  presenceStatusPreset: DEFAULT_PRESENCE_STATUS
 };
 
 const followingSubscribers = new Set();
@@ -38,6 +77,81 @@ const reviewSubscribers = new Map();
 const notificationSubscribers = new Set();
 const socialOverviewSubscribers = new Set();
 const collaborativeSubscribers = new Set();
+const presenceStatusSubscribers = new Set();
+
+function notifyPresenceStatusSubscribers() {
+  const preset = getPresenceStatusPreset();
+  presenceStatusSubscribers.forEach((callback) => {
+    try {
+      callback(preset);
+    } catch (error) {
+      console.warn('Presence status subscriber error', error);
+    }
+  });
+}
+
+function normalizePresenceStatusPreset(value) {
+  if (typeof value !== 'string') {
+    return DEFAULT_PRESENCE_STATUS;
+  }
+  const trimmed = value.trim().toLowerCase();
+  return PRESENCE_STATUS_PRESET_MAP.has(trimmed) ? trimmed : DEFAULT_PRESENCE_STATUS;
+}
+
+function setLocalPresenceStatusPreset(presetKey, { notify = true } = {}) {
+  const normalized = normalizePresenceStatusPreset(presetKey);
+  if (state.presenceStatusPreset === normalized) {
+    if (notify) {
+      notifyPresenceStatusSubscribers();
+    }
+    return normalized;
+  }
+  state.presenceStatusPreset = normalized;
+  if (notify) {
+    notifyPresenceStatusSubscribers();
+  }
+  return normalized;
+}
+
+export function getPresenceStatusPreset() {
+  return state.presenceStatusPreset || DEFAULT_PRESENCE_STATUS;
+}
+
+export function subscribeToPresenceStatusPreset(callback) {
+  if (typeof callback !== 'function') {
+    return () => {};
+  }
+  presenceStatusSubscribers.add(callback);
+  try {
+    callback(getPresenceStatusPreset());
+  } catch (error) {
+    console.warn('Presence status subscriber error', error);
+  }
+  return () => {
+    presenceStatusSubscribers.delete(callback);
+  };
+}
+
+export async function setPresenceStatusPreset(presetKey, options = {}) {
+  const previous = getPresenceStatusPreset();
+  const normalized = setLocalPresenceStatusPreset(presetKey);
+  const shouldSync = options.sync !== false;
+  const silent = options.silent === true;
+  if (!shouldSync) {
+    return normalized;
+  }
+  if (!state.session || !state.session.token) {
+    setLocalPresenceStatusPreset(previous);
+    throw new Error('Sign in to share a status with friends.');
+  }
+  try {
+    await pingPresence('online', { statusPreset: normalized, silent });
+    return normalized;
+  } catch (error) {
+    setLocalPresenceStatusPreset(previous);
+    throw error;
+  }
+}
 
 subscribeToSession((session) => {
   state.session = session;
@@ -48,6 +162,7 @@ subscribeToSession((session) => {
     state.followingLoading = false;
     state.socialOverview = createDefaultSocialOverview();
     state.presence = {};
+    state.presenceStatusPreset = DEFAULT_PRESENCE_STATUS;
     state.badges = [];
     state.collabState = {
       lists: { owned: [], shared: [], invites: [] },
@@ -61,6 +176,7 @@ subscribeToSession((session) => {
     stopNotificationPolling();
     stopNotificationStream();
     stopPresenceTicker();
+    notifyPresenceStatusSubscribers();
     notifyNotificationSubscribers();
     notifyFollowingSubscribers();
     notifySocialOverviewSubscribers();
@@ -833,8 +949,19 @@ function renderReviewItem(review, sectionState) {
     const presencePill = document.createElement('span');
     presencePill.className = 'community-presence-pill';
     presencePill.dataset.state = presence.state;
-    const label = presence.state === 'watching' ? 'Watching now' : presence.state === 'away' ? 'Away' : 'Online';
-    presencePill.textContent = presence.movieTitle ? `${label}: ${presence.movieTitle}` : label;
+    const statusKey = normalizePresenceStatusPreset(presence.statusPreset || 'default');
+    presencePill.dataset.statusPreset = statusKey;
+    const preset = PRESENCE_STATUS_PRESET_MAP.get(statusKey);
+    let label = 'Online';
+    if (presence.state === 'watching' && presence.movieTitle) {
+      label = `Watching now: ${presence.movieTitle}`;
+    } else if (presence.state === 'away') {
+      label = 'Away';
+    } else if (preset && preset.key !== 'default') {
+      const shortLabel = preset.shortLabel || preset.label;
+      label = preset.icon ? `${preset.icon} ${shortLabel}` : shortLabel;
+    }
+    presencePill.textContent = label;
     header.appendChild(presencePill);
   }
 
@@ -1873,6 +2000,15 @@ function startNotificationStream() {
         if (data && data.presence) {
           state.presence = data.presence;
           state.socialOverview.presence = data.presence;
+          if (state.session && state.session.username) {
+            const myUsername = canonicalUsername(state.session.username);
+            if (myUsername) {
+              const entry = data.presence[myUsername];
+              const presetKey =
+                entry && typeof entry.statusPreset === 'string' ? entry.statusPreset : DEFAULT_PRESENCE_STATUS;
+              setLocalPresenceStatusPreset(presetKey);
+            }
+          }
           notifySocialOverviewSubscribers();
         }
       } catch (error) {
@@ -1958,6 +2094,14 @@ function handleStreamPresence(event) {
     if (state.socialOverview && typeof state.socialOverview === 'object') {
       state.socialOverview.presence = presence;
     }
+    if (state.session && state.session.username) {
+      const myUsername = canonicalUsername(state.session.username);
+      if (myUsername) {
+        const entry = presence[myUsername];
+        const presetKey = entry && typeof entry.statusPreset === 'string' ? entry.statusPreset : DEFAULT_PRESENCE_STATUS;
+        setLocalPresenceStatusPreset(presetKey);
+      }
+    }
     notifySocialOverviewSubscribers();
   } catch (error) {
     console.warn('Invalid presence event payload', error);
@@ -1971,9 +2115,9 @@ function startPresenceTicker() {
   if (state.presenceTicker) {
     return;
   }
-  pingPresence('online').catch(() => {});
+  pingPresence('online', { silent: true }).catch(() => {});
   state.presenceTicker = window.setInterval(() => {
-    pingPresence('online').catch(() => {});
+    pingPresence('online', { silent: true }).catch(() => {});
   }, 60000);
 }
 
@@ -1984,14 +2128,24 @@ function stopPresenceTicker() {
   }
 }
 
-async function pingPresence(stateLabel = 'online') {
+async function pingPresence(stateLabel = 'online', options = {}) {
   if (!state.session || !state.session.token) {
     return;
   }
+  const statusPreset =
+    typeof options.statusPreset === 'string'
+      ? normalizePresenceStatusPreset(options.statusPreset)
+      : getPresenceStatusPreset();
+  const payload = { state: stateLabel, statusPreset };
+  if (options.movie && typeof options.movie === 'object') {
+    payload.movie = options.movie;
+  }
   try {
-    await callSocial('updatePresence', { state: stateLabel });
+    await callSocial('updatePresence', payload);
   } catch (error) {
-    // presence updates are best effort
+    if (!options.silent) {
+      throw error;
+    }
   }
 }
 
