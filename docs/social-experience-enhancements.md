@@ -7,9 +7,35 @@
 ## Opportunities to Expand the Experience
 
 ### 1. Smarter Friend Discovery and Onboarding
-- Layer in "People you may know" suggestions that look at mutual followers, overlapping watch histories, or favorite genres to make the follow graph grow organically.
-- Encourage profile sharing with customizable vanity links and QR codes so in-person events can translate into in-app connections quickly.
-- Add optional contact syncing or invite links that pre-fill follow requests, respecting privacy by keeping everything opt-in.
+
+**Goals**
+- Remove friction from the first-hour experience so that new members connect with at least three friends before leaving the onboarding flow.
+- Help returning users continue expanding their network with low-effort, privacy-preserving suggestions that feel relevant and timely.
+
+**Key Enhancements**
+- **People You May Know (PYMK) 2.0**
+  - **Signal blend**: Weight mutual followers (0.30), shared watch history (0.25), common favorites (0.20), genre affinity (0.15), and recent co-hosted watch parties (0.10) into a single score so no single signal dominates.
+  - **Freshness guardrails**: Refresh the ranking every Monday, cap repeats to once per 14 days, and automatically hide suggestions already dismissed or followed in the past week.
+  - **Multi-surface delivery**: Show the top five matches on the dashboard hero card, dedicate a three-card carousel during onboarding step two, and email a weekly digest to opted-in members.
+  - **Feedback loop**: Log impressions, dismissals, follows, and acceptance conversions to a PYMK analytics table so data science can re-tune coefficients quarterly.
+- **Sharable Profiles**
+  - **Vanity handle flow**: Let members claim a handle (3–20 characters, alphanumeric plus underscore) during onboarding, with real-time availability checks and automatic migration if they change it later.
+  - **Invite artifacts**: Generate deep links (`smartmoviematch.com/u/<handle>`), QR codes sized for print (1024×1024 PNG), and NFC payload snippets for event booths—all including contextual copy like “Scan to swap movie lists.”
+  - **Safety catches**: Rate-limit link generations to three per minute, include one-tap abuse reporting on shared profiles, and expire QR codes after 30 days unless refreshed.
+- **Guided Invitations**
+  - **Consent-first import**: Add an explicit opt-in gate before enabling CSV/OAuth contact syncing, surface exactly which fields are imported, and allow members to delete uploaded lists at any time.
+  - **Smart templates**: Offer three tone presets (“Friendly catch-up,” “Festival buddy,” “Watch party invite”) that auto-populate notes with dynamic tokens like `{first_name}` and `{favorite_genre}`.
+  - **Deliverability hygiene**: Validate handles on upload, dedupe against existing followers, throttle invites to 25 per day, and provide a status dashboard summarizing pending, sent, and bounced requests.
+
+**Onboarding Flow Tweaks**
+1. Prompt new users to choose their preferred discovery method (suggested friends, manual search, invite import) to emphasize control.
+2. Offer "Add all" and "Skip for now" actions with clear microcopy explaining that settings can be revisited later in the profile menu.
+3. Send a follow-up notification 48 hours after signup summarizing pending invites, accepted connections, and a call-to-action to explore collaborative lists.
+
+**Success Metrics & Safeguards**
+- Track conversion from suggestion view → follow request → accepted connection, and run A/B tests on PYMK ranking weights to ensure diversity in recommendations.
+- Log invitation source (link, QR, contact sync) to understand which channels drive the highest acceptance while monitoring for spam via rate limiting and abuse reporting hooks.
+- Use differential privacy techniques when aggregating watch history signals so no single viewing session reveals sensitive behavior.
 
 ### 2. Deeper Conversations Around Reviews
 - Let people start threaded replies under community notes, with lightweight markdown and spoiler tags so longer-form reviews stay readable.

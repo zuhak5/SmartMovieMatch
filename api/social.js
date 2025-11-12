@@ -1,6 +1,7 @@
 const fs = require('fs/promises');
 const path = require('path');
 const https = require('https');
+const QRCode = require('qrcode');
 const { randomUUID } = require('crypto');
 const { setInterval: nodeSetInterval, clearInterval: nodeClearInterval } = require('timers');
 
@@ -26,6 +27,7 @@ function enableLocalFallback(reason, error) {
 const MAX_REVIEW_LENGTH = 600;
 const MAX_LONG_REVIEW_LENGTH = 2400;
 const MAX_SUGGESTION_RESULTS = 8;
+const MAX_FOLLOW_NOTE_LENGTH = 180;
 const SEARCH_RESULT_LIMIT = 6;
 const MIN_SEARCH_LENGTH = 2;
 const STREAM_HEARTBEAT_MS = 20000;
@@ -150,6 +152,9 @@ module.exports = async (req, res) => {
       case 'updatePresence':
         result = await handleUpdatePresence(req, payload);
         break;
+      case 'generateInviteQr':
+        result = await handleGenerateInviteQr(req, payload);
+        break;
       default:
         res.status(400).json({ error: 'Unsupported action' });
         return;
@@ -265,6 +270,7 @@ function broadcastNotificationToStreams(entry) {
       movieTitle: entry.movieTitle || null,
       movieTmdbId: entry.movieTmdbId || null,
       movieImdbId: entry.movieImdbId || null,
+      note: entry.note || null,
       createdAt: entry.createdAt || new Date().toISOString()
     }
   };
@@ -291,11 +297,18 @@ async function handleFollowUser(req, payload) {
     throw new HttpError(404, 'That username does not exist.');
   }
 
+  const noteRaw = typeof payload.note === 'string' ? payload.note : '';
+  if (noteRaw && stripControlCharacters(noteRaw).trim().length > MAX_FOLLOW_NOTE_LENGTH) {
+    throw new HttpError(400, `Follow notes must be ${MAX_FOLLOW_NOTE_LENGTH} characters or fewer.`);
+  }
+  const note = sanitizeFollowNote(noteRaw);
+
   await upsertFollow(user.username, target);
   await enqueueNotification({
     username: target,
     type: 'follow',
-    actor: user.username
+    actor: user.username,
+    note
   });
   return {
     body: {
@@ -609,6 +622,12 @@ async function handleSearchUsers(req, payload) {
     .map((profile) => {
       const sharedFavorites = computeSharedFavorites(suggestionContext.userProfile, profile);
       const sharedGenres = computeSharedGenres(suggestionContext.userProfile, profile);
+      const sharedWatchHistory = computeSharedWatchHistory(suggestionContext.userProfile, profile);
+      const sharedWatchParties = computeSharedWatchParties(
+        graph.username,
+        profile.username,
+        suggestionContext.partyIndex
+      );
       const mutualFollowers = computeMutualFollowersForCandidate(
         profile,
         graph.followingSet,
@@ -619,12 +638,16 @@ async function handleSearchUsers(req, payload) {
         (profile.username.startsWith(normalizedQuery) ? 6 : 0) +
         (sharedFavorites.length * 4) +
         (sharedGenres.length * 2) +
+        (sharedWatchHistory.length * 3) +
+        (sharedWatchParties.length ? 4 : 0) +
         (mutualFollowers.length ? 2 : 0) +
         (followsYou ? 3 : 0);
       return {
         profile,
         sharedFavorites,
         sharedGenres,
+        sharedWatchHistory,
+        sharedWatchParties,
         mutualFollowers,
         followsYou,
         score: baseScore
@@ -651,6 +674,8 @@ async function handleSearchUsers(req, payload) {
           tagline: buildProfileTagline(entry.profile),
           sharedInterests: entry.sharedGenres,
           sharedFavorites: entry.sharedFavorites,
+          sharedWatchHistory: entry.sharedWatchHistory,
+          sharedWatchParties: entry.sharedWatchParties,
           mutualFollowers: entry.mutualFollowers,
           followsYou: entry.followsYou
         },
@@ -1267,6 +1292,54 @@ async function handleUpdatePresence(req, payload) {
   return { body: { ok: true } };
 }
 
+async function handleGenerateInviteQr(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const rawLink = typeof payload.link === 'string' ? payload.link.trim() : '';
+  if (!rawLink) {
+    throw new HttpError(400, 'Provide a profile link to encode.');
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(rawLink);
+  } catch (error) {
+    throw new HttpError(400, 'That invite link is not valid.');
+  }
+
+  const protocol = parsed.protocol.toLowerCase();
+  if (protocol !== 'https:' && protocol !== 'http:') {
+    throw new HttpError(400, 'Only http(s) links can be converted to a QR code.');
+  }
+
+  const followParam = canonicalUsername(parsed.searchParams.get('follow') || '');
+  if (!followParam || followParam !== canonicalUsername(user.username)) {
+    throw new HttpError(400, 'Use your own invite link when creating a QR code.');
+  }
+
+  const normalized = parsed.toString();
+
+  try {
+    const dataUrl = await QRCode.toDataURL(normalized, {
+      errorCorrectionLevel: 'M',
+      margin: 2,
+      scale: 6,
+      color: {
+        dark: '#05050F',
+        light: '#FFFFFF'
+      }
+    });
+    return {
+      body: {
+        ok: true,
+        dataUrl
+      }
+    };
+  } catch (error) {
+    console.error('Failed to generate invite QR code', error);
+    throw new HttpError(500, 'Unable to generate a QR code right now.');
+  }
+}
+
 async function authenticate(req, payload) {
   const token = extractToken(req, payload);
   if (!token) {
@@ -1465,11 +1538,16 @@ async function buildFollowSuggestions({
     .filter((handle) => handle && !followingSet.has(handle) && handle !== username)
     .forEach((handle) => {
       const mutuals = suggestionContext.mutualMap.get(handle) || [];
+      const candidateProfile = suggestionContext.profileMap.get(handle) || null;
+      const sharedWatchHistory = computeSharedWatchHistory(suggestionContext.userProfile, candidateProfile);
+      const sharedWatchParties = computeSharedWatchParties(username, handle, suggestionContext.partyIndex);
       addSuggestion({
         username: handle,
         displayName: formatDisplayNameFromHandle(handle),
         sharedInterests: [],
         sharedFavorites: [],
+        sharedWatchHistory,
+        sharedWatchParties,
         mutualFollowers: mutuals,
         followsYou: true,
         tagline: 'They already follow you back.',
@@ -1488,11 +1566,23 @@ async function buildFollowSuggestions({
         suggestionContext.userProfile,
         profile
       );
+      const sharedWatchHistory = computeSharedWatchHistory(
+        suggestionContext.userProfile,
+        profile
+      );
+      const sharedWatchParties = computeSharedWatchParties(
+        username,
+        profile.username,
+        suggestionContext.partyIndex
+      );
       const mutuals = computeMutualFollowersForCandidate(profile, followingSet, followersSet);
       const followsYou = followersSet.has(profile.username);
       const score =
         (sharedFavorites.length * 4) +
         (sharedGenres.length * 2) +
+        (sharedWatchHistory.length * 3) +
+        (sharedWatchParties.length ? 5 : 0) +
+        Math.min(sharedWatchParties.length, 2) * 2 +
         (mutuals.length ? 3 : 0) +
         (followsYou ? 3 : 0) +
         Math.min(profile.followerCount || 0, 4) +
@@ -1501,6 +1591,8 @@ async function buildFollowSuggestions({
         profile,
         sharedFavorites,
         sharedGenres,
+        sharedWatchHistory,
+        sharedWatchParties,
         mutuals,
         followsYou,
         score
@@ -1527,6 +1619,8 @@ async function buildFollowSuggestions({
       tagline: buildProfileTagline(entry.profile),
       sharedInterests: entry.sharedGenres,
       sharedFavorites: entry.sharedFavorites,
+      sharedWatchHistory: entry.sharedWatchHistory,
+      sharedWatchParties: entry.sharedWatchParties,
       mutualFollowers: entry.mutuals,
       followsYou: entry.followsYou
     });
@@ -1536,15 +1630,23 @@ async function buildFollowSuggestions({
 }
 
 async function loadSuggestionCandidates({ username, followingSet, followersSet }) {
-  const [profiles, followRows] = await Promise.all([
+  const [profiles, followRows, partyIndex] = await Promise.all([
     fetchAllUserProfiles(),
-    fetchFollowGraph()
+    fetchFollowGraph(),
+    fetchWatchPartyIndex()
   ]);
 
   const followerMap = buildFollowerMap(followRows);
   const normalizedProfiles = profiles
     .map((profile) => enrichProfileForSuggestions(profile, followerMap))
     .filter(Boolean);
+
+  const profileMap = new Map();
+  normalizedProfiles.forEach((profile) => {
+    if (profile && profile.username) {
+      profileMap.set(profile.username, profile);
+    }
+  });
 
   const userProfile = normalizedProfiles.find((profile) => profile.username === username) || null;
   const candidates = normalizedProfiles.filter((profile) => profile.username !== username);
@@ -1554,7 +1656,7 @@ async function loadSuggestionCandidates({ username, followingSet, followersSet }
     mutualMap.set(handle, computeMutualFollowersFromMap(handle, followerMap, followingSet, followersSet));
   });
 
-  return { userProfile, candidates, mutualMap };
+  return { userProfile, candidates, mutualMap, partyIndex, profileMap };
 }
 
 function computeMutualFollowersFromMap(handle, followerMap, followingSet, followersSet) {
@@ -1631,6 +1733,92 @@ function computeSharedGenres(currentProfile, candidateProfile) {
   return shared.slice(0, 3);
 }
 
+function computeSharedWatchHistory(currentProfile, candidateProfile) {
+  if (!currentProfile || !candidateProfile) {
+    return [];
+  }
+  const results = [];
+  const seen = new Set();
+  const candidateIds = candidateProfile.watchedImdbSet || new Set();
+  const candidateTitles = candidateProfile.watchedTitleSet || new Set();
+  const history = Array.isArray(currentProfile.watchedHistory) ? currentProfile.watchedHistory : [];
+  history.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') {
+      return;
+    }
+    const title = typeof entry.title === 'string' ? entry.title.trim() : '';
+    const imdbId = entry.imdbId ? normalizeIdentifier(entry.imdbId) : '';
+    const normalizedTitle = title ? normalizeTitleKey(title) : '';
+    if (imdbId && candidateIds.has(imdbId) && !seen.has(imdbId)) {
+      seen.add(imdbId);
+      if (title) {
+        results.push(title);
+      }
+      return;
+    }
+    if (normalizedTitle && candidateTitles.has(normalizedTitle) && !seen.has(normalizedTitle)) {
+      seen.add(normalizedTitle);
+      if (title) {
+        results.push(title);
+      }
+    }
+  });
+  return results.slice(0, 3);
+}
+
+function computeSharedWatchParties(username, candidateUsername, partyIndex) {
+  if (!partyIndex || !partyIndex.participationMap || !partyIndex.partyDetailMap) {
+    return [];
+  }
+  const currentHandle = canonicalUsername(username);
+  const candidateHandle = canonicalUsername(candidateUsername);
+  if (!currentHandle || !candidateHandle) {
+    return [];
+  }
+  const userParties = partyIndex.participationMap.get(currentHandle);
+  const candidateParties = partyIndex.participationMap.get(candidateHandle);
+  if (!userParties || !candidateParties) {
+    return [];
+  }
+  const sharedIds = [];
+  userParties.forEach((partyId) => {
+    if (candidateParties.has(partyId)) {
+      sharedIds.push(partyId);
+    }
+  });
+  const formatted = sharedIds
+    .map((partyId) => partyIndex.partyDetailMap.get(partyId))
+    .filter(Boolean)
+    .map(formatWatchPartyTag)
+    .filter(Boolean);
+  return formatted.slice(0, 2);
+}
+
+function formatWatchPartyTag(detail) {
+  if (!detail) {
+    return '';
+  }
+  const parts = [];
+  if (detail.title) {
+    parts.push(detail.title);
+  }
+  if (detail.scheduledFor) {
+    const date = new Date(detail.scheduledFor);
+    if (!Number.isNaN(date.getTime())) {
+      parts.push(
+        date.toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric'
+        })
+      );
+    }
+  }
+  if (!parts.length && detail.host) {
+    parts.push(`${formatDisplayNameFromHandle(detail.host)}’s party`);
+  }
+  return parts.join(' • ');
+}
+
 function normalizeSuggestionPayload(entry, { username, followingSet, followersSet }) {
   if (!entry || typeof entry !== 'object') {
     return null;
@@ -1645,6 +1833,12 @@ function normalizeSuggestionPayload(entry, { username, followingSet, followersSe
     : [];
   const sharedFavorites = Array.isArray(entry.sharedFavorites)
     ? entry.sharedFavorites.map((value) => (typeof value === 'string' ? value.trim() : '')).filter(Boolean)
+    : [];
+  const sharedWatchHistory = Array.isArray(entry.sharedWatchHistory)
+    ? entry.sharedWatchHistory.map((value) => (typeof value === 'string' ? value.trim() : '')).filter(Boolean)
+    : [];
+  const sharedWatchParties = Array.isArray(entry.sharedWatchParties)
+    ? entry.sharedWatchParties.map((value) => (typeof value === 'string' ? value.trim() : '')).filter(Boolean)
     : [];
   const mutualFollowers = Array.isArray(entry.mutualFollowers)
     ? Array.from(
@@ -1672,6 +1866,16 @@ function normalizeSuggestionPayload(entry, { username, followingSet, followersSe
   if (sharedFavorites.length) {
     reasonParts.push(`Shared favorites: ${sharedFavorites.slice(0, 2).join(', ')}`);
   }
+  if (sharedWatchHistory.length) {
+    reasonParts.push(`Recently watched: ${sharedWatchHistory.slice(0, 2).join(', ')}`);
+  }
+  if (sharedWatchParties.length) {
+    reasonParts.push(
+      sharedWatchParties.length === 1
+        ? `Joined the same watch party: ${sharedWatchParties[0]}`
+        : `Joined ${sharedWatchParties.length} of the same watch parties`
+    );
+  }
   if (entry.reason && typeof entry.reason === 'string') {
     reasonParts.push(entry.reason.trim());
   }
@@ -1682,6 +1886,8 @@ function normalizeSuggestionPayload(entry, { username, followingSet, followersSe
     tagline: entry.tagline ? String(entry.tagline).trim() : '',
     sharedInterests,
     sharedFavorites,
+    sharedWatchHistory,
+    sharedWatchParties,
     mutualFollowers,
     followsYou,
     reason: reasonParts.join(' • ')
@@ -1721,7 +1927,8 @@ async function fetchAllUserProfiles() {
   try {
     const rows = await supabaseFetch('auth_users', {
       query: {
-        select: 'username,display_name,preferences_snapshot,favorites_list,last_login_at,created_at'
+        select:
+          'username,display_name,preferences_snapshot,favorites_list,watched_history,last_login_at,created_at'
       }
     });
     if (!Array.isArray(rows)) {
@@ -1754,6 +1961,66 @@ async function fetchFollowGraph() {
   }
 }
 
+async function fetchWatchPartyIndex() {
+  if (usingLocalStore()) {
+    const store = await readSocialStore();
+    return buildWatchPartyIndex(Array.isArray(store.watchParties) ? store.watchParties : []);
+  }
+  return { participationMap: new Map(), partyDetailMap: new Map() };
+}
+
+function buildWatchPartyIndex(entries) {
+  const participationMap = new Map();
+  const partyDetailMap = new Map();
+  if (!Array.isArray(entries)) {
+    return { participationMap, partyDetailMap };
+  }
+  entries.forEach((party) => {
+    if (!party || !party.id) {
+      return;
+    }
+    const partyId = String(party.id);
+    const host = canonicalUsername(party.host || '');
+    const title = typeof party.movieTitle === 'string'
+      ? party.movieTitle
+      : typeof party.movie?.title === 'string'
+      ? party.movie.title
+      : '';
+    const scheduledFor = party.scheduledFor || party.scheduled_for || null;
+    partyDetailMap.set(partyId, {
+      id: partyId,
+      title: title ? title.trim() : '',
+      scheduledFor,
+      host
+    });
+    if (host) {
+      addPartyParticipation(participationMap, host, partyId);
+    }
+    const invitees = Array.isArray(party.invitees) ? party.invitees : [];
+    invitees.forEach((invite) => {
+      const handle = canonicalUsername(invite && invite.username ? invite.username : '');
+      if (!handle) {
+        return;
+      }
+      const response = (invite.response || invite.status || '').toLowerCase();
+      if (!response || response === 'accepted' || response === 'attending' || response === 'yes' || response === 'host') {
+        addPartyParticipation(participationMap, handle, partyId);
+      }
+    });
+  });
+  return { participationMap, partyDetailMap };
+}
+
+function addPartyParticipation(map, username, partyId) {
+  if (!username || !partyId) {
+    return;
+  }
+  if (!map.has(username)) {
+    map.set(username, new Set());
+  }
+  map.get(username).add(partyId);
+}
+
 function buildFollowerMap(rows) {
   const map = new Map();
   if (!Array.isArray(rows)) {
@@ -1781,6 +2048,12 @@ function enrichProfileForSuggestions(profile, followerMap) {
   const favoriteTitleSet = new Set();
   const favoriteImdbSet = new Set();
   const favoriteGenreSet = new Set();
+  const watchedHistoryRaw = Array.isArray(profile.watchedHistory)
+    ? profile.watchedHistory.slice()
+    : [];
+  const watchedHistoryList = [];
+  const watchedTitleSet = new Set();
+  const watchedImdbSet = new Set();
   favoritesList.forEach((favorite) => {
     if (!favorite || typeof favorite !== 'object') {
       return;
@@ -1802,6 +2075,33 @@ function enrichProfileForSuggestions(profile, followerMap) {
       });
     }
   });
+  watchedHistoryRaw.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') {
+      return;
+    }
+    const title = typeof entry.title === 'string' ? entry.title : typeof entry.movieTitle === 'string' ? entry.movieTitle : '';
+    const imdbId = normalizeIdentifier(entry.imdbId || entry.imdbID || entry.movieImdbId);
+    const watchedAt = entry.watchedAt || entry.watched_at || entry.created_at || entry.updated_at || entry.watchedOn;
+    if (title) {
+      watchedTitleSet.add(normalizeTitleKey(title));
+    }
+    if (imdbId) {
+      watchedImdbSet.add(imdbId);
+    }
+    if (title || imdbId) {
+      watchedHistoryList.push({
+        title: title ? title.trim() : '',
+        imdbId,
+        watchedAt: watchedAt || null
+      });
+    }
+  });
+  watchedHistoryList.sort((a, b) => {
+    const aTime = a && a.watchedAt ? new Date(a.watchedAt).getTime() : 0;
+    const bTime = b && b.watchedAt ? new Date(b.watchedAt).getTime() : 0;
+    return bTime - aTime;
+  });
+  const recentWatched = watchedHistoryList.slice(0, 60);
   const selectedGenres = Array.isArray(profile.preferencesSnapshot?.selectedGenres)
     ? profile.preferencesSnapshot.selectedGenres
         .map((genre) => normalizeGenreLabel(genre))
@@ -1819,6 +2119,9 @@ function enrichProfileForSuggestions(profile, followerMap) {
     favoriteTitleSet,
     favoriteImdbSet,
     favoriteGenreSet,
+    watchedHistory: recentWatched,
+    watchedTitleSet,
+    watchedImdbSet,
     followers,
     followerCount: followers.length,
     lastLoginAt: profile.lastLoginAt || null,
@@ -1846,9 +2149,36 @@ function mapAuthUserProfile(row) {
     displayName,
     preferencesSnapshot,
     favoritesList,
+    watchedHistory: Array.isArray(row.watched_history)
+      ? row.watched_history
+      : Array.isArray(row.watchedHistory)
+      ? row.watchedHistory
+      : [],
     lastLoginAt: row.last_login_at || row.lastLoginAt || null,
     createdAt: row.created_at || row.createdAt || null
   };
+}
+
+function stripControlCharacters(value) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.replace(/[\u0000-\u001F\u007F]/g, '');
+}
+
+function sanitizeFollowNote(value) {
+  const stripped = stripControlCharacters(value);
+  if (!stripped) {
+    return '';
+  }
+  const trimmed = stripped.trim();
+  if (!trimmed) {
+    return '';
+  }
+  if (trimmed.length > MAX_FOLLOW_NOTE_LENGTH) {
+    return trimmed.slice(0, MAX_FOLLOW_NOTE_LENGTH).trim();
+  }
+  return trimmed;
 }
 
 function normalizeIdentifier(value) {
@@ -2442,12 +2772,13 @@ function extractMentions(text) {
   return matches.map((match) => canonicalUsername(match.slice(1))).filter(Boolean);
 }
 
-async function enqueueNotification({ store, username, type, actor, movie, timestamp }) {
+async function enqueueNotification({ store, username, type, actor, movie, timestamp, note }) {
   const normalizedUsername = canonicalUsername(username);
   if (!normalizedUsername || (actor && normalizedUsername === actor)) {
     return null;
   }
   const createdAt = timestamp || new Date().toISOString();
+  const sanitizedNote = note ? sanitizeFollowNote(note) : '';
   const entry = {
     id: randomUUID(),
     username: normalizedUsername,
@@ -2456,7 +2787,8 @@ async function enqueueNotification({ store, username, type, actor, movie, timest
     movieTitle: movie && movie.title ? movie.title : null,
     movieTmdbId: movie && movie.tmdbId ? movie.tmdbId : null,
     movieImdbId: movie && movie.imdbId ? movie.imdbId : null,
-    message: formatNotificationMessage(type, { actor, movie }),
+    message: formatNotificationMessage(type, { actor, movie, note: sanitizedNote }),
+    note: sanitizedNote || null,
     createdAt,
     readAt: null
   };
@@ -2465,7 +2797,8 @@ async function enqueueNotification({ store, username, type, actor, movie, timest
     movieTitle: entry.movieTitle,
     movieTmdbId: entry.movieTmdbId,
     movieImdbId: entry.movieImdbId,
-    message: entry.message
+    message: entry.message,
+    note: sanitizedNote || undefined
   };
 
   if (usingLocalStore()) {
@@ -2508,6 +2841,9 @@ function formatNotificationMessage(type, context = {}) {
   const title = context.movie && context.movie.title ? context.movie.title : 'a movie';
   switch (type) {
     case 'follow':
+      if (context.note) {
+        return `${actor} followed you: “${context.note}”`;
+      }
       return `${actor} followed you.`;
     case 'mention':
       return `${actor} mentioned you in a review for ${title}.`;
