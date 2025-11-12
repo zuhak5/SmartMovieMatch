@@ -146,6 +146,9 @@ export function buildCommunitySection(movieContext) {
   form.appendChild(submitRow);
   section.appendChild(form);
 
+  const filterControls = createFilterControls();
+  section.appendChild(filterControls.container);
+
   const listWrapper = document.createElement('div');
   listWrapper.className = 'community-reviews';
   const list = document.createElement('div');
@@ -180,6 +183,8 @@ export function buildCommunitySection(movieContext) {
     spoilerInput,
     submitBtn,
     statusEl,
+    filter: 'all',
+    filterControls,
     summaryEl: summary.container,
     summaryOverallValue: summary.overallValue,
     summaryOverallMeta: summary.overallMeta,
@@ -197,11 +202,23 @@ export function buildCommunitySection(movieContext) {
     lastFriendActivity: null,
     list,
     empty,
+    emptyDefaultMessage: empty.textContent,
     loadingIndicator,
     errorMessage,
     visible: false,
     unsubscribe: null
   };
+
+  if (filterControls.allButton) {
+    filterControls.allButton.addEventListener('click', () => {
+      setSectionFilter(sectionState, 'all');
+    });
+  }
+  if (filterControls.friendsButton) {
+    filterControls.friendsButton.addEventListener('click', () => {
+      setSectionFilter(sectionState, 'friends');
+    });
+  }
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -308,6 +325,16 @@ function hideSection(sectionState) {
   if (sectionState.condensedBadge) {
     sectionState.condensedBadge.hidden = true;
     sectionState.condensedBadge.classList.remove('is-visible');
+    sectionState.condensedBadge.removeAttribute('aria-label');
+  }
+  sectionState.filter = 'all';
+  if (sectionState.filterControls) {
+    sectionState.filterControls.container.hidden = true;
+    if (sectionState.filterControls.friendsButton) {
+      sectionState.filterControls.friendsButton.disabled = true;
+      sectionState.filterControls.friendsButton.setAttribute('aria-disabled', 'true');
+    }
+    updateFilterButtonState(sectionState);
   }
   sectionState.friendActivityInitialized = false;
   sectionState.friendActivitySeenAt = null;
@@ -433,6 +460,7 @@ function renderSection(sectionState, cache) {
 
   const summaryStats = stats || computeReviewStats(reviews);
   renderSummary(sectionState, summaryStats);
+  updateFilterControls(sectionState, summaryStats, myReview, reviews);
 
   if (myReview) {
     sectionState.ratingInput.value = myReview.rating != null ? String(myReview.rating) : '';
@@ -441,15 +469,105 @@ function renderSection(sectionState, cache) {
   }
 
   sectionState.list.innerHTML = '';
-  if (!reviews.length) {
+  const filteredReviews = filterReviewsForDisplay(reviews, sectionState.filter);
+
+  if (!filteredReviews.length) {
+    const hasAnyReviews = reviews.length > 0;
+    if (!hasAnyReviews) {
+      sectionState.empty.textContent = sectionState.emptyDefaultMessage;
+    } else if (sectionState.filter === 'friends') {
+      sectionState.empty.textContent =
+        'No friend reviews yet. Switch back to everyone to see all community notes.';
+    } else {
+      sectionState.empty.textContent = sectionState.emptyDefaultMessage;
+    }
     sectionState.empty.hidden = false;
     return;
   }
   sectionState.empty.hidden = true;
 
-  reviews.forEach((review) => {
+  filteredReviews.forEach((review) => {
     sectionState.list.appendChild(renderReviewItem(review));
   });
+}
+
+function updateFilterControls(sectionState, stats, myReview, reviews) {
+  const controls = sectionState.filterControls;
+  if (!controls || !controls.container) {
+    return;
+  }
+
+  const totalReviews = stats && typeof stats.totalReviews === 'number' ? stats.totalReviews : 0;
+  const hasAnyReviews = totalReviews > 0 || (Array.isArray(reviews) && reviews.length > 0);
+  controls.container.hidden = !hasAnyReviews;
+
+  const friendButton = controls.friendsButton;
+  if (friendButton) {
+    const friendReviews = stats && typeof stats.friendReviews === 'number' ? stats.friendReviews : 0;
+    const hasFriendReviews =
+      friendReviews > 0 || Boolean(myReview && (myReview.isFriend || myReview.isSelf));
+    friendButton.disabled = !hasFriendReviews;
+    if (hasFriendReviews) {
+      friendButton.removeAttribute('aria-disabled');
+    } else {
+      friendButton.setAttribute('aria-disabled', 'true');
+    }
+    if (!hasFriendReviews && sectionState.filter === 'friends') {
+      sectionState.filter = 'all';
+    }
+  }
+
+  updateFilterButtonState(sectionState);
+}
+
+function updateFilterButtonState(sectionState) {
+  const controls = sectionState.filterControls;
+  if (!controls) {
+    return;
+  }
+  const active = sectionState.filter === 'friends' ? 'friends' : 'all';
+  const { allButton, friendsButton } = controls;
+  if (allButton) {
+    const isActive = active === 'all';
+    allButton.classList.toggle('is-active', isActive);
+    allButton.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  }
+  if (friendsButton) {
+    const isActive = active === 'friends';
+    friendsButton.classList.toggle('is-active', isActive);
+    friendsButton.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  }
+}
+
+function filterReviewsForDisplay(reviews, filter) {
+  if (!Array.isArray(reviews) || reviews.length === 0) {
+    return [];
+  }
+  if (filter === 'friends') {
+    return reviews.filter((review) => review && (review.isFriend || review.isSelf));
+  }
+  return reviews.slice();
+}
+
+function setSectionFilter(sectionState, nextFilter) {
+  if (!sectionState || !sectionState.filterControls) {
+    return;
+  }
+  const normalized = nextFilter === 'friends' ? 'friends' : 'all';
+  if (
+    normalized === 'friends' &&
+    sectionState.filterControls.friendsButton &&
+    sectionState.filterControls.friendsButton.disabled
+  ) {
+    return;
+  }
+  if (sectionState.filter === normalized) {
+    return;
+  }
+  sectionState.filter = normalized;
+  updateFilterButtonState(sectionState);
+  const cache = state.reviewCache.get(sectionState.key) || {};
+  renderSection(sectionState, cache);
 }
 
 function renderReviewItem(review) {
@@ -577,6 +695,39 @@ function renderSummary(sectionState, stats) {
 
   updateCondensedHeader(sectionState, stats);
   updateFriendBadge(sectionState, stats.friendLastReviewAt || null);
+}
+
+function createFilterControls() {
+  const container = document.createElement('div');
+  container.className = 'community-filter-bar';
+  container.hidden = true;
+
+  const label = document.createElement('span');
+  label.className = 'community-filter-label';
+  label.textContent = 'Show';
+  container.appendChild(label);
+
+  const buttonGroup = document.createElement('div');
+  buttonGroup.className = 'community-filter-buttons';
+  container.appendChild(buttonGroup);
+
+  const allButton = document.createElement('button');
+  allButton.type = 'button';
+  allButton.className = 'community-filter-btn is-active';
+  allButton.textContent = 'Everyone';
+  allButton.setAttribute('aria-pressed', 'true');
+  buttonGroup.appendChild(allButton);
+
+  const friendsButton = document.createElement('button');
+  friendsButton.type = 'button';
+  friendsButton.className = 'community-filter-btn';
+  friendsButton.textContent = 'Friends';
+  friendsButton.disabled = true;
+  friendsButton.setAttribute('aria-pressed', 'false');
+  friendsButton.setAttribute('aria-disabled', 'true');
+  buttonGroup.appendChild(friendsButton);
+
+  return { container, label, buttonGroup, allButton, friendsButton };
 }
 
 function updateCondensedHeader(sectionState, stats) {
