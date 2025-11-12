@@ -55,6 +55,11 @@ import {
 } from "./ui.js";
 import { $ } from "./dom.js";
 import { playUiClick, playExpandSound } from "./sound.js";
+import {
+  createProfileButton,
+  subscribeToProfileOpens,
+  canonicalHandle
+} from "./profile-overlay.js";
 import { getWatchedRatingPreference } from "./taste.js";
 
 const RECOMMENDATIONS_PAGE_SIZE = 20;
@@ -136,8 +141,19 @@ let unsubscribeNotifications = null;
 let unsubscribeSocialOverview = null;
 let unsubscribeCollaborative = null;
 let unsubscribePresenceStatus = null;
+let unsubscribeProfileOpen = null;
 const presenceStatusButtons = new Map();
 let presenceStatusFeedbackTimer = null;
+let socialProfileOverlay = null;
+let socialProfileCloseBtn = null;
+let socialProfileTitleEl = null;
+let socialProfileSubtitleEl = null;
+let socialProfileBodyEl = null;
+let socialProfileStatusEl = null;
+let socialProfileActiveUsername = null;
+let socialProfileRequestId = 0;
+let socialProfileReturnFocus = null;
+let socialProfileInitialized = false;
 
 const GENRE_ICON_MAP = {
   "28": "💥", // Action
@@ -1310,6 +1326,10 @@ function wireEvents() {
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
+      if (isSocialProfileOpen()) {
+        closeSocialProfileOverlay();
+        return;
+      }
       if (state.accountMenuOpen) {
         closeAccountMenu(true);
       }
@@ -3850,6 +3870,12 @@ function updateSnapshotPreviews(session) {
 
 function setupSocialFeatures() {
   initSocialFeatures();
+  initSocialProfileOverlay();
+  if (!unsubscribeProfileOpen) {
+    unsubscribeProfileOpen = subscribeToProfileOpens((username) => {
+      openSocialProfile(username);
+    });
+  }
   if (unsubscribeFollowing) {
     unsubscribeFollowing();
   }
@@ -4487,27 +4513,55 @@ function wireFollowForm() {
       item.className = "social-follow-search-item";
       item.role = "option";
 
-      const infoButton = document.createElement("button");
-      infoButton.type = "button";
+      const infoButton = document.createElement("div");
       infoButton.className = "social-follow-search-info";
-      infoButton.addEventListener("click", () => {
+      infoButton.setAttribute("role", "button");
+      infoButton.tabIndex = 0;
+      const handleSelect = () => {
         input.value = result.username;
         input.focus();
         setSearchState(
           "hint",
           `Press Follow to add @${result.username.toLowerCase()} or keep browsing results.`
         );
+      };
+      infoButton.addEventListener("click", () => {
+        handleSelect();
+      });
+      infoButton.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          handleSelect();
+        }
       });
 
-      const name = document.createElement("span");
-      name.className = "social-follow-name";
-      name.textContent = result.displayName || formatSocialDisplayName(result.username);
-      const handle = document.createElement("span");
-      handle.className = "social-follow-handle";
-      handle.textContent = `@${result.username}`;
-
-      infoButton.appendChild(name);
-      infoButton.appendChild(handle);
+      const profileTrigger = createProfileButton(result.username, {
+        className: "social-profile-trigger",
+        ariaLabel: `View profile for ${
+          result.displayName || formatSocialDisplayName(result.username)
+        }`,
+        stopPropagation: true
+      });
+      if (profileTrigger) {
+        const name = document.createElement("span");
+        name.className = "social-follow-name";
+        name.textContent = result.displayName || formatSocialDisplayName(result.username);
+        const handle = document.createElement("span");
+        handle.className = "social-follow-handle";
+        handle.textContent = `@${result.username}`;
+        profileTrigger.appendChild(name);
+        profileTrigger.appendChild(handle);
+        infoButton.appendChild(profileTrigger);
+      } else {
+        const name = document.createElement("span");
+        name.className = "social-follow-name";
+        name.textContent = result.displayName || formatSocialDisplayName(result.username);
+        const handle = document.createElement("span");
+        handle.className = "social-follow-handle";
+        handle.textContent = `@${result.username}`;
+        infoButton.appendChild(name);
+        infoButton.appendChild(handle);
+      }
 
       if (result.reason) {
         const reason = document.createElement("span");
@@ -5063,16 +5117,24 @@ function renderSocialConnections() {
       activeEntries.forEach((entry) => {
         const row = document.createElement("div");
         row.className = "social-presence-row";
-        const name = document.createElement("span");
-        name.className = "social-presence-name";
-        name.textContent = formatSocialDisplayName(entry.username);
+        const nameButton = createProfileButton(entry.username, {
+          className: "social-profile-plain social-presence-name",
+          ariaLabel: `View profile for ${formatSocialDisplayName(entry.username)}`
+        });
+        if (nameButton) {
+          row.appendChild(nameButton);
+        } else {
+          const name = document.createElement("span");
+          name.className = "social-presence-name";
+          name.textContent = formatSocialDisplayName(entry.username);
+          row.appendChild(name);
+        }
         const state = document.createElement("span");
         state.className = "social-presence-state";
         const statusKey = getPresenceEntryStatusKey(entry);
         state.dataset.state = entry.presence.state || "online";
         state.dataset.statusPreset = statusKey;
         state.textContent = formatPresenceListStatus(entry);
-        row.appendChild(name);
         row.appendChild(state);
         presenceListEl.appendChild(row);
       });
@@ -5108,11 +5170,13 @@ function renderSocialConnections() {
       mutualEmptyEl.hidden = false;
     } else {
       mutualFollowers.forEach((username) => {
-        const chip = document.createElement("span");
-        chip.className = "social-chip";
-        chip.textContent = formatSocialDisplayName(username);
-        chip.dataset.handle = username;
-        mutualListEl.appendChild(chip);
+        const chip = createProfileButton(username, {
+          className: "social-chip social-chip--action",
+          label: formatSocialDisplayName(username)
+        });
+        if (chip) {
+          mutualListEl.appendChild(chip);
+        }
       });
       mutualListEl.hidden = false;
       mutualEmptyEl.hidden = true;
@@ -5310,22 +5374,35 @@ function buildCollaborativeListCard(entry, mode) {
 
   const meta = document.createElement("div");
   meta.className = "collab-list-meta";
-  const metaParts = [];
+  const appendMetaText = (text) => {
+    if (!text) {
+      return;
+    }
+    if (meta.childNodes.length) {
+      meta.appendChild(document.createTextNode(" • "));
+    }
+    meta.appendChild(document.createTextNode(text));
+  };
   if (mode === "owner") {
-    metaParts.push("You own this list");
+    appendMetaText("You own this list");
   } else if (entry.owner) {
-    metaParts.push(`Owner: @${entry.owner}`);
+    appendMetaText("Owner: ");
+    const ownerLink = createProfileButton(entry.owner, {
+      className: "social-profile-link",
+      label: `@${entry.owner}`,
+      stopPropagation: true
+    });
+    if (ownerLink) {
+      meta.appendChild(ownerLink);
+    } else {
+      meta.appendChild(document.createTextNode(`@${entry.owner}`));
+    }
   }
-  if (entry.visibility === "private") {
-    metaParts.push("Private access");
-  } else {
-    metaParts.push("Friends can view");
-  }
+  appendMetaText(entry.visibility === "private" ? "Private access" : "Friends can view");
   const updatedLabel = formatTimeAgo(entry.updatedAt || entry.createdAt);
   if (updatedLabel) {
-    metaParts.push(`Updated ${updatedLabel}`);
+    appendMetaText(`Updated ${updatedLabel}`);
   }
-  meta.textContent = metaParts.join(" • ");
   card.appendChild(meta);
 
   if (Array.isArray(entry.preview) && entry.preview.length) {
@@ -5355,10 +5432,14 @@ function buildCollaborativeListCard(entry, mode) {
     label.textContent = "Collaborators";
     row.appendChild(label);
     collaborators.forEach((handle) => {
-      const chip = document.createElement("span");
-      chip.className = "collab-chip";
-      chip.textContent = formatSocialDisplayName(handle);
-      row.appendChild(chip);
+      const chip = createProfileButton(handle, {
+        className: "collab-chip collab-chip--action",
+        label: formatSocialDisplayName(handle),
+        stopPropagation: true
+      });
+      if (chip) {
+        row.appendChild(chip);
+      }
     });
     card.appendChild(row);
   }
@@ -5366,7 +5447,22 @@ function buildCollaborativeListCard(entry, mode) {
   if (mode === "owner" && Array.isArray(entry.pendingInvites) && entry.pendingInvites.length) {
     const pending = document.createElement("p");
     pending.className = "collab-list-pending";
-    pending.textContent = `Pending invites: ${entry.pendingInvites.map((handle) => `@${handle}`).join(", ")}`;
+    pending.appendChild(document.createTextNode("Pending invites: "));
+    entry.pendingInvites.forEach((handle, index) => {
+      if (index > 0) {
+        pending.appendChild(document.createTextNode(", "));
+      }
+      const inviteLink = createProfileButton(handle, {
+        className: "social-profile-link",
+        label: `@${handle}`,
+        stopPropagation: true
+      });
+      if (inviteLink) {
+        pending.appendChild(inviteLink);
+      } else {
+        pending.appendChild(document.createTextNode(`@${handle}`));
+      }
+    });
     card.appendChild(pending);
   }
 
@@ -5401,15 +5497,32 @@ function buildCollaborativeInviteCard(entry) {
 
   const meta = document.createElement("div");
   meta.className = "collab-list-meta";
-  const parts = [];
+  const appendMetaText = (text) => {
+    if (!text) {
+      return;
+    }
+    if (meta.childNodes.length) {
+      meta.appendChild(document.createTextNode(" • "));
+    }
+    meta.appendChild(document.createTextNode(text));
+  };
   if (entry.owner) {
-    parts.push(`Owner: @${entry.owner}`);
+    appendMetaText("Owner: ");
+    const ownerLink = createProfileButton(entry.owner, {
+      className: "social-profile-link",
+      label: `@${entry.owner}`,
+      stopPropagation: true
+    });
+    if (ownerLink) {
+      meta.appendChild(ownerLink);
+    } else {
+      meta.appendChild(document.createTextNode(`@${entry.owner}`));
+    }
   }
   const invitedAt = formatTimeAgo(entry.invitedAt);
   if (invitedAt) {
-    parts.push(`Invited ${invitedAt}`);
+    appendMetaText(`Invited ${invitedAt}`);
   }
-  meta.textContent = parts.join(" • ");
   card.appendChild(meta);
 
   if (entry.description) {
@@ -5458,15 +5571,26 @@ function buildWatchPartyCard(entry, mode) {
 
   const meta = document.createElement("div");
   meta.className = "watch-party-meta";
-  const metaParts = [];
   const schedule = formatWatchPartyDate(entry.scheduledFor);
   if (schedule) {
-    metaParts.push(schedule);
+    meta.appendChild(document.createTextNode(schedule));
   }
   if (entry.host) {
-    metaParts.push(`Host: @${entry.host}`);
+    if (meta.childNodes.length) {
+      meta.appendChild(document.createTextNode(" • "));
+    }
+    meta.appendChild(document.createTextNode("Host: "));
+    const hostLink = createProfileButton(entry.host, {
+      className: "social-profile-link",
+      label: `@${entry.host}`,
+      stopPropagation: true
+    });
+    if (hostLink) {
+      meta.appendChild(hostLink);
+    } else {
+      meta.appendChild(document.createTextNode(`@${entry.host}`));
+    }
   }
-  meta.textContent = metaParts.join(" • ");
   card.appendChild(meta);
 
   if (entry.note) {
@@ -5483,11 +5607,15 @@ function buildWatchPartyCard(entry, mode) {
       if (!invite || !invite.username) {
         return;
       }
-      const chip = document.createElement("span");
-      chip.className = "watch-party-chip";
-      chip.dataset.state = invite.response || "pending";
-      chip.textContent = `${formatSocialDisplayName(invite.username)} – ${formatPartyResponse(invite.response)}`;
-      roster.appendChild(chip);
+      const chip = createProfileButton(invite.username, {
+        className: "watch-party-chip watch-party-chip--action",
+        label: `${formatSocialDisplayName(invite.username)} – ${formatPartyResponse(invite.response)}`,
+        stopPropagation: true
+      });
+      if (chip) {
+        chip.dataset.state = invite.response || "pending";
+        roster.appendChild(chip);
+      }
     });
     card.appendChild(roster);
   }
@@ -5941,6 +6069,292 @@ function updateSocialCount(id, value) {
   el.textContent = number.toLocaleString();
 }
 
+function initSocialProfileOverlay() {
+  if (socialProfileInitialized) {
+    return;
+  }
+  socialProfileOverlay = $("socialProfileOverlay");
+  socialProfileCloseBtn = $("socialProfileClose");
+  socialProfileTitleEl = $("socialProfileTitle");
+  socialProfileSubtitleEl = $("socialProfileSubtitle");
+  socialProfileBodyEl = $("socialProfileBody");
+  socialProfileStatusEl = $("socialProfileStatus");
+  if (socialProfileOverlay) {
+    socialProfileOverlay.addEventListener("click", (event) => {
+      if (event.target === socialProfileOverlay) {
+        closeSocialProfileOverlay();
+      }
+    });
+  }
+  if (socialProfileCloseBtn) {
+    socialProfileCloseBtn.addEventListener("click", () => {
+      playUiClick();
+      closeSocialProfileOverlay();
+    });
+  }
+  socialProfileInitialized = Boolean(socialProfileOverlay);
+}
+
+function isSocialProfileOpen() {
+  return Boolean(socialProfileOverlay && socialProfileOverlay.hasAttribute("open"));
+}
+
+function openSocialProfile(username) {
+  const normalized = canonicalHandle(username);
+  if (!normalized) {
+    return;
+  }
+  initSocialProfileOverlay();
+  if (!socialProfileOverlay) {
+    window.location.href = "profile.html#profileOverview";
+    return;
+  }
+  if (!state.session || !state.session.token) {
+    window.location.href = "login.html";
+    return;
+  }
+  socialProfileActiveUsername = normalized;
+  socialProfileReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  socialProfileOverlay.hidden = false;
+  socialProfileOverlay.setAttribute("open", "");
+  socialProfileOverlay.setAttribute("aria-hidden", "false");
+  socialProfileOverlay.scrollTop = 0;
+  if (socialProfileBodyEl) {
+    socialProfileBodyEl.innerHTML = "";
+  }
+  if (socialProfileTitleEl) {
+    socialProfileTitleEl.textContent = formatSocialDisplayName(normalized);
+  }
+  if (socialProfileSubtitleEl) {
+    socialProfileSubtitleEl.textContent = `@${normalized}`;
+  }
+  setSocialProfileStatus("Loading profile…", "loading");
+  window.requestAnimationFrame(() => {
+    if (socialProfileCloseBtn) {
+      try {
+        socialProfileCloseBtn.focus();
+      } catch (error) {
+        // ignore focus errors
+      }
+    }
+  });
+  const requestId = ++socialProfileRequestId;
+  searchSocialUsers(normalized)
+    .then((results) => {
+      if (requestId !== socialProfileRequestId || socialProfileActiveUsername !== normalized) {
+        return;
+      }
+      const match = Array.isArray(results)
+        ? results.find((entry) => canonicalHandle(entry.username) === normalized)
+        : null;
+      if (!match) {
+        setSocialProfileStatus("We couldn’t find that profile right now.", "error");
+        return;
+      }
+      renderSocialProfileContent(match);
+      setSocialProfileStatus("", null);
+    })
+    .catch((error) => {
+      if (requestId !== socialProfileRequestId) {
+        return;
+      }
+      const message = error && error.message
+        ? String(error.message)
+        : "We couldn’t load that profile right now.";
+      setSocialProfileStatus(message, "error");
+    });
+}
+
+function closeSocialProfileOverlay() {
+  if (!socialProfileOverlay) {
+    return;
+  }
+  socialProfileOverlay.removeAttribute("open");
+  socialProfileOverlay.setAttribute("aria-hidden", "true");
+  socialProfileOverlay.hidden = true;
+  socialProfileActiveUsername = null;
+  socialProfileRequestId += 1;
+  if (socialProfileBodyEl) {
+    socialProfileBodyEl.innerHTML = "";
+  }
+  setSocialProfileStatus("", null);
+  if (socialProfileReturnFocus && typeof socialProfileReturnFocus.focus === "function") {
+    try {
+      socialProfileReturnFocus.focus();
+    } catch (error) {
+      // ignore focus restoration errors
+    }
+  }
+  socialProfileReturnFocus = null;
+}
+
+function setSocialProfileStatus(message, variant) {
+  if (!socialProfileStatusEl) {
+    return;
+  }
+  if (!message) {
+    socialProfileStatusEl.textContent = "";
+    socialProfileStatusEl.hidden = true;
+    socialProfileStatusEl.removeAttribute("data-variant");
+    return;
+  }
+  socialProfileStatusEl.textContent = message;
+  socialProfileStatusEl.hidden = false;
+  if (variant) {
+    socialProfileStatusEl.dataset.variant = variant;
+  } else {
+    socialProfileStatusEl.removeAttribute("data-variant");
+  }
+}
+
+function renderSocialProfileContent(profile) {
+  if (!socialProfileBodyEl) {
+    return;
+  }
+  socialProfileBodyEl.innerHTML = "";
+  const normalized = canonicalHandle(profile && profile.username ? profile.username : socialProfileActiveUsername);
+  const displayName = profile && profile.displayName
+    ? profile.displayName
+    : formatSocialDisplayName(normalized);
+  if (socialProfileTitleEl) {
+    socialProfileTitleEl.textContent = displayName;
+  }
+  const subtitleParts = [];
+  if (normalized) {
+    subtitleParts.push(`@${normalized}`);
+  }
+  if (profile && profile.followsYou) {
+    subtitleParts.push("Follows you");
+  }
+  const isFollowing = Array.isArray(state.followingUsers)
+    ? state.followingUsers.some((handle) => canonicalHandle(handle) === normalized)
+    : false;
+  if (isFollowing) {
+    subtitleParts.push("You follow");
+  }
+  if (socialProfileSubtitleEl) {
+    socialProfileSubtitleEl.textContent = subtitleParts.join(" • ");
+  }
+
+  if (normalized) {
+    const actions = document.createElement("div");
+    actions.className = "modal-actions";
+    if (isFollowing) {
+      const unfollowBtn = document.createElement("button");
+      unfollowBtn.type = "button";
+      unfollowBtn.className = "btn-subtle btn-subtle-danger";
+      unfollowBtn.textContent = "Unfollow";
+      unfollowBtn.addEventListener("click", async () => {
+        setSocialProfileStatus(`Removing @${normalized}…`, "loading");
+        await handleUnfollowUser(normalized, unfollowBtn);
+        setSocialProfileStatus("", null);
+      });
+      actions.appendChild(unfollowBtn);
+    } else {
+      const followBtn = document.createElement("button");
+      followBtn.type = "button";
+      followBtn.className = "btn-secondary";
+      followBtn.textContent = "Follow";
+      followBtn.addEventListener("click", async () => {
+        setSocialProfileStatus(`Following @${normalized}…`, "loading");
+        await handleFollowFromList(normalized, followBtn);
+        setSocialProfileStatus("", null);
+      });
+      actions.appendChild(followBtn);
+    }
+    if (actions.childElementCount) {
+      socialProfileBodyEl.appendChild(actions);
+    }
+  }
+
+  if (profile && profile.tagline) {
+    const tagline = document.createElement("p");
+    tagline.className = "social-profile-tagline";
+    tagline.textContent = profile.tagline;
+    socialProfileBodyEl.appendChild(tagline);
+  }
+
+  if (profile && profile.reason) {
+    const reason = document.createElement("p");
+    reason.className = "social-profile-meta";
+    reason.textContent = profile.reason;
+    socialProfileBodyEl.appendChild(reason);
+  }
+
+  if (profile && Array.isArray(profile.mutualFollowers) && profile.mutualFollowers.length) {
+    const heading = document.createElement("h3");
+    heading.className = "modal-section-title";
+    heading.textContent = `Mutual followers (${profile.mutualFollowers.length})`;
+    socialProfileBodyEl.appendChild(heading);
+
+    const chips = document.createElement("div");
+    chips.className = "social-profile-tags";
+    profile.mutualFollowers.forEach((handle) => {
+      const chip = createProfileButton(handle, {
+        className: "social-chip social-chip--action",
+        label: formatSocialDisplayName(handle)
+      });
+      if (chip) {
+        chips.appendChild(chip);
+      }
+    });
+    socialProfileBodyEl.appendChild(chips);
+  }
+
+  renderProfileTagSection("Shared favorites", profile && profile.sharedFavorites, "favorite");
+  renderProfileTagSection("Shared genres", profile && profile.sharedInterests, "interest");
+  renderProfileTagSection(
+    "Recently watched overlap",
+    profile && profile.sharedWatchHistory,
+    "watched"
+  );
+  renderProfileTagSection("Watch parties together", profile && profile.sharedWatchParties, "party");
+
+  const hasDetails = Boolean(
+    (profile && profile.tagline) ||
+      (profile && profile.reason) ||
+      (profile && Array.isArray(profile.mutualFollowers) && profile.mutualFollowers.length) ||
+      (profile && Array.isArray(profile.sharedFavorites) && profile.sharedFavorites.length) ||
+      (profile && Array.isArray(profile.sharedInterests) && profile.sharedInterests.length) ||
+      (profile && Array.isArray(profile.sharedWatchHistory) && profile.sharedWatchHistory.length) ||
+      (profile && Array.isArray(profile.sharedWatchParties) && profile.sharedWatchParties.length)
+  );
+
+  if (!hasDetails) {
+    const empty = document.createElement("p");
+    empty.className = "social-profile-meta";
+    empty.textContent = "No shared activity yet. Follow to start swapping recommendations.";
+    socialProfileBodyEl.appendChild(empty);
+  }
+}
+
+function renderProfileTagSection(title, values, variant) {
+  if (!socialProfileBodyEl) {
+    return;
+  }
+  const list = Array.isArray(values) ? values.filter((value) => typeof value === "string" && value.trim()) : [];
+  if (!list.length) {
+    return;
+  }
+  const heading = document.createElement("h3");
+  heading.className = "modal-section-title";
+  heading.textContent = title;
+  socialProfileBodyEl.appendChild(heading);
+
+  const tagWrap = document.createElement("div");
+  tagWrap.className = "social-profile-tags";
+  list.slice(0, 8).forEach((value) => {
+    const tag = document.createElement("span");
+    tag.className = "social-suggestion-tag";
+    if (variant) {
+      tag.dataset.variant = variant;
+    }
+    tag.textContent = value;
+    tagWrap.appendChild(tag);
+  });
+  socialProfileBodyEl.appendChild(tagWrap);
+}
+
 function buildSocialListItem({ username, isFollowing, followsYou, mutualFollowers, onPrimaryAction }) {
   const item = document.createElement("div");
   item.className = "social-follow-item";
@@ -5951,14 +6365,30 @@ function buildSocialListItem({ username, isFollowing, followsYou, mutualFollower
 
   const primary = document.createElement("div");
   primary.className = "social-follow-primary";
-  const name = document.createElement("span");
-  name.className = "social-follow-name";
-  name.textContent = formatSocialDisplayName(username);
-  const handle = document.createElement("span");
-  handle.className = "social-follow-handle";
-  handle.textContent = `@${username}`;
-  primary.appendChild(name);
-  primary.appendChild(handle);
+  const profileTrigger = createProfileButton(username, {
+    className: "social-profile-trigger",
+    ariaLabel: `View profile for ${formatSocialDisplayName(username)}`
+  });
+  if (profileTrigger) {
+    const name = document.createElement("span");
+    name.className = "social-follow-name";
+    name.textContent = formatSocialDisplayName(username);
+    const handle = document.createElement("span");
+    handle.className = "social-follow-handle";
+    handle.textContent = `@${username}`;
+    profileTrigger.appendChild(name);
+    profileTrigger.appendChild(handle);
+    primary.appendChild(profileTrigger);
+  } else {
+    const name = document.createElement("span");
+    name.className = "social-follow-name";
+    name.textContent = formatSocialDisplayName(username);
+    const handle = document.createElement("span");
+    handle.className = "social-follow-handle";
+    handle.textContent = `@${username}`;
+    primary.appendChild(name);
+    primary.appendChild(handle);
+  }
   row.appendChild(primary);
 
   const badges = document.createElement("div");
@@ -6021,17 +6451,35 @@ function buildSuggestionCard(suggestion, onFollow) {
   identity.className = "social-suggestion-identity";
   header.appendChild(identity);
 
-  const nameBlock = document.createElement("div");
-  nameBlock.className = "social-suggestion-names";
-  const name = document.createElement("span");
-  name.className = "social-follow-name";
-  name.textContent = suggestion.displayName || formatSocialDisplayName(suggestion.username);
-  const handle = document.createElement("span");
-  handle.className = "social-follow-handle";
-  handle.textContent = `@${suggestion.username}`;
-  nameBlock.appendChild(name);
-  nameBlock.appendChild(handle);
-  identity.appendChild(nameBlock);
+  const nameBlock = createProfileButton(suggestion.username, {
+    className: "social-profile-trigger social-suggestion-names",
+    ariaLabel: `View profile for ${
+      suggestion.displayName || formatSocialDisplayName(suggestion.username)
+    }`
+  });
+  if (nameBlock) {
+    const name = document.createElement("span");
+    name.className = "social-follow-name";
+    name.textContent = suggestion.displayName || formatSocialDisplayName(suggestion.username);
+    const handle = document.createElement("span");
+    handle.className = "social-follow-handle";
+    handle.textContent = `@${suggestion.username}`;
+    nameBlock.appendChild(name);
+    nameBlock.appendChild(handle);
+    identity.appendChild(nameBlock);
+  } else {
+    const name = document.createElement("span");
+    name.className = "social-follow-name";
+    name.textContent = suggestion.displayName || formatSocialDisplayName(suggestion.username);
+    const handle = document.createElement("span");
+    handle.className = "social-follow-handle";
+    handle.textContent = `@${suggestion.username}`;
+    const fallback = document.createElement("div");
+    fallback.className = "social-suggestion-names";
+    fallback.appendChild(name);
+    fallback.appendChild(handle);
+    identity.appendChild(fallback);
+  }
 
   if (suggestion.followsYou) {
     const badges = document.createElement("div");
@@ -6172,13 +6620,6 @@ function toTimestamp(value) {
     return 0;
   }
   return date.getTime();
-}
-
-function canonicalHandle(value) {
-  if (typeof value !== "string") {
-    return "";
-  }
-  return value.trim().toLowerCase();
 }
 
 function formatMovieCount(count) {
