@@ -1617,7 +1617,7 @@ function highlightProfileOverview() {
 
   const page = document.body ? document.body.getAttribute("data-page") : null;
   if (page !== "profile-overview") {
-    window.location.href = "profile.html#profileOverview";
+    window.location.href = "profile";
   }
 }
 
@@ -1703,13 +1703,11 @@ function openAccountSettings(section = "profile") {
     return;
   }
 
-  let target = "account-settings.html";
+  let target = "account-settings";
   if (section === "snapshots") {
     target += "#snapshots";
   } else if (section === "security") {
     target += "#security";
-  } else {
-    target += "#profile";
   }
   window.location.href = target;
 }
@@ -6106,7 +6104,7 @@ function openSocialProfile(username) {
   }
   initSocialProfileOverlay();
   if (!socialProfileOverlay) {
-    window.location.href = "profile.html#profileOverview";
+    window.location.href = "profile";
     return;
   }
   if (!state.session || !state.session.token) {
