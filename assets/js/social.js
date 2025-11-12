@@ -10,6 +10,7 @@ const state = {
   following: [],
   followingLoaded: false,
   followingLoading: false,
+  socialOverview: createDefaultSocialOverview(),
   sections: new Set(),
   sectionsByKey: new Map(),
   reviewCache: new Map(),
@@ -24,6 +25,7 @@ const state = {
 const followingSubscribers = new Set();
 const reviewSubscribers = new Map();
 const notificationSubscribers = new Set();
+const socialOverviewSubscribers = new Set();
 
 subscribeToSession((session) => {
   state.session = session;
@@ -32,6 +34,7 @@ subscribeToSession((session) => {
     state.following = [];
     state.followingLoaded = false;
     state.followingLoading = false;
+    state.socialOverview = createDefaultSocialOverview();
     state.reviewCache.clear();
     state.notifications = [];
     state.notificationsLoaded = false;
@@ -40,11 +43,13 @@ subscribeToSession((session) => {
     stopNotificationPolling();
     notifyNotificationSubscribers();
     notifyFollowingSubscribers();
+    notifySocialOverviewSubscribers();
     state.sections.forEach((section) => hideSection(section));
     return;
   }
   state.followingLoaded = false;
   state.followingLoading = false;
+  state.socialOverview = createDefaultSocialOverview();
   loadFollowing().catch(() => {});
   state.notificationsLoaded = false;
   state.notificationsLoading = false;
@@ -283,6 +288,21 @@ export function subscribeToFollowing(callback) {
   };
 }
 
+export function subscribeToSocialOverview(callback) {
+  if (typeof callback !== 'function') {
+    return () => {};
+  }
+  socialOverviewSubscribers.add(callback);
+  try {
+    callback(cloneSocialOverview(state.socialOverview));
+  } catch (error) {
+    console.warn('Social overview subscriber error', error);
+  }
+  return () => {
+    socialOverviewSubscribers.delete(callback);
+  };
+}
+
 export function subscribeToNotifications(callback) {
   if (typeof callback !== 'function') {
     return () => {};
@@ -350,6 +370,10 @@ export async function unfollowUserByUsername(username) {
 
 export function getFollowingSnapshot() {
   return state.following.slice();
+}
+
+export function getSocialOverviewSnapshot() {
+  return cloneSocialOverview(state.socialOverview);
 }
 
 export function acknowledgeFriendActivity(key) {
@@ -1234,7 +1258,9 @@ async function loadFollowing(force = false) {
   if (!state.session || !state.session.token) {
     state.following = [];
     state.followingLoaded = false;
+    state.socialOverview = createDefaultSocialOverview();
     notifyFollowingSubscribers();
+    notifySocialOverviewSubscribers();
     return;
   }
   if (state.followingLoading && !force) {
@@ -1243,10 +1269,12 @@ async function loadFollowing(force = false) {
   state.followingLoading = true;
   try {
     const response = await callSocial('listFollowing');
-    const list = Array.isArray(response.following) ? response.following : [];
-    state.following = list.map((username) => canonicalUsername(username)).filter(Boolean).sort();
+    const overview = normalizeSocialOverview(response);
+    state.socialOverview = overview;
+    state.following = overview.following.slice();
     state.followingLoaded = true;
     notifyFollowingSubscribers();
+    notifySocialOverviewSubscribers();
   } catch (error) {
     console.warn('Failed to load following list', error);
   } finally {
@@ -1261,6 +1289,17 @@ function notifyFollowingSubscribers() {
       callback(snapshot);
     } catch (error) {
       console.warn('Following subscriber error', error);
+    }
+  });
+}
+
+function notifySocialOverviewSubscribers() {
+  const snapshot = cloneSocialOverview(state.socialOverview);
+  socialOverviewSubscribers.forEach((callback) => {
+    try {
+      callback(snapshot);
+    } catch (error) {
+      console.warn('Social overview subscriber error', error);
     }
   });
 }
@@ -1385,6 +1424,181 @@ function getToastHost() {
   document.body.appendChild(host);
   state.toastHost = host;
   return host;
+}
+
+function normalizeSocialOverview(payload) {
+  const rawFollowing = Array.isArray(payload && payload.following) ? payload.following : [];
+  const rawFollowers = Array.isArray(payload && payload.followers) ? payload.followers : [];
+  const following = Array.from(
+    new Set(rawFollowing.map((username) => canonicalUsername(username)).filter(Boolean))
+  ).sort();
+  const followers = Array.from(
+    new Set(rawFollowers.map((username) => canonicalUsername(username)).filter(Boolean))
+  ).sort();
+  const followingSet = new Set(following);
+  const followersSet = new Set(followers);
+  const rawMutual = Array.isArray(payload && payload.mutualFollowers)
+    ? payload.mutualFollowers
+    : [];
+  const mutualFollowers = rawMutual.length
+    ? Array.from(
+        new Set(
+          rawMutual
+            .map((username) => canonicalUsername(username))
+            .filter((username) => username && (followingSet.has(username) || followersSet.has(username)))
+        )
+      ).sort()
+    : following.filter((username) => followersSet.has(username));
+  const countsPayload = payload && payload.counts ? payload.counts : {};
+  const counts = {
+    following: Number.isFinite(countsPayload.following)
+      ? Number(countsPayload.following)
+      : following.length,
+    followers: Number.isFinite(countsPayload.followers)
+      ? Number(countsPayload.followers)
+      : followers.length,
+    mutual: Number.isFinite(countsPayload.mutual)
+      ? Number(countsPayload.mutual)
+      : mutualFollowers.length
+  };
+  const rawSuggestions = Array.isArray(payload && payload.suggestions) ? payload.suggestions : [];
+  const suggestions = rawSuggestions
+    .map((entry) => normalizeSocialSuggestion(entry, followersSet, followingSet))
+    .filter(Boolean);
+  return {
+    following,
+    followers,
+    mutualFollowers,
+    counts,
+    suggestions
+  };
+}
+
+function normalizeSocialSuggestion(entry, followersSet, followingSet) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+  const username = canonicalUsername(entry.username);
+  if (!username || followingSet.has(username)) {
+    return null;
+  }
+  const displayName = typeof entry.displayName === 'string' && entry.displayName.trim()
+    ? entry.displayName.trim()
+    : formatDisplayNameFromHandle(username);
+  const tagline = typeof entry.tagline === 'string' ? entry.tagline.trim() : '';
+  const reason = typeof entry.reason === 'string' ? entry.reason.trim() : '';
+  const sharedInterests = Array.isArray(entry.sharedInterests)
+    ? entry.sharedInterests
+        .map((value) => (typeof value === 'string' ? value.trim() : ''))
+        .filter(Boolean)
+    : [];
+  const sharedFavorites = Array.isArray(entry.sharedFavorites)
+    ? entry.sharedFavorites
+        .map((value) => (typeof value === 'string' ? value.trim() : ''))
+        .filter(Boolean)
+    : [];
+  const mutualFollowers = Array.isArray(entry.mutualFollowers)
+    ? Array.from(
+        new Set(
+          entry.mutualFollowers
+            .map((value) => canonicalUsername(value))
+            .filter((value) => value && (followersSet.has(value) || followingSet.has(value)))
+        )
+      ).sort()
+    : [];
+  const followsYou = entry.followsYou === true || followersSet.has(username);
+  return {
+    username,
+    displayName,
+    tagline,
+    sharedInterests,
+    sharedFavorites,
+    mutualFollowers,
+    followsYou,
+    reason
+  };
+}
+
+function cloneSocialOverview(overview) {
+  if (!overview || typeof overview !== 'object') {
+    return createDefaultSocialOverview();
+  }
+  return {
+    following: Array.isArray(overview.following) ? overview.following.slice() : [],
+    followers: Array.isArray(overview.followers) ? overview.followers.slice() : [],
+    mutualFollowers: Array.isArray(overview.mutualFollowers)
+      ? overview.mutualFollowers.slice()
+      : [],
+    counts: {
+      following: Number.isFinite(overview.counts && overview.counts.following)
+        ? Number(overview.counts.following)
+        : Array.isArray(overview.following)
+        ? overview.following.length
+        : 0,
+      followers: Number.isFinite(overview.counts && overview.counts.followers)
+        ? Number(overview.counts.followers)
+        : Array.isArray(overview.followers)
+        ? overview.followers.length
+        : 0,
+      mutual: Number.isFinite(overview.counts && overview.counts.mutual)
+        ? Number(overview.counts.mutual)
+        : Array.isArray(overview.mutualFollowers)
+        ? overview.mutualFollowers.length
+        : 0
+    },
+    suggestions: Array.isArray(overview.suggestions)
+      ? overview.suggestions.map((entry) => ({
+          username: entry.username,
+          displayName: entry.displayName,
+          tagline: entry.tagline,
+          sharedInterests: Array.isArray(entry.sharedInterests)
+            ? entry.sharedInterests.slice()
+            : [],
+          sharedFavorites: Array.isArray(entry.sharedFavorites)
+            ? entry.sharedFavorites.slice()
+            : [],
+          mutualFollowers: Array.isArray(entry.mutualFollowers)
+            ? entry.mutualFollowers.slice()
+            : [],
+          followsYou: Boolean(entry.followsYou),
+          reason: entry.reason || ''
+        }))
+      : []
+  };
+}
+
+function createDefaultSocialOverview() {
+  return {
+    following: [],
+    followers: [],
+    mutualFollowers: [],
+    counts: {
+      following: 0,
+      followers: 0,
+      mutual: 0
+    },
+    suggestions: []
+  };
+}
+
+function formatDisplayNameFromHandle(handle) {
+  if (!handle) {
+    return '';
+  }
+  return handle
+    .replace(/[_\-.]+/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => toTitleCase(part))
+    .join(' ');
+}
+
+function toTitleCase(value) {
+  if (!value) {
+    return '';
+  }
+  const lower = value.toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
 
 function normalizeMovieForApi(movie) {

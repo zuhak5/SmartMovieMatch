@@ -1452,7 +1452,7 @@ h6 {
 
 .social-panel .panel-inner {
   display: grid;
-  gap: 1.2rem;
+  gap: 1.5rem;
 }
 
 .social-signed-out {
@@ -1478,7 +1478,35 @@ h6 {
 
 .social-content {
   display: grid;
-  gap: 1rem;
+  gap: 1.3rem;
+}
+
+.social-overview-stats {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.social-stat {
+  background: rgba(8, 12, 26, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 20px;
+  padding: 1rem 1.1rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.social-stat-label {
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(203, 213, 225, 0.72);
+}
+
+.social-stat-value {
+  font-size: 1.65rem;
+  font-weight: 700;
+  color: var(--text-main);
 }
 
 .social-follow-form {
@@ -1506,20 +1534,111 @@ h6 {
   flex-shrink: 0;
 }
 
-.social-following-list {
+.social-mutuals {
   display: grid;
   gap: 0.75rem;
+  background: rgba(8, 12, 26, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 18px;
+  padding: 1rem 1.1rem;
+}
+
+.social-section-header {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.social-section-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.social-section-header p {
+  margin: 0;
+  color: var(--text-subtle);
+  font-size: 0.9rem;
+}
+
+.social-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.social-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(96, 165, 250, 0.14);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  color: rgba(191, 219, 254, 0.95);
+  font-size: 0.82rem;
+}
+
+.empty-state--subtle {
+  font-size: 0.88rem;
+  color: var(--text-subtle);
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px dashed rgba(148, 163, 184, 0.25);
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md);
+}
+
+.social-lists-grid {
+  display: grid;
+  gap: 1.2rem;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.social-list-block {
+  display: grid;
+  gap: 0.9rem;
+  background: rgba(8, 12, 26, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 20px;
+  padding: 1rem 1.1rem;
+}
+
+.social-count-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.45rem;
+  font-size: 0.78rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.16);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: rgba(226, 232, 240, 0.92);
+}
+
+.social-following-list {
+  display: grid;
+  gap: 0.8rem;
 }
 
 .social-follow-item {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.55rem;
-  padding: 0.65rem 0.85rem;
-  border-radius: var(--radius-md);
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-lg);
   background: rgba(15, 23, 42, 0.78);
   border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.social-follow-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.social-follow-primary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 160px;
 }
 
 .social-follow-name {
@@ -1527,17 +1646,134 @@ h6 {
   color: var(--text-main);
 }
 
+.social-follow-handle {
+  font-size: 0.86rem;
+  color: var(--text-subtle);
+}
+
+.social-follow-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
 .social-follow-badge {
   font-size: 0.72rem;
-  padding: 0.18rem 0.5rem;
+  padding: 0.2rem 0.55rem;
   border-radius: 999px;
   background: rgba(96, 165, 250, 0.16);
   border: 1px solid rgba(96, 165, 250, 0.3);
   color: rgba(191, 219, 254, 0.95);
 }
 
-.social-unfollow-btn {
+.social-follow-badge--accent {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(16, 185, 129, 0.45);
+  color: rgba(167, 243, 208, 0.95);
+}
+
+.social-follow-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   margin-left: auto;
+}
+
+.social-follow-status {
+  font-size: 0.86rem;
+  color: var(--text-subtle);
+}
+
+.social-follow-secondary {
+  font-size: 0.86rem;
+  color: var(--text-subtle);
+}
+
+.social-suggestions {
+  display: grid;
+  gap: 1rem;
+}
+
+.social-suggestions-list {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.social-suggestion-card {
+  display: grid;
+  gap: 0.75rem;
+  background: rgba(8, 12, 26, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 20px;
+  padding: 1rem 1.1rem;
+}
+
+.social-suggestion-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.social-suggestion-identity {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.social-suggestion-names {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.social-suggestion-actions {
+  flex-shrink: 0;
+}
+
+.social-suggestion-tagline {
+  margin: 0;
+  color: var(--text-subtle);
+}
+
+.social-suggestion-reason {
+  margin: 0;
+  font-size: 0.9rem;
+  color: rgba(226, 232, 240, 0.86);
+}
+
+.social-suggestion-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.social-suggestion-tag {
+  font-size: 0.75rem;
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(15, 23, 42, 0.6);
+  color: rgba(226, 232, 240, 0.86);
+}
+
+.social-suggestion-tag[data-variant="mutual"] {
+  background: rgba(96, 165, 250, 0.12);
+  border-color: rgba(96, 165, 250, 0.32);
+  color: rgba(191, 219, 254, 0.95);
+}
+
+.social-suggestion-tag[data-variant="interest"] {
+  background: rgba(196, 181, 253, 0.16);
+  border-color: rgba(196, 181, 253, 0.32);
+  color: rgba(233, 213, 255, 0.9);
+}
+
+.social-suggestion-tag[data-variant="favorite"] {
+  background: rgba(248, 113, 113, 0.14);
+  border-color: rgba(248, 113, 113, 0.32);
+  color: rgba(254, 202, 202, 0.9);
 }
 
 @media (max-width: 540px) {
@@ -1550,13 +1786,36 @@ h6 {
     width: 100%;
   }
 
-  .social-follow-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.45rem;
+  .social-lists-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .social-unfollow-btn {
+  .social-follow-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .social-follow-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .social-follow-actions .btn-secondary,
+  .social-follow-actions .btn-subtle {
+    width: 100%;
+  }
+
+  .social-suggestion-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .social-suggestion-actions {
+    width: 100%;
+  }
+
+  .social-suggestion-actions .btn-secondary {
     width: 100%;
   }
 }

@@ -19,9 +19,11 @@ import {
   initSocialFeatures,
   buildCommunitySection,
   subscribeToFollowing,
+  subscribeToSocialOverview,
   followUserByUsername,
   unfollowUserByUsername,
   getFollowingSnapshot,
+  getSocialOverviewSnapshot,
   subscribeToNotifications,
   acknowledgeNotifications,
   recordLibraryActivity
@@ -45,6 +47,7 @@ const state = {
   watchedMovies: [],
   favorites: [],
   followingUsers: [],
+  socialOverview: getSocialOverviewSnapshot(),
   lastRecSeed: Math.random(),
   activeCollectionView: "favorites",
   session: null,
@@ -79,6 +82,7 @@ let profileCalloutSnapshot = {
 let profileCalloutPulseTimer = null;
 let unsubscribeFollowing = null;
 let unsubscribeNotifications = null;
+let unsubscribeSocialOverview = null;
 
 const GENRE_ICON_MAP = {
   "28": "💥", // Action
@@ -2393,10 +2397,18 @@ function setupSocialFeatures() {
   }
   unsubscribeFollowing = subscribeToFollowing((list) => {
     state.followingUsers = Array.isArray(list) ? list.slice() : [];
-    renderFollowingList();
+    renderSocialConnections();
   });
   state.followingUsers = getFollowingSnapshot();
-  renderFollowingList();
+  if (unsubscribeSocialOverview) {
+    unsubscribeSocialOverview();
+  }
+  unsubscribeSocialOverview = subscribeToSocialOverview((overview) => {
+    state.socialOverview = overview;
+    renderSocialConnections();
+  });
+  state.socialOverview = getSocialOverviewSnapshot();
+  renderSocialConnections();
   wireFollowForm();
   if (unsubscribeNotifications) {
     unsubscribeNotifications();
@@ -2424,75 +2436,390 @@ function wireFollowForm() {
 
     const username = input.value.trim();
     if (username.length < 3) {
-      statusEl.textContent = "Enter at least 3 characters to follow someone.";
-      statusEl.dataset.variant = "error";
+      setSocialStatus("Enter at least 3 characters to follow someone.", "error");
       input.focus();
       return;
     }
 
     submitBtn.disabled = true;
-    statusEl.textContent = "Following…";
-    statusEl.dataset.variant = "loading";
+    setSocialStatus(`Following @${username.toLowerCase()}…`, "loading");
 
     try {
       await followUserByUsername(username);
-      statusEl.textContent = `Now following ${username.toLowerCase()}.`;
-      statusEl.dataset.variant = "success";
+      setSocialStatus(`Now following @${username.toLowerCase()}.`, "success");
       input.value = "";
     } catch (error) {
-      statusEl.textContent =
-        error instanceof Error ? error.message : "Couldn’t follow that user right now.";
-      statusEl.dataset.variant = "error";
+      setSocialStatus(
+        error instanceof Error ? error.message : "Couldn’t follow that user right now.",
+        "error"
+      );
     } finally {
       submitBtn.disabled = false;
     }
   });
 }
 
-function renderFollowingList() {
-  const listEl = $("socialFollowingList");
-  const emptyEl = $("socialFollowingEmpty");
-  if (!listEl || !emptyEl) {
-    return;
+function renderSocialConnections() {
+  const overview = state.socialOverview || getSocialOverviewSnapshot();
+  const following = Array.isArray(overview.following) ? overview.following : [];
+  const followers = Array.isArray(overview.followers) ? overview.followers : [];
+  const mutualFollowers = Array.isArray(overview.mutualFollowers) ? overview.mutualFollowers : [];
+  const suggestions = Array.isArray(overview.suggestions) ? overview.suggestions : [];
+  const counts = overview && overview.counts ? overview.counts : {};
+
+  const followingSet = new Set(following);
+  const followersSet = new Set(followers);
+  const mutualSet = new Set(mutualFollowers);
+
+  updateSocialCount("followersCount", Number.isFinite(counts.followers) ? counts.followers : followers.length);
+  updateSocialCount(
+    "followingCount",
+    Number.isFinite(counts.following) ? counts.following : following.length
+  );
+  updateSocialCount(
+    "mutualFollowersCount",
+    Number.isFinite(counts.mutual) ? counts.mutual : mutualFollowers.length
+  );
+  updateSocialCount(
+    "socialFollowingHeadingCount",
+    Number.isFinite(counts.following) ? counts.following : following.length
+  );
+  updateSocialCount(
+    "socialFollowersHeadingCount",
+    Number.isFinite(counts.followers) ? counts.followers : followers.length
+  );
+
+  const mutualListEl = $("socialMutualList");
+  const mutualEmptyEl = $("socialMutualEmpty");
+  if (mutualListEl && mutualEmptyEl) {
+    mutualListEl.innerHTML = "";
+    if (!mutualFollowers.length) {
+      mutualListEl.hidden = true;
+      mutualEmptyEl.hidden = false;
+    } else {
+      mutualFollowers.forEach((username) => {
+        const chip = document.createElement("span");
+        chip.className = "social-chip";
+        chip.textContent = formatSocialDisplayName(username);
+        chip.dataset.handle = username;
+        mutualListEl.appendChild(chip);
+      });
+      mutualListEl.hidden = false;
+      mutualEmptyEl.hidden = true;
+    }
   }
 
-  listEl.innerHTML = "";
-  const followers = Array.isArray(state.followingUsers) ? state.followingUsers : [];
-  if (!followers.length) {
-    listEl.hidden = true;
-    emptyEl.hidden = false;
-    return;
+  const followingListEl = $("socialFollowingList");
+  const followingEmptyEl = $("socialFollowingEmpty");
+  if (followingListEl && followingEmptyEl) {
+    followingListEl.innerHTML = "";
+    if (!following.length) {
+      followingListEl.hidden = true;
+      followingEmptyEl.hidden = false;
+    } else {
+      followingListEl.hidden = false;
+      followingEmptyEl.hidden = true;
+      following.forEach((username) => {
+        const item = buildSocialListItem({
+          username,
+          isFollowing: true,
+          followsYou: followersSet.has(username),
+          mutualFollowers: mutualFollowers.filter((value) => value !== username),
+          onPrimaryAction: (button) => {
+            playUiClick();
+            handleUnfollowUser(username, button);
+          }
+        });
+        followingListEl.appendChild(item);
+      });
+    }
   }
 
-  listEl.hidden = false;
-  emptyEl.hidden = true;
+  const followersListEl = $("socialFollowersList");
+  const followersEmptyEl = $("socialFollowersEmpty");
+  if (followersListEl && followersEmptyEl) {
+    followersListEl.innerHTML = "";
+    if (!followers.length) {
+      followersListEl.hidden = true;
+      followersEmptyEl.hidden = false;
+    } else {
+      followersListEl.hidden = false;
+      followersEmptyEl.hidden = true;
+      followers.forEach((username) => {
+        const isFollowing = followingSet.has(username);
+        const item = buildSocialListItem({
+          username,
+          isFollowing,
+          followsYou: true,
+          mutualFollowers: mutualFollowers.filter((value) => value !== username),
+          onPrimaryAction: isFollowing
+            ? null
+            : (button) => {
+                playUiClick();
+                handleFollowFromList(username, button);
+              }
+        });
+        followersListEl.appendChild(item);
+      });
+    }
+  }
 
-  followers.forEach((username) => {
-    const item = document.createElement("div");
-    item.className = "social-follow-item";
+  const suggestionsListEl = $("socialSuggestionsList");
+  const suggestionsEmptyEl = $("socialSuggestionsEmpty");
+  if (suggestionsListEl && suggestionsEmptyEl) {
+    suggestionsListEl.innerHTML = "";
+    const availableSuggestions = suggestions.filter((suggestion) => {
+      return suggestion && suggestion.username && !followingSet.has(suggestion.username);
+    });
+    if (!availableSuggestions.length) {
+      suggestionsListEl.hidden = true;
+      suggestionsEmptyEl.hidden = false;
+    } else {
+      suggestionsListEl.hidden = false;
+      suggestionsEmptyEl.hidden = true;
+      availableSuggestions.forEach((suggestion) => {
+        const card = buildSuggestionCard(suggestion, (button) => {
+          playUiClick();
+          handleFollowFromList(suggestion.username, button);
+        });
+        suggestionsListEl.appendChild(card);
+      });
+    }
+  }
+}
 
-    const name = document.createElement("span");
-    name.className = "social-follow-name";
-    name.textContent = username;
-    item.appendChild(name);
+function setSocialStatus(message, variant) {
+  const statusEl = $("socialFollowStatus");
+  if (!statusEl) {
+    return;
+  }
+  if (message) {
+    statusEl.textContent = message;
+  } else {
+    statusEl.textContent = "";
+  }
+  if (variant) {
+    statusEl.dataset.variant = variant;
+  } else {
+    statusEl.removeAttribute("data-variant");
+  }
+}
 
+function updateSocialCount(id, value) {
+  const el = $(id);
+  if (!el) {
+    return;
+  }
+  const number = Number.isFinite(value) ? Number(value) : 0;
+  el.textContent = number.toLocaleString();
+}
+
+function buildSocialListItem({ username, isFollowing, followsYou, mutualFollowers, onPrimaryAction }) {
+  const item = document.createElement("div");
+  item.className = "social-follow-item";
+
+  const row = document.createElement("div");
+  row.className = "social-follow-row";
+  item.appendChild(row);
+
+  const primary = document.createElement("div");
+  primary.className = "social-follow-primary";
+  const name = document.createElement("span");
+  name.className = "social-follow-name";
+  name.textContent = formatSocialDisplayName(username);
+  const handle = document.createElement("span");
+  handle.className = "social-follow-handle";
+  handle.textContent = `@${username}`;
+  primary.appendChild(name);
+  primary.appendChild(handle);
+  row.appendChild(primary);
+
+  const badges = document.createElement("div");
+  badges.className = "social-follow-badges";
+  if (followsYou) {
     const badge = document.createElement("span");
     badge.className = "social-follow-badge";
-    badge.textContent = "Following";
-    item.appendChild(badge);
+    badge.textContent = "Follows you";
+    badges.appendChild(badge);
+  }
+  if (isFollowing) {
+    const badge = document.createElement("span");
+    badge.className = "social-follow-badge social-follow-badge--accent";
+    badge.textContent = followsYou ? "Mutual" : "Following";
+    badges.appendChild(badge);
+  }
+  if (badges.childElementCount) {
+    row.appendChild(badges);
+  }
 
-    const action = document.createElement("button");
-    action.type = "button";
-    action.className = "btn-subtle social-unfollow-btn";
-    action.textContent = "Unfollow";
-    action.addEventListener("click", () => {
-      playUiClick();
-      handleUnfollowUser(username, action);
+  const actions = document.createElement("div");
+  actions.className = "social-follow-actions";
+  if (typeof onPrimaryAction === "function") {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = isFollowing ? "btn-subtle social-unfollow-btn" : "btn-secondary";
+    button.textContent = isFollowing ? "Unfollow" : "Follow back";
+    button.addEventListener("click", () => {
+      onPrimaryAction(button);
     });
-    item.appendChild(action);
+    actions.appendChild(button);
+  } else if (isFollowing) {
+    const status = document.createElement("span");
+    status.className = "social-follow-status";
+    status.textContent = followsYou ? "Following each other" : "Following";
+    actions.appendChild(status);
+  }
+  row.appendChild(actions);
 
-    listEl.appendChild(item);
+  const detail = buildMutualDescription({ isFollowing, followsYou, mutualFollowers });
+  if (detail) {
+    const secondary = document.createElement("div");
+    secondary.className = "social-follow-secondary";
+    secondary.textContent = detail;
+    item.appendChild(secondary);
+  }
+
+  return item;
+}
+
+function buildSuggestionCard(suggestion, onFollow) {
+  const card = document.createElement("article");
+  card.className = "social-suggestion-card";
+
+  const header = document.createElement("div");
+  header.className = "social-suggestion-header";
+  card.appendChild(header);
+
+  const identity = document.createElement("div");
+  identity.className = "social-suggestion-identity";
+  header.appendChild(identity);
+
+  const nameBlock = document.createElement("div");
+  nameBlock.className = "social-suggestion-names";
+  const name = document.createElement("span");
+  name.className = "social-follow-name";
+  name.textContent = suggestion.displayName || formatSocialDisplayName(suggestion.username);
+  const handle = document.createElement("span");
+  handle.className = "social-follow-handle";
+  handle.textContent = `@${suggestion.username}`;
+  nameBlock.appendChild(name);
+  nameBlock.appendChild(handle);
+  identity.appendChild(nameBlock);
+
+  if (suggestion.followsYou) {
+    const badges = document.createElement("div");
+    badges.className = "social-follow-badges";
+    const badge = document.createElement("span");
+    badge.className = "social-follow-badge";
+    badge.textContent = "Follows you";
+    badges.appendChild(badge);
+    identity.appendChild(badges);
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "social-suggestion-actions";
+  const followBtn = document.createElement("button");
+  followBtn.type = "button";
+  followBtn.className = "btn-secondary";
+  followBtn.textContent = "Follow";
+  if (typeof onFollow === "function") {
+    followBtn.addEventListener("click", () => {
+      onFollow(followBtn);
+    });
+  } else {
+    followBtn.disabled = true;
+  }
+  actions.appendChild(followBtn);
+  header.appendChild(actions);
+
+  if (suggestion.tagline) {
+    const tagline = document.createElement("p");
+    tagline.className = "social-suggestion-tagline";
+    tagline.textContent = suggestion.tagline;
+    card.appendChild(tagline);
+  }
+
+  if (suggestion.reason) {
+    const reason = document.createElement("p");
+    reason.className = "social-suggestion-reason";
+    reason.textContent = suggestion.reason;
+    card.appendChild(reason);
+  }
+
+  const tags = document.createElement("div");
+  tags.className = "social-suggestion-tags";
+  const mutualSummary = summarizeNames(suggestion.mutualFollowers, 2);
+  if (mutualSummary) {
+    const tag = document.createElement("span");
+    tag.className = "social-suggestion-tag";
+    tag.dataset.variant = "mutual";
+    tag.textContent = `Mutual: ${mutualSummary}`;
+    tags.appendChild(tag);
+  }
+  suggestion.sharedInterests.slice(0, 2).forEach((interest) => {
+    const tag = document.createElement("span");
+    tag.className = "social-suggestion-tag";
+    tag.dataset.variant = "interest";
+    tag.textContent = interest;
+    tags.appendChild(tag);
   });
+  suggestion.sharedFavorites.slice(0, 2).forEach((favorite) => {
+    const tag = document.createElement("span");
+    tag.className = "social-suggestion-tag";
+    tag.dataset.variant = "favorite";
+    tag.textContent = favorite;
+    tags.appendChild(tag);
+  });
+  if (tags.childElementCount) {
+    card.appendChild(tags);
+  }
+
+  return card;
+}
+
+function buildMutualDescription({ isFollowing, followsYou, mutualFollowers }) {
+  if (isFollowing && followsYou) {
+    return "You follow each other.";
+  }
+  const mutualSummary = summarizeNames(mutualFollowers, 3);
+  if (mutualSummary) {
+    return `Mutual followers: ${mutualSummary}`;
+  }
+  if (followsYou && !isFollowing) {
+    return "They follow you. Follow back to swap recommendations.";
+  }
+  if (!followsYou && isFollowing) {
+    return "You’ll see their highlights in discovery.";
+  }
+  return "";
+}
+
+function formatSocialDisplayName(username) {
+  if (!username) {
+    return "";
+  }
+  return username
+    .split(/[^a-zA-Z0-9]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function summarizeNames(list, max = 2) {
+  if (!Array.isArray(list) || !list.length) {
+    return "";
+  }
+  const formatted = list
+    .map((value) => formatSocialDisplayName(value))
+    .filter(Boolean);
+  if (!formatted.length) {
+    return "";
+  }
+  if (formatted.length <= max) {
+    return formatted.join(", ");
+  }
+  const visible = formatted.slice(0, max);
+  return `${visible.join(", ")} +${formatted.length - max} more`;
 }
 
 function renderNotificationCenter(payload = {}) {
@@ -2656,27 +2983,61 @@ async function handleUnfollowUser(username, button) {
     return;
   }
 
-  const statusEl = $("socialFollowStatus");
+  const normalized = typeof username === "string" ? username.trim() : "";
+  if (!normalized) {
+    return;
+  }
+
+  const handle = `@${normalized.toLowerCase()}`;
+  const confirmed = window.confirm("Are you sure you want to unfollow?");
+  if (!confirmed) {
+    return;
+  }
+
   if (button) {
     button.disabled = true;
   }
-  if (statusEl) {
-    statusEl.textContent = `Removing ${username.toLowerCase()}…`;
-    statusEl.dataset.variant = "loading";
-  }
+  setSocialStatus(`Removing ${handle}…`, "loading");
 
   try {
-    await unfollowUserByUsername(username);
-    if (statusEl) {
-      statusEl.textContent = `Unfollowed ${username.toLowerCase()}.`;
-      statusEl.dataset.variant = "success";
-    }
+    await unfollowUserByUsername(normalized);
+    setSocialStatus(`Unfollowed ${handle}.`, "success");
   } catch (error) {
-    if (statusEl) {
-      statusEl.textContent =
-        error instanceof Error ? error.message : "Couldn’t unfollow that user right now.";
-      statusEl.dataset.variant = "error";
+    setSocialStatus(
+      error instanceof Error ? error.message : "Couldn’t unfollow that user right now.",
+      "error"
+    );
+  } finally {
+    if (button) {
+      button.disabled = false;
     }
+  }
+}
+
+async function handleFollowFromList(username, button) {
+  if (!state.session || !state.session.token) {
+    window.location.href = "login.html";
+    return;
+  }
+
+  const normalized = typeof username === "string" ? username.trim() : "";
+  if (!normalized) {
+    return;
+  }
+
+  if (button) {
+    button.disabled = true;
+  }
+  setSocialStatus(`Following @${normalized.toLowerCase()}…`, "loading");
+
+  try {
+    await followUserByUsername(normalized);
+    setSocialStatus(`Now following @${normalized.toLowerCase()}.`, "success");
+  } catch (error) {
+    setSocialStatus(
+      error instanceof Error ? error.message : "Couldn’t follow that user right now.",
+      "error"
+    );
   } finally {
     if (button) {
       button.disabled = false;
@@ -2692,7 +3053,6 @@ function updateSocialSectionVisibility(session) {
   const signedOutCard = $("socialConnectionsSignedOut");
   const content = $("socialConnectionsContent");
   const submitBtn = $("socialFollowSubmit");
-  const statusEl = $("socialFollowStatus");
   const hasSession = Boolean(session && session.token);
 
   if (signedOutCard) {
@@ -2706,9 +3066,8 @@ function updateSocialSectionVisibility(session) {
   if (submitBtn) {
     submitBtn.disabled = !hasSession;
   }
-  if (!hasSession && statusEl) {
-    statusEl.textContent = "";
-    statusEl.removeAttribute("data-variant");
+  if (!hasSession) {
+    setSocialStatus("", null);
   }
 }
 

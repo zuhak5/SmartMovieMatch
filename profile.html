@@ -72,52 +72,105 @@
   </header>
 
   <main class="app-main profile-main">
-    <section class="panel profile-overview-panel">
+    <section class="panel social-panel" id="socialConnectionsSection">
       <div class="panel-inner">
-        <div class="panel-header profile-panel-header">
+        <div class="panel-header">
           <div>
-            <div class="panel-title">Sync insights</div>
-            <div class="panel-subtitle">Check in on the latest cloud updates and stored copies.</div>
+            <div class="panel-title">Social circle</div>
+            <div class="panel-subtitle">Follow friends to spotlight their reviews in discovery.</div>
           </div>
-          <a class="btn-subtle btn-chip" href="index.html">
-            <span aria-hidden="true">←</span>
-            <span>Back to discovery</span>
-          </a>
         </div>
-        <p class="profile-overview-lede">
-          Monitor how your taste profile evolves over time, then jump back into discovery when you’re ready for new picks.
-        </p>
-        <div class="profile-overview-card">
-          <section id="profileOverview" class="account-insights" hidden>
-            <div class="account-insights-header">
-              <div>
-                <h3 class="account-insights-title">Latest syncs</h3>
-                <p class="account-insights-subtitle">Timestamps refresh after every successful sync.</p>
-              </div>
-              <button type="button" class="btn-subtle btn-chip" id="viewSnapshotsBtn" disabled>
-                View stored snapshots
-              </button>
+        <div id="socialConnectionsSignedOut" class="social-signed-out">
+          <h3>Sign in to follow friends</h3>
+          <p>Log in to follow reviewers you trust and see their notes highlighted in recommendations.</p>
+          <a class="btn-primary" href="login.html">Log in / Sign up</a>
+        </div>
+        <div id="socialConnectionsContent" class="social-content" hidden aria-hidden="true">
+          <div class="social-overview-stats" aria-live="polite">
+            <div class="social-stat">
+              <span class="social-stat-label">Followers</span>
+              <span id="followersCount" class="social-stat-value">0</span>
             </div>
-            <dl class="account-insights-grid">
-              <div class="account-insight">
-                <dt>Preferences</dt>
-                <dd id="profileOverviewPreferencesValue">Sign in to sync</dd>
-              </div>
-              <div class="account-insight">
-                <dt>Watched history</dt>
-                <dd id="profileOverviewWatchedValue">Sign in to sync</dd>
-              </div>
-              <div class="account-insight">
-                <dt>Favorites</dt>
-                <dd id="profileOverviewFavoritesValue">Sign in to sync</dd>
-              </div>
-            </dl>
-          </section>
-          <div id="profileOverviewSignedOut" class="profile-signed-out">
-            <h3>Sign in to unlock your overview</h3>
-            <p>Log in to see your saved favorites, watched titles, and sync activity across devices.</p>
-            <a class="btn-primary" href="login.html">Log in / Sign up</a>
+            <div class="social-stat">
+              <span class="social-stat-label">Following</span>
+              <span id="followingCount" class="social-stat-value">0</span>
+            </div>
+            <div class="social-stat">
+              <span class="social-stat-label">Mutual followers</span>
+              <span id="mutualFollowersCount" class="social-stat-value">0</span>
+            </div>
           </div>
+
+          <form id="socialFollowForm" class="social-follow-form" novalidate>
+            <div class="field-grid">
+              <label class="field-label" for="socialFollowUsername">Follow by username</label>
+              <div class="social-follow-input-row">
+                <input
+                  id="socialFollowUsername"
+                  class="input-base input-text"
+                  type="text"
+                  name="username"
+                  autocomplete="off"
+                  minlength="3"
+                  placeholder="friend_username"
+                  required
+                />
+                <button type="submit" id="socialFollowSubmit" class="btn-secondary">Follow</button>
+              </div>
+            </div>
+            <div id="socialFollowStatus" class="community-status" role="status" aria-live="polite"></div>
+          </form>
+
+          <section class="social-mutuals">
+            <header class="social-section-header">
+              <h3>Mutual followers</h3>
+              <p>People you follow who follow you back.</p>
+            </header>
+            <div id="socialMutualList" class="social-chip-list" hidden></div>
+            <div id="socialMutualEmpty" class="empty-state empty-state--subtle">
+              Follow and follow back to build your circle.
+            </div>
+          </section>
+
+          <div class="social-lists-grid">
+            <section class="social-list-block">
+              <header class="social-section-header">
+                <h3>
+                  Following
+                  <span id="socialFollowingHeadingCount" class="social-count-pill">0</span>
+                </h3>
+                <p>People you’ll see highlighted in recommendations.</p>
+              </header>
+              <div id="socialFollowingEmpty" class="empty-state">
+                You’re not following anyone yet. Follow a friend to highlight their community notes.
+              </div>
+              <div id="socialFollowingList" class="social-following-list" hidden></div>
+            </section>
+            <section class="social-list-block">
+              <header class="social-section-header">
+                <h3>
+                  Followers
+                  <span id="socialFollowersHeadingCount" class="social-count-pill">0</span>
+                </h3>
+                <p>These members see your reviews in their feed.</p>
+              </header>
+              <div id="socialFollowersEmpty" class="empty-state">
+                No followers yet. Share your profile to invite friends.
+              </div>
+              <div id="socialFollowersList" class="social-following-list" hidden></div>
+            </section>
+          </div>
+
+          <section class="social-suggestions">
+            <header class="social-section-header">
+              <h3>People you may know</h3>
+              <p>Follow recommendations based on mutual followers, interests, and favorites.</p>
+            </header>
+            <div id="socialSuggestionsEmpty" class="empty-state empty-state--subtle">
+              We’ll suggest critics and friends as your circle grows.
+            </div>
+            <div id="socialSuggestionsList" class="social-suggestions-list" hidden></div>
+          </section>
         </div>
       </div>
     </section>
@@ -177,43 +230,52 @@
       </div>
     </section>
 
-    <section class="panel social-panel" id="socialConnectionsSection">
+    <section class="panel profile-overview-panel">
       <div class="panel-inner">
-        <div class="panel-header">
+        <div class="panel-header profile-panel-header">
           <div>
-            <div class="panel-title">Social circle</div>
-            <div class="panel-subtitle">Follow friends to spotlight their reviews in discovery.</div>
+            <div class="panel-title">Sync insights</div>
+            <div class="panel-subtitle">Check in on the latest cloud updates and stored copies.</div>
           </div>
+          <a class="btn-subtle btn-chip" href="index.html">
+            <span aria-hidden="true">←</span>
+            <span>Back to discovery</span>
+          </a>
         </div>
-        <div id="socialConnectionsSignedOut" class="social-signed-out">
-          <h3>Sign in to follow friends</h3>
-          <p>Log in to follow reviewers you trust and see their notes highlighted in recommendations.</p>
-          <a class="btn-primary" href="login.html">Log in / Sign up</a>
-        </div>
-        <div id="socialConnectionsContent" class="social-content" hidden aria-hidden="true">
-          <form id="socialFollowForm" class="social-follow-form" novalidate>
-            <div class="field-grid">
-              <label class="field-label" for="socialFollowUsername">Follow by username</label>
-              <div class="social-follow-input-row">
-                <input
-                  id="socialFollowUsername"
-                  class="input-base input-text"
-                  type="text"
-                  name="username"
-                  autocomplete="off"
-                  minlength="3"
-                  placeholder="friend_username"
-                  required
-                />
-                <button type="submit" id="socialFollowSubmit" class="btn-secondary">Follow</button>
+        <p class="profile-overview-lede">
+          Monitor how your taste profile evolves over time, then jump back into discovery when you’re ready for new picks.
+        </p>
+        <div class="profile-overview-card">
+          <section id="profileOverview" class="account-insights" hidden>
+            <div class="account-insights-header">
+              <div>
+                <h3 class="account-insights-title">Latest syncs</h3>
+                <p class="account-insights-subtitle">Timestamps refresh after every successful sync.</p>
               </div>
+              <button type="button" class="btn-subtle btn-chip" id="viewSnapshotsBtn" disabled>
+                View stored snapshots
+              </button>
             </div>
-            <div id="socialFollowStatus" class="community-status" role="status" aria-live="polite"></div>
-          </form>
-          <div id="socialFollowingEmpty" class="empty-state">
-            You’re not following anyone yet. Follow a friend to highlight their community notes.
+            <dl class="account-insights-grid">
+              <div class="account-insight">
+                <dt>Preferences</dt>
+                <dd id="profileOverviewPreferencesValue">Sign in to sync</dd>
+              </div>
+              <div class="account-insight">
+                <dt>Watched history</dt>
+                <dd id="profileOverviewWatchedValue">Sign in to sync</dd>
+              </div>
+              <div class="account-insight">
+                <dt>Favorites</dt>
+                <dd id="profileOverviewFavoritesValue">Sign in to sync</dd>
+              </div>
+            </dl>
+          </section>
+          <div id="profileOverviewSignedOut" class="profile-signed-out">
+            <h3>Sign in to unlock your overview</h3>
+            <p>Log in to see your saved favorites, watched titles, and sync activity across devices.</p>
+            <a class="btn-primary" href="login.html">Log in / Sign up</a>
           </div>
-          <div id="socialFollowingList" class="social-following-list" hidden></div>
         </div>
       </div>
     </section>
