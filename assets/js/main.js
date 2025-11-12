@@ -22,6 +22,7 @@ import {
   subscribeToSocialOverview,
   followUserByUsername,
   unfollowUserByUsername,
+  searchSocialUsers,
   getFollowingSnapshot,
   getSocialOverviewSnapshot,
   subscribeToNotifications,
@@ -56,6 +57,7 @@ const state = {
   notifications: [],
   accountAvatarPreviewUrl: null,
   accountRemoveAvatar: false,
+  socialSearchReset: null,
   watchedSyncTimer: null,
   favoritesSyncTimer: null,
   activeRecToken: null,
@@ -355,6 +357,14 @@ function init() {
     updateAccountUi(session);
     updateSnapshotPreviews(session);
     updateSocialSectionVisibility(session);
+    updateSocialInviteLink(session);
+    if (!session || !session.token) {
+      if (typeof state.socialSearchReset === "function") {
+        state.socialSearchReset({ hidePanel: true });
+      }
+    } else if (typeof state.socialSearchReset === "function") {
+      state.socialSearchReset({ showPrompt: true });
+    }
     if (!session || !session.token) {
       state.notifications = [];
       closeNotificationPanel();
@@ -2423,9 +2433,24 @@ function wireFollowForm() {
   const input = $("socialFollowUsername");
   const submitBtn = $("socialFollowSubmit");
   const statusEl = $("socialFollowStatus");
+  const searchPanel = $("socialFollowSearchPanel");
+  const searchList = $("socialFollowSearchList");
+  const searchStatus = $("socialFollowSearchStatus");
+  const searchEmpty = $("socialFollowSearchEmpty");
+  const inviteCopyBtn = $("socialInviteCopyBtn");
+  const inviteStatus = $("socialInviteStatus");
   if (!form || !input || !submitBtn || !statusEl) {
     return;
   }
+
+  const SEARCH_MIN_CHARS = 2;
+  let searchTimer = null;
+  let searchRequestId = 0;
+  let lastQuery = "";
+
+  prefillFollowFromQuery();
+  updateSocialInviteLink();
+  resetSearchPanel();
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -2448,6 +2473,7 @@ function wireFollowForm() {
       await followUserByUsername(username);
       setSocialStatus(`Now following @${username.toLowerCase()}.`, "success");
       input.value = "";
+      clearSearchResults({ hidePanel: true });
     } catch (error) {
       setSocialStatus(
         error instanceof Error ? error.message : "Couldn’t follow that user right now.",
@@ -2457,6 +2483,365 @@ function wireFollowForm() {
       submitBtn.disabled = false;
     }
   });
+
+  input.addEventListener("input", () => {
+    if (!state.session || !state.session.token) {
+      clearSearchResults({ hidePanel: true });
+      return;
+    }
+    const value = input.value.trim();
+    if (searchTimer) {
+      window.clearTimeout(searchTimer);
+      searchTimer = null;
+    }
+    if (value.length < SEARCH_MIN_CHARS) {
+      lastQuery = "";
+      resetSearchPanel();
+      return;
+    }
+    searchTimer = window.setTimeout(() => {
+      runSearch(value);
+    }, 220);
+  });
+
+  input.addEventListener("focus", () => {
+    if (!state.session || !state.session.token) {
+      return;
+    }
+    const value = input.value.trim();
+    if (value.length >= SEARCH_MIN_CHARS) {
+      runSearch(value);
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!searchPanel || searchPanel.hidden) {
+      return;
+    }
+    const target = event.target;
+    if (!target) {
+      return;
+    }
+    if (
+      target === input ||
+      searchPanel.contains(target) ||
+      (typeof target.closest === "function" && target.closest(".social-follow-search-item"))
+    ) {
+      return;
+    }
+    clearSearchResults({ hidePanel: true });
+  });
+
+  if (inviteCopyBtn && inviteStatus) {
+    inviteCopyBtn.addEventListener("click", async () => {
+      if (!state.session || !state.session.token) {
+        window.location.href = "login.html";
+        return;
+      }
+      const inviteLinkEl = $("socialInviteLink");
+      if (!inviteLinkEl || !inviteLinkEl.value) {
+        updateSocialInviteLink();
+      }
+      const linkValue = inviteLinkEl ? inviteLinkEl.value.trim() : "";
+      if (!linkValue) {
+        setInviteStatus("Invite link not ready yet. Try again in a moment.", "error");
+        return;
+      }
+      try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+          await navigator.clipboard.writeText(linkValue);
+        } else if (inviteLinkEl) {
+          inviteLinkEl.focus();
+          inviteLinkEl.select();
+          document.execCommand("copy");
+          inviteLinkEl.setSelectionRange(inviteLinkEl.value.length, inviteLinkEl.value.length);
+        }
+        setInviteStatus("Link copied! Share it with friends.", "success");
+      } catch (error) {
+        setInviteStatus("Copy failed. Select the link and copy it manually.", "error");
+      }
+    });
+  }
+
+  state.socialSearchReset = (options = {}) => {
+    if (options.hidePanel) {
+      clearSearchResults({ hidePanel: true });
+      return;
+    }
+    if (options.showPrompt) {
+      resetSearchPanel();
+      return;
+    }
+    clearSearchResults();
+    resetSearchPanel();
+  };
+
+  function runSearch(query) {
+    if (!state.session || !state.session.token) {
+      return;
+    }
+    const trimmed = query.trim();
+    if (trimmed.length < SEARCH_MIN_CHARS) {
+      resetSearchPanel();
+      return;
+    }
+    lastQuery = trimmed;
+    const currentRequest = ++searchRequestId;
+    setSearchState("loading", `Searching for “${trimmed}”…`);
+    searchSocialUsers(trimmed)
+      .then((results) => {
+        if (currentRequest !== searchRequestId) {
+          return;
+        }
+        if (!Array.isArray(results) || !results.length) {
+          setSearchState(
+            "empty",
+            `No members matched “${trimmed}” yet. Try a different name or handle.`
+          );
+          return;
+        }
+        renderSearchResults(results);
+      })
+      .catch((error) => {
+        if (currentRequest !== searchRequestId) {
+          return;
+        }
+        const message =
+          error instanceof Error
+            ? error.message
+            : "We couldn’t search right now. Try again.";
+        setSearchState("error", message);
+      });
+  }
+
+  function renderSearchResults(results) {
+    if (!searchPanel || !searchList) {
+      return;
+    }
+    searchList.innerHTML = "";
+    results.forEach((result) => {
+      if (!result || !result.username) {
+        return;
+      }
+      const item = document.createElement("li");
+      item.className = "social-follow-search-item";
+      item.role = "option";
+
+      const infoButton = document.createElement("button");
+      infoButton.type = "button";
+      infoButton.className = "social-follow-search-info";
+      infoButton.addEventListener("click", () => {
+        input.value = result.username;
+        input.focus();
+        setSearchState(
+          "hint",
+          `Press Follow to add @${result.username.toLowerCase()} or keep browsing results.`
+        );
+      });
+
+      const name = document.createElement("span");
+      name.className = "social-follow-name";
+      name.textContent = result.displayName || formatSocialDisplayName(result.username);
+      const handle = document.createElement("span");
+      handle.className = "social-follow-handle";
+      handle.textContent = `@${result.username}`;
+
+      infoButton.appendChild(name);
+      infoButton.appendChild(handle);
+
+      if (result.reason) {
+        const reason = document.createElement("span");
+        reason.className = "social-follow-search-reason";
+        reason.textContent = result.reason;
+        infoButton.appendChild(reason);
+      }
+
+      if (Array.isArray(result.sharedInterests) && result.sharedInterests.length) {
+        const tags = document.createElement("div");
+        tags.className = "social-follow-search-tags";
+        result.sharedInterests.slice(0, 2).forEach((interest) => {
+          const tag = document.createElement("span");
+          tag.className = "social-suggestion-tag";
+          tag.dataset.variant = "interest";
+          tag.textContent = interest;
+          tags.appendChild(tag);
+        });
+        infoButton.appendChild(tags);
+      }
+
+      if (Array.isArray(result.sharedFavorites) && result.sharedFavorites.length) {
+        const favs = document.createElement("div");
+        favs.className = "social-follow-search-tags";
+        result.sharedFavorites.slice(0, 2).forEach((favorite) => {
+          const tag = document.createElement("span");
+          tag.className = "social-suggestion-tag";
+          tag.dataset.variant = "favorite";
+          tag.textContent = favorite;
+          favs.appendChild(tag);
+        });
+        infoButton.appendChild(favs);
+      }
+
+      item.appendChild(infoButton);
+
+      const followBtn = document.createElement("button");
+      followBtn.type = "button";
+      followBtn.className = "btn-secondary social-follow-search-follow";
+      followBtn.textContent = "Follow";
+      followBtn.addEventListener("click", async () => {
+        if (!state.session || !state.session.token) {
+          window.location.href = "login.html";
+          return;
+        }
+        playUiClick();
+        followBtn.disabled = true;
+        setSocialStatus(`Following @${result.username.toLowerCase()}…`, "loading");
+        try {
+          await followUserByUsername(result.username);
+          setSocialStatus(`Now following @${result.username.toLowerCase()}.`, "success");
+          runSearch(lastQuery);
+        } catch (error) {
+          setSocialStatus(
+            error instanceof Error
+              ? error.message
+              : "Couldn’t follow that user right now.",
+            "error"
+          );
+        } finally {
+          followBtn.disabled = false;
+        }
+      });
+      item.appendChild(followBtn);
+
+      searchList.appendChild(item);
+    });
+    setSearchState(
+      "results",
+      results.length === 1
+        ? "Found 1 member you might know."
+        : `Found ${results.length} members who match.`
+    );
+  }
+
+  function setSearchState(state, message) {
+    if (!searchPanel) {
+      return;
+    }
+    searchPanel.hidden = false;
+    searchPanel.dataset.state = state;
+    if (searchStatus) {
+      if (message) {
+        searchStatus.hidden = false;
+        searchStatus.textContent = message;
+      } else {
+        searchStatus.hidden = true;
+        searchStatus.textContent = "";
+      }
+    }
+    if (searchList) {
+      searchList.hidden = state !== "results";
+    }
+    if (searchEmpty) {
+      if (state === "empty") {
+        searchEmpty.hidden = false;
+        if (message) {
+          searchEmpty.textContent = message;
+        }
+      } else {
+        searchEmpty.hidden = true;
+      }
+    }
+  }
+
+  function clearSearchResults({ hidePanel = false } = {}) {
+    if (searchTimer) {
+      window.clearTimeout(searchTimer);
+      searchTimer = null;
+    }
+    searchRequestId++;
+    lastQuery = "";
+    if (searchList) {
+      searchList.innerHTML = "";
+      searchList.hidden = true;
+    }
+    if (searchEmpty) {
+      searchEmpty.hidden = true;
+    }
+    if (searchStatus) {
+      searchStatus.textContent = "";
+      searchStatus.hidden = true;
+    }
+    if (searchPanel) {
+      searchPanel.dataset.state = "idle";
+      if (hidePanel) {
+        searchPanel.hidden = true;
+      }
+    }
+  }
+
+  function resetSearchPanel() {
+    if (!searchPanel) {
+      return;
+    }
+    if (!state.session || !state.session.token) {
+      clearSearchResults({ hidePanel: true });
+      return;
+    }
+    searchPanel.hidden = false;
+    searchPanel.dataset.state = "idle";
+    if (searchStatus) {
+      searchStatus.hidden = false;
+      searchStatus.textContent = "Start typing to find friends by name or handle.";
+    }
+    if (searchList) {
+      searchList.hidden = true;
+    }
+    if (searchEmpty) {
+      searchEmpty.hidden = true;
+    }
+  }
+
+  function prefillFollowFromQuery() {
+    const params = new URLSearchParams(window.location.search);
+    const followValue = params.get("follow");
+    if (!followValue) {
+      return;
+    }
+    input.value = followValue;
+    if (state.session && state.session.token && followValue.trim().length >= SEARCH_MIN_CHARS) {
+      runSearch(followValue.trim());
+    }
+    if (typeof window.history.replaceState === "function") {
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.delete("follow");
+      const newSearch = currentUrl.searchParams.toString();
+      const next = `${currentUrl.pathname}${newSearch ? `?${newSearch}` : ""}${currentUrl.hash}`;
+      window.history.replaceState({}, document.title, next);
+    }
+  }
+
+  function setInviteStatus(message, variant) {
+    if (!inviteStatus) {
+      return;
+    }
+    if (!message) {
+      inviteStatus.textContent = "";
+      inviteStatus.removeAttribute("data-variant");
+      return;
+    }
+    inviteStatus.textContent = message;
+    if (variant) {
+      inviteStatus.dataset.variant = variant;
+    } else {
+      inviteStatus.removeAttribute("data-variant");
+    }
+    window.setTimeout(() => {
+      if (inviteStatus.textContent === message) {
+        inviteStatus.textContent = "";
+        inviteStatus.removeAttribute("data-variant");
+      }
+    }, 4000);
+  }
 }
 
 function renderSocialConnections() {
@@ -2602,6 +2987,39 @@ function setSocialStatus(message, variant) {
     statusEl.dataset.variant = variant;
   } else {
     statusEl.removeAttribute("data-variant");
+  }
+}
+
+function updateSocialInviteLink(session = state.session) {
+  const inviteLinkEl = $("socialInviteLink");
+  const inviteCopyBtn = $("socialInviteCopyBtn");
+  const inviteStatus = $("socialInviteStatus");
+  if (!inviteLinkEl || !inviteCopyBtn) {
+    return;
+  }
+  const hasSession = Boolean(session && session.token);
+  if (!hasSession) {
+    inviteLinkEl.value = "";
+    inviteLinkEl.placeholder = "Sign in to get your invite link";
+    inviteLinkEl.readOnly = true;
+    inviteCopyBtn.disabled = true;
+    if (inviteStatus) {
+      inviteStatus.textContent = "";
+      inviteStatus.removeAttribute("data-variant");
+    }
+    return;
+  }
+  const shareUrl = new URL(window.location.href);
+  shareUrl.hash = "";
+  shareUrl.search = "";
+  shareUrl.searchParams.set("follow", session.username);
+  inviteLinkEl.value = shareUrl.toString();
+  inviteLinkEl.readOnly = true;
+  inviteLinkEl.placeholder = "";
+  inviteCopyBtn.disabled = false;
+  if (inviteStatus) {
+    inviteStatus.textContent = "";
+    inviteStatus.removeAttribute("data-variant");
   }
 }
 

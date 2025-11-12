@@ -23,41 +23,9 @@ function enableLocalFallback(reason, error) {
 }
 
 const MAX_REVIEW_LENGTH = 600;
-
-const SUGGESTED_PROFILES = [
-  {
-    username: 'cinephilesam',
-    displayName: 'Cinephile Sam',
-    tagline: 'Documentary deep dives and space epics.',
-    interests: ['Documentaries', 'Sci-Fi epics', 'True stories'],
-    favorites: ['Free Solo', 'Arrival', 'First Man'],
-    mutualCandidates: ['moviemaven', 'arthouserachel']
-  },
-  {
-    username: 'noirnewton',
-    displayName: 'Noir Newton',
-    tagline: 'Hardboiled mysteries & neo-noir gems.',
-    interests: ['Mystery thrillers', 'Neo-noir', 'Classic crime'],
-    favorites: ['Blade Runner 2049', 'Brick', 'Chinatown'],
-    mutualCandidates: ['thrillseeker', 'cineclub']
-  },
-  {
-    username: 'arthouserachel',
-    displayName: 'Art House Rachel',
-    tagline: 'Festival circuit discoveries and bold debuts.',
-    interests: ['Indie drama', 'International cinema', 'Film festivals'],
-    favorites: ['Portrait of a Lady on Fire', 'Drive My Car', 'Aftersun'],
-    mutualCandidates: ['cineclub', 'cinephilesam']
-  },
-  {
-    username: 'animationamy',
-    displayName: 'Animation Amy',
-    tagline: 'Animated storytelling across every style.',
-    interests: ['Animation', 'Family adventures', 'Anime classics'],
-    favorites: ['Spider-Verse', 'Wolfwalkers', 'Your Name'],
-    mutualCandidates: ['moviemaven', 'storyboardsteve']
-  }
-];
+const MAX_SUGGESTION_RESULTS = 8;
+const SEARCH_RESULT_LIMIT = 6;
+const MIN_SEARCH_LENGTH = 2;
 
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -111,6 +79,9 @@ module.exports = async (req, res) => {
         break;
       case 'recordLibraryAction':
         result = await handleRecordLibraryAction(req, payload);
+        break;
+      case 'searchUsers':
+        result = await handleSearchUsers(req, payload);
         break;
       default:
         res.status(400).json({ error: 'Unsupported action' });
@@ -441,6 +412,99 @@ async function handleRecordLibraryAction(req, payload) {
   return { body: { ok: true } };
 }
 
+async function handleSearchUsers(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const queryRaw = typeof payload.query === 'string' ? payload.query : '';
+  const query = queryRaw.trim();
+  if (query.length < MIN_SEARCH_LENGTH) {
+    throw new HttpError(400, `Enter at least ${MIN_SEARCH_LENGTH} characters to search.`);
+  }
+  const graph = await loadSocialGraph(user.username);
+  const suggestionContext = await loadSuggestionCandidates({
+    username: graph.username,
+    followingSet: graph.followingSet,
+    followersSet: graph.followersSet
+  });
+  const normalizedQuery = query.toLowerCase();
+  const matches = suggestionContext.candidates
+    .filter((profile) => {
+      if (!profile || !profile.username) {
+        return false;
+      }
+      if (graph.followingSet.has(profile.username)) {
+        return false;
+      }
+      const displayName = profile.displayName ? profile.displayName.toLowerCase() : '';
+      return (
+        profile.username.includes(normalizedQuery) ||
+        (displayName && displayName.includes(normalizedQuery))
+      );
+    })
+    .map((profile) => {
+      const sharedFavorites = computeSharedFavorites(suggestionContext.userProfile, profile);
+      const sharedGenres = computeSharedGenres(suggestionContext.userProfile, profile);
+      const mutualFollowers = computeMutualFollowersForCandidate(
+        profile,
+        graph.followingSet,
+        graph.followersSet
+      );
+      const followsYou = graph.followersSet.has(profile.username);
+      const baseScore =
+        (profile.username.startsWith(normalizedQuery) ? 6 : 0) +
+        (sharedFavorites.length * 4) +
+        (sharedGenres.length * 2) +
+        (mutualFollowers.length ? 2 : 0) +
+        (followsYou ? 3 : 0);
+      return {
+        profile,
+        sharedFavorites,
+        sharedGenres,
+        mutualFollowers,
+        followsYou,
+        score: baseScore
+      };
+    })
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      if ((b.profile.followerCount || 0) !== (a.profile.followerCount || 0)) {
+        return (b.profile.followerCount || 0) - (a.profile.followerCount || 0);
+      }
+      const nameA = a.profile.displayName || a.profile.username;
+      const nameB = b.profile.displayName || b.profile.username;
+      return nameA.localeCompare(nameB);
+    })
+    .slice(0, SEARCH_RESULT_LIMIT)
+    .map((entry) =>
+      normalizeSuggestionPayload(
+        {
+          username: entry.profile.username,
+          displayName: entry.profile.displayName,
+          tagline: buildProfileTagline(entry.profile),
+          sharedInterests: entry.sharedGenres,
+          sharedFavorites: entry.sharedFavorites,
+          mutualFollowers: entry.mutualFollowers,
+          followsYou: entry.followsYou
+        },
+        {
+          username: graph.username,
+          followingSet: graph.followingSet,
+          followersSet: graph.followersSet
+        }
+      )
+    )
+    .filter(Boolean);
+
+  return {
+    body: {
+      ok: true,
+      results: matches
+    }
+  };
+}
+
 async function authenticate(req, payload) {
   const token = extractToken(req, payload);
   if (!token) {
@@ -554,6 +618,22 @@ async function listFollowers(username) {
 }
 
 async function buildSocialOverview(username) {
+  const graph = await loadSocialGraph(username);
+  const suggestions = await buildFollowSuggestions(graph);
+  return {
+    following: graph.following,
+    followers: graph.followers,
+    mutualFollowers: graph.mutualFollowers,
+    counts: {
+      following: graph.following.length,
+      followers: graph.followers.length,
+      mutual: graph.mutualFollowers.length
+    },
+    suggestions
+  };
+}
+
+async function loadSocialGraph(username) {
   const following = await listFollowing(username);
   const followers = await listFollowers(username);
   const followingSet = new Set(following);
@@ -561,29 +641,17 @@ async function buildSocialOverview(username) {
   const mutualFollowers = following
     .filter((handle) => followersSet.has(handle))
     .sort();
-  const counts = {
-    following: following.length,
-    followers: followers.length,
-    mutual: mutualFollowers.length
-  };
-  const suggestions = buildFollowSuggestions({
+  return {
     username,
     following,
     followers,
     mutualFollowers,
     followingSet,
     followersSet
-  });
-  return {
-    following,
-    followers,
-    mutualFollowers,
-    counts,
-    suggestions
   };
 }
 
-function buildFollowSuggestions({
+async function buildFollowSuggestions({
   username,
   following,
   followers,
@@ -594,60 +662,32 @@ function buildFollowSuggestions({
   const suggestions = [];
   const seen = new Set();
 
-  const addSuggestion = (entry) => {
-    const handle = canonicalUsername(entry && entry.username ? entry.username : '');
-    if (!handle || handle === username || followingSet.has(handle) || seen.has(handle)) {
+  const suggestionContext = await loadSuggestionCandidates({
+    username,
+    followingSet,
+    followersSet
+  });
+
+  const addSuggestion = (payload) => {
+    const suggestion = normalizeSuggestionPayload(payload, {
+      username,
+      followingSet,
+      followersSet
+    });
+    if (!suggestion) {
       return;
     }
-    seen.add(handle);
-    const displayName = entry.displayName
-      ? entry.displayName
-      : formatDisplayNameFromHandle(handle);
-    const sharedInterests = Array.isArray(entry.sharedInterests)
-      ? entry.sharedInterests.filter(Boolean).map(String)
-      : [];
-    const sharedFavorites = Array.isArray(entry.sharedFavorites)
-      ? entry.sharedFavorites.filter(Boolean).map(String)
-      : [];
-    const mutuals = Array.isArray(entry.mutualFollowers)
-      ? entry.mutualFollowers
-          .map((value) => canonicalUsername(value))
-          .filter((value) => value && (followingSet.has(value) || followersSet.has(value)))
-      : [];
-    const followsYou = Boolean(entry.followsYou);
-
-    const reasonParts = [];
-    if (followsYou) {
-      reasonParts.push('Follows you');
+    if (seen.has(suggestion.username)) {
+      return;
     }
-    if (mutuals.length) {
-      reasonParts.push(
-        `${mutuals.length} mutual follower${mutuals.length === 1 ? '' : 's'}`
-      );
-    }
-    if (sharedInterests.length) {
-      reasonParts.push(`Interests: ${sharedInterests.slice(0, 2).join(', ')}`);
-    }
-    if (sharedFavorites.length) {
-      reasonParts.push(`Favorites: ${sharedFavorites.slice(0, 2).join(', ')}`);
-    }
-
-    suggestions.push({
-      username: handle,
-      displayName,
-      tagline: entry.tagline ? String(entry.tagline) : '',
-      sharedInterests,
-      sharedFavorites,
-      mutualFollowers: mutuals,
-      followsYou,
-      reason: reasonParts.join(' • ')
-    });
+    seen.add(suggestion.username);
+    suggestions.push(suggestion);
   };
 
   followers
     .filter((handle) => handle && !followingSet.has(handle) && handle !== username)
     .forEach((handle) => {
-      const mutuals = mutualFollowers.filter((value) => value !== handle);
+      const mutuals = suggestionContext.mutualMap.get(handle) || [];
       addSuggestion({
         username: handle,
         displayName: formatDisplayNameFromHandle(handle),
@@ -655,32 +695,411 @@ function buildFollowSuggestions({
         sharedFavorites: [],
         mutualFollowers: mutuals,
         followsYou: true,
-        tagline: 'They already follow you back.'
+        tagline: 'They already follow you back.',
+        priorityReason: 'Already following you'
       });
     });
 
-  SUGGESTED_PROFILES.forEach((profile) => {
-    const handle = canonicalUsername(profile.username);
-    if (!handle || handle === username || followingSet.has(handle) || seen.has(handle)) {
-      return;
-    }
-    const mutuals = Array.isArray(profile.mutualCandidates)
-      ? profile.mutualCandidates
-          .map((value) => canonicalUsername(value))
-          .filter((value) => value && (followingSet.has(value) || followersSet.has(value)))
-      : [];
+  const dynamicCandidates = suggestionContext.candidates
+    .filter((profile) => profile && profile.username !== username && !followingSet.has(profile.username))
+    .map((profile) => {
+      const sharedFavorites = computeSharedFavorites(
+        suggestionContext.userProfile,
+        profile
+      );
+      const sharedGenres = computeSharedGenres(
+        suggestionContext.userProfile,
+        profile
+      );
+      const mutuals = computeMutualFollowersForCandidate(profile, followingSet, followersSet);
+      const followsYou = followersSet.has(profile.username);
+      const score =
+        (sharedFavorites.length * 4) +
+        (sharedGenres.length * 2) +
+        (mutuals.length ? 3 : 0) +
+        (followsYou ? 3 : 0) +
+        Math.min(profile.followerCount || 0, 4) +
+        (profile.favoritesList.length ? 1 : 0);
+      return {
+        profile,
+        sharedFavorites,
+        sharedGenres,
+        mutuals,
+        followsYou,
+        score
+      };
+    })
+    .filter((entry) => entry && entry.score > 0)
+    .sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      if ((b.profile.followerCount || 0) !== (a.profile.followerCount || 0)) {
+        return (b.profile.followerCount || 0) - (a.profile.followerCount || 0);
+      }
+      const nameA = a.profile.displayName || a.profile.username;
+      const nameB = b.profile.displayName || b.profile.username;
+      return nameA.localeCompare(nameB);
+    })
+    .slice(0, MAX_SUGGESTION_RESULTS);
+
+  dynamicCandidates.forEach((entry) => {
     addSuggestion({
-      username: handle,
-      displayName: profile.displayName,
-      tagline: profile.tagline,
-      sharedInterests: profile.interests || [],
-      sharedFavorites: profile.favorites || [],
-      mutualFollowers: mutuals,
-      followsYou: followersSet.has(handle)
+      username: entry.profile.username,
+      displayName: entry.profile.displayName,
+      tagline: buildProfileTagline(entry.profile),
+      sharedInterests: entry.sharedGenres,
+      sharedFavorites: entry.sharedFavorites,
+      mutualFollowers: entry.mutuals,
+      followsYou: entry.followsYou
     });
   });
 
-  return suggestions.slice(0, 8);
+  return suggestions.slice(0, MAX_SUGGESTION_RESULTS);
+}
+
+async function loadSuggestionCandidates({ username, followingSet, followersSet }) {
+  const [profiles, followRows] = await Promise.all([
+    fetchAllUserProfiles(),
+    fetchFollowGraph()
+  ]);
+
+  const followerMap = buildFollowerMap(followRows);
+  const normalizedProfiles = profiles
+    .map((profile) => enrichProfileForSuggestions(profile, followerMap))
+    .filter(Boolean);
+
+  const userProfile = normalizedProfiles.find((profile) => profile.username === username) || null;
+  const candidates = normalizedProfiles.filter((profile) => profile.username !== username);
+
+  const mutualMap = new Map();
+  followersSet.forEach((handle) => {
+    mutualMap.set(handle, computeMutualFollowersFromMap(handle, followerMap, followingSet, followersSet));
+  });
+
+  return { userProfile, candidates, mutualMap };
+}
+
+function computeMutualFollowersFromMap(handle, followerMap, followingSet, followersSet) {
+  const canonical = canonicalUsername(handle);
+  if (!canonical || !followerMap.has(canonical)) {
+    return [];
+  }
+  const followers = followerMap.get(canonical);
+  const mutuals = [];
+  followers.forEach((follower) => {
+    if ((followingSet.has(follower) || followersSet.has(follower)) && follower !== canonical) {
+      mutuals.push(follower);
+    }
+  });
+  return Array.from(new Set(mutuals)).sort();
+}
+
+function computeMutualFollowersForCandidate(profile, followingSet, followersSet) {
+  if (!profile || !Array.isArray(profile.followers)) {
+    return [];
+  }
+  const mutuals = profile.followers.filter((handle) => {
+    const canonical = canonicalUsername(handle);
+    return canonical && canonical !== profile.username && (followingSet.has(canonical) || followersSet.has(canonical));
+  });
+  return Array.from(new Set(mutuals)).sort();
+}
+
+function computeSharedFavorites(currentProfile, candidateProfile) {
+  if (!currentProfile || !candidateProfile) {
+    return [];
+  }
+  const results = [];
+  const seen = new Set();
+  const candidateIds = candidateProfile.favoriteImdbSet || new Set();
+  const candidateTitles = candidateProfile.favoriteTitleSet || new Set();
+  const favorites = Array.isArray(currentProfile.favoritesList) ? currentProfile.favoritesList : [];
+  favorites.forEach((favorite) => {
+    if (!favorite || typeof favorite !== 'object') {
+      return;
+    }
+    const title = typeof favorite.title === 'string' ? favorite.title.trim() : '';
+    const imdbId = normalizeIdentifier(favorite.imdbID || favorite.imdbId);
+    if (imdbId && candidateIds.has(imdbId) && !seen.has(imdbId)) {
+      seen.add(imdbId);
+      if (title) {
+        results.push(title);
+      }
+      return;
+    }
+    const normalizedTitle = normalizeTitleKey(title);
+    if (normalizedTitle && candidateTitles.has(normalizedTitle) && !seen.has(normalizedTitle)) {
+      seen.add(normalizedTitle);
+      if (title) {
+        results.push(title);
+      }
+    }
+  });
+  return results.slice(0, 3);
+}
+
+function computeSharedGenres(currentProfile, candidateProfile) {
+  if (!currentProfile || !candidateProfile) {
+    return [];
+  }
+  const currentGenres = currentProfile.favoriteGenreSet || new Set();
+  const candidateGenres = candidateProfile.favoriteGenreSet || new Set();
+  const shared = [];
+  currentGenres.forEach((genre) => {
+    if (candidateGenres.has(genre) && !shared.includes(genre)) {
+      shared.push(genre);
+    }
+  });
+  return shared.slice(0, 3);
+}
+
+function normalizeSuggestionPayload(entry, { username, followingSet, followersSet }) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+  const handle = canonicalUsername(entry.username);
+  if (!handle || handle === username || followingSet.has(handle)) {
+    return null;
+  }
+  const displayName = entry.displayName ? String(entry.displayName).trim() : formatDisplayNameFromHandle(handle);
+  const sharedInterests = Array.isArray(entry.sharedInterests)
+    ? entry.sharedInterests.map((value) => normalizeGenreLabel(value)).filter(Boolean)
+    : [];
+  const sharedFavorites = Array.isArray(entry.sharedFavorites)
+    ? entry.sharedFavorites.map((value) => (typeof value === 'string' ? value.trim() : '')).filter(Boolean)
+    : [];
+  const mutualFollowers = Array.isArray(entry.mutualFollowers)
+    ? Array.from(
+        new Set(
+          entry.mutualFollowers
+            .map((value) => canonicalUsername(value))
+            .filter((value) => value && (followingSet.has(value) || followersSet.has(value)))
+        )
+      ).sort()
+    : [];
+  const followsYou = entry.followsYou === true || followersSet.has(handle);
+  const reasonParts = [];
+  if (entry.priorityReason) {
+    reasonParts.push(entry.priorityReason);
+  }
+  if (followsYou && !reasonParts.includes('Already following you')) {
+    reasonParts.push('Follows you');
+  }
+  if (mutualFollowers.length) {
+    reasonParts.push(`${mutualFollowers.length} mutual follower${mutualFollowers.length === 1 ? '' : 's'}`);
+  }
+  if (sharedInterests.length) {
+    reasonParts.push(`Shared genres: ${sharedInterests.slice(0, 2).join(', ')}`);
+  }
+  if (sharedFavorites.length) {
+    reasonParts.push(`Shared favorites: ${sharedFavorites.slice(0, 2).join(', ')}`);
+  }
+  if (entry.reason && typeof entry.reason === 'string') {
+    reasonParts.push(entry.reason.trim());
+  }
+
+  return {
+    username: handle,
+    displayName,
+    tagline: entry.tagline ? String(entry.tagline).trim() : '',
+    sharedInterests,
+    sharedFavorites,
+    mutualFollowers,
+    followsYou,
+    reason: reasonParts.join(' • ')
+  };
+}
+
+function buildProfileTagline(profile) {
+  if (!profile) {
+    return '';
+  }
+  const likesText = profile.preferencesSnapshot && typeof profile.preferencesSnapshot.likesText === 'string'
+    ? profile.preferencesSnapshot.likesText.trim()
+    : '';
+  if (likesText) {
+    return likesText;
+  }
+  const genreList = Array.from(profile.favoriteGenreSet || []).slice(0, 3);
+  if (genreList.length) {
+    return `Into ${genreList.join(', ')}`;
+  }
+  const favorites = Array.isArray(profile.favoritesList) ? profile.favoritesList : [];
+  const recent = favorites
+    .slice(-2)
+    .map((entry) => (entry && typeof entry.title === 'string' ? entry.title.trim() : ''))
+    .filter(Boolean);
+  if (recent.length) {
+    return `Recently favorited ${recent.join(' & ')}`;
+  }
+  return '';
+}
+
+async function fetchAllUserProfiles() {
+  if (usingLocalStore()) {
+    const store = await readAuthStore();
+    return store.users.map(mapAuthUserProfile).filter(Boolean);
+  }
+  try {
+    const rows = await supabaseFetch('auth_users', {
+      query: {
+        select: 'username,display_name,preferences_snapshot,favorites_list,last_login_at,created_at'
+      }
+    });
+    if (!Array.isArray(rows)) {
+      return [];
+    }
+    return rows.map(mapAuthUserProfile).filter(Boolean);
+  } catch (error) {
+    console.warn('Failed to load user profiles for suggestions', error);
+    enableLocalFallback('loading user profiles', error);
+    return fetchAllUserProfiles();
+  }
+}
+
+async function fetchFollowGraph() {
+  if (usingLocalStore()) {
+    const store = await readSocialStore();
+    return Array.isArray(store.follows) ? store.follows.slice() : [];
+  }
+  try {
+    const rows = await supabaseFetch('user_follows', {
+      query: {
+        select: 'follower_username,followed_username'
+      }
+    });
+    return Array.isArray(rows) ? rows : [];
+  } catch (error) {
+    console.warn('Failed to load follow graph', error);
+    enableLocalFallback('loading follow graph', error);
+    return fetchFollowGraph();
+  }
+}
+
+function buildFollowerMap(rows) {
+  const map = new Map();
+  if (!Array.isArray(rows)) {
+    return map;
+  }
+  rows.forEach((row) => {
+    const follower = canonicalUsername(row.follower_username || row.follower);
+    const followee = canonicalUsername(row.followed_username || row.followee);
+    if (!follower || !followee) {
+      return;
+    }
+    if (!map.has(followee)) {
+      map.set(followee, new Set());
+    }
+    map.get(followee).add(follower);
+  });
+  return map;
+}
+
+function enrichProfileForSuggestions(profile, followerMap) {
+  if (!profile || !profile.username) {
+    return null;
+  }
+  const favoritesList = Array.isArray(profile.favoritesList) ? profile.favoritesList : [];
+  const favoriteTitleSet = new Set();
+  const favoriteImdbSet = new Set();
+  const favoriteGenreSet = new Set();
+  favoritesList.forEach((favorite) => {
+    if (!favorite || typeof favorite !== 'object') {
+      return;
+    }
+    const title = typeof favorite.title === 'string' ? favorite.title.trim() : '';
+    if (title) {
+      favoriteTitleSet.add(normalizeTitleKey(title));
+    }
+    const imdbId = normalizeIdentifier(favorite.imdbID || favorite.imdbId);
+    if (imdbId) {
+      favoriteImdbSet.add(imdbId);
+    }
+    if (Array.isArray(favorite.genres)) {
+      favorite.genres.forEach((genre) => {
+        const normalized = normalizeGenreLabel(genre);
+        if (normalized) {
+          favoriteGenreSet.add(normalized);
+        }
+      });
+    }
+  });
+  const selectedGenres = Array.isArray(profile.preferencesSnapshot?.selectedGenres)
+    ? profile.preferencesSnapshot.selectedGenres
+        .map((genre) => normalizeGenreLabel(genre))
+        .filter(Boolean)
+    : [];
+  selectedGenres.forEach((genre) => favoriteGenreSet.add(genre));
+  const followers = followerMap.has(profile.username)
+    ? Array.from(followerMap.get(profile.username)).sort()
+    : [];
+  return {
+    username: profile.username,
+    displayName: profile.displayName || formatDisplayNameFromHandle(profile.username),
+    preferencesSnapshot: profile.preferencesSnapshot || null,
+    favoritesList,
+    favoriteTitleSet,
+    favoriteImdbSet,
+    favoriteGenreSet,
+    followers,
+    followerCount: followers.length,
+    lastLoginAt: profile.lastLoginAt || null,
+    createdAt: profile.createdAt || null
+  };
+}
+
+function mapAuthUserProfile(row) {
+  if (!row || !row.username) {
+    return null;
+  }
+  const username = canonicalUsername(row.username);
+  if (!username) {
+    return null;
+  }
+  const displayName = row.display_name || row.displayName || formatDisplayNameFromHandle(username);
+  const preferencesSnapshot = row.preferences_snapshot || row.preferencesSnapshot || null;
+  const favoritesList = Array.isArray(row.favorites_list)
+    ? row.favorites_list
+    : Array.isArray(row.favoritesList)
+    ? row.favoritesList
+    : [];
+  return {
+    username,
+    displayName,
+    preferencesSnapshot,
+    favoritesList,
+    lastLoginAt: row.last_login_at || row.lastLoginAt || null,
+    createdAt: row.created_at || row.createdAt || null
+  };
+}
+
+function normalizeIdentifier(value) {
+  if (!value) {
+    return '';
+  }
+  return String(value).trim().toLowerCase();
+}
+
+function normalizeTitleKey(value) {
+  if (!value) {
+    return '';
+  }
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function normalizeGenreLabel(value) {
+  if (!value || typeof value !== 'string') {
+    return '';
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+  return trimmed
+    .split(' ')
+    .map((part) => titleCase(part))
+    .join(' ');
 }
 
 async function upsertFollow(follower, followee) {

@@ -117,13 +117,53 @@
                 />
                 <button type="submit" id="socialFollowSubmit" class="btn-secondary">Follow</button>
               </div>
-            </div>
-            <div id="socialFollowStatus" class="community-status" role="status" aria-live="polite"></div>
-          </form>
+          </div>
+          <div id="socialFollowStatus" class="community-status" role="status" aria-live="polite"></div>
+          <div class="social-follow-assist">
+            <section
+              id="socialFollowSearchPanel"
+              class="social-follow-search"
+              hidden
+              data-state="idle"
+              aria-live="polite"
+            >
+              <p id="socialFollowSearchStatus" class="social-follow-search-status"></p>
+              <ul id="socialFollowSearchList" class="social-follow-search-list" role="listbox"></ul>
+              <p id="socialFollowSearchEmpty" class="social-follow-search-empty">
+                Start typing to find friends by name or handle.
+              </p>
+            </section>
+            <section class="social-invite-card">
+              <span class="social-invite-title">Share your profile</span>
+              <p class="social-invite-text">
+                Copy your link so friends can follow you instantly.
+              </p>
+              <div class="social-invite-link-row">
+                <input
+                  id="socialInviteLink"
+                  class="input-base social-invite-link"
+                  type="text"
+                  readonly
+                  value=""
+                  aria-label="Profile invite link"
+                />
+                <button type="button" id="socialInviteCopyBtn" class="btn-subtle" disabled>
+                  Copy link
+                </button>
+              </div>
+              <div
+                id="socialInviteStatus"
+                class="community-status social-invite-status"
+                role="status"
+                aria-live="polite"
+              ></div>
+            </section>
+          </div>
+        </form>
 
-          <section class="social-mutuals">
-            <header class="social-section-header">
-              <h3>Mutual followers</h3>
+        <section class="social-mutuals">
+          <header class="social-section-header">
+            <h3>Mutual followers</h3>
               <p>People you follow who follow you back.</p>
             </header>
             <div id="socialMutualList" class="social-chip-list" hidden></div>
