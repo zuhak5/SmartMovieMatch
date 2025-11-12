@@ -1415,6 +1415,8 @@ h6 {
   display: grid;
   gap: 0.75rem;
   max-width: 520px;
+  margin-inline: auto;
+  justify-self: center;
 }
 
 @media (max-width: 540px) {
@@ -1453,6 +1455,7 @@ h6 {
 .social-panel .panel-inner {
   display: grid;
   gap: 1.5rem;
+  align-items: stretch;
 }
 
 .social-signed-out {
@@ -1463,6 +1466,8 @@ h6 {
   display: grid;
   gap: 0.7rem;
   max-width: 520px;
+  margin-inline: auto;
+  justify-self: center;
 }
 
 .social-signed-out h3 {
@@ -1479,6 +1484,11 @@ h6 {
 .social-content {
   display: grid;
   gap: 1.3rem;
+  justify-items: stretch;
+}
+
+.social-content > * {
+  width: 100%;
 }
 
 .social-overview-stats {
@@ -1491,6 +1501,7 @@ h6 {
   display: grid;
   gap: 0.9rem;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  width: 100%;
 }
 
 .social-highlight {
@@ -2594,6 +2605,8 @@ body[data-page="account-settings"] .app-main {
   display: grid;
   gap: 0.85rem;
   max-width: 520px;
+  margin-inline: auto;
+  justify-self: center;
 }
 
 .settings-signed-out h2 {
