@@ -50,6 +50,7 @@ import {
 } from "./ui.js";
 import { $ } from "./dom.js";
 import { playUiClick, playExpandSound } from "./sound.js";
+import { getWatchedRatingPreference } from "./taste.js";
 
 const RECOMMENDATIONS_PAGE_SIZE = 20;
 const MAX_FOLLOW_NOTE_LENGTH = 180;
@@ -116,6 +117,21 @@ const GENRE_ICON_MAP = {
   "10749": "❤️", // Romance
   "10751": "👨‍👩‍👧", // Family
 };
+
+const GENRE_NAME_ICON_MAP = Object.entries(TMDB_GENRES).reduce((map, [id, name]) => {
+  const icon = GENRE_ICON_MAP[id];
+  if (icon && name) {
+    map[name.toLowerCase()] = icon;
+  }
+  return map;
+}, Object.create(null));
+
+function getGenreIconByLabel(label) {
+  if (!label) {
+    return "🎬";
+  }
+  return GENRE_NAME_ICON_MAP[label.toLowerCase()] || "🎬";
+}
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -617,6 +633,31 @@ function wireEvents() {
       refreshProfileOverviewCallout();
     });
   });
+
+  document.querySelectorAll("[data-profile-action]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      const action = button.getAttribute("data-profile-action");
+      if (!action) {
+        return;
+      }
+      if (button.tagName === "A") {
+        return;
+      }
+      event.preventDefault();
+      playUiClick();
+      switch (action) {
+        case "snapshots":
+          openAccountSettings("snapshots");
+          break;
+        case "favorites":
+        case "watched":
+          highlightCollectionSection(action);
+          break;
+        default:
+          break;
+      }
+    });
+  });
 }
 
 function toggleAccountMenu() {
@@ -709,6 +750,23 @@ function highlightProfileOverview() {
   const page = document.body ? document.body.getAttribute("data-page") : null;
   if (page !== "profile-overview") {
     window.location.href = "profile.html#profileOverview";
+  }
+}
+
+function highlightCollectionSection(target) {
+  const normalized = target === "watched" ? "watched" : "favorites";
+  switchCollectionView(normalized);
+  const collectionsPanel = document.querySelector(".profile-collections-panel");
+  if (collectionsPanel) {
+    collectionsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  const highlightView = normalized === "watched" ? $("watchedView") : $("favoritesView");
+  const highlightEl = highlightView || collectionsPanel;
+  if (highlightEl) {
+    highlightEl.classList.add("profile-section-pulse");
+    window.setTimeout(() => {
+      highlightEl.classList.remove("profile-section-pulse");
+    }, 1200);
   }
 }
 
@@ -1046,6 +1104,8 @@ function refreshProfileOverviewCallout(options = {}) {
   const watchedList = $("profileCalloutWatchedList");
   const favoritesSubtitle = $("profileCalloutFavoritesSubtitle");
   const watchedSubtitle = $("profileCalloutWatchedSubtitle");
+  const tasteList = $("profileCalloutTasteList");
+  const tasteSubtitle = $("profileCalloutTasteSubtitle");
 
   const favoritesCount = Array.isArray(state.favorites) ? state.favorites.length : 0;
   const watchedCount = Array.isArray(state.watchedMovies) ? state.watchedMovies.length : 0;
@@ -1142,6 +1202,111 @@ function refreshProfileOverviewCallout(options = {}) {
     if (progressContainer && progressMessage) {
       progressContainer.setAttribute("aria-label", `Favorite milestone progress – ${progressMessage}`);
     }
+  }
+
+  if (tasteList) {
+    tasteList.innerHTML = "";
+    const genreMap = new Map();
+    const addGenresFrom = (items) => {
+      if (!Array.isArray(items)) {
+        return;
+      }
+      items.forEach((entry) => {
+        if (!entry || !Array.isArray(entry.genres)) {
+          return;
+        }
+        entry.genres.forEach((genre) => {
+          if (!genre) {
+            return;
+          }
+          const normalized = genre.trim().toLowerCase();
+          if (!normalized) {
+            return;
+          }
+          if (!genreMap.has(normalized)) {
+            genreMap.set(normalized, { label: genre.trim(), count: 0 });
+          }
+          const data = genreMap.get(normalized);
+          data.count += 1;
+        });
+      });
+    };
+
+    addGenresFrom(state.favorites);
+    addGenresFrom(state.watchedMovies);
+
+    const topGenres = Array.from(genreMap.values()).sort((a, b) => b.count - a.count).slice(0, 3);
+    const highlightItems = [];
+
+    if (topGenres.length) {
+      const labels = topGenres.map((entry) => entry.label);
+      highlightItems.push({
+        icon: getGenreIconByLabel(labels[0]),
+        title: labels.length > 1 ? "Comfort genres" : `${labels[0]} focus`,
+        meta: labels.join(" • ")
+      });
+    }
+
+    const avgRating = getWatchedRatingPreference(
+      Array.isArray(state.watchedMovies) ? state.watchedMovies : []
+    );
+    if (typeof avgRating === "number" && Number.isFinite(avgRating)) {
+      highlightItems.push({
+        icon: "⭐",
+        title: "Average IMDb rating",
+        meta: `${avgRating.toFixed(1)} across watched titles`
+      });
+    }
+
+    if (!highlightItems.length && (favoritesCount || watchedCount)) {
+      const prefersFavorites = favoritesCount >= watchedCount;
+      const count = prefersFavorites ? favoritesCount : watchedCount;
+      const noun = prefersFavorites ? "favorite" : "watched title";
+      highlightItems.push({
+        icon: prefersFavorites ? "💾" : "🎬",
+        title: prefersFavorites ? "Favorites saved" : "Watched logged",
+        meta: `${count.toLocaleString()} ${noun}${count === 1 ? "" : "s"} so far`
+      });
+    }
+
+    if (!highlightItems.length) {
+      const empty = document.createElement("li");
+      empty.className = "profile-callout-taste-empty";
+      empty.textContent = "Add favorites or log watched titles to unlock taste highlights.";
+      tasteList.appendChild(empty);
+    } else {
+      highlightItems.slice(0, 3).forEach((item) => {
+        const li = document.createElement("li");
+        li.className = "profile-callout-taste-item";
+        const iconEl = document.createElement("span");
+        iconEl.className = "profile-callout-taste-icon";
+        iconEl.textContent = item.icon;
+        iconEl.setAttribute("aria-hidden", "true");
+        const textWrap = document.createElement("div");
+        textWrap.className = "profile-callout-taste-text";
+        const titleEl = document.createElement("span");
+        titleEl.className = "profile-callout-taste-title";
+        titleEl.textContent = item.title;
+        textWrap.appendChild(titleEl);
+        if (item.meta) {
+          const metaEl = document.createElement("span");
+          metaEl.className = "profile-callout-taste-meta";
+          metaEl.textContent = item.meta;
+          textWrap.appendChild(metaEl);
+        }
+        li.appendChild(iconEl);
+        li.appendChild(textWrap);
+        tasteList.appendChild(li);
+      });
+    }
+
+    if (tasteSubtitle) {
+      tasteSubtitle.textContent = highlightItems.length
+        ? "Based on your recent favorites and watched history."
+        : "We’ll summarize your taste once you start saving titles.";
+    }
+  } else if (tasteSubtitle) {
+    tasteSubtitle.textContent = "We’ll summarize your taste once you start saving titles.";
   }
 
   const renderSnapshotList = (
