@@ -24,6 +24,41 @@ function enableLocalFallback(reason, error) {
 
 const MAX_REVIEW_LENGTH = 600;
 
+const SUGGESTED_PROFILES = [
+  {
+    username: 'cinephilesam',
+    displayName: 'Cinephile Sam',
+    tagline: 'Documentary deep dives and space epics.',
+    interests: ['Documentaries', 'Sci-Fi epics', 'True stories'],
+    favorites: ['Free Solo', 'Arrival', 'First Man'],
+    mutualCandidates: ['moviemaven', 'arthouserachel']
+  },
+  {
+    username: 'noirnewton',
+    displayName: 'Noir Newton',
+    tagline: 'Hardboiled mysteries & neo-noir gems.',
+    interests: ['Mystery thrillers', 'Neo-noir', 'Classic crime'],
+    favorites: ['Blade Runner 2049', 'Brick', 'Chinatown'],
+    mutualCandidates: ['thrillseeker', 'cineclub']
+  },
+  {
+    username: 'arthouserachel',
+    displayName: 'Art House Rachel',
+    tagline: 'Festival circuit discoveries and bold debuts.',
+    interests: ['Indie drama', 'International cinema', 'Film festivals'],
+    favorites: ['Portrait of a Lady on Fire', 'Drive My Car', 'Aftersun'],
+    mutualCandidates: ['cineclub', 'cinephilesam']
+  },
+  {
+    username: 'animationamy',
+    displayName: 'Animation Amy',
+    tagline: 'Animated storytelling across every style.',
+    interests: ['Animation', 'Family adventures', 'Anime classics'],
+    favorites: ['Spider-Verse', 'Wolfwalkers', 'Your Name'],
+    mutualCandidates: ['moviemaven', 'storyboardsteve']
+  }
+];
+
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
 
@@ -95,9 +130,12 @@ module.exports = async (req, res) => {
 
 async function handleListFollowing(req, payload) {
   const { user } = await authenticate(req, payload);
-  const following = await listFollowing(user.username);
+  const overview = await buildSocialOverview(user.username);
   return {
-    body: { following }
+    body: {
+      ok: true,
+      ...overview
+    }
   };
 }
 
@@ -123,9 +161,11 @@ async function handleFollowUser(req, payload) {
     type: 'follow',
     actor: user.username
   });
-  const following = await listFollowing(user.username);
   return {
-    body: { ok: true, following }
+    body: {
+      ok: true,
+      ...(await buildSocialOverview(user.username))
+    }
   };
 }
 
@@ -140,9 +180,11 @@ async function handleUnfollowUser(req, payload) {
   }
 
   await deleteFollow(user.username, target);
-  const following = await listFollowing(user.username);
   return {
-    body: { ok: true, following }
+    body: {
+      ok: true,
+      ...(await buildSocialOverview(user.username))
+    }
   };
 }
 
@@ -476,6 +518,169 @@ async function listFollowing(username) {
     .map((row) => row.followed_username)
     .filter(Boolean)
     .sort();
+}
+
+async function listFollowers(username) {
+  if (!username) {
+    return [];
+  }
+  if (usingLocalStore()) {
+    const store = await readSocialStore();
+    return store.follows
+      .filter((entry) => entry.followee === username)
+      .map((entry) => entry.follower)
+      .filter(Boolean)
+      .sort();
+  }
+  let rows;
+  try {
+    rows = await supabaseFetch('user_follows', {
+      query: {
+        select: 'follower_username',
+        followed_username: `eq.${username}`
+      }
+    });
+  } catch (error) {
+    enableLocalFallback('loading followers list', error);
+    return listFollowers(username);
+  }
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+  return rows
+    .map((row) => row.follower_username)
+    .filter(Boolean)
+    .sort();
+}
+
+async function buildSocialOverview(username) {
+  const following = await listFollowing(username);
+  const followers = await listFollowers(username);
+  const followingSet = new Set(following);
+  const followersSet = new Set(followers);
+  const mutualFollowers = following
+    .filter((handle) => followersSet.has(handle))
+    .sort();
+  const counts = {
+    following: following.length,
+    followers: followers.length,
+    mutual: mutualFollowers.length
+  };
+  const suggestions = buildFollowSuggestions({
+    username,
+    following,
+    followers,
+    mutualFollowers,
+    followingSet,
+    followersSet
+  });
+  return {
+    following,
+    followers,
+    mutualFollowers,
+    counts,
+    suggestions
+  };
+}
+
+function buildFollowSuggestions({
+  username,
+  following,
+  followers,
+  mutualFollowers,
+  followingSet,
+  followersSet
+}) {
+  const suggestions = [];
+  const seen = new Set();
+
+  const addSuggestion = (entry) => {
+    const handle = canonicalUsername(entry && entry.username ? entry.username : '');
+    if (!handle || handle === username || followingSet.has(handle) || seen.has(handle)) {
+      return;
+    }
+    seen.add(handle);
+    const displayName = entry.displayName
+      ? entry.displayName
+      : formatDisplayNameFromHandle(handle);
+    const sharedInterests = Array.isArray(entry.sharedInterests)
+      ? entry.sharedInterests.filter(Boolean).map(String)
+      : [];
+    const sharedFavorites = Array.isArray(entry.sharedFavorites)
+      ? entry.sharedFavorites.filter(Boolean).map(String)
+      : [];
+    const mutuals = Array.isArray(entry.mutualFollowers)
+      ? entry.mutualFollowers
+          .map((value) => canonicalUsername(value))
+          .filter((value) => value && (followingSet.has(value) || followersSet.has(value)))
+      : [];
+    const followsYou = Boolean(entry.followsYou);
+
+    const reasonParts = [];
+    if (followsYou) {
+      reasonParts.push('Follows you');
+    }
+    if (mutuals.length) {
+      reasonParts.push(
+        `${mutuals.length} mutual follower${mutuals.length === 1 ? '' : 's'}`
+      );
+    }
+    if (sharedInterests.length) {
+      reasonParts.push(`Interests: ${sharedInterests.slice(0, 2).join(', ')}`);
+    }
+    if (sharedFavorites.length) {
+      reasonParts.push(`Favorites: ${sharedFavorites.slice(0, 2).join(', ')}`);
+    }
+
+    suggestions.push({
+      username: handle,
+      displayName,
+      tagline: entry.tagline ? String(entry.tagline) : '',
+      sharedInterests,
+      sharedFavorites,
+      mutualFollowers: mutuals,
+      followsYou,
+      reason: reasonParts.join(' • ')
+    });
+  };
+
+  followers
+    .filter((handle) => handle && !followingSet.has(handle) && handle !== username)
+    .forEach((handle) => {
+      const mutuals = mutualFollowers.filter((value) => value !== handle);
+      addSuggestion({
+        username: handle,
+        displayName: formatDisplayNameFromHandle(handle),
+        sharedInterests: [],
+        sharedFavorites: [],
+        mutualFollowers: mutuals,
+        followsYou: true,
+        tagline: 'They already follow you back.'
+      });
+    });
+
+  SUGGESTED_PROFILES.forEach((profile) => {
+    const handle = canonicalUsername(profile.username);
+    if (!handle || handle === username || followingSet.has(handle) || seen.has(handle)) {
+      return;
+    }
+    const mutuals = Array.isArray(profile.mutualCandidates)
+      ? profile.mutualCandidates
+          .map((value) => canonicalUsername(value))
+          .filter((value) => value && (followingSet.has(value) || followersSet.has(value)))
+      : [];
+    addSuggestion({
+      username: handle,
+      displayName: profile.displayName,
+      tagline: profile.tagline,
+      sharedInterests: profile.interests || [],
+      sharedFavorites: profile.favorites || [],
+      mutualFollowers: mutuals,
+      followsYou: followersSet.has(handle)
+    });
+  });
+
+  return suggestions.slice(0, 8);
 }
 
 async function upsertFollow(follower, followee) {
@@ -1476,6 +1681,26 @@ function canonicalUsername(username) {
     return '';
   }
   return username.trim().toLowerCase();
+}
+
+function formatDisplayNameFromHandle(handle) {
+  if (!handle) {
+    return '';
+  }
+  const cleaned = handle.replace(/[_\-.]+/g, ' ');
+  return cleaned
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => titleCase(part))
+    .join(' ');
+}
+
+function titleCase(value) {
+  if (!value) {
+    return '';
+  }
+  const lower = value.toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
 
 function extractToken(req, payload) {
