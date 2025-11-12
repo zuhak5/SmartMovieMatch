@@ -11,12 +11,24 @@
   <link rel="stylesheet" href="assets/css/app.css" />
 
 </head>
-<body class="has-mobile-toolbar" data-page="discovery">
+<body class="has-mobile-toolbar" data-page="discovery" data-theme="dark">
 <div class="app">
   <header class="app-header">
     <div class="account-bar" role="navigation" data-account-state="guest">
       <span id="accountGreeting" class="account-greeting">You’re browsing as guest.</span>
-      <a id="accountLoginLink" class="account-link" href="login.html">Log in / Sign up</a>
+      <div class="account-bar-actions">
+        <button
+          id="themeToggle"
+          class="btn-theme-toggle"
+          type="button"
+          aria-label="Switch to light theme"
+          data-theme-target="light"
+        >
+          <span class="btn-theme-icon" aria-hidden="true">🌙</span>
+          <span class="btn-theme-label">Dark</span>
+        </button>
+        <a id="accountLoginLink" class="account-link" href="login.html">Log in / Sign up</a>
+      </div>
       <button
         id="notificationBell"
         class="notification-bell"
@@ -97,29 +109,63 @@
       to your mood and what you’ve already watched.
     </p>
 
-    <ul class="app-highlight-grid" aria-label="Highlights">
-      <li class="highlight-card" tabindex="0">
-        <span class="highlight-icon" aria-hidden="true">⚡</span>
-        <div class="highlight-body">
-          <span class="highlight-title">Live discovery</span>
-          <span class="highlight-text">TMDB &amp; OMDb blended in real time.</span>
+    <div class="app-highlight-showcase">
+      <ul class="app-highlight-grid" aria-label="Highlights">
+        <li>
+          <button
+            class="highlight-card"
+            type="button"
+            data-highlight="live"
+            aria-pressed="true"
+          >
+            <span class="highlight-icon" aria-hidden="true">⚡</span>
+            <div class="highlight-body">
+              <span class="highlight-title">Live discovery</span>
+              <span class="highlight-text">Blend TMDB &amp; OMDb in real time.</span>
+            </div>
+          </button>
+        </li>
+        <li>
+          <button class="highlight-card" type="button" data-highlight="taste">
+            <span class="highlight-icon" aria-hidden="true">🧠</span>
+            <div class="highlight-body">
+              <span class="highlight-title">Adaptive taste</span>
+              <span class="highlight-text">Favorites reshape your feed instantly.</span>
+            </div>
+          </button>
+        </li>
+        <li>
+          <button class="highlight-card" type="button" data-highlight="filters">
+            <span class="highlight-icon" aria-hidden="true">🎯</span>
+            <div class="highlight-body">
+              <span class="highlight-title">Precision filters</span>
+              <span class="highlight-text">Dial in vibes, runtime, and mood.</span>
+            </div>
+          </button>
+        </li>
+        <li>
+          <button class="highlight-card" type="button" data-highlight="community">
+            <span class="highlight-icon" aria-hidden="true">🤝</span>
+            <div class="highlight-body">
+              <span class="highlight-title">Community picks</span>
+              <span class="highlight-text">See what friends are raving about.</span>
+            </div>
+          </button>
+        </li>
+      </ul>
+      <div id="highlightPreview" class="highlight-preview" aria-live="polite">
+        <div class="highlight-preview-label">Preview</div>
+        <div class="highlight-preview-content" data-highlight-preview="live">
+          <span class="highlight-preview-icon" aria-hidden="true">⚡</span>
+          <div>
+            <div class="highlight-preview-title">Live movie fetch</div>
+            <div class="highlight-preview-text">
+              Watch cards fill with art, trailers, and availability as we stream results from TMDB and OMDb.
+            </div>
+          </div>
         </div>
-      </li>
-      <li class="highlight-card" tabindex="0">
-        <span class="highlight-icon" aria-hidden="true">🧠</span>
-        <div class="highlight-body">
-          <span class="highlight-title">Adaptive taste</span>
-          <span class="highlight-text">Every favorite and watched tag reshapes picks.</span>
-        </div>
-      </li>
-      <li class="highlight-card" tabindex="0">
-        <span class="highlight-icon" aria-hidden="true">🎯</span>
-        <div class="highlight-body">
-          <span class="highlight-title">Precision filters</span>
-          <span class="highlight-text">Dial in vibes, runtime, and mood before fetching.</span>
-        </div>
-      </li>
-    </ul>
+      </div>
+    </div>
   </header>
 
   <main class="app-main">
@@ -289,6 +335,23 @@
           </div>
           <div class="collection-summary" id="favoritesSummary"></div>
           <div class="collection-summary" id="watchedSummary"></div>
+          <div class="collection-filters" role="region" aria-label="Collection filters">
+            <div class="collection-filter-group">
+              <label class="collection-filter-label" for="collectionFilterGenre">Filter by genre</label>
+              <select id="collectionFilterGenre" class="collection-filter-select">
+                <option value="">All</option>
+              </select>
+            </div>
+            <div class="collection-filter-group">
+              <label class="collection-filter-label" for="collectionFilterSort">Sort by</label>
+              <select id="collectionFilterSort" class="collection-filter-select">
+                <option value="recent">Recently added</option>
+                <option value="alpha">Alphabetical</option>
+                <option value="rating">IMDb rating</option>
+                <option value="year">Release year</option>
+              </select>
+            </div>
+          </div>
           <div id="favoritesView" class="collection-view active" role="tabpanel" aria-labelledby="favoritesTab">
             <div id="favoritesList" class="favorites-list"></div>
             <div id="favoritesEmpty" class="empty-state">
@@ -331,6 +394,33 @@
             </div>
           </div>
 
+          <div class="recommendations-controls" role="region" aria-label="Result view preferences">
+            <div class="control-group">
+              <label class="control-label" for="recommendationLayout">Layout</label>
+              <div class="segmented-control" role="radiogroup" aria-label="Recommendation layout">
+                <button type="button" class="segment" data-layout="grid" aria-pressed="true">Grid</button>
+                <button type="button" class="segment" data-layout="carousel">Carousel</button>
+              </div>
+            </div>
+            <div class="control-group">
+              <fieldset class="control-filter-set">
+                <legend class="control-label">Quick filters</legend>
+                <label class="control-chip">
+                  <input type="checkbox" id="filterTopRated" />
+                  <span>IMDb 7+</span>
+                </label>
+                <label class="control-chip">
+                  <input type="checkbox" id="filterStreaming" />
+                  <span>Streamable now</span>
+                </label>
+                <label class="control-chip">
+                  <input type="checkbox" id="filterFresh" />
+                  <span>Released &lt; 2 years</span>
+                </label>
+              </fieldset>
+            </div>
+          </div>
+
           <div
             id="recStatus"
             class="status-row"
@@ -356,18 +446,38 @@
   </main>
 </div>
 
+  <div id="onboardingCoach" class="onboarding-coach" role="dialog" aria-modal="true" hidden>
+    <div class="onboarding-card">
+      <div class="onboarding-header">
+        <div class="onboarding-step">Step <span id="onboardingStep">1</span> of 3</div>
+        <button id="onboardingClose" class="onboarding-close" type="button" aria-label="Skip onboarding">✕</button>
+      </div>
+      <div id="onboardingContent" class="onboarding-content"></div>
+      <div class="onboarding-actions">
+        <button id="onboardingBack" class="btn-subtle" type="button">Back</button>
+        <button id="onboardingNext" class="btn-primary" type="button">Next</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="globalToastRegion" class="global-toast-region" role="status" aria-live="polite"></div>
+
   <nav class="mobile-toolbar" aria-label="Smart Movie Match navigation">
     <a class="mobile-toolbar-action" href="index.html" aria-current="page">
       <span class="mobile-toolbar-icon" aria-hidden="true">🏠</span>
       <span class="mobile-toolbar-label">Discover</span>
     </a>
-    <a class="mobile-toolbar-action" href="#preferencesPanel">
-      <span class="mobile-toolbar-icon" aria-hidden="true">🎛️</span>
-      <span class="mobile-toolbar-label">Preferences</span>
+    <a class="mobile-toolbar-action" href="#collectionsPanel">
+      <span class="mobile-toolbar-icon" aria-hidden="true">🗂️</span>
+      <span class="mobile-toolbar-label">Collections</span>
     </a>
-    <a class="mobile-toolbar-action" href="#recommendationsPanel">
-      <span class="mobile-toolbar-icon" aria-hidden="true">🎬</span>
-      <span class="mobile-toolbar-label">Results</span>
+    <a class="mobile-toolbar-action" href="profile.html">
+      <span class="mobile-toolbar-icon" aria-hidden="true">📊</span>
+      <span class="mobile-toolbar-label">Profile</span>
+    </a>
+    <a class="mobile-toolbar-action" href="account-settings.html">
+      <span class="mobile-toolbar-icon" aria-hidden="true">⚙️</span>
+      <span class="mobile-toolbar-label">Settings</span>
     </a>
   </nav>
 

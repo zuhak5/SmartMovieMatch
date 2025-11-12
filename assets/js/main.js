@@ -46,7 +46,8 @@ import {
   updateFavoritesSummary,
   showSkeletons,
   setRecStatus,
-  setRecError
+  setRecError,
+  showToast
 } from "./ui.js";
 import { $ } from "./dom.js";
 import { playUiClick, playExpandSound } from "./sound.js";
@@ -56,6 +57,8 @@ const RECOMMENDATIONS_PAGE_SIZE = 20;
 const MAX_FOLLOW_NOTE_LENGTH = 180;
 
 let inviteQrRequest = 0;
+
+const RECOMMENDATION_LAYOUT_STORAGE_KEY = "smm.recommendation-layout.v1";
 
 const state = {
   watchedMovies: [],
@@ -79,8 +82,18 @@ const state = {
   activeRecToken: null,
   activeRecAbort: null,
   recommendations: [],
+  filteredRecommendations: [],
   visibleRecommendations: 0,
   recommendationContext: null,
+  recommendationLayout: "grid",
+  recommendationFilters: { topRated: false, streaming: false, fresh: false },
+  collectionFilters: { genre: "", sort: "recent" },
+  theme: null,
+  highlightPreview: "live",
+  onboardingSeen: false,
+  onboardingStep: 0,
+  activeSettingsSection: "profile",
+  gridVisibleRecommendations: 0,
   sessionHydration: {
     token: null,
     lastPreferencesSync: null,
@@ -118,6 +131,71 @@ const GENRE_ICON_MAP = {
   "10751": "👨‍👩‍👧", // Family
 };
 
+const THEME_STORAGE_KEY = "smm.theme.v1";
+const ONBOARDING_STORAGE_KEY = "smm.onboarding.v1";
+
+const HIGHLIGHT_PREVIEWS = {
+  live: {
+    icon: "⚡",
+    title: "Live movie fetch",
+    text:
+      "Watch cards fill with trailers, art, and metadata as I blend TMDB and OMDb in real time."
+  },
+  taste: {
+    icon: "🧠",
+    title: "Adaptive taste engine",
+    text: "Mark titles as favorites or watched and I’ll immediately reshape future batches."
+  },
+  filters: {
+    icon: "🎯",
+    title: "Precision tuning",
+    text: "Combine genres, moods, runtimes, and quick filters to zero-in on tonight’s pick."
+  },
+  community: {
+    icon: "🤝",
+    title: "Community pulse",
+    text: "See which films are trending with friends and jump into collaborative watchlists."
+  }
+};
+
+function getStoredRecommendationLayout() {
+  try {
+    const stored = localStorage.getItem(RECOMMENDATION_LAYOUT_STORAGE_KEY);
+    if (stored === "grid" || stored === "carousel") {
+      return stored;
+    }
+  } catch (error) {
+    console.warn("Failed to read stored recommendation layout", error);
+  }
+  return "grid";
+}
+
+function persistRecommendationLayout(layout) {
+  try {
+    localStorage.setItem(RECOMMENDATION_LAYOUT_STORAGE_KEY, layout);
+  } catch (error) {
+    console.warn("Failed to persist recommendation layout", error);
+  }
+}
+
+const ONBOARDING_STEPS = [
+  {
+    title: "Set your vibe",
+    description: "Choose genres, moods, and watched titles so recommendations feel instantly personal.",
+    focus: "#preferencesPanel"
+  },
+  {
+    title: "Curate collections",
+    description: "Favorites and watched history stay organized with filters, expansion memory, and sync.",
+    focus: "#collectionsPanel"
+  },
+  {
+    title: "Refine results",
+    description: "Apply quick filters, switch layouts, and save the standouts straight from the results grid.",
+    focus: "#recommendationsPanel"
+  }
+];
+
 const GENRE_NAME_ICON_MAP = Object.entries(TMDB_GENRES).reduce((map, [id, name]) => {
   const icon = GENRE_ICON_MAP[id];
   if (icon && name) {
@@ -131,6 +209,468 @@ function getGenreIconByLabel(label) {
     return "🎬";
   }
   return GENRE_NAME_ICON_MAP[label.toLowerCase()] || "🎬";
+}
+
+function getStoredTheme() {
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === "light" || stored === "dark") {
+      return stored;
+    }
+  } catch (error) {
+    console.warn("Failed to read stored theme", error);
+  }
+  if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) {
+    return "light";
+  }
+  return "dark";
+}
+
+function updateThemeToggle(theme) {
+  const button = $("themeToggle");
+  if (!button) {
+    return;
+  }
+  const icon = button.querySelector(".btn-theme-icon");
+  const label = button.querySelector(".btn-theme-label");
+  if (theme === "light") {
+    if (icon) {
+      icon.textContent = "☀️";
+    }
+    if (label) {
+      label.textContent = "Light";
+    }
+    button.setAttribute("aria-label", "Switch to dark theme");
+    button.dataset.themeTarget = "dark";
+  } else {
+    if (icon) {
+      icon.textContent = "🌙";
+    }
+    if (label) {
+      label.textContent = "Dark";
+    }
+    button.setAttribute("aria-label", "Switch to light theme");
+    button.dataset.themeTarget = "light";
+  }
+}
+
+function applyTheme(theme, { persist = true } = {}) {
+  const normalized = theme === "light" ? "light" : "dark";
+  state.theme = normalized;
+  if (document.body) {
+    document.body.dataset.theme = normalized;
+  }
+  updateThemeToggle(normalized);
+  if (persist) {
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, normalized);
+    } catch (error) {
+      console.warn("Failed to persist theme", error);
+    }
+  }
+}
+
+function handleThemeToggle() {
+  const nextTheme = state.theme === "light" ? "dark" : "light";
+  applyTheme(nextTheme);
+  showToast({
+    title: `Theme set to ${nextTheme}`,
+    text: nextTheme === "light" ? "Enjoy a brighter palette." : "Enjoy the cinematic dark mode.",
+    icon: nextTheme === "light" ? "☀️" : "🌙"
+  });
+}
+
+function updateHighlightPreview(key) {
+  const preview = $("highlightPreview");
+  if (!preview) {
+    return;
+  }
+  const data = HIGHLIGHT_PREVIEWS[key] || HIGHLIGHT_PREVIEWS.live;
+  preview.querySelectorAll(".highlight-preview-content").forEach((node) => {
+    node.remove();
+  });
+  const content = document.createElement("div");
+  content.className = "highlight-preview-content";
+  content.dataset.highlightPreview = key;
+
+  const iconEl = document.createElement("span");
+  iconEl.className = "highlight-preview-icon";
+  iconEl.textContent = data.icon;
+  iconEl.setAttribute("aria-hidden", "true");
+
+  const textWrap = document.createElement("div");
+  const titleEl = document.createElement("div");
+  titleEl.className = "highlight-preview-title";
+  titleEl.textContent = data.title;
+  const textEl = document.createElement("div");
+  textEl.className = "highlight-preview-text";
+  textEl.textContent = data.text;
+  textWrap.appendChild(titleEl);
+  textWrap.appendChild(textEl);
+
+  content.appendChild(iconEl);
+  content.appendChild(textWrap);
+  preview.appendChild(content);
+}
+
+function setActiveHighlight(key) {
+  const normalized = HIGHLIGHT_PREVIEWS[key] ? key : "live";
+  state.highlightPreview = normalized;
+  document.querySelectorAll(".highlight-card").forEach((btn) => {
+    const match = btn.getAttribute("data-highlight") === normalized;
+    btn.setAttribute("aria-pressed", match ? "true" : "false");
+  });
+  updateHighlightPreview(normalized);
+}
+
+function normalizeGenreValue(value) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function applyCollectionFilters(list) {
+  const normalizedGenre = normalizeGenreValue(state.collectionFilters.genre);
+  const sortMode = state.collectionFilters.sort || "recent";
+  let result = Array.isArray(list) ? [...list] : [];
+  if (normalizedGenre) {
+    result = result.filter((movie) => {
+      if (!movie || !Array.isArray(movie.genres)) {
+        return false;
+      }
+      return movie.genres.some((genre) => normalizeGenreValue(genre) === normalizedGenre);
+    });
+  }
+
+  if (sortMode === "alpha") {
+    result.sort((a, b) => {
+      const titleA = (a && a.title ? a.title : "").toLowerCase();
+      const titleB = (b && b.title ? b.title : "").toLowerCase();
+      return titleA.localeCompare(titleB);
+    });
+  } else if (sortMode === "rating") {
+    result.sort((a, b) => {
+      const ratingA = typeof a?.rating === "number" ? a.rating : -1;
+      const ratingB = typeof b?.rating === "number" ? b.rating : -1;
+      return ratingB - ratingA;
+    });
+  } else if (sortMode === "year") {
+    result.sort((a, b) => {
+      const yearA = parseInt(a?.year, 10) || 0;
+      const yearB = parseInt(b?.year, 10) || 0;
+      return yearB - yearA;
+    });
+  } else {
+    // recent – newest additions first
+    result.reverse();
+  }
+
+  return result;
+}
+
+function updateCollectionFilterOptions() {
+  const select = $("collectionFilterGenre");
+  if (!select) {
+    return;
+  }
+  const previous = normalizeGenreValue(state.collectionFilters.genre);
+  const genres = new Set();
+  [...state.favorites, ...state.watchedMovies].forEach((movie) => {
+    if (movie && Array.isArray(movie.genres)) {
+      movie.genres
+        .map((genre) => genre && genre.trim())
+        .filter(Boolean)
+        .forEach((genre) => {
+          genres.add(genre);
+        });
+    }
+  });
+
+  const sortedGenres = Array.from(genres).sort((a, b) => a.localeCompare(b));
+  const currentValue = previous && sortedGenres.some((genre) => normalizeGenreValue(genre) === previous)
+    ? previous
+    : "";
+
+  select.innerHTML = "";
+  const defaultOption = document.createElement("option");
+  defaultOption.value = "";
+  defaultOption.textContent = "All";
+  select.appendChild(defaultOption);
+
+  sortedGenres.forEach((genre) => {
+    const opt = document.createElement("option");
+    opt.value = normalizeGenreValue(genre);
+    opt.textContent = genre;
+    select.appendChild(opt);
+  });
+
+  select.value = currentValue;
+  state.collectionFilters.genre = select.value;
+}
+
+function hasStreamingAvailability(entry) {
+  const tmdb = entry?.tmdb || entry?.candidate || null;
+  const providerResults = tmdb && tmdb.watch_providers && tmdb.watch_providers.results;
+  if (providerResults && typeof providerResults === "object") {
+    return Object.values(providerResults).some((provider) => {
+      if (!provider) {
+        return false;
+      }
+      const flat = Array.isArray(provider.flatrate) ? provider.flatrate : [];
+      const rent = Array.isArray(provider.rent) ? provider.rent : [];
+      const buy = Array.isArray(provider.buy) ? provider.buy : [];
+      return flat.length > 0 || rent.length > 0 || buy.length > 0;
+    });
+  }
+  if (Array.isArray(tmdb?.streaming_services) && tmdb.streaming_services.length) {
+    return true;
+  }
+  if (Array.isArray(entry?.streamingProviders) && entry.streamingProviders.length) {
+    return true;
+  }
+  return false;
+}
+
+function getRecommendationYear(entry) {
+  const omdbYear = entry?.omdb?.Year ? parseInt(entry.omdb.Year, 10) : NaN;
+  if (!Number.isNaN(omdbYear) && omdbYear > 1900) {
+    return omdbYear;
+  }
+  const release = entry?.tmdb?.release_date;
+  if (release && release.length >= 4) {
+    const parsed = parseInt(release.slice(0, 4), 10);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+  return NaN;
+}
+
+function applyRecommendationFilters(items) {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+  const filters = state.recommendationFilters;
+  if (!filters.topRated && !filters.streaming && !filters.fresh) {
+    return items.slice();
+  }
+  const currentYear = new Date().getFullYear();
+  return items.filter((entry) => {
+    if (!entry) {
+      return false;
+    }
+    if (filters.topRated) {
+      const rating = parseFloat(entry?.omdb?.imdbRating);
+      if (!Number.isFinite(rating) || rating < 7) {
+        return false;
+      }
+    }
+    if (filters.streaming && !hasStreamingAvailability(entry)) {
+      return false;
+    }
+    if (filters.fresh) {
+      const year = getRecommendationYear(entry);
+      if (!Number.isFinite(year) || currentYear - year > 2) {
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
+function updateFilteredRecommendations({ preserveVisible = true } = {}) {
+  state.filteredRecommendations = applyRecommendationFilters(state.recommendations);
+  const total = state.filteredRecommendations.length;
+  const fallbackVisible = total ? Math.min(total, RECOMMENDATIONS_PAGE_SIZE) : 0;
+  if (!preserveVisible || !state.visibleRecommendations) {
+    state.visibleRecommendations = fallbackVisible;
+  } else {
+    state.visibleRecommendations = Math.min(total, state.visibleRecommendations);
+  }
+  updateRecommendationsView();
+}
+
+function updateRecommendationLayout() {
+  const grid = $("recommendationsGrid");
+  if (grid) {
+    grid.dataset.layout = state.recommendationLayout;
+    if (state.recommendationLayout === "carousel") {
+      grid.setAttribute("aria-live", "polite");
+    } else {
+      grid.removeAttribute("aria-live");
+    }
+  }
+  if (document.body) {
+    document.body.dataset.recommendationsLayout = state.recommendationLayout;
+  }
+  document.querySelectorAll(".segmented-control .segment[data-layout]").forEach((btn) => {
+    const layout = btn.getAttribute("data-layout");
+    btn.setAttribute("aria-pressed", layout === state.recommendationLayout ? "true" : "false");
+  });
+}
+
+function clearOnboardingFocus() {
+  document.querySelectorAll(".onboarding-focus").forEach((node) => {
+    node.classList.remove("onboarding-focus");
+  });
+}
+
+function focusOnboardingTarget(selector) {
+  clearOnboardingFocus();
+  if (!selector) {
+    return;
+  }
+  const target = document.querySelector(selector);
+  if (target) {
+    target.classList.add("onboarding-focus");
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+}
+
+function hasCompletedOnboarding() {
+  try {
+    return localStorage.getItem(ONBOARDING_STORAGE_KEY) === "complete";
+  } catch (error) {
+    console.warn("Failed to read onboarding state", error);
+    return false;
+  }
+}
+
+function markOnboardingComplete() {
+  state.onboardingSeen = true;
+  try {
+    localStorage.setItem(ONBOARDING_STORAGE_KEY, "complete");
+  } catch (error) {
+    console.warn("Failed to persist onboarding state", error);
+  }
+}
+
+function evaluatePasswordRules(password, confirmPassword = "") {
+  const value = typeof password === "string" ? password : "";
+  const confirm = typeof confirmPassword === "string" ? confirmPassword : "";
+  const rules = {
+    length: value.length >= 8,
+    upper: /[a-z]/.test(value) && /[A-Z]/.test(value),
+    number: /\d/.test(value),
+    symbol: /[^A-Za-z0-9]/.test(value)
+  };
+  if (confirm) {
+    rules.match = value === confirm;
+  }
+  return rules;
+}
+
+function updatePasswordChecklist(listEl, password, confirmPassword = "") {
+  if (!listEl) {
+    return;
+  }
+  const rules = evaluatePasswordRules(password, confirmPassword);
+  listEl.querySelectorAll("[data-password-rule]").forEach((item) => {
+    const key = item.getAttribute("data-password-rule");
+    if (!key) {
+      return;
+    }
+    const isMet = key in rules ? Boolean(rules[key]) : false;
+    item.dataset.state = isMet ? "met" : "pending";
+  });
+}
+
+function attachPasswordToggle(button) {
+  if (!button) {
+    return;
+  }
+  const targetId = button.getAttribute("data-password-toggle");
+  if (!targetId) {
+    return;
+  }
+  const input = document.getElementById(targetId);
+  if (!input) {
+    return;
+  }
+  const labelNode = button.querySelector("[data-toggle-label]");
+  const showLabel = button.getAttribute("data-label-show") || "Show";
+  const hideLabel = button.getAttribute("data-label-hide") || "Hide";
+  const showAria = button.getAttribute("data-aria-show") || "Show password";
+  const hideAria = button.getAttribute("data-aria-hide") || "Hide password";
+
+  button.setAttribute("aria-pressed", input.getAttribute("type") !== "password" ? "true" : "false");
+  if (labelNode) {
+    labelNode.textContent = input.getAttribute("type") === "password" ? showLabel : hideLabel;
+  }
+  button.setAttribute(
+    "aria-label",
+    input.getAttribute("type") === "password" ? showAria : hideAria
+  );
+
+  button.addEventListener("click", () => {
+    const isPassword = input.getAttribute("type") === "password";
+    input.setAttribute("type", isPassword ? "text" : "password");
+    button.setAttribute("aria-pressed", isPassword ? "true" : "false");
+    if (labelNode) {
+      labelNode.textContent = isPassword ? hideLabel : showLabel;
+    } else {
+      button.textContent = isPassword ? hideLabel : showLabel;
+    }
+    button.setAttribute("aria-label", isPassword ? hideAria : showAria);
+    playUiClick();
+    input.focus();
+  });
+}
+
+function updateOnboardingUi() {
+  const overlay = $("onboardingCoach");
+  if (!overlay || overlay.hidden) {
+    return;
+  }
+  const stepIndex = Math.max(0, Math.min(state.onboardingStep, ONBOARDING_STEPS.length - 1));
+  const step = ONBOARDING_STEPS[stepIndex];
+  const stepEl = $("onboardingStep");
+  if (stepEl) {
+    stepEl.textContent = String(stepIndex + 1);
+  }
+  const content = $("onboardingContent");
+  if (content) {
+    content.innerHTML = `<h3>${step.title}</h3><p>${step.description}</p>`;
+  }
+  const backBtn = $("onboardingBack");
+  if (backBtn) {
+    backBtn.disabled = stepIndex === 0;
+  }
+  const nextBtn = $("onboardingNext");
+  if (nextBtn) {
+    nextBtn.textContent = stepIndex === ONBOARDING_STEPS.length - 1 ? "Finish" : "Next";
+  }
+  focusOnboardingTarget(step.focus);
+}
+
+function openOnboarding(step = 0) {
+  const overlay = $("onboardingCoach");
+  if (!overlay) {
+    return;
+  }
+  state.onboardingStep = Math.max(0, Math.min(step, ONBOARDING_STEPS.length - 1));
+  overlay.hidden = false;
+  overlay.dataset.open = "true";
+  overlay.setAttribute("aria-hidden", "false");
+  if (document.body) {
+    document.body.classList.add("onboarding-open");
+  }
+  updateOnboardingUi();
+}
+
+function closeOnboarding({ persist = true } = {}) {
+  const overlay = $("onboardingCoach");
+  if (!overlay) {
+    return;
+  }
+  overlay.hidden = true;
+  overlay.dataset.open = "false";
+  overlay.setAttribute("aria-hidden", "true");
+  if (document.body) {
+    document.body.classList.remove("onboarding-open");
+  }
+  clearOnboardingFocus();
+  if (persist) {
+    markOnboardingComplete();
+  }
 }
 
 function fileToBase64(file) {
@@ -362,6 +902,13 @@ function isAbortError(error) {
 document.addEventListener("DOMContentLoaded", init);
 
 function init() {
+  const initialTheme = getStoredTheme();
+  applyTheme(initialTheme, { persist: false });
+  state.onboardingSeen = hasCompletedOnboarding();
+  state.recommendationLayout = getStoredRecommendationLayout();
+  setActiveHighlight(state.highlightPreview);
+  updateRecommendationLayout();
+
   state.watchedMovies = [];
   state.favorites = [];
   state.session = loadSession();
@@ -421,16 +968,48 @@ function init() {
   wireEvents();
   renderNotificationCenter();
 
+  if (!state.onboardingSeen) {
+    window.setTimeout(() => {
+      if (!state.onboardingSeen) {
+        openOnboarding(0);
+      }
+    }, 650);
+  }
+
   if (window.location.hash === "#profileOverview" || window.location.hash === "#overview") {
     window.requestAnimationFrame(() => {
       highlightProfileOverview();
     });
   }
 
-  if (isAccountSettingsContext() && window.location.hash === "#snapshots" && state.session && state.session.token) {
-    window.requestAnimationFrame(() => {
-      openAccountSettings("snapshots");
-    });
+  if (isAccountSettingsContext()) {
+    const hash = window.location.hash ? window.location.hash.replace("#", "") : "";
+    const validSection = hash === "snapshots" || hash === "security" || hash === "profile";
+    if (validSection && state.session && state.session.token) {
+      window.requestAnimationFrame(() => {
+        setActiveSettingsSection(hash, { updateHash: false });
+        if (hash === "snapshots") {
+          const anchor = document.getElementById("snapshots");
+          if (anchor) {
+            anchor.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        } else if (hash === "security") {
+          const securityInput = $("currentPasswordInput");
+          if (securityInput) {
+            securityInput.focus();
+          }
+        } else {
+          const displayNameInput = $("accountDisplayName");
+          if (displayNameInput) {
+            displayNameInput.focus();
+          }
+        }
+      });
+    } else if (document.querySelector('[data-settings-section]')) {
+      window.requestAnimationFrame(() => {
+        setActiveSettingsSection(state.activeSettingsSection, { updateHash: false });
+      });
+    }
   }
 }
 
@@ -447,6 +1026,19 @@ function wireEvents() {
   const notificationBell = $("notificationBell");
   const notificationPanel = $("notificationPanel");
   const notificationMarkRead = $("notificationMarkRead");
+  const themeToggle = $("themeToggle");
+  const collectionFilterGenre = $("collectionFilterGenre");
+  const collectionFilterSort = $("collectionFilterSort");
+  const filterTopRated = $("filterTopRated");
+  const filterStreaming = $("filterStreaming");
+  const filterFresh = $("filterFresh");
+  const onboardingNext = $("onboardingNext");
+  const onboardingBack = $("onboardingBack");
+  const onboardingClose = $("onboardingClose");
+  const currentPasswordInput = $("currentPasswordInput");
+  const newPasswordInput = $("newPasswordInput");
+  const confirmPasswordInput = $("confirmPasswordInput");
+  const settingsPasswordChecklist = $("settingsPasswordChecklist");
 
   if (accountProfileBtn && accountMenu) {
     accountProfileBtn.addEventListener("click", (event) => {
@@ -455,6 +1047,33 @@ function wireEvents() {
       toggleAccountMenu();
     });
   }
+
+  if (themeToggle) {
+    themeToggle.addEventListener("click", () => {
+      playUiClick();
+      handleThemeToggle();
+    });
+  }
+
+  document.querySelectorAll(".highlight-card").forEach((card) => {
+    card.addEventListener("click", () => {
+      const key = card.getAttribute("data-highlight") || "live";
+      if (state.highlightPreview !== key) {
+        playUiClick();
+        setActiveHighlight(key);
+      }
+    });
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        const key = card.getAttribute("data-highlight") || "live";
+        if (state.highlightPreview !== key) {
+          playUiClick();
+          setActiveHighlight(key);
+        }
+      }
+    });
+  });
 
   if (notificationBell) {
     notificationBell.addEventListener("click", (event) => {
@@ -480,6 +1099,137 @@ function wireEvents() {
     });
   }
 
+  if (collectionFilterGenre) {
+    collectionFilterGenre.value = state.collectionFilters.genre || "";
+    collectionFilterGenre.addEventListener("change", (event) => {
+      state.collectionFilters.genre = normalizeGenreValue(event.target.value || "");
+      refreshFavoritesUi();
+      refreshWatchedUi();
+    });
+  }
+
+  if (collectionFilterSort) {
+    collectionFilterSort.value = state.collectionFilters.sort || "recent";
+    collectionFilterSort.addEventListener("change", (event) => {
+      const value = event.target.value || "recent";
+      state.collectionFilters.sort = value;
+      refreshFavoritesUi();
+      refreshWatchedUi();
+    });
+  }
+
+  document.querySelectorAll(".segmented-control .segment[data-layout]").forEach((segment) => {
+    segment.addEventListener("click", () => {
+      const layout = segment.getAttribute("data-layout") === "carousel" ? "carousel" : "grid";
+      if (state.recommendationLayout !== layout) {
+        playUiClick();
+        const previousLayout = state.recommendationLayout;
+        if (layout === "carousel") {
+          state.gridVisibleRecommendations = state.visibleRecommendations || state.gridVisibleRecommendations;
+        } else if (previousLayout === "carousel" && state.gridVisibleRecommendations) {
+          state.visibleRecommendations = state.gridVisibleRecommendations;
+        }
+        state.recommendationLayout = layout;
+        persistRecommendationLayout(layout);
+        updateRecommendationsView();
+      } else {
+        playUiClick();
+      }
+    });
+  });
+
+  if (filterTopRated) {
+    filterTopRated.checked = state.recommendationFilters.topRated;
+    filterTopRated.addEventListener("change", () => {
+      state.recommendationFilters.topRated = filterTopRated.checked;
+      updateFilteredRecommendations();
+    });
+  }
+
+  if (filterStreaming) {
+    filterStreaming.checked = state.recommendationFilters.streaming;
+    filterStreaming.addEventListener("change", () => {
+      state.recommendationFilters.streaming = filterStreaming.checked;
+      updateFilteredRecommendations();
+    });
+  }
+
+  if (filterFresh) {
+    filterFresh.checked = state.recommendationFilters.fresh;
+    filterFresh.addEventListener("change", () => {
+      state.recommendationFilters.fresh = filterFresh.checked;
+      updateFilteredRecommendations();
+    });
+  }
+
+  if (onboardingNext) {
+    onboardingNext.addEventListener("click", () => {
+      playUiClick();
+      if (state.onboardingStep >= ONBOARDING_STEPS.length - 1) {
+        closeOnboarding();
+      } else {
+        state.onboardingStep += 1;
+        updateOnboardingUi();
+      }
+    });
+  }
+
+  if (onboardingBack) {
+    onboardingBack.addEventListener("click", () => {
+      playUiClick();
+      if (state.onboardingStep > 0) {
+        state.onboardingStep -= 1;
+        updateOnboardingUi();
+      }
+    });
+  }
+
+  if (onboardingClose) {
+    onboardingClose.addEventListener("click", () => {
+      playUiClick();
+      closeOnboarding();
+    });
+  }
+
+  const onboardingOverlay = $("onboardingCoach");
+  if (onboardingOverlay) {
+    onboardingOverlay.addEventListener("click", (event) => {
+      if (event.target === onboardingOverlay) {
+        playUiClick();
+        closeOnboarding();
+      }
+    });
+  }
+
+  document.querySelectorAll('[data-password-toggle]').forEach((button) => {
+    attachPasswordToggle(button);
+  });
+
+  if (settingsPasswordChecklist && newPasswordInput) {
+    const refreshChecklist = () => {
+      updatePasswordChecklist(
+        settingsPasswordChecklist,
+        newPasswordInput ? newPasswordInput.value : "",
+        confirmPasswordInput ? confirmPasswordInput.value : ""
+      );
+    };
+    newPasswordInput.addEventListener("input", refreshChecklist);
+    if (confirmPasswordInput) {
+      confirmPasswordInput.addEventListener("input", refreshChecklist);
+    }
+    refreshChecklist();
+  }
+
+  const settingsNavButtons = document.querySelectorAll('[data-settings-target]');
+  if (settingsNavButtons.length) {
+    settingsNavButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const target = button.getAttribute("data-settings-target") || "profile";
+        setActiveSettingsSection(target);
+      });
+    });
+  }
+
   document.addEventListener("click", (event) => {
     if (state.accountMenuOpen) {
       const container = accountProfile || (accountProfileBtn ? accountProfileBtn.parentElement : null);
@@ -501,18 +1251,14 @@ function wireEvents() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       if (state.accountMenuOpen) {
-        closeAccountMenu();
+        closeAccountMenu(true);
       }
       if (state.notificationPanelOpen) {
         closeNotificationPanel();
       }
-    }
-  });
-
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-      if (state.accountMenuOpen) {
-        closeAccountMenu(true);
+      const coach = $("onboardingCoach");
+      if (coach && !coach.hidden) {
+        closeOnboarding();
       }
     }
   });
@@ -603,6 +1349,11 @@ function wireEvents() {
       refreshWatchedUi();
       scheduleWatchedSync();
       getRecommendations(true);
+      showToast({
+        title: "History cleared",
+        text: "Watched history reset for this device.",
+        icon: "🧹"
+      });
     });
   }
 
@@ -779,6 +1530,30 @@ function isAccountSettingsOpen() {
   return isAccountSettingsContext();
 }
 
+function setActiveSettingsSection(section, { updateHash = true } = {}) {
+  const normalized = section === "security" || section === "snapshots" ? section : "profile";
+  state.activeSettingsSection = normalized;
+  document.querySelectorAll('[data-settings-section]').forEach((panel) => {
+    const target = panel.getAttribute('data-settings-section');
+    const match = target === normalized;
+    panel.hidden = !match;
+    panel.setAttribute('aria-hidden', match ? "false" : "true");
+    panel.classList.toggle('is-active', match);
+  });
+  document.querySelectorAll('[data-settings-target]').forEach((button) => {
+    const target = button.getAttribute('data-settings-target');
+    const match = target === normalized;
+    button.classList.toggle('is-active', match);
+    button.setAttribute('aria-pressed', match ? "true" : "false");
+  });
+  if (updateHash) {
+    const hash = normalized === "profile" ? "#profile" : normalized === "security" ? "#security" : "#snapshots";
+    if (window.location.hash !== hash) {
+      window.history.replaceState(null, "", hash);
+    }
+  }
+}
+
 function openAccountSettings(section = "profile") {
   if (!state.session || !state.session.token) {
     window.location.href = "login.html";
@@ -790,21 +1565,21 @@ function openAccountSettings(section = "profile") {
   if (page === "account-settings") {
     populateAccountSettings();
     window.setTimeout(() => {
+      setActiveSettingsSection(section, { updateHash: true });
       if (section === "snapshots") {
         const anchor = document.getElementById("snapshots");
         if (anchor) {
           anchor.scrollIntoView({ behavior: "smooth", block: "start" });
         }
+      } else if (section === "security") {
+        const securityInput = $("currentPasswordInput");
+        if (securityInput) {
+          securityInput.focus();
+        }
       } else {
         const displayNameInput = $("accountDisplayName");
         if (displayNameInput) {
           displayNameInput.focus();
-        }
-      }
-      if (section === "snapshots" || section === "profile") {
-        const targetHash = `#${section}`;
-        if (window.location.hash !== targetHash) {
-          window.history.replaceState(null, "", targetHash);
         }
       }
     }, 60);
@@ -814,7 +1589,9 @@ function openAccountSettings(section = "profile") {
   let target = "account-settings.html";
   if (section === "snapshots") {
     target += "#snapshots";
-  } else if (section === "profile") {
+  } else if (section === "security") {
+    target += "#security";
+  } else {
     target += "#profile";
   }
   window.location.href = target;
@@ -952,6 +1729,7 @@ async function handleSecuritySubmit(event) {
   const newInput = $("newPasswordInput");
   const confirmInput = $("confirmPasswordInput");
   const statusEl = $("accountSecurityStatus");
+  const checklist = $("settingsPasswordChecklist");
 
   if (!currentInput || !newInput || !confirmInput || !statusEl) {
     return;
@@ -960,6 +1738,8 @@ async function handleSecuritySubmit(event) {
   const currentPassword = currentInput.value;
   const newPassword = newInput.value;
   const confirmPassword = confirmInput.value;
+
+  updatePasswordChecklist(checklist, newPassword, confirmPassword);
 
   if (newPassword !== confirmPassword) {
     statusEl.textContent = "New passwords don’t match.";
@@ -983,6 +1763,7 @@ async function handleSecuritySubmit(event) {
     currentInput.value = "";
     newInput.value = "";
     confirmInput.value = "";
+    updatePasswordChecklist(checklist, "", "");
   } catch (error) {
     statusEl.textContent = error.message || "Couldn’t update your password.";
     statusEl.dataset.variant = "error";
@@ -1063,22 +1844,26 @@ function handleAvatarRemove() {
 }
 
 function refreshWatchedUi() {
-  renderWatchedList(state.watchedMovies, { onRemove: handleRemoveWatched });
+  const filteredWatched = applyCollectionFilters(state.watchedMovies);
+  renderWatchedList(filteredWatched, { onRemove: handleRemoveWatched });
   updateWatchedSummary(state.watchedMovies);
   updateCollectionVisibility();
   updatePreferencesPreview();
   refreshProfileOverviewCallout();
+  updateCollectionFilterOptions();
   if (state.recommendations.length && !state.activeRecAbort) {
     updateRecommendationsView();
   }
 }
 
 function refreshFavoritesUi() {
-  renderFavoritesList(state.favorites, { onRemove: handleRemoveFavorite });
+  const filteredFavorites = applyCollectionFilters(state.favorites);
+  renderFavoritesList(filteredFavorites, { onRemove: handleRemoveFavorite });
   updateFavoritesSummary(state.favorites);
   updateCollectionVisibility();
   updatePreferencesPreview();
   refreshProfileOverviewCallout();
+  updateCollectionFilterOptions();
   if (state.recommendations.length && !state.activeRecAbort) {
     updateRecommendationsView();
   }
@@ -1228,6 +2013,44 @@ function refreshProfileOverviewCallout(options = {}) {
     }
   }
 
+  const computeViewingStreak = () => {
+    if (!Array.isArray(state.watchedMovies) || !state.watchedMovies.length) {
+      return 0;
+    }
+    const daySet = new Set();
+    state.watchedMovies.forEach((movie) => {
+      const raw = movie && (movie.loggedAt || movie.syncedAt || movie.updatedAt || movie.timestamp);
+      let date;
+      if (typeof raw === "number" && Number.isFinite(raw)) {
+        date = new Date(raw);
+      } else if (typeof raw === "string" && raw.trim()) {
+        date = new Date(raw);
+      }
+      if (date && !Number.isNaN(date.getTime())) {
+        const normalized = new Date(date);
+        normalized.setHours(0, 0, 0, 0);
+        daySet.add(normalized.toISOString().slice(0, 10));
+      }
+    });
+    if (!daySet.size) {
+      return 0;
+    }
+    let streak = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let offset = 0; offset <= daySet.size; offset += 1) {
+      const check = new Date(today);
+      check.setDate(check.getDate() - offset);
+      const key = check.toISOString().slice(0, 10);
+      if (daySet.has(key)) {
+        streak += 1;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  };
+
   if (tasteList) {
     tasteList.innerHTML = "";
     const genreMap = new Map();
@@ -1268,6 +2091,15 @@ function refreshProfileOverviewCallout(options = {}) {
         icon: getGenreIconByLabel(labels[0]),
         title: labels.length > 1 ? "Comfort genres" : `${labels[0]} focus`,
         meta: labels.join(" • ")
+      });
+    }
+
+    const viewingStreak = computeViewingStreak();
+    if (viewingStreak >= 2) {
+      highlightItems.push({
+        icon: "🔥",
+        title: "Viewing streak",
+        meta: `${viewingStreak} days in a row`
       });
     }
 
@@ -1322,120 +2154,58 @@ function refreshProfileOverviewCallout(options = {}) {
         li.appendChild(textWrap);
         tasteList.appendChild(li);
       });
-    }
-
-    if (tasteSubtitle) {
-      tasteSubtitle.textContent = highlightItems.length
-        ? "Based on your recent favorites and watched history."
-        : "We’ll summarize your taste once you start saving titles.";
-    }
-  } else if (tasteSubtitle) {
-    tasteSubtitle.textContent = "We’ll summarize your taste once you start saving titles.";
   }
 
-  if (tasteList) {
-    tasteList.innerHTML = "";
-    const genreMap = new Map();
-    const addGenresFrom = (items) => {
-      if (!Array.isArray(items)) {
-        return;
+  if (tasteSubtitle) {
+    tasteSubtitle.textContent = highlightItems.length
+      ? "Based on your recent favorites and watched history."
+      : "We’ll summarize your taste once you start saving titles.";
+  }
+} else if (tasteSubtitle) {
+  tasteSubtitle.textContent = "We’ll summarize your taste once you start saving titles.";
+}
+
+  const genreChips = $("profileCalloutGenreChips");
+  const genreEmpty = $("profileCalloutGenreEmpty");
+  const selectedGenres = Array.isArray(session?.preferencesSnapshot?.selectedGenres)
+    ? session.preferencesSnapshot.selectedGenres
+        .map((genre) => (typeof genre === "string" ? genre.trim() : ""))
+        .filter(Boolean)
+    : [];
+  const uniqueGenres = Array.from(new Set(selectedGenres.map((genre) => genre.toLowerCase()))).map((key) => {
+    const match = selectedGenres.find((genre) => genre.toLowerCase() === key);
+    return match || key;
+  });
+
+  if (genreChips) {
+    genreChips.innerHTML = "";
+    if (uniqueGenres.length) {
+      genreChips.hidden = false;
+      if (genreEmpty) {
+        genreEmpty.hidden = true;
       }
-      items.forEach((entry) => {
-        if (!entry || !Array.isArray(entry.genres)) {
-          return;
-        }
-        entry.genres.forEach((genre) => {
-          if (!genre) {
-            return;
-          }
-          const normalized = genre.trim().toLowerCase();
-          if (!normalized) {
-            return;
-          }
-          if (!genreMap.has(normalized)) {
-            genreMap.set(normalized, { label: genre.trim(), count: 0 });
-          }
-          const data = genreMap.get(normalized);
-          data.count += 1;
-        });
+      uniqueGenres.slice(0, 8).forEach((genre) => {
+        const chip = document.createElement("li");
+        chip.className = "profile-callout-genre-chip";
+        const icon = document.createElement("span");
+        icon.className = "profile-callout-genre-icon";
+        icon.textContent = getGenreIconByLabel(genre);
+        icon.setAttribute("aria-hidden", "true");
+        const label = document.createElement("span");
+        label.className = "profile-callout-genre-label";
+        label.textContent = genre;
+        chip.appendChild(icon);
+        chip.appendChild(label);
+        genreChips.appendChild(chip);
       });
-    };
-
-    addGenresFrom(state.favorites);
-    addGenresFrom(state.watchedMovies);
-
-    const topGenres = Array.from(genreMap.values()).sort((a, b) => b.count - a.count).slice(0, 3);
-    const highlightItems = [];
-
-    if (topGenres.length) {
-      const labels = topGenres.map((entry) => entry.label);
-      highlightItems.push({
-        icon: getGenreIconByLabel(labels[0]),
-        title: labels.length > 1 ? "Comfort genres" : `${labels[0]} focus`,
-        meta: labels.join(" • ")
-      });
-    }
-
-    const avgRating = getWatchedRatingPreference(
-      Array.isArray(state.watchedMovies) ? state.watchedMovies : []
-    );
-    if (typeof avgRating === "number" && Number.isFinite(avgRating)) {
-      highlightItems.push({
-        icon: "⭐",
-        title: "Average IMDb rating",
-        meta: `${avgRating.toFixed(1)} across watched titles`
-      });
-    }
-
-    if (!highlightItems.length && (favoritesCount || watchedCount)) {
-      const prefersFavorites = favoritesCount >= watchedCount;
-      const count = prefersFavorites ? favoritesCount : watchedCount;
-      const noun = prefersFavorites ? "favorite" : "watched title";
-      highlightItems.push({
-        icon: prefersFavorites ? "💾" : "🎬",
-        title: prefersFavorites ? "Favorites saved" : "Watched logged",
-        meta: `${count.toLocaleString()} ${noun}${count === 1 ? "" : "s"} so far`
-      });
-    }
-
-    if (!highlightItems.length) {
-      const empty = document.createElement("li");
-      empty.className = "profile-callout-taste-empty";
-      empty.textContent = "Add favorites or log watched titles to unlock taste highlights.";
-      tasteList.appendChild(empty);
     } else {
-      highlightItems.slice(0, 3).forEach((item) => {
-        const li = document.createElement("li");
-        li.className = "profile-callout-taste-item";
-        const iconEl = document.createElement("span");
-        iconEl.className = "profile-callout-taste-icon";
-        iconEl.textContent = item.icon;
-        iconEl.setAttribute("aria-hidden", "true");
-        const textWrap = document.createElement("div");
-        textWrap.className = "profile-callout-taste-text";
-        const titleEl = document.createElement("span");
-        titleEl.className = "profile-callout-taste-title";
-        titleEl.textContent = item.title;
-        textWrap.appendChild(titleEl);
-        if (item.meta) {
-          const metaEl = document.createElement("span");
-          metaEl.className = "profile-callout-taste-meta";
-          metaEl.textContent = item.meta;
-          textWrap.appendChild(metaEl);
-        }
-        li.appendChild(iconEl);
-        li.appendChild(textWrap);
-        tasteList.appendChild(li);
-      });
+      genreChips.hidden = true;
+      if (genreEmpty) {
+        genreEmpty.hidden = false;
+      }
     }
-
-    if (tasteSubtitle) {
-      tasteSubtitle.textContent = highlightItems.length
-        ? "Based on your recent favorites and watched history."
-        : "We’ll summarize your taste once you start saving titles.";
-    }
-  } else if (tasteSubtitle) {
-    tasteSubtitle.textContent = "We’ll summarize your taste once you start saving titles.";
+  } else if (genreEmpty) {
+    genreEmpty.hidden = uniqueGenres.length > 0;
   }
 
   const renderSnapshotList = (
@@ -1464,6 +2234,26 @@ function refreshProfileOverviewCallout(options = {}) {
       empty.className = "profile-callout-snapshot-empty";
       empty.textContent = emptyMessage;
       listEl.appendChild(empty);
+      if (listEl.id === "profileCalloutFavoritesList" || listEl.id === "profileCalloutWatchedList") {
+        const ctaItem = document.createElement("li");
+        ctaItem.className = "profile-callout-snapshot-empty-cta";
+        const ctaButton = document.createElement("button");
+        ctaButton.type = "button";
+        ctaButton.className = "profile-callout-empty-cta";
+        if (listEl.id === "profileCalloutFavoritesList") {
+          ctaButton.textContent = "Find movies to favorite";
+          ctaButton.addEventListener("click", () => {
+            window.location.href = "index.html#recommendationsPanel";
+          });
+        } else {
+          ctaButton.textContent = "Log something you watched";
+          ctaButton.addEventListener("click", () => {
+            window.location.href = "index.html#collectionsPanel";
+          });
+        }
+        ctaItem.appendChild(ctaButton);
+        listEl.appendChild(ctaItem);
+      }
       listEl.dataset.expanded = "false";
       if (toggleBtn) {
         toggleBtn.hidden = true;
@@ -2031,6 +2821,7 @@ async function getRecommendations(isShuffleOnly) {
         false
       );
       state.recommendations = [];
+      state.filteredRecommendations = [];
       state.visibleRecommendations = 0;
       updateRecommendationsView();
       return;
@@ -2061,6 +2852,7 @@ async function getRecommendations(isShuffleOnly) {
         false
       );
       state.recommendations = [];
+      state.filteredRecommendations = [];
       state.visibleRecommendations = 0;
       updateRecommendationsView();
       return;
@@ -2083,6 +2875,7 @@ async function getRecommendations(isShuffleOnly) {
         false
       );
       state.recommendations = [];
+      state.filteredRecommendations = [];
       state.visibleRecommendations = 0;
       updateRecommendationsView();
       return;
@@ -2126,6 +2919,7 @@ async function getRecommendations(isShuffleOnly) {
         false
       );
       state.recommendations = [];
+      state.filteredRecommendations = [];
       state.visibleRecommendations = 0;
       updateRecommendationsView();
       finalizeRequest();
@@ -2133,16 +2927,14 @@ async function getRecommendations(isShuffleOnly) {
     }
 
     state.recommendations = filteredRecommendations;
-    state.visibleRecommendations = Math.min(
-      RECOMMENDATIONS_PAGE_SIZE,
-      filteredRecommendations.length
-    );
+    state.visibleRecommendations = 0;
+    state.filteredRecommendations = [];
 
     setRecStatus(
       "Here’s a curated batch based on your input. Mark anything you’ve already seen – I’ll keep learning.",
       false
     );
-    updateRecommendationsView();
+    updateFilteredRecommendations({ preserveVisible: false });
   } catch (error) {
     if (signal.aborted || isStale() || isAbortError(error)) {
       return;
@@ -2153,6 +2945,7 @@ async function getRecommendations(isShuffleOnly) {
     );
     setRecStatus("I hit an error while fetching movies.", false);
     state.recommendations = [];
+    state.filteredRecommendations = [];
     state.visibleRecommendations = 0;
     updateRecommendationsView();
   } finally {
@@ -2162,6 +2955,7 @@ async function getRecommendations(isShuffleOnly) {
 
 function resetRecommendationsState() {
   state.recommendations = [];
+  state.filteredRecommendations = [];
   state.visibleRecommendations = 0;
   state.recommendationContext = null;
   const container = $("recommendationsActions");
@@ -2175,12 +2969,21 @@ function resetRecommendationsState() {
 }
 
 function updateRecommendationsView() {
-  const total = state.recommendations.length;
+  const filtered = Array.isArray(state.filteredRecommendations) && state.filteredRecommendations.length
+    ? state.filteredRecommendations
+    : applyRecommendationFilters(state.recommendations);
+  state.filteredRecommendations = filtered;
+  const total = filtered.length;
   const fallbackVisible = total ? Math.min(total, RECOMMENDATIONS_PAGE_SIZE) : 0;
-  const visible = total
-    ? Math.min(total, state.visibleRecommendations || fallbackVisible)
-    : 0;
-  const items = total ? state.recommendations.slice(0, visible) : [];
+  if (!state.visibleRecommendations) {
+    state.visibleRecommendations = fallbackVisible;
+  }
+  if (state.recommendationLayout === "carousel") {
+    state.visibleRecommendations = total;
+  }
+  const visible = total ? Math.min(total, state.visibleRecommendations || fallbackVisible) : 0;
+  const items = total ? filtered.slice(0, visible) : [];
+  updateRecommendationLayout();
   renderRecommendations(items, state.watchedMovies, {
     favorites: state.favorites,
     onMarkWatched: handleMarkWatched,
@@ -2200,7 +3003,13 @@ function updateShowMoreButton() {
     return;
   }
 
-  const total = state.recommendations.length;
+  if (state.recommendationLayout === "carousel") {
+    container.style.display = "none";
+    button.style.display = "none";
+    return;
+  }
+
+  const total = state.filteredRecommendations.length;
   const visible = Math.min(total, state.visibleRecommendations || total);
 
   if (total > 0 && visible < total) {
@@ -2232,25 +3041,35 @@ function updateRecommendationsMeta() {
   }
 
   const total = state.recommendations.length;
-  const visible = total ? Math.min(total, state.visibleRecommendations || total) : 0;
+  const filteredTotal = state.filteredRecommendations.length;
+  const visible = filteredTotal ? Math.min(filteredTotal, state.visibleRecommendations || filteredTotal) : 0;
 
   if (!total) {
     metaEl.textContent = `${context.baseMeta} No matches yet – try adjusting your vibe.`;
     return;
   }
 
-  if (visible >= total) {
-    metaEl.textContent = `${context.baseMeta} Showing all ${total} movies.`;
+  if (!filteredTotal) {
+    metaEl.textContent = `${context.baseMeta} Filters are hiding everything – loosen them or fetch again.`;
+    return;
+  }
+
+  if (filteredTotal >= total) {
+    if (visible >= filteredTotal) {
+      metaEl.textContent = `${context.baseMeta} Showing all ${filteredTotal} movies.`;
+    } else {
+      metaEl.textContent = `${context.baseMeta} Showing ${visible} of ${filteredTotal} movies.`;
+    }
   } else {
-    metaEl.textContent = `${context.baseMeta} Showing ${visible} of ${total} movies.`;
+    metaEl.textContent = `${context.baseMeta} Showing ${visible} of ${filteredTotal} filtered movies (${total} found).`;
   }
 }
 
 function revealMoreRecommendations() {
-  if (!state.recommendations.length) {
+  const total = state.filteredRecommendations.length;
+  if (!total) {
     return;
   }
-  const total = state.recommendations.length;
   const nextVisible = Math.min(
     total,
     (state.visibleRecommendations || RECOMMENDATIONS_PAGE_SIZE) + RECOMMENDATIONS_PAGE_SIZE
@@ -2277,6 +3096,14 @@ function handleMarkWatched(omdbMovie, tmdbMovie) {
         tmdbId,
         imdbId: omdbMovie && omdbMovie.imdbID ? omdbMovie.imdbID : null,
         title
+      });
+    }
+    if (title) {
+      showToast({
+        title: "Logged as watched",
+        text: `${title} added to your history.`,
+        icon: "🎞️",
+        variant: "success"
       });
     }
   }
@@ -2307,6 +3134,13 @@ function handleRemoveWatched(movie) {
   state.watchedMovies = next;
   refreshWatchedUi();
   scheduleWatchedSync();
+  if (movie.title) {
+    showToast({
+      title: "Removed from history",
+      text: `${movie.title} removed from watched list.`,
+      icon: "↩️"
+    });
+  }
   setRecStatus("Updated your watched list.", false);
 }
 
@@ -2342,6 +3176,13 @@ function handleToggleFavorite(payload) {
     state.favorites.splice(existingIndex, 1);
     refreshFavoritesUi();
     scheduleFavoritesSync();
+    if (title) {
+      showToast({
+        title: "Removed from favorites",
+        text: `${title} removed from your saved list.`,
+        icon: "💔"
+      });
+    }
     return false;
   }
 
@@ -2388,6 +3229,14 @@ function handleToggleFavorite(payload) {
 
   refreshFavoritesUi();
   scheduleFavoritesSync();
+  if (title) {
+    showToast({
+      title: "Added to favorites",
+      text: `${title} pinned to your saved list.`,
+      icon: "❤️",
+      variant: "success"
+    });
+  }
   return true;
 }
 
@@ -2414,6 +3263,13 @@ function handleRemoveFavorite(movie) {
   state.favorites = next;
   refreshFavoritesUi();
   scheduleFavoritesSync();
+  if (movie.title) {
+    showToast({
+      title: "Removed from favorites",
+      text: `${movie.title} removed from your saved list.`,
+      icon: "💔"
+    });
+  }
 }
 
 function markAsWatched(omdbMovie) {
@@ -2446,7 +3302,8 @@ function markAsWatched(omdbMovie) {
     year: omdbMovie.Year || "",
     genres,
     rating,
-    poster
+    poster,
+    loggedAt: Date.now()
   });
 
   refreshWatchedUi();
@@ -5215,6 +6072,24 @@ function applyWatchedHistory(history) {
           : typeof entry.rating === "string" && entry.rating.trim() !== ""
           ? Number(entry.rating)
           : null;
+      const rawLoggedAt =
+        entry.loggedAt ||
+        entry.logged_at ||
+        entry.updatedAt ||
+        entry.updated_at ||
+        entry.syncedAt ||
+        entry.synced_at ||
+        entry.timestamp ||
+        null;
+      let loggedAt = null;
+      if (typeof rawLoggedAt === "number" && Number.isFinite(rawLoggedAt)) {
+        loggedAt = rawLoggedAt;
+      } else if (typeof rawLoggedAt === "string" && rawLoggedAt.trim()) {
+        const parsedDate = new Date(rawLoggedAt);
+        if (!Number.isNaN(parsedDate.getTime())) {
+          loggedAt = parsedDate.getTime();
+        }
+      }
       return {
         imdbID: entry.imdbID || null,
         title,
@@ -5226,7 +6101,8 @@ function applyWatchedHistory(history) {
         poster:
           typeof entry.poster === "string" && entry.poster.trim() !== ""
             ? entry.poster
-            : null
+            : null,
+        loggedAt
       };
     })
     .filter(Boolean);
