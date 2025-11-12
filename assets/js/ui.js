@@ -525,7 +525,7 @@ export function renderRecommendations(items, watchedMovies, options = {}) {
       item.reasons || [],
       watchedMovies,
       favorites,
-      { onMarkWatched, onToggleFavorite }
+      { onMarkWatched, onToggleFavorite, community: options.community || null }
     );
     grid.appendChild(card);
   });
@@ -533,6 +533,9 @@ export function renderRecommendations(items, watchedMovies, options = {}) {
 
 function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites, handlers) {
   const imdbID = omdb && omdb.imdbID ? omdb.imdbID : "";
+  const tmdbId = tmdb && (tmdb.id || tmdb.tmdb_id || tmdb.tmdbId)
+    ? tmdb.id || tmdb.tmdb_id || tmdb.tmdbId
+    : null;
   const tmdbPoster = tmdb && tmdb.poster_path ? `https://image.tmdb.org/t/p/w342${tmdb.poster_path}` : null;
   const omdbPoster = omdb && omdb.Poster && omdb.Poster !== "N/A" ? omdb.Poster : null;
   const poster = tmdbPoster || omdbPoster;
@@ -841,6 +844,21 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites,
   details.appendChild(plotEl);
   details.appendChild(actions);
   details.appendChild(trailerArea);
+
+  if (
+    handlers &&
+    handlers.community &&
+    typeof handlers.community.buildSection === "function"
+  ) {
+    const communitySection = handlers.community.buildSection({
+      tmdbId,
+      imdbId: imdbID,
+      title
+    });
+    if (communitySection) {
+      details.appendChild(communitySection);
+    }
+  }
 
   const toggleExpansion = () => {
     const expanded = card.classList.toggle("expanded");
