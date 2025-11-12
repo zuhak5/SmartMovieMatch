@@ -72,6 +72,164 @@
   </header>
 
   <main class="app-main profile-main">
+    <section class="panel profile-callout-panel">
+      <div class="panel-inner">
+        <article
+          id="profileOverviewCallout"
+          class="profile-callout"
+          data-sync-state="guest"
+          aria-live="polite"
+        >
+          <header class="panel-header profile-callout-header">
+            <span class="panel-eyebrow">Taste snapshot</span>
+            <h2 class="panel-title">Your Smart Movie Match pulse</h2>
+            <p class="panel-subtitle">
+              Track favorites, watched history, and sync health with personalized highlights and quick actions.
+            </p>
+          </header>
+          <div class="profile-callout-body">
+            <div class="profile-callout-column profile-callout-column--primary">
+              <div class="profile-callout-summary" aria-live="polite">
+                <div class="profile-callout-summary-header">
+                  <span id="profileCalloutSyncBadge" class="profile-callout-sync-badge" aria-hidden="true">Guest mode</span>
+                  <span class="profile-callout-summary-caption">Keep tabs on your library health at a glance.</span>
+                </div>
+                <div class="profile-callout-stats" role="list">
+                  <div class="profile-callout-stat" role="listitem">
+                    <span class="profile-callout-label">Favorites saved</span>
+                    <span id="profileCalloutFavoritesValue" class="profile-callout-value">0</span>
+                    <span id="profileCalloutFavoritesMeta" class="profile-callout-meta">Ready when you are</span>
+                  </div>
+                  <div class="profile-callout-stat" role="listitem">
+                    <span class="profile-callout-label">Watched titles</span>
+                    <span id="profileCalloutWatchedValue" class="profile-callout-value">0</span>
+                    <span id="profileCalloutWatchedMeta" class="profile-callout-meta">Log watched titles to tune picks.</span>
+                  </div>
+                  <div class="profile-callout-stat" role="listitem">
+                    <span class="profile-callout-label">Sync status</span>
+                    <span id="profileCalloutSyncValue" class="profile-callout-value">Guest mode</span>
+                    <span id="profileCalloutSyncMeta" class="profile-callout-meta">Sign in to start syncing automatically.</span>
+                  </div>
+                </div>
+                <div class="profile-callout-progress-card" role="group" aria-label="Favorite milestone progress">
+                  <div
+                    id="profileCalloutProgress"
+                    class="profile-callout-progress"
+                    role="img"
+                    aria-label="Favorite milestone meter"
+                    tabindex="0"
+                  >
+                    <span class="profile-callout-progress-label">Next milestone</span>
+                    <div class="profile-callout-progress-track">
+                      <span id="profileCalloutProgressFill" class="profile-callout-progress-fill"></span>
+                    </div>
+                  </div>
+                  <p id="profileCalloutProgressText" class="profile-callout-progress-text">
+                    Add 5 favorites to unlock smarter batches.
+                  </p>
+                </div>
+                <div class="profile-callout-taste">
+                  <div class="profile-callout-taste-header">
+                    <span class="profile-callout-label">Taste highlights</span>
+                    <p id="profileCalloutTasteSubtitle" class="profile-callout-meta">
+                      We’ll summarize your taste once you start saving titles.
+                    </p>
+                  </div>
+                  <ul id="profileCalloutTasteList" class="profile-callout-taste-list">
+                    <li class="profile-callout-taste-empty">
+                      Add favorites or log watched titles to unlock taste highlights.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <div class="profile-callout-actions">
+                <button type="button" class="btn-secondary profile-callout-cta" data-profile-action="snapshots">
+                  Review sync snapshots
+                </button>
+                <div class="profile-callout-quick-links" role="group" aria-label="Profile quick actions">
+                  <button type="button" class="profile-callout-quick-link" data-profile-action="favorites">
+                    <span aria-hidden="true">⭐</span>
+                    Jump to favorites
+                  </button>
+                  <button type="button" class="profile-callout-quick-link" data-profile-action="watched">
+                    <span aria-hidden="true">🎬</span>
+                    Jump to watched history
+                  </button>
+                  <a class="profile-callout-quick-link" href="index.html">
+                    <span aria-hidden="true">🔎</span>
+                    Back to discovery
+                  </a>
+                </div>
+              </div>
+            </div>
+            <div
+              class="profile-callout-column profile-callout-column--secondary profile-callout-snapshots"
+              aria-live="polite"
+            >
+              <section class="profile-callout-snapshot">
+                <header class="profile-callout-snapshot-header">
+                  <span class="profile-callout-snapshot-icon" aria-hidden="true">⭐</span>
+                  <div class="profile-callout-snapshot-text-group">
+                    <span class="profile-callout-snapshot-title">Latest favorites</span>
+                    <span id="profileCalloutFavoritesSubtitle" class="profile-callout-snapshot-subtitle">
+                      Save favorites to surface them here.
+                    </span>
+                  </div>
+                </header>
+                <ul id="profileCalloutFavoritesList" class="profile-callout-snapshot-list" data-expanded="false"></ul>
+                <button
+                  type="button"
+                  class="btn-subtle profile-callout-toggle"
+                  data-profile-snapshot-toggle
+                  data-target="profileCalloutFavoritesList"
+                  data-label-singular="favorite"
+                  data-label-plural="favorites"
+                  hidden
+                  aria-hidden="true"
+                >
+                  Show all favorites
+                </button>
+              </section>
+              <section class="profile-callout-snapshot">
+                <header class="profile-callout-snapshot-header">
+                  <span class="profile-callout-snapshot-icon" aria-hidden="true">🎟️</span>
+                  <div class="profile-callout-snapshot-text-group">
+                    <span class="profile-callout-snapshot-title">Recently watched</span>
+                    <span id="profileCalloutWatchedSubtitle" class="profile-callout-snapshot-subtitle">
+                      Log watched titles to see recent activity.
+                    </span>
+                  </div>
+                </header>
+                <ul id="profileCalloutWatchedList" class="profile-callout-snapshot-list" data-expanded="false"></ul>
+                <button
+                  type="button"
+                  class="btn-subtle profile-callout-toggle"
+                  data-profile-snapshot-toggle
+                  data-target="profileCalloutWatchedList"
+                  data-label-singular="watched title"
+                  data-label-plural="watched titles"
+                  hidden
+                  aria-hidden="true"
+                >
+                  Show all watched titles
+                </button>
+              </section>
+            </div>
+            <div class="profile-callout-footnotes">
+              <span class="profile-callout-footnote">
+                <span class="profile-callout-footnote-icon" aria-hidden="true">⚡</span>
+                Sync insights refresh automatically when you’re signed in.
+              </span>
+              <span class="profile-callout-footnote">
+                <span class="profile-callout-footnote-icon" aria-hidden="true">💡</span>
+                Highlights adapt as you add favorites or log watched titles.
+              </span>
+            </div>
+            <span class="profile-callout-illustration" aria-hidden="true">🍿</span>
+          </div>
+        </article>
+      </div>
+    </section>
     <section class="panel social-panel" id="socialConnectionsSection">
       <div class="panel-inner">
         <div class="panel-header">
