@@ -1,6 +1,7 @@
 import { computeWatchedGenreWeights } from "./taste.js";
 import { $ } from "./dom.js";
 import { playExpandSound, playFavoriteSound, playUiClick } from "./sound.js";
+import { acknowledgeFriendActivity } from "./social.js";
 
 export function setRecStatus(text, loading) {
   const statusText = $("recStatusText");
@@ -621,6 +622,25 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites,
   });
   infoWrap.appendChild(genreTags);
 
+  const communityMeta = document.createElement("div");
+  communityMeta.className = "movie-community-meta";
+  communityMeta.hidden = true;
+
+  const communityOverall = document.createElement("span");
+  communityOverall.className = "movie-community-chip";
+  communityMeta.appendChild(communityOverall);
+
+  const communityFriends = document.createElement("span");
+  communityFriends.className = "movie-community-chip is-friends";
+  communityMeta.appendChild(communityFriends);
+
+  infoWrap.appendChild(communityMeta);
+
+  const communityActivity = document.createElement("div");
+  communityActivity.className = "movie-community-activity";
+  communityActivity.hidden = true;
+  infoWrap.appendChild(communityActivity);
+
   const stateIcons = document.createElement("div");
   stateIcons.className = "movie-state-icons";
 
@@ -640,6 +660,11 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites,
 
   summaryButton.appendChild(posterWrap);
   summaryButton.appendChild(infoWrap);
+
+  const communityBadge = document.createElement("span");
+  communityBadge.className = "movie-community-badge";
+  communityBadge.hidden = true;
+  summaryButton.appendChild(communityBadge);
 
   const details = document.createElement("div");
   details.className = "movie-details";
@@ -717,7 +742,7 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites,
     if (watchedBtn.classList.contains("watched")) {
       return false;
     }
-    const added = handlers.onMarkWatched ? handlers.onMarkWatched(omdb) : true;
+    const added = handlers.onMarkWatched ? handlers.onMarkWatched(omdb, tmdb) : true;
     if (added) {
       markButtonAsWatched(watchedBtn, title, watchedStateIcon, { animate: true });
     }
@@ -853,7 +878,14 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites,
     const communitySection = handlers.community.buildSection({
       tmdbId,
       imdbId: imdbID,
-      title
+      title,
+      headerSummary: {
+        container: communityMeta,
+        overall: communityOverall,
+        friends: communityFriends,
+        activity: communityActivity,
+        badge: communityBadge
+      }
     });
     if (communitySection) {
       details.appendChild(communitySection);
@@ -865,6 +897,9 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites,
     card.classList.toggle("collapsed", !expanded);
     summaryButton.setAttribute("aria-expanded", expanded ? "true" : "false");
     playExpandSound(expanded);
+    if (expanded && tmdbId) {
+      acknowledgeFriendActivity(String(tmdbId));
+    }
   };
 
   summaryButton.addEventListener("click", () => {

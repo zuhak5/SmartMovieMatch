@@ -1,6 +1,7 @@
 const fs = require('fs/promises');
 const path = require('path');
 const https = require('https');
+const { randomUUID } = require('crypto');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -48,6 +49,21 @@ module.exports = async (req, res) => {
       case 'upsertReview':
         result = await handleUpsertReview(req, payload);
         break;
+      case 'likeReview':
+        result = await handleLikeReview(req, payload);
+        break;
+      case 'unlikeReview':
+        result = await handleUnlikeReview(req, payload);
+        break;
+      case 'listNotifications':
+        result = await handleListNotifications(req, payload);
+        break;
+      case 'ackNotifications':
+        result = await handleAcknowledgeNotifications(req, payload);
+        break;
+      case 'recordLibraryAction':
+        result = await handleRecordLibraryAction(req, payload);
+        break;
       default:
         res.status(400).json({ error: 'Unsupported action' });
         return;
@@ -89,6 +105,11 @@ async function handleFollowUser(req, payload) {
   }
 
   await upsertFollow(user.username, target);
+  await enqueueNotification({
+    username: target,
+    type: 'follow',
+    actor: user.username
+  });
   const following = await listFollowing(user.username);
   return {
     body: { ok: true, following }
@@ -121,11 +142,16 @@ async function handleGetMovieReviews(req, payload) {
 
   const resolvedMovie = await resolveMovieIdentifiers(movie);
   const following = new Set(await listFollowing(user.username));
-  const { reviews, myReview } = await fetchMovieReviews(resolvedMovie, following, user.username);
+  const { reviews, myReview, stats } = await fetchMovieReviews(
+    resolvedMovie,
+    following,
+    user.username
+  );
   return {
     body: {
       reviews,
-      myReview
+      myReview,
+      stats
     }
   };
 }
@@ -156,16 +182,194 @@ async function handleUpsertReview(req, payload) {
     body: body ? body.slice(0, MAX_REVIEW_LENGTH) : null,
     hasSpoilers
   });
+  await broadcastReviewActivity({
+    actor: user.username,
+    movie: resolvedMovie,
+    body
+  });
 
   const following = new Set(await listFollowing(user.username));
-  const { reviews, myReview } = await fetchMovieReviews(resolvedMovie, following, user.username);
+  const { reviews, myReview, stats } = await fetchMovieReviews(
+    resolvedMovie,
+    following,
+    user.username
+  );
   return {
     body: {
       ok: true,
       myReview,
-      reviews
+      reviews,
+      stats
     }
   };
+}
+
+async function handleLikeReview(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const movie = normalizeMovieInput(payload.movie);
+  const reviewUsername = canonicalUsername(payload.reviewUsername || '');
+  if (!movie || !movie.tmdbId || !movie.title) {
+    throw new HttpError(400, 'Missing movie identifiers.');
+  }
+  if (!reviewUsername) {
+    throw new HttpError(400, 'Missing review username.');
+  }
+  if (reviewUsername === user.username) {
+    throw new HttpError(400, 'You cannot like your own review.');
+  }
+
+  const resolvedMovie = await resolveMovieIdentifiers(movie);
+  const timestamp = new Date().toISOString();
+
+  if (USING_LOCAL_STORE) {
+    const store = await readSocialStore();
+    const exists = store.reviewLikes.some(
+      (entry) =>
+        entry.movieTmdbId === resolvedMovie.tmdbId &&
+        entry.reviewUsername === reviewUsername &&
+        entry.likedBy === user.username
+    );
+    if (!exists) {
+      store.reviewLikes.push({
+        movieTmdbId: resolvedMovie.tmdbId,
+        movieImdbId: resolvedMovie.imdbId || null,
+        reviewUsername,
+        likedBy: user.username,
+        createdAt: timestamp
+      });
+      await enqueueNotification({
+        store,
+        username: reviewUsername,
+        type: 'review_like',
+        actor: user.username,
+        movie: resolvedMovie,
+        timestamp
+      });
+      await writeSocialStore(store);
+    }
+    const likes = summarizeLikes(
+      store.reviewLikes.filter(
+        (entry) =>
+          entry.movieTmdbId === resolvedMovie.tmdbId && entry.reviewUsername === reviewUsername
+      ),
+      user.username
+    );
+    return { body: { ok: true, likes } };
+  }
+
+  await ensureMovieRecord(resolvedMovie);
+  try {
+    await supabaseFetch('review_likes', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates' },
+      body: [
+        {
+          movie_tmdb_id: resolvedMovie.tmdbId,
+          movie_imdb_id: resolvedMovie.imdbId,
+          review_username: reviewUsername,
+          liked_by: user.username,
+          created_at: timestamp
+        }
+      ]
+    });
+  } catch (error) {
+    throw new HttpError(500, 'Unable to like this review right now.');
+  }
+  await enqueueNotification({
+    username: reviewUsername,
+    type: 'review_like',
+    actor: user.username,
+    movie: resolvedMovie,
+    timestamp
+  });
+  const likes = await fetchReviewLikeSummary(resolvedMovie, reviewUsername, user.username);
+  return { body: { ok: true, likes } };
+}
+
+async function handleUnlikeReview(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const movie = normalizeMovieInput(payload.movie);
+  const reviewUsername = canonicalUsername(payload.reviewUsername || '');
+  if (!movie || !movie.tmdbId || !movie.title) {
+    throw new HttpError(400, 'Missing movie identifiers.');
+  }
+  if (!reviewUsername) {
+    throw new HttpError(400, 'Missing review username.');
+  }
+
+  const resolvedMovie = await resolveMovieIdentifiers(movie);
+
+  if (USING_LOCAL_STORE) {
+    const store = await readSocialStore();
+    const before = store.reviewLikes.length;
+    store.reviewLikes = store.reviewLikes.filter(
+      (entry) =>
+        !(
+          entry.movieTmdbId === resolvedMovie.tmdbId &&
+          entry.reviewUsername === reviewUsername &&
+          entry.likedBy === user.username
+        )
+    );
+    if (store.reviewLikes.length !== before) {
+      await writeSocialStore(store);
+    }
+    const likes = summarizeLikes(
+      store.reviewLikes.filter(
+        (entry) =>
+          entry.movieTmdbId === resolvedMovie.tmdbId && entry.reviewUsername === reviewUsername
+      ),
+      user.username
+    );
+    return { body: { ok: true, likes } };
+  }
+
+  try {
+    await supabaseFetch('review_likes', {
+      method: 'DELETE',
+      query: {
+        movie_tmdb_id: `eq.${resolvedMovie.tmdbId}`,
+        review_username: `eq.${reviewUsername}`,
+        liked_by: `eq.${user.username}`
+      }
+    });
+  } catch (error) {
+    throw new HttpError(500, 'Unable to remove your like right now.');
+  }
+  const likes = await fetchReviewLikeSummary(resolvedMovie, reviewUsername, user.username);
+  return { body: { ok: true, likes } };
+}
+
+async function handleListNotifications(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const limit = Number(payload.limit) || 50;
+  const response = await listNotifications(user.username, { limit });
+  return { body: response };
+}
+
+async function handleAcknowledgeNotifications(req, payload) {
+  const { user } = await authenticate(req, payload);
+  await markNotificationsRead(user.username);
+  const response = await listNotifications(user.username, { limit: Number(payload.limit) || 50 });
+  return { body: response };
+}
+
+async function handleRecordLibraryAction(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const action = typeof payload.action === 'string' ? payload.action : '';
+  if (!['watchlist_add', 'favorite_add'].includes(action)) {
+    throw new HttpError(400, 'Unsupported library action.');
+  }
+  const movie = normalizeMovieInput(payload.movie);
+  if (!movie || !movie.tmdbId || !movie.title) {
+    throw new HttpError(400, 'Missing movie identifiers.');
+  }
+  const resolvedMovie = await resolveMovieIdentifiers(movie);
+  await recordLibraryActivity({
+    username: user.username,
+    action,
+    movie: resolvedMovie
+  });
+  return { body: { ok: true } };
 }
 
 async function authenticate(req, payload) {
@@ -285,8 +489,23 @@ async function fetchMovieReviews(movie, followingSet, currentUsername) {
       .filter((entry) => entry.movieTmdbId === movie.tmdbId)
       .sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
     const reviews = rows.map((row) => mapReviewRow(row, followingSet, currentUsername));
+    const likeMap = new Map();
+    store.reviewLikes
+      .filter((entry) => entry.movieTmdbId === movie.tmdbId)
+      .forEach((entry) => {
+        const key = `${entry.reviewUsername}`;
+        if (!likeMap.has(key)) {
+          likeMap.set(key, []);
+        }
+        likeMap.get(key).push(entry);
+      });
+    reviews.forEach((review) => {
+      const likes = likeMap.get(review.username) || [];
+      review.likes = summarizeLikes(likes, currentUsername);
+    });
     const myReview = reviews.find((review) => review.username === currentUsername) || null;
-    return { reviews, myReview };
+    const stats = calculateReviewStats(reviews);
+    return { reviews, myReview, stats };
   }
   if (!movie.imdbId) {
     return { reviews: [], myReview: null };
@@ -302,8 +521,38 @@ async function fetchMovieReviews(movie, followingSet, currentUsername) {
     return { reviews: [], myReview: null };
   }
   const reviews = rows.map((row) => mapReviewRow(row, followingSet, currentUsername));
+  try {
+    const likeRows = await supabaseFetch('review_likes', {
+      query: {
+        select: 'review_username,liked_by',
+        movie_tmdb_id: `eq.${movie.tmdbId}`
+      }
+    });
+    if (Array.isArray(likeRows) && likeRows.length) {
+      const likeMap = new Map();
+      likeRows.forEach((row) => {
+        const key = `${row.review_username}`;
+        if (!likeMap.has(key)) {
+          likeMap.set(key, []);
+        }
+        likeMap.get(key).push(row);
+      });
+      reviews.forEach((review) => {
+        const likes = likeMap.get(review.username) || [];
+        review.likes = summarizeLikes(likes, currentUsername);
+      });
+    }
+  } catch (error) {
+    console.warn('Failed to load review likes for movie', error);
+  }
+  reviews.forEach((review) => {
+    if (!review.likes) {
+      review.likes = summarizeLikes([], currentUsername);
+    }
+  });
   const myReview = reviews.find((review) => review.username === currentUsername) || null;
-  return { reviews, myReview };
+  const stats = calculateReviewStats(reviews);
+  return { reviews, myReview, stats };
 }
 
 async function upsertReview({ username, movie, rating, body, hasSpoilers }) {
@@ -389,6 +638,496 @@ function mapReviewRow(row, followingSet, currentUsername) {
     isFriend: username !== currentUsername && followingSet.has(username),
     isSelf: username === currentUsername
   };
+}
+
+function calculateReviewStats(reviews) {
+  if (!Array.isArray(reviews) || reviews.length === 0) {
+    return {
+      totalReviews: 0,
+      totalRatings: 0,
+      averageRating: null,
+      friendReviews: 0,
+      friendRatings: 0,
+      friendAverageRating: null,
+      lastReviewAt: null
+    };
+  }
+
+  let totalReviews = 0;
+  let totalRatings = 0;
+  let ratingSum = 0;
+  let friendReviews = 0;
+  let friendRatings = 0;
+  let friendRatingSum = 0;
+  let latestTimestamp = null;
+  let friendLatestTimestamp = null;
+
+  reviews.forEach((review) => {
+    if (!review) {
+      return;
+    }
+    totalReviews += 1;
+
+    const ratingValue =
+      typeof review.rating === 'number'
+        ? review.rating
+        : typeof review.rating === 'string'
+        ? Number(review.rating)
+        : null;
+    if (Number.isFinite(ratingValue)) {
+      totalRatings += 1;
+      ratingSum += ratingValue;
+      if (review.isFriend) {
+        friendRatings += 1;
+        friendRatingSum += ratingValue;
+      }
+    }
+
+    const timestamp = review.updatedAt || review.createdAt || null;
+    if (review.isFriend) {
+      friendReviews += 1;
+      if (timestamp && typeof timestamp === 'string') {
+        if (!friendLatestTimestamp || timestamp > friendLatestTimestamp) {
+          friendLatestTimestamp = timestamp;
+        }
+      }
+    }
+    if (timestamp && typeof timestamp === 'string') {
+      if (!latestTimestamp || timestamp > latestTimestamp) {
+        latestTimestamp = timestamp;
+      }
+    }
+  });
+
+  return {
+    totalReviews,
+    totalRatings,
+    averageRating: totalRatings ? Math.round((ratingSum / totalRatings) * 10) / 10 : null,
+    friendReviews,
+    friendRatings,
+    friendAverageRating: friendRatings ? Math.round((friendRatingSum / friendRatings) * 10) / 10 : null,
+    lastReviewAt: latestTimestamp,
+    friendLastReviewAt: friendLatestTimestamp
+  };
+}
+
+async function broadcastReviewActivity({ actor, movie, body }) {
+  if (!actor || !movie || !movie.tmdbId) {
+    return;
+  }
+  const timestamp = new Date().toISOString();
+  const followers = await listFollowers(actor);
+  const mentionTargets = await resolveMentionTargets(body, actor);
+
+  if (USING_LOCAL_STORE) {
+    const store = await readSocialStore();
+    followers
+      .filter((username) => username && username !== actor)
+      .forEach((username) => {
+        enqueueNotification({
+          store,
+          username,
+          type: 'friend_review',
+          actor,
+          movie,
+          timestamp
+        });
+      });
+    mentionTargets
+      .filter((username) => username && username !== actor)
+      .forEach((username) => {
+        enqueueNotification({
+          store,
+          username,
+          type: 'mention',
+          actor,
+          movie,
+          timestamp
+        });
+      });
+    await writeSocialStore(store);
+    return;
+  }
+
+  await Promise.all(
+    followers
+      .filter((username) => username && username !== actor)
+      .map((username) =>
+        enqueueNotification({
+          username,
+          type: 'friend_review',
+          actor,
+          movie,
+          timestamp
+        })
+      )
+  );
+  await Promise.all(
+    mentionTargets
+      .filter((username) => username && username !== actor)
+      .map((username) =>
+        enqueueNotification({
+          username,
+          type: 'mention',
+          actor,
+          movie,
+          timestamp
+        })
+      )
+  );
+}
+
+async function recordLibraryActivity({ username, action, movie }) {
+  if (!username || !action || !movie) {
+    return;
+  }
+  const timestamp = new Date().toISOString();
+  const notificationType = action === 'watchlist_add' ? 'friend_watchlist' : 'friend_favorite';
+
+  if (USING_LOCAL_STORE) {
+    const store = await readSocialStore();
+    store.library.push({
+      username,
+      action,
+      movieTmdbId: movie.tmdbId,
+      movieImdbId: movie.imdbId || null,
+      movieTitle: movie.title || '',
+      createdAt: timestamp
+    });
+    store.follows
+      .filter((entry) => entry.followee === username)
+      .map((entry) => entry.follower)
+      .filter((follower) => follower && follower !== username)
+      .forEach((follower) => {
+        enqueueNotification({
+          store,
+          username: follower,
+          type: notificationType,
+          actor: username,
+          movie,
+          timestamp
+        });
+      });
+    await writeSocialStore(store);
+    return;
+  }
+
+  try {
+    await supabaseFetch('library_activity', {
+      method: 'POST',
+      body: [
+        {
+          username,
+          action,
+          movie_tmdb_id: movie.tmdbId,
+          movie_imdb_id: movie.imdbId,
+          movie_title: movie.title,
+          created_at: timestamp
+        }
+      ]
+    });
+  } catch (error) {
+    console.warn('Failed to persist library activity', error);
+  }
+
+  const followers = await listFollowers(username);
+  await Promise.all(
+    followers
+      .filter((follower) => follower && follower !== username)
+      .map((follower) =>
+        enqueueNotification({
+          username: follower,
+          type: notificationType,
+          actor: username,
+          movie,
+          timestamp
+        })
+      )
+  );
+}
+
+async function listFollowers(username) {
+  if (!username) {
+    return [];
+  }
+  if (USING_LOCAL_STORE) {
+    const store = await readSocialStore();
+    return store.follows
+      .filter((entry) => entry.followee === username)
+      .map((entry) => entry.follower)
+      .filter(Boolean)
+      .sort();
+  }
+  try {
+    const rows = await supabaseFetch('user_follows', {
+      query: {
+        select: 'follower_username',
+        followed_username: `eq.${username}`
+      }
+    });
+    if (!Array.isArray(rows)) {
+      return [];
+    }
+    return rows
+      .map((row) => row.follower_username)
+      .filter(Boolean)
+      .sort();
+  } catch (error) {
+    console.warn('Failed to load followers', error);
+    return [];
+  }
+}
+
+async function resolveMentionTargets(body, actor) {
+  if (!body) {
+    return [];
+  }
+  const mentions = Array.from(new Set(extractMentions(body))).filter(
+    (username) => username && username !== actor
+  );
+  if (!mentions.length) {
+    return [];
+  }
+  const valid = [];
+  for (const username of mentions) {
+    try {
+      if (await userExists(username)) {
+        valid.push(username);
+      }
+    } catch (error) {
+      // ignore lookup failure
+    }
+  }
+  return valid;
+}
+
+function extractMentions(text) {
+  if (!text || typeof text !== 'string') {
+    return [];
+  }
+  const matches = text.match(/@([a-z0-9_\.\-]{2,20})/gi) || [];
+  return matches.map((match) => canonicalUsername(match.slice(1))).filter(Boolean);
+}
+
+async function enqueueNotification({ store, username, type, actor, movie, timestamp }) {
+  const normalizedUsername = canonicalUsername(username);
+  if (!normalizedUsername || (actor && normalizedUsername === actor)) {
+    return null;
+  }
+  const createdAt = timestamp || new Date().toISOString();
+  const entry = {
+    id: randomUUID(),
+    username: normalizedUsername,
+    type,
+    actor: actor || null,
+    movieTitle: movie && movie.title ? movie.title : null,
+    movieTmdbId: movie && movie.tmdbId ? movie.tmdbId : null,
+    movieImdbId: movie && movie.imdbId ? movie.imdbId : null,
+    message: formatNotificationMessage(type, { actor, movie }),
+    createdAt,
+    readAt: null
+  };
+
+  if (USING_LOCAL_STORE) {
+    if (store) {
+      store.notifications.push(entry);
+      return entry;
+    }
+    const nextStore = await readSocialStore();
+    nextStore.notifications.push(entry);
+    await writeSocialStore(nextStore);
+    return entry;
+  }
+
+  try {
+    await supabaseFetch('user_notifications', {
+      method: 'POST',
+      body: [
+        {
+          id: entry.id,
+          username: entry.username,
+          type: entry.type,
+          actor: entry.actor,
+          movie_title: entry.movieTitle,
+          movie_tmdb_id: entry.movieTmdbId,
+          movie_imdb_id: entry.movieImdbId,
+          message: entry.message,
+          created_at: entry.createdAt,
+          read_at: null
+        }
+      ]
+    });
+  } catch (error) {
+    console.warn('Failed to enqueue notification', error);
+  }
+  return entry;
+}
+
+function formatNotificationMessage(type, context = {}) {
+  const actor = context.actor ? context.actor : 'Someone';
+  const title = context.movie && context.movie.title ? context.movie.title : 'a movie';
+  switch (type) {
+    case 'follow':
+      return `${actor} followed you.`;
+    case 'mention':
+      return `${actor} mentioned you in a review for ${title}.`;
+    case 'review_like':
+      return `${actor} liked your review for ${title}.`;
+    case 'friend_review':
+      return `${actor} posted a new review for ${title}.`;
+    case 'friend_watchlist':
+      return `${actor} added ${title} to their watchlist.`;
+    case 'friend_favorite':
+      return `${actor} favorited ${title}.`;
+    default:
+      return `New activity from ${actor}.`;
+  }
+}
+
+function summarizeLikes(entries, currentUsername) {
+  if (!Array.isArray(entries) || !entries.length) {
+    return { count: 0, hasLiked: false };
+  }
+  const count = entries.length;
+  const hasLiked = entries.some((entry) => {
+    const username = entry.likedBy || entry.liked_by;
+    return username === currentUsername;
+  });
+  return { count, hasLiked };
+}
+
+async function fetchReviewLikeSummary(movie, reviewUsername, currentUsername) {
+  if (!movie || !movie.tmdbId) {
+    return { count: 0, hasLiked: false };
+  }
+  if (USING_LOCAL_STORE) {
+    const store = await readSocialStore();
+    const likes = store.reviewLikes.filter(
+      (entry) => entry.movieTmdbId === movie.tmdbId && entry.reviewUsername === reviewUsername
+    );
+    return summarizeLikes(likes, currentUsername);
+  }
+  try {
+    const rows = await supabaseFetch('review_likes', {
+      query: {
+        select: 'liked_by',
+        movie_tmdb_id: `eq.${movie.tmdbId}`,
+        review_username: `eq.${reviewUsername}`
+      }
+    });
+    if (!Array.isArray(rows)) {
+      return { count: 0, hasLiked: false };
+    }
+    return summarizeLikes(rows, currentUsername);
+  } catch (error) {
+    console.warn('Failed to load review likes', error);
+    return { count: 0, hasLiked: false };
+  }
+}
+
+async function listNotifications(username, { limit = 50 } = {}) {
+  if (!username) {
+    return { notifications: [], unreadCount: 0 };
+  }
+  if (USING_LOCAL_STORE) {
+    const store = await readSocialStore();
+    const all = store.notifications
+      .filter((entry) => entry.username === username)
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    const unreadCount = all.filter((entry) => !entry.readAt).length;
+    return {
+      notifications: all.slice(0, limit).map((entry) => ({
+        id: entry.id,
+        type: entry.type,
+        actor: entry.actor,
+        movieTitle: entry.movieTitle,
+        movieTmdbId: entry.movieTmdbId,
+        movieImdbId: entry.movieImdbId,
+        message: entry.message,
+        createdAt: entry.createdAt,
+        readAt: entry.readAt || null
+      })),
+      unreadCount
+    };
+  }
+  try {
+    const rows = await supabaseFetch('user_notifications', {
+      query: {
+        select:
+          'id,type,actor,movie_title,movie_tmdb_id,movie_imdb_id,message,created_at,read_at',
+        username: `eq.${username}`,
+        order: 'created_at.desc',
+        limit: String(limit)
+      }
+    });
+    if (!Array.isArray(rows)) {
+      return { notifications: [], unreadCount: 0 };
+    }
+    let unreadCount = rows.filter((row) => !row.read_at).length;
+    if (unreadCount < rows.length) {
+      try {
+        const unreadRows = await supabaseFetch('user_notifications', {
+          query: {
+            select: 'id',
+            username: `eq.${username}`,
+            read_at: 'is.null'
+          }
+        });
+        if (Array.isArray(unreadRows)) {
+          unreadCount = unreadRows.length;
+        }
+      } catch (error) {
+        // ignore supplementary unread fetch failures
+      }
+    }
+    return {
+      notifications: rows.map((row) => ({
+        id: row.id,
+        type: row.type,
+        actor: row.actor,
+        movieTitle: row.movie_title,
+        movieTmdbId: row.movie_tmdb_id,
+        movieImdbId: row.movie_imdb_id,
+        message: row.message,
+        createdAt: row.created_at,
+        readAt: row.read_at || null
+      })),
+      unreadCount
+    };
+  } catch (error) {
+    console.warn('Failed to load notifications', error);
+    return { notifications: [], unreadCount: 0 };
+  }
+}
+
+async function markNotificationsRead(username) {
+  if (!username) {
+    return;
+  }
+  const now = new Date().toISOString();
+  if (USING_LOCAL_STORE) {
+    const store = await readSocialStore();
+    let changed = false;
+    store.notifications.forEach((entry) => {
+      if (entry.username === username && !entry.readAt) {
+        entry.readAt = now;
+        changed = true;
+      }
+    });
+    if (changed) {
+      await writeSocialStore(store);
+    }
+    return;
+  }
+  try {
+    await supabaseFetch('user_notifications', {
+      method: 'PATCH',
+      query: { username: `eq.${username}` },
+      body: { read_at: now }
+    });
+  } catch (error) {
+    console.warn('Failed to mark notifications read', error);
+  }
 }
 
 async function resolveMovieIdentifiers(movie) {
@@ -550,10 +1289,13 @@ async function readSocialStore() {
     const parsed = JSON.parse(text);
     return {
       follows: Array.isArray(parsed.follows) ? parsed.follows.slice() : [],
-      reviews: Array.isArray(parsed.reviews) ? parsed.reviews.slice() : []
+      reviews: Array.isArray(parsed.reviews) ? parsed.reviews.slice() : [],
+      reviewLikes: Array.isArray(parsed.reviewLikes) ? parsed.reviewLikes.slice() : [],
+      notifications: Array.isArray(parsed.notifications) ? parsed.notifications.slice() : [],
+      library: Array.isArray(parsed.library) ? parsed.library.slice() : []
     };
   } catch (error) {
-    return { follows: [], reviews: [] };
+    return { follows: [], reviews: [], reviewLikes: [], notifications: [], library: [] };
   }
 }
 
@@ -561,7 +1303,10 @@ async function writeSocialStore(store) {
   const payload = JSON.stringify(
     {
       follows: Array.isArray(store.follows) ? store.follows : [],
-      reviews: Array.isArray(store.reviews) ? store.reviews : []
+      reviews: Array.isArray(store.reviews) ? store.reviews : [],
+      reviewLikes: Array.isArray(store.reviewLikes) ? store.reviewLikes : [],
+      notifications: Array.isArray(store.notifications) ? store.notifications : [],
+      library: Array.isArray(store.library) ? store.library : []
     },
     null,
     2
