@@ -74,7 +74,12 @@
   <main class="app-main profile-main">
     <section class="panel profile-callout-panel">
       <div class="panel-inner">
-        <article id="profileOverviewCallout" class="profile-callout" aria-live="polite">
+        <article
+          id="profileOverviewCallout"
+          class="profile-callout"
+          data-sync-state="guest"
+          aria-live="polite"
+        >
           <header class="panel-header profile-callout-header">
             <span class="panel-eyebrow">Taste snapshot</span>
             <h2 class="panel-title">Your Smart Movie Match pulse</h2>
@@ -83,45 +88,59 @@
             </p>
           </header>
           <div class="profile-callout-body">
-            <div class="profile-callout-summary">
-              <div class="profile-callout-stats" aria-live="polite">
-                <div class="profile-callout-stat">
-                  <span class="profile-callout-label">Favorites saved</span>
-                  <span id="profileCalloutFavoritesValue" class="profile-callout-value">0</span>
-                  <span id="profileCalloutFavoritesMeta" class="profile-callout-meta">Ready when you are</span>
+            <div class="profile-callout-column profile-callout-column--primary">
+              <div class="profile-callout-summary" aria-live="polite">
+                <div class="profile-callout-summary-header">
+                  <span id="profileCalloutSyncBadge" class="profile-callout-sync-badge" aria-hidden="true">Guest mode</span>
+                  <span class="profile-callout-summary-caption">Keep tabs on your library health at a glance.</span>
                 </div>
-                <div class="profile-callout-stat">
-                  <span class="profile-callout-label">Watched titles</span>
-                  <span id="profileCalloutWatchedValue" class="profile-callout-value">0</span>
-                  <span id="profileCalloutWatchedMeta" class="profile-callout-meta">Log watched titles to tune picks.</span>
+                <div class="profile-callout-stats" role="list">
+                  <div class="profile-callout-stat" role="listitem">
+                    <span class="profile-callout-label">Favorites saved</span>
+                    <span id="profileCalloutFavoritesValue" class="profile-callout-value">0</span>
+                    <span id="profileCalloutFavoritesMeta" class="profile-callout-meta">Ready when you are</span>
+                  </div>
+                  <div class="profile-callout-stat" role="listitem">
+                    <span class="profile-callout-label">Watched titles</span>
+                    <span id="profileCalloutWatchedValue" class="profile-callout-value">0</span>
+                    <span id="profileCalloutWatchedMeta" class="profile-callout-meta">Log watched titles to tune picks.</span>
+                  </div>
+                  <div class="profile-callout-stat" role="listitem">
+                    <span class="profile-callout-label">Sync status</span>
+                    <span id="profileCalloutSyncValue" class="profile-callout-value">Guest mode</span>
+                    <span id="profileCalloutSyncMeta" class="profile-callout-meta">Sign in to start syncing automatically.</span>
+                  </div>
                 </div>
-                <div class="profile-callout-stat">
-                  <span class="profile-callout-label">Sync status</span>
-                  <span id="profileCalloutSyncValue" class="profile-callout-value">Guest mode</span>
-                  <span id="profileCalloutSyncMeta" class="profile-callout-meta">Sign in to start syncing automatically.</span>
-                </div>
-              </div>
-              <div id="profileCalloutProgress" class="profile-callout-progress" role="group" aria-label="Favorite milestone progress">
-                <div class="profile-callout-progress-row">
-                  <span class="profile-callout-label">Next milestone</span>
-                  <span id="profileCalloutProgressText" class="profile-callout-progress-text">
+                <div class="profile-callout-progress-card" role="group" aria-label="Favorite milestone progress">
+                  <div
+                    id="profileCalloutProgress"
+                    class="profile-callout-progress"
+                    role="img"
+                    aria-label="Favorite milestone meter"
+                    tabindex="0"
+                  >
+                    <span class="profile-callout-progress-label">Next milestone</span>
+                    <div class="profile-callout-progress-track">
+                      <span id="profileCalloutProgressFill" class="profile-callout-progress-fill"></span>
+                    </div>
+                  </div>
+                  <p id="profileCalloutProgressText" class="profile-callout-progress-text">
                     Add 5 favorites to unlock smarter batches.
-                  </span>
+                  </p>
                 </div>
-                <div class="profile-callout-progress-track">
-                  <span id="profileCalloutProgressFill" class="profile-callout-progress-fill"></span>
+                <div class="profile-callout-taste">
+                  <div class="profile-callout-taste-header">
+                    <span class="profile-callout-label">Taste highlights</span>
+                    <p id="profileCalloutTasteSubtitle" class="profile-callout-meta">
+                      We’ll summarize your taste once you start saving titles.
+                    </p>
+                  </div>
+                  <ul id="profileCalloutTasteList" class="profile-callout-taste-list">
+                    <li class="profile-callout-taste-empty">
+                      Add favorites or log watched titles to unlock taste highlights.
+                    </li>
+                  </ul>
                 </div>
-              </div>
-              <div class="profile-callout-taste">
-                <span class="profile-callout-label">Taste highlights</span>
-                <p id="profileCalloutTasteSubtitle" class="profile-callout-meta">
-                  We’ll summarize your taste once you start saving titles.
-                </p>
-                <ul id="profileCalloutTasteList" class="profile-callout-taste-list">
-                  <li class="profile-callout-taste-empty">
-                    Add favorites or log watched titles to unlock taste highlights.
-                  </li>
-                </ul>
               </div>
               <div class="profile-callout-actions">
                 <button type="button" class="btn-secondary profile-callout-cta" data-profile-action="snapshots">
@@ -143,7 +162,10 @@
                 </div>
               </div>
             </div>
-            <div class="profile-callout-snapshots" aria-live="polite">
+            <div
+              class="profile-callout-column profile-callout-column--secondary profile-callout-snapshots"
+              aria-live="polite"
+            >
               <section class="profile-callout-snapshot">
                 <header class="profile-callout-snapshot-header">
                   <span class="profile-callout-snapshot-icon" aria-hidden="true">⭐</span>
