@@ -119,8 +119,9 @@ async function handleGetMovieReviews(req, payload) {
     throw new HttpError(400, 'Missing movie identifiers.');
   }
 
+  const resolvedMovie = await resolveMovieIdentifiers(movie);
   const following = new Set(await listFollowing(user.username));
-  const { reviews, myReview } = await fetchMovieReviews(movie.tmdbId, following, user.username);
+  const { reviews, myReview } = await fetchMovieReviews(resolvedMovie, following, user.username);
   return {
     body: {
       reviews,
@@ -144,16 +145,20 @@ async function handleUpsertReview(req, payload) {
 
   const body = typeof reviewInput.body === 'string' ? reviewInput.body.trim() : '';
   const hasSpoilers = Boolean(reviewInput.hasSpoilers);
+  const resolvedMovie = await resolveMovieIdentifiers(movie);
+  if (!USING_LOCAL_STORE && !resolvedMovie.imdbId) {
+    throw new HttpError(400, 'Missing IMDb ID for this movie. Try another recommendation.');
+  }
   await upsertReview({
     username: user.username,
-    movie,
+    movie: resolvedMovie,
     rating,
     body: body ? body.slice(0, MAX_REVIEW_LENGTH) : null,
     hasSpoilers
   });
 
   const following = new Set(await listFollowing(user.username));
-  const { reviews, myReview } = await fetchMovieReviews(movie.tmdbId, following, user.username);
+  const { reviews, myReview } = await fetchMovieReviews(resolvedMovie, following, user.username);
   return {
     body: {
       ok: true,
@@ -221,9 +226,9 @@ async function listFollowing(username) {
       .filter(Boolean)
       .sort();
   }
-  const rows = await supabaseFetch('social_follows', {
+  const rows = await supabaseFetch('user_follows', {
     query: {
-      select: 'followee_username',
+      select: 'followed_username',
       follower_username: `eq.${username}`
     }
   });
@@ -231,7 +236,7 @@ async function listFollowing(username) {
     return [];
   }
   return rows
-    .map((row) => row.followee_username)
+    .map((row) => row.followed_username)
     .filter(Boolean)
     .sort();
 }
@@ -248,10 +253,10 @@ async function upsertFollow(follower, followee) {
     }
     return;
   }
-  await supabaseFetch('social_follows', {
+  await supabaseFetch('user_follows', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates' },
-    body: [{ follower_username: follower, followee_username: followee }]
+    body: [{ follower_username: follower, followed_username: followee }]
   });
 }
 
@@ -264,29 +269,32 @@ async function deleteFollow(follower, followee) {
     await writeSocialStore(store);
     return;
   }
-  await supabaseFetch('social_follows', {
+  await supabaseFetch('user_follows', {
     method: 'DELETE',
     query: {
       follower_username: `eq.${follower}`,
-      followee_username: `eq.${followee}`
+      followed_username: `eq.${followee}`
     }
   });
 }
 
-async function fetchMovieReviews(tmdbId, followingSet, currentUsername) {
+async function fetchMovieReviews(movie, followingSet, currentUsername) {
   if (USING_LOCAL_STORE) {
     const store = await readSocialStore();
     const rows = store.reviews
-      .filter((entry) => entry.movieTmdbId === tmdbId)
+      .filter((entry) => entry.movieTmdbId === movie.tmdbId)
       .sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
     const reviews = rows.map((row) => mapReviewRow(row, followingSet, currentUsername));
     const myReview = reviews.find((review) => review.username === currentUsername) || null;
     return { reviews, myReview };
   }
-  const rows = await supabaseFetch('social_reviews', {
+  if (!movie.imdbId) {
+    return { reviews: [], myReview: null };
+  }
+  const rows = await supabaseFetch('movie_reviews', {
     query: {
-      select: 'author_username,rating,body,has_spoilers,created_at,updated_at',
-      movie_tmdb_id: `eq.${tmdbId}`,
+      select: 'username,rating,body,is_spoiler,created_at,updated_at',
+      movie_imdb_id: `eq.${movie.imdbId}`,
       order: 'updated_at.desc'
     }
   });
@@ -333,18 +341,18 @@ async function upsertReview({ username, movie, rating, body, hasSpoilers }) {
     await writeSocialStore(store);
     return;
   }
-  await supabaseFetch('social_reviews', {
+  await ensureMovieRecord(movie);
+  await supabaseFetch('movie_reviews', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates' },
+    query: { on_conflict: 'username,movie_imdb_id' },
     body: [
       {
-        author_username: username,
-        movie_tmdb_id: movie.tmdbId,
-        movie_imdb_id: movie.imdbId || null,
-        movie_title: movie.title,
+        username,
+        movie_imdb_id: movie.imdbId,
         rating,
         body: body || null,
-        has_spoilers: hasSpoilers,
+        is_spoiler: hasSpoilers,
         updated_at: timestamp
       }
     ]
@@ -375,12 +383,57 @@ function mapReviewRow(row, followingSet, currentUsername) {
     username,
     rating: typeof row.rating === 'number' ? Number(row.rating) : row.rating ? Number(row.rating) : null,
     body: row.body || null,
-    hasSpoilers: Boolean(row.has_spoilers || row.hasSpoilers),
+    hasSpoilers: Boolean(row.has_spoilers || row.hasSpoilers || row.is_spoiler),
     createdAt: row.created_at || row.createdAt || null,
     updatedAt: row.updated_at || row.updatedAt || row.created_at || row.createdAt || null,
     isFriend: username !== currentUsername && followingSet.has(username),
     isSelf: username === currentUsername
   };
+}
+
+async function resolveMovieIdentifiers(movie) {
+  if (!movie || typeof movie !== 'object') {
+    return { tmdbId: null, imdbId: null, title: '' };
+  }
+  if (USING_LOCAL_STORE || movie.imdbId) {
+    return movie;
+  }
+  try {
+    const rows = await supabaseFetch('movies', {
+      query: {
+        select: 'imdb_id,title',
+        tmdb_id: `eq.${movie.tmdbId}`,
+        limit: '1'
+      }
+    });
+    if (Array.isArray(rows) && rows.length) {
+      return {
+        tmdbId: movie.tmdbId,
+        imdbId: rows[0].imdb_id || movie.imdbId || null,
+        title: movie.title || rows[0].title || ''
+      };
+    }
+  } catch (error) {
+    // Ignore lookup failure and fall back to existing identifiers.
+  }
+  return movie;
+}
+
+async function ensureMovieRecord(movie) {
+  if (USING_LOCAL_STORE || !movie.imdbId) {
+    return;
+  }
+  const payload = {
+    imdb_id: movie.imdbId,
+    tmdb_id: movie.tmdbId || null,
+    title: movie.title || movie.imdbId
+  };
+  await supabaseFetch('movies', {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates' },
+    query: { on_conflict: 'imdb_id' },
+    body: [payload]
+  });
 }
 
 function normalizeMovieInput(movie) {
