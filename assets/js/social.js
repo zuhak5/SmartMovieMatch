@@ -834,7 +834,8 @@ async function toggleReviewLike(sectionState, review, button) {
   try {
     const response = await callSocial(currentlyLiked ? 'unlikeReview' : 'likeReview', {
       movie: payload,
-      reviewUsername: target
+      reviewUsername: target,
+      reviewId: review && review.id ? review.id : review && review.reviewId ? review.reviewId : undefined
     });
     if (response && response.likes) {
       updateLikeButtonState(button, response.likes);

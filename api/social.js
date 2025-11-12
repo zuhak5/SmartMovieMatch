@@ -221,6 +221,8 @@ async function handleLikeReview(req, payload) {
   const { user } = await authenticate(req, payload);
   const movie = normalizeMovieInput(payload.movie);
   const reviewUsername = canonicalUsername(payload.reviewUsername || '');
+  const reviewIdRaw = payload && typeof payload.reviewId === 'string' ? payload.reviewId.trim() : '';
+  const reviewId = reviewIdRaw || null;
   if (!movie || !movie.tmdbId || !movie.title) {
     throw new HttpError(400, 'Missing movie identifiers.');
   }
@@ -233,11 +235,21 @@ async function handleLikeReview(req, payload) {
 
   const resolvedMovie = await resolveMovieIdentifiers(movie);
   const timestamp = new Date().toISOString();
+  const targetReviewId = await ensureReviewId({
+    movie: resolvedMovie,
+    reviewUsername,
+    reviewId,
+    requireRemote: !usingLocalStore()
+  });
+  if (!targetReviewId) {
+    throw new HttpError(404, 'Unable to locate that review.');
+  }
 
   if (usingLocalStore()) {
     const likes = await likeReviewLocal({
       movie: resolvedMovie,
       reviewUsername,
+      reviewId: targetReviewId,
       likedBy: user.username,
       timestamp
     });
@@ -249,13 +261,11 @@ async function handleLikeReview(req, payload) {
     await ensureMovieRecord(resolvedMovie);
     await supabaseFetch('review_likes', {
       method: 'POST',
-      headers: { Prefer: 'resolution=merge-duplicates' },
+      headers: { Prefer: 'resolution=ignore-duplicates' },
       body: [
         {
-          movie_tmdb_id: resolvedMovie.tmdbId,
-          movie_imdb_id: resolvedMovie.imdbId,
-          review_username: reviewUsername,
-          liked_by: user.username,
+          review_id: targetReviewId,
+          username: user.username,
           created_at: timestamp
         }
       ]
@@ -268,6 +278,7 @@ async function handleLikeReview(req, payload) {
       const likes = await likeReviewLocal({
         movie: resolvedMovie,
         reviewUsername,
+        reviewId: targetReviewId,
         likedBy: user.username,
         timestamp
       });
@@ -285,7 +296,12 @@ async function handleLikeReview(req, payload) {
     });
   }
 
-  const likes = await fetchReviewLikeSummary(resolvedMovie, reviewUsername, user.username);
+  const likes = await fetchReviewLikeSummary({
+    reviewId: targetReviewId,
+    movie: resolvedMovie,
+    reviewUsername,
+    currentUsername: user.username
+  });
   return { body: { ok: true, likes } };
 }
 
@@ -293,6 +309,8 @@ async function handleUnlikeReview(req, payload) {
   const { user } = await authenticate(req, payload);
   const movie = normalizeMovieInput(payload.movie);
   const reviewUsername = canonicalUsername(payload.reviewUsername || '');
+  const reviewIdRaw = payload && typeof payload.reviewId === 'string' ? payload.reviewId.trim() : '';
+  const reviewId = reviewIdRaw || null;
   if (!movie || !movie.tmdbId || !movie.title) {
     throw new HttpError(400, 'Missing movie identifiers.');
   }
@@ -301,11 +319,21 @@ async function handleUnlikeReview(req, payload) {
   }
 
   const resolvedMovie = await resolveMovieIdentifiers(movie);
+  const targetReviewId = await ensureReviewId({
+    movie: resolvedMovie,
+    reviewUsername,
+    reviewId,
+    requireRemote: !usingLocalStore()
+  });
+  if (!targetReviewId) {
+    throw new HttpError(404, 'Unable to locate that review.');
+  }
 
   if (usingLocalStore()) {
     const likes = await unlikeReviewLocal({
       movie: resolvedMovie,
       reviewUsername,
+      reviewId: targetReviewId,
       likedBy: user.username
     });
     return { body: { ok: true, likes } };
@@ -315,9 +343,8 @@ async function handleUnlikeReview(req, payload) {
     await supabaseFetch('review_likes', {
       method: 'DELETE',
       query: {
-        movie_tmdb_id: `eq.${resolvedMovie.tmdbId}`,
-        review_username: `eq.${reviewUsername}`,
-        liked_by: `eq.${user.username}`
+        review_id: `eq.${targetReviewId}`,
+        username: `eq.${user.username}`
       }
     });
   } catch (error) {
@@ -325,11 +352,17 @@ async function handleUnlikeReview(req, payload) {
     const likes = await unlikeReviewLocal({
       movie: resolvedMovie,
       reviewUsername,
+      reviewId: targetReviewId,
       likedBy: user.username
     });
     return { body: { ok: true, likes } };
   }
-  const likes = await fetchReviewLikeSummary(resolvedMovie, reviewUsername, user.username);
+  const likes = await fetchReviewLikeSummary({
+    reviewId: targetReviewId,
+    movie: resolvedMovie,
+    reviewUsername,
+    currentUsername: user.username
+  });
   return { body: { ok: true, likes } };
 }
 
@@ -503,14 +536,15 @@ async function fetchMovieReviews(movie, followingSet, currentUsername) {
     store.reviewLikes
       .filter((entry) => entry.movieTmdbId === movie.tmdbId)
       .forEach((entry) => {
-        const key = `${entry.reviewUsername}`;
+        const key = entry.reviewId || buildLocalReviewId(entry.movieTmdbId, entry.reviewUsername);
         if (!likeMap.has(key)) {
           likeMap.set(key, []);
         }
         likeMap.get(key).push(entry);
       });
     reviews.forEach((review) => {
-      const likes = likeMap.get(review.username) || [];
+      const lookupKey = review.id || buildLocalReviewId(movie.tmdbId, review.username);
+      const likes = likeMap.get(lookupKey) || likeMap.get(review.username) || [];
       review.likes = summarizeLikes(likes, currentUsername);
     });
     const myReview = reviews.find((review) => review.username === currentUsername) || null;
@@ -524,7 +558,7 @@ async function fetchMovieReviews(movie, followingSet, currentUsername) {
   try {
     rows = await supabaseFetch('movie_reviews', {
       query: {
-        select: 'username,rating,body,is_spoiler,created_at,updated_at',
+        select: 'id,username,rating,body,is_spoiler,created_at,updated_at',
         movie_imdb_id: `eq.${movie.imdbId}`,
         order: 'updated_at.desc'
       }
@@ -537,26 +571,32 @@ async function fetchMovieReviews(movie, followingSet, currentUsername) {
     return { reviews: [], myReview: null };
   }
   const reviews = rows.map((row) => mapReviewRow(row, followingSet, currentUsername));
+  const reviewIds = reviews.map((review) => review.id).filter(Boolean);
   try {
-    const likeRows = await supabaseFetch('review_likes', {
-      query: {
-        select: 'review_username,liked_by',
-        movie_tmdb_id: `eq.${movie.tmdbId}`
-      }
-    });
-    if (Array.isArray(likeRows) && likeRows.length) {
-      const likeMap = new Map();
-      likeRows.forEach((row) => {
-        const key = `${row.review_username}`;
-        if (!likeMap.has(key)) {
-          likeMap.set(key, []);
+    if (reviewIds.length) {
+      const likeRows = await supabaseFetch('review_likes', {
+        query: {
+          select: 'review_id,username',
+          review_id: `in.(${reviewIds.join(',')})`
         }
-        likeMap.get(key).push(row);
       });
-      reviews.forEach((review) => {
-        const likes = likeMap.get(review.username) || [];
-        review.likes = summarizeLikes(likes, currentUsername);
-      });
+      if (Array.isArray(likeRows) && likeRows.length) {
+        const likeMap = new Map();
+        likeRows.forEach((row) => {
+          const key = row.review_id || row.reviewId;
+          if (!key) {
+            return;
+          }
+          if (!likeMap.has(key)) {
+            likeMap.set(key, []);
+          }
+          likeMap.get(key).push(row);
+        });
+        reviews.forEach((review) => {
+          const likes = likeMap.get(review.id) || [];
+          review.likes = summarizeLikes(likes, currentUsername);
+        });
+      }
     }
   } catch (error) {
     console.warn('Failed to load review likes for movie', error);
@@ -578,7 +618,11 @@ async function upsertReview({ username, movie, rating, body, hasSpoilers }) {
     const existingIndex = store.reviews.findIndex(
       (entry) => entry.movieTmdbId === movie.tmdbId && entry.username === username
     );
+    const fallbackId = buildLocalReviewId(movie.tmdbId, username);
+    const existing = existingIndex !== -1 ? store.reviews[existingIndex] : null;
+    const reviewId = existing && existing.id ? existing.id : fallbackId;
     const payload = {
+      id: reviewId,
       username,
       movieTmdbId: movie.tmdbId,
       movieImdbId: movie.imdbId || null,
@@ -590,7 +634,6 @@ async function upsertReview({ username, movie, rating, body, hasSpoilers }) {
       updatedAt: timestamp
     };
     if (existingIndex !== -1) {
-      const existing = store.reviews[existingIndex];
       store.reviews[existingIndex] = {
         ...existing,
         rating,
@@ -598,7 +641,8 @@ async function upsertReview({ username, movie, rating, body, hasSpoilers }) {
         hasSpoilers,
         updatedAt: timestamp,
         movieTitle: movie.title,
-        movieImdbId: movie.imdbId || null
+        movieImdbId: movie.imdbId || null,
+        id: reviewId
       };
     } else {
       store.reviews.push(payload);
@@ -654,7 +698,9 @@ async function userExists(username) {
 
 function mapReviewRow(row, followingSet, currentUsername) {
   const username = row.username || row.author_username || '';
+  const fallbackId = buildLocalReviewId(row.movieTmdbId || row.movie_tmdb_id, username);
   return {
+    id: row.id || row.reviewId || fallbackId || null,
     username,
     rating: typeof row.rating === 'number' ? Number(row.rating) : row.rating ? Number(row.rating) : null,
     body: row.body || null,
@@ -1055,18 +1101,27 @@ function summarizeLikes(entries, currentUsername) {
   }
   const count = entries.length;
   const hasLiked = entries.some((entry) => {
-    const username = entry.likedBy || entry.liked_by;
+    const username = entry.likedBy || entry.liked_by || entry.username;
     return username === currentUsername;
   });
   return { count, hasLiked };
 }
 
-async function likeReviewLocal({ movie, reviewUsername, likedBy, timestamp }) {
+function buildLocalReviewId(tmdbId, username) {
+  const normalizedUsername = canonicalUsername(username);
+  if (!tmdbId || !normalizedUsername) {
+    return null;
+  }
+  return `${tmdbId}:${normalizedUsername}`;
+}
+
+async function likeReviewLocal({ movie, reviewUsername, reviewId, likedBy, timestamp }) {
   const store = await readSocialStore();
+  const fallbackId = buildLocalReviewId(movie.tmdbId, reviewUsername);
+  const id = reviewId || fallbackId;
   const exists = store.reviewLikes.some(
     (entry) =>
-      entry.movieTmdbId === movie.tmdbId &&
-      entry.reviewUsername === reviewUsername &&
+      (entry.reviewId ? entry.reviewId === id : entry.movieTmdbId === movie.tmdbId && entry.reviewUsername === reviewUsername) &&
       entry.likedBy === likedBy
   );
   if (!exists) {
@@ -1074,6 +1129,7 @@ async function likeReviewLocal({ movie, reviewUsername, likedBy, timestamp }) {
       movieTmdbId: movie.tmdbId,
       movieImdbId: movie.imdbId || null,
       reviewUsername,
+      reviewId: id,
       likedBy,
       createdAt: timestamp
     });
@@ -1087,49 +1143,66 @@ async function likeReviewLocal({ movie, reviewUsername, likedBy, timestamp }) {
     });
     await writeSocialStore(store);
   }
-  const likes = store.reviewLikes.filter(
-    (entry) => entry.movieTmdbId === movie.tmdbId && entry.reviewUsername === reviewUsername
-  );
+  const likes = store.reviewLikes.filter((entry) => {
+    if (entry.reviewId && id) {
+      return entry.reviewId === id;
+    }
+    return entry.movieTmdbId === movie.tmdbId && entry.reviewUsername === reviewUsername;
+  });
   return summarizeLikes(likes, likedBy);
 }
 
-async function unlikeReviewLocal({ movie, reviewUsername, likedBy }) {
+async function unlikeReviewLocal({ movie, reviewUsername, reviewId, likedBy }) {
   const store = await readSocialStore();
+  const fallbackId = buildLocalReviewId(movie.tmdbId, reviewUsername);
+  const id = reviewId || fallbackId;
   const before = store.reviewLikes.length;
   store.reviewLikes = store.reviewLikes.filter(
     (entry) =>
       !(
-        entry.movieTmdbId === movie.tmdbId &&
-        entry.reviewUsername === reviewUsername &&
+        (entry.reviewId ? entry.reviewId === id : entry.movieTmdbId === movie.tmdbId && entry.reviewUsername === reviewUsername) &&
         entry.likedBy === likedBy
       )
   );
   if (store.reviewLikes.length !== before) {
     await writeSocialStore(store);
   }
-  const likes = store.reviewLikes.filter(
-    (entry) => entry.movieTmdbId === movie.tmdbId && entry.reviewUsername === reviewUsername
-  );
+  const likes = store.reviewLikes.filter((entry) => {
+    if (entry.reviewId && id) {
+      return entry.reviewId === id;
+    }
+    return entry.movieTmdbId === movie.tmdbId && entry.reviewUsername === reviewUsername;
+  });
   return summarizeLikes(likes, likedBy);
 }
 
-async function fetchReviewLikeSummary(movie, reviewUsername, currentUsername) {
-  if (!movie || !movie.tmdbId) {
+async function fetchReviewLikeSummary({ reviewId, movie, reviewUsername, currentUsername }) {
+  if (!reviewId && (!movie || !movie.tmdbId)) {
     return { count: 0, hasLiked: false };
   }
   if (usingLocalStore()) {
     const store = await readSocialStore();
-    const likes = store.reviewLikes.filter(
-      (entry) => entry.movieTmdbId === movie.tmdbId && entry.reviewUsername === reviewUsername
-    );
+    const fallbackId = buildLocalReviewId(movie ? movie.tmdbId : null, reviewUsername);
+    const id = reviewId || fallbackId;
+    const likes = store.reviewLikes.filter((entry) => {
+      if (entry.reviewId && id) {
+        return entry.reviewId === id;
+      }
+      if (!movie) {
+        return false;
+      }
+      return entry.movieTmdbId === movie.tmdbId && entry.reviewUsername === reviewUsername;
+    });
     return summarizeLikes(likes, currentUsername);
   }
   try {
+    if (!reviewId) {
+      return { count: 0, hasLiked: false };
+    }
     const rows = await supabaseFetch('review_likes', {
       query: {
-        select: 'liked_by',
-        movie_tmdb_id: `eq.${movie.tmdbId}`,
-        review_username: `eq.${reviewUsername}`
+        select: 'username',
+        review_id: `eq.${reviewId}`
       }
     });
     if (!Array.isArray(rows)) {
@@ -1140,6 +1213,49 @@ async function fetchReviewLikeSummary(movie, reviewUsername, currentUsername) {
     console.warn('Failed to load review likes', error);
     return { count: 0, hasLiked: false };
   }
+}
+
+async function ensureReviewId({ movie, reviewUsername, reviewId, requireRemote = false }) {
+  if (reviewId) {
+    return reviewId;
+  }
+  if (!reviewUsername) {
+    return null;
+  }
+  if (usingLocalStore()) {
+    const tmdbId = movie && movie.tmdbId ? movie.tmdbId : null;
+    const store = await readSocialStore();
+    const entry = store.reviews.find(
+      (row) => row.movieTmdbId === tmdbId && row.username === reviewUsername
+    );
+    if (entry && entry.id) {
+      return entry.id;
+    }
+    return buildLocalReviewId(tmdbId, reviewUsername);
+  }
+  if (!movie || !movie.imdbId) {
+    return null;
+  }
+  try {
+    const rows = await supabaseFetch('movie_reviews', {
+      query: {
+        select: 'id',
+        movie_imdb_id: `eq.${movie.imdbId}`,
+        username: `eq.${reviewUsername}`,
+        limit: '1'
+      }
+    });
+    if (Array.isArray(rows) && rows.length && rows[0].id) {
+      return rows[0].id;
+    }
+  } catch (error) {
+    if (requireRemote) {
+      enableLocalFallback('finding review id', error);
+      return ensureReviewId({ movie, reviewUsername, reviewId, requireRemote: false });
+    }
+    throw error;
+  }
+  return null;
 }
 
 async function listLocalNotifications(username, limit) {
