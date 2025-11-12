@@ -1308,6 +1308,125 @@ h6 {
   margin-top: 1rem;
 }
 
+.social-panel {
+  margin-top: 1rem;
+}
+
+.social-panel .panel-header {
+  align-items: flex-start;
+}
+
+.social-panel .panel-inner {
+  display: grid;
+  gap: 1.2rem;
+}
+
+.social-signed-out {
+  border: 1px dashed rgba(148, 163, 184, 0.4);
+  border-radius: var(--radius-lg);
+  padding: 1.3rem 1.5rem;
+  background: rgba(15, 23, 42, 0.72);
+  display: grid;
+  gap: 0.7rem;
+  max-width: 520px;
+}
+
+.social-signed-out h3 {
+  margin: 0;
+  font-size: 1.02rem;
+}
+
+.social-signed-out p {
+  margin: 0;
+  color: var(--text-subtle);
+  line-height: 1.55;
+}
+
+.social-content {
+  display: grid;
+  gap: 1rem;
+}
+
+.social-follow-form {
+  display: grid;
+  gap: 0.9rem;
+  background: rgba(8, 12, 26, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 18px;
+  padding: 1rem 1.1rem;
+}
+
+.social-follow-input-row {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.social-follow-input-row .input-base {
+  flex: 1;
+  min-width: 220px;
+}
+
+.social-follow-input-row .btn-secondary {
+  flex-shrink: 0;
+}
+
+.social-following-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.social-follow-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-md);
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.social-follow-name {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.social-follow-badge {
+  font-size: 0.72rem;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(96, 165, 250, 0.16);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  color: rgba(191, 219, 254, 0.95);
+}
+
+.social-unfollow-btn {
+  margin-left: auto;
+}
+
+@media (max-width: 540px) {
+  .social-follow-input-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .social-follow-input-row .btn-secondary {
+    width: 100%;
+  }
+
+  .social-follow-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.45rem;
+  }
+
+  .social-unfollow-btn {
+    width: 100%;
+  }
+}
+
 .profile-callout {
   overflow: hidden;
 }
@@ -3686,6 +3805,199 @@ form.settings-section {
 
     .movie-card.collapsed .movie-details {
       display: none;
+    }
+
+    .community-notes {
+      border-top: 1px solid rgba(148, 163, 184, 0.25);
+      padding-top: 0.95rem;
+      margin-top: 0.35rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.9rem;
+    }
+
+    .community-notes-header h3 {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .community-notes-helper {
+      margin: 0.2rem 0 0;
+      font-size: 0.8rem;
+      color: var(--text-subtle);
+    }
+
+    .community-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 16px;
+      padding: 0.85rem;
+    }
+
+    .community-form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .community-rating-input {
+      max-width: 7rem;
+    }
+
+    .community-textarea {
+      min-height: 72px;
+      resize: vertical;
+    }
+
+    .community-flags-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .community-flag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.85rem;
+      color: rgba(226, 232, 240, 0.9);
+    }
+
+    .community-submit-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .community-status {
+      font-size: 0.8rem;
+      color: var(--text-subtle);
+      min-height: 1em;
+    }
+
+    .community-status[data-variant="error"] {
+      color: var(--error);
+    }
+
+    .community-status[data-variant="success"] {
+      color: var(--success);
+    }
+
+    .community-status[data-variant="loading"] {
+      color: var(--accent-secondary);
+    }
+
+    .community-reviews {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .community-review-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .community-empty-state {
+      font-size: 0.85rem;
+      color: var(--text-subtle);
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px dashed rgba(148, 163, 184, 0.28);
+      border-radius: 14px;
+      padding: 0.8rem 1rem;
+    }
+
+    .community-loading {
+      font-size: 0.78rem;
+      color: var(--text-subtle);
+    }
+
+    .community-error {
+      font-size: 0.78rem;
+      color: var(--error);
+    }
+
+    .community-error:empty,
+    .community-loading:empty {
+      display: none;
+    }
+
+    .community-review-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+      padding: 0.85rem;
+      border-radius: 16px;
+      background: rgba(15, 23, 42, 0.78);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+    }
+
+    .community-review-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .community-review-author {
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .community-review-badge {
+      font-size: 0.7rem;
+      padding: 0.18rem 0.48rem;
+      border-radius: 999px;
+      background: rgba(96, 165, 250, 0.18);
+      border: 1px solid rgba(96, 165, 250, 0.35);
+      color: rgba(191, 219, 254, 0.95);
+    }
+
+    .community-review-rating {
+      margin-left: auto;
+      font-size: 0.8rem;
+      color: var(--text-subtle);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .community-review-timestamp {
+      font-size: 0.72rem;
+      color: rgba(148, 163, 184, 0.78);
+    }
+
+    .community-review-text {
+      margin: 0;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      color: var(--text-main);
+    }
+
+    .community-review-text.is-spoiler {
+      transition: filter var(--transition-fast), opacity var(--transition-fast);
+    }
+
+    .community-review-text.is-spoiler.is-hidden {
+      filter: blur(10px);
+      opacity: 0.35;
+    }
+
+    .community-spoiler-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+
+    .community-spoiler-notice {
+      font-size: 0.78rem;
+      color: var(--accent-secondary);
     }
 
     /* Collections */
