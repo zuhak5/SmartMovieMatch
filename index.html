@@ -17,6 +17,19 @@
     <div class="account-bar" role="navigation" data-account-state="guest">
       <span id="accountGreeting" class="account-greeting">You’re browsing as guest.</span>
       <a id="accountLoginLink" class="account-link" href="login.html">Log in / Sign up</a>
+      <button
+        id="notificationBell"
+        class="notification-bell"
+        type="button"
+        aria-haspopup="true"
+        aria-expanded="false"
+        aria-controls="notificationPanel"
+        hidden
+      >
+        <span class="notification-icon" aria-hidden="true">🔔</span>
+        <span id="notificationCount" class="notification-count" hidden>0</span>
+        <span class="sr-only">Open notifications</span>
+      </button>
       <div id="accountProfile" class="account-profile" hidden>
         <button
           id="accountProfileBtn"
@@ -58,6 +71,16 @@
             </button>
           </li>
         </ul>
+      </div>
+      <div id="notificationPanel" class="notification-panel" role="region" aria-label="Notifications" hidden>
+        <div class="notification-panel-header">
+          <span class="notification-panel-title">Notifications</span>
+          <button id="notificationMarkRead" class="btn-subtle notification-mark-read" type="button">
+            Mark all read
+          </button>
+        </div>
+        <div id="notificationList" class="notification-list" role="list"></div>
+        <div id="notificationEmpty" class="notification-empty">You’re all caught up!</div>
       </div>
     </div>
     <div class="app-title-row">
