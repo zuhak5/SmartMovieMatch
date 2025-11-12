@@ -164,6 +164,10 @@
                     <span aria-hidden="true">🎬</span>
                     Jump to watched history
                   </button>
+                  <button type="button" class="profile-callout-quick-link" data-profile-settings-action="profile">
+                    <span aria-hidden="true">⚙️</span>
+                    Manage account settings
+                  </button>
                   <a class="profile-callout-quick-link" href="index.html">
                     <span aria-hidden="true">🔎</span>
                     Back to discovery
@@ -720,6 +724,11 @@
                 <dd id="profileOverviewFavoritesValue">Sign in to sync</dd>
               </div>
             </dl>
+            <ul id="profileOverviewTimeline" class="account-insights-timeline" aria-live="polite">
+              <li class="account-insights-timeline-empty">
+                Sync activity will appear here once you start signing in.
+              </li>
+            </ul>
           </section>
           <div id="profileOverviewSignedOut" class="profile-signed-out">
             <h3>Sign in to unlock your overview</h3>
