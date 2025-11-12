@@ -140,6 +140,18 @@ export async function respondWatchPartyRemote({ partyId, response, note }) {
   return callSocial('respondWatchParty', { partyId, response, note });
 }
 
+export async function generateInviteQrRemote(link) {
+  const trimmed = typeof link === 'string' ? link.trim() : '';
+  if (!trimmed) {
+    throw new Error('Provide a profile link before creating a QR code.');
+  }
+  const response = await callSocial('generateInviteQr', { link: trimmed });
+  if (!response || typeof response.dataUrl !== 'string' || !response.dataUrl.startsWith('data:image/')) {
+    throw new Error('Unable to create a QR code right now.');
+  }
+  return response.dataUrl;
+}
+
 export function buildCommunitySection(movieContext) {
   const tmdbId = normalizeId(movieContext && movieContext.tmdbId);
   const title = typeof movieContext?.title === 'string' ? movieContext.title : '';
@@ -447,12 +459,14 @@ export async function recordLibraryActivity(action, movie) {
   }
 }
 
-export async function followUserByUsername(username) {
+export async function followUserByUsername(username, options = {}) {
   const normalized = canonicalUsername(username);
   if (!normalized) {
     throw new Error('Enter a username to follow.');
   }
-  await callSocial('followUser', { target: normalized });
+  const note = typeof options.note === 'string' ? options.note.trim() : '';
+  const payload = note ? { target: normalized, note } : { target: normalized };
+  await callSocial('followUser', payload);
   await loadFollowing(true);
   refreshAllSections();
 }
@@ -482,6 +496,8 @@ export async function searchSocialUsers(query) {
     tagline: entry.tagline || '',
     sharedInterests: Array.isArray(entry.sharedInterests) ? entry.sharedInterests.slice() : [],
     sharedFavorites: Array.isArray(entry.sharedFavorites) ? entry.sharedFavorites.slice() : [],
+    sharedWatchHistory: Array.isArray(entry.sharedWatchHistory) ? entry.sharedWatchHistory.slice() : [],
+    sharedWatchParties: Array.isArray(entry.sharedWatchParties) ? entry.sharedWatchParties.slice() : [],
     mutualFollowers: Array.isArray(entry.mutualFollowers) ? entry.mutualFollowers.slice() : [],
     followsYou: entry.followsYou === true,
     reason: typeof entry.reason === 'string' ? entry.reason : ''
@@ -2270,6 +2286,12 @@ function cloneSocialOverview(overview) {
             : [],
           sharedFavorites: Array.isArray(entry.sharedFavorites)
             ? entry.sharedFavorites.slice()
+            : [],
+          sharedWatchHistory: Array.isArray(entry.sharedWatchHistory)
+            ? entry.sharedWatchHistory.slice()
+            : [],
+          sharedWatchParties: Array.isArray(entry.sharedWatchParties)
+            ? entry.sharedWatchParties.slice()
             : [],
           mutualFollowers: Array.isArray(entry.mutualFollowers)
             ? entry.mutualFollowers.slice()

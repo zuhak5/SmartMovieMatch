@@ -35,7 +35,8 @@ import {
   scheduleWatchPartyRemote,
   respondWatchPartyRemote,
   subscribeToCollaborativeState,
-  getCollaborativeStateSnapshot
+  getCollaborativeStateSnapshot,
+  generateInviteQrRemote
 } from "./social.js";
 import {
   renderWatchedList,
@@ -51,6 +52,9 @@ import { $ } from "./dom.js";
 import { playUiClick, playExpandSound } from "./sound.js";
 
 const RECOMMENDATIONS_PAGE_SIZE = 20;
+const MAX_FOLLOW_NOTE_LENGTH = 180;
+
+let inviteQrRequest = 0;
 
 const state = {
   watchedMovies: [],
@@ -67,6 +71,8 @@ const state = {
   accountAvatarPreviewUrl: null,
   accountRemoveAvatar: false,
   socialSearchReset: null,
+  followNote: '',
+  inviteQr: { link: '', dataUrl: '', generating: false },
   watchedSyncTimer: null,
   favoritesSyncTimer: null,
   activeRecToken: null,
@@ -2458,6 +2464,14 @@ function wireFollowForm() {
   const searchEmpty = $("socialFollowSearchEmpty");
   const inviteCopyBtn = $("socialInviteCopyBtn");
   const inviteStatus = $("socialInviteStatus");
+  const noteInput = $("socialFollowNote");
+  const noteHint = $("socialFollowNoteHint");
+  const noteTemplateBtn = $("socialFollowNoteTemplate");
+  const inviteQrDownload = $("socialInviteQrDownload");
+  const importFile = $("socialInviteImportFile");
+  const importConsent = $("socialInviteImportConsent");
+  const importBtn = $("socialInviteImportBtn");
+  const importStatus = $("socialInviteImportStatus");
   if (!form || !input || !submitBtn || !statusEl) {
     return;
   }
@@ -2467,9 +2481,164 @@ function wireFollowForm() {
   let searchRequestId = 0;
   let lastQuery = "";
 
+  const updateNoteHint = () => {
+    if (!noteHint || !noteInput) {
+      return;
+    }
+    const length = noteInput.value.trim().length;
+    if (length) {
+      const remaining = Math.max(0, MAX_FOLLOW_NOTE_LENGTH - length);
+      noteHint.textContent = `${remaining} characters left for your note.`;
+    } else {
+      noteHint.textContent = "We’ll include this note in follow requests (optional).";
+    }
+  };
+
+  const applyNoteValue = (value) => {
+    if (noteInput) {
+      noteInput.value = setFollowNoteValue(value);
+      updateNoteHint();
+    } else {
+      setFollowNoteValue(value);
+    }
+  };
+
+  if (noteInput) {
+    noteInput.maxLength = MAX_FOLLOW_NOTE_LENGTH;
+    noteInput.addEventListener("input", () => {
+      applyNoteValue(noteInput.value);
+    });
+    applyNoteValue(noteInput.value || state.followNote || "");
+  } else {
+    setFollowNoteValue(state.followNote || "");
+  }
+
+  if (noteTemplateBtn) {
+    noteTemplateBtn.addEventListener("click", () => {
+      applyNoteValue(buildFollowNoteTemplate());
+      if (noteInput) {
+        noteInput.focus();
+      }
+    });
+  }
+
+  if (inviteQrDownload) {
+    inviteQrDownload.addEventListener("click", () => {
+      if (!state.inviteQr || !state.inviteQr.dataUrl) {
+        return;
+      }
+      playUiClick();
+      downloadInviteQr();
+    });
+  }
+
+  const updateImportControls = () => {
+    if (!importBtn) {
+      return;
+    }
+    const hasFile = Boolean(importFile && importFile.files && importFile.files.length);
+    const consentGiven = importConsent ? importConsent.checked : false;
+    importBtn.disabled = !(hasFile && consentGiven);
+  };
+
+  if (importConsent) {
+    importConsent.addEventListener("change", () => {
+      updateImportControls();
+    });
+  }
+
+  if (importFile) {
+    importFile.addEventListener("change", () => {
+      updateImportControls();
+      if (importStatus) {
+        importStatus.textContent = "";
+        importStatus.removeAttribute("data-variant");
+      }
+    });
+  }
+
+  if (importBtn) {
+    importBtn.disabled = true;
+    importBtn.addEventListener("click", async () => {
+      if (!state.session || !state.session.token) {
+        window.location.href = "login.html";
+        return;
+      }
+      if (!importConsent || !importConsent.checked) {
+        if (importStatus) {
+          importStatus.textContent = "Confirm you have permission to invite these contacts.";
+          importStatus.dataset.variant = "error";
+        }
+        return;
+      }
+      if (!importFile || !importFile.files || !importFile.files.length) {
+        if (importStatus) {
+          importStatus.textContent = "Choose a CSV file first.";
+          importStatus.dataset.variant = "error";
+        }
+        return;
+      }
+      playUiClick();
+      const file = importFile.files[0];
+      importBtn.disabled = true;
+      if (importStatus) {
+        importStatus.textContent = "Reading contacts…";
+        importStatus.dataset.variant = "loading";
+      }
+      let text = "";
+      try {
+        text = await file.text();
+      } catch (error) {
+        if (importStatus) {
+          importStatus.textContent = "Couldn't read that file.";
+          importStatus.dataset.variant = "error";
+        }
+        updateImportControls();
+        return;
+      }
+      const handles = extractHandlesFromCsv(text).slice(0, 25);
+      if (!handles.length) {
+        if (importStatus) {
+          importStatus.textContent = "No usernames found in that CSV.";
+          importStatus.dataset.variant = "error";
+        }
+        updateImportControls();
+        return;
+      }
+      let success = 0;
+      const failures = [];
+      if (importStatus) {
+        importStatus.textContent = `Sending ${handles.length} follow request${handles.length === 1 ? "" : "s"}…`;
+        importStatus.dataset.variant = "loading";
+      }
+      for (const handle of handles) {
+        try {
+          await followUserByUsername(handle, {
+            note: getFollowNoteValue() || buildFollowNoteTemplate()
+          });
+          success += 1;
+        } catch (error) {
+          failures.push(handle);
+        }
+      }
+      if (importStatus) {
+        if (success) {
+          const skipped = failures.length ? ` (${failures.length} skipped)` : "";
+          importStatus.textContent = `Invited ${success} friend${success === 1 ? "" : "s"}${skipped}.`;
+          importStatus.dataset.variant = failures.length ? "warning" : "success";
+        } else {
+          importStatus.textContent = "We couldn't send any invites from that file.";
+          importStatus.dataset.variant = "error";
+        }
+      }
+      updateImportControls();
+    });
+  }
+
   prefillFollowFromQuery();
   updateSocialInviteLink();
   resetSearchPanel();
+  updateImportControls();
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -2489,7 +2658,7 @@ function wireFollowForm() {
     setSocialStatus(`Following @${username.toLowerCase()}…`, "loading");
 
     try {
-      await followUserByUsername(username);
+      await followUserByUsername(username, { note: getFollowNoteValue() });
       setSocialStatus(`Now following @${username.toLowerCase()}.`, "success");
       input.value = "";
       clearSearchResults({ hidePanel: true });
@@ -2558,42 +2727,29 @@ function wireFollowForm() {
         return;
       }
       const inviteLinkEl = $("socialInviteLink");
-      if (!inviteLinkEl || !inviteLinkEl.value) {
-        updateSocialInviteLink();
-      }
-      const linkValue = inviteLinkEl ? inviteLinkEl.value.trim() : "";
-      if (!linkValue) {
-        setInviteStatus("Invite link not ready yet. Try again in a moment.", "error");
+      if (!inviteLinkEl || !inviteLinkEl.value.trim()) {
+        setInviteStatus("Generate your invite link first.", "error");
         return;
       }
+      const linkValue = inviteLinkEl.value.trim();
       try {
         if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
           await navigator.clipboard.writeText(linkValue);
-        } else if (inviteLinkEl) {
+        } else {
           inviteLinkEl.focus();
           inviteLinkEl.select();
           document.execCommand("copy");
           inviteLinkEl.setSelectionRange(inviteLinkEl.value.length, inviteLinkEl.value.length);
         }
-        setInviteStatus("Link copied! Share it with friends.", "success");
+        setInviteStatus("Link copied!", "success");
       } catch (error) {
-        setInviteStatus("Copy failed. Select the link and copy it manually.", "error");
+        setInviteStatus(
+          error instanceof Error ? error.message : "Couldn’t copy that link. Try manually instead.",
+          "error"
+        );
       }
     });
   }
-
-  state.socialSearchReset = (options = {}) => {
-    if (options.hidePanel) {
-      clearSearchResults({ hidePanel: true });
-      return;
-    }
-    if (options.showPrompt) {
-      resetSearchPanel();
-      return;
-    }
-    clearSearchResults();
-    resetSearchPanel();
-  };
 
   function runSearch(query) {
     if (!state.session || !state.session.token) {
@@ -2701,6 +2857,32 @@ function wireFollowForm() {
         infoButton.appendChild(favs);
       }
 
+      if (Array.isArray(result.sharedWatchHistory) && result.sharedWatchHistory.length) {
+        const watched = document.createElement("div");
+        watched.className = "social-follow-search-tags";
+        result.sharedWatchHistory.slice(0, 2).forEach((title) => {
+          const tag = document.createElement("span");
+          tag.className = "social-suggestion-tag";
+          tag.dataset.variant = "watched";
+          tag.textContent = title;
+          watched.appendChild(tag);
+        });
+        infoButton.appendChild(watched);
+      }
+
+      if (Array.isArray(result.sharedWatchParties) && result.sharedWatchParties.length) {
+        const parties = document.createElement("div");
+        parties.className = "social-follow-search-tags";
+        result.sharedWatchParties.slice(0, 2).forEach((summary) => {
+          const tag = document.createElement("span");
+          tag.className = "social-suggestion-tag";
+          tag.dataset.variant = "party";
+          tag.textContent = summary;
+          parties.appendChild(tag);
+        });
+        infoButton.appendChild(parties);
+      }
+
       item.appendChild(infoButton);
 
       const followBtn = document.createElement("button");
@@ -2716,7 +2898,7 @@ function wireFollowForm() {
         followBtn.disabled = true;
         setSocialStatus(`Following @${result.username.toLowerCase()}…`, "loading");
         try {
-          await followUserByUsername(result.username);
+          await followUserByUsername(result.username, { note: getFollowNoteValue() });
           setSocialStatus(`Now following @${result.username.toLowerCase()}.`, "success");
           runSearch(lastQuery);
         } catch (error) {
@@ -2862,7 +3044,6 @@ function wireFollowForm() {
     }, 4000);
   }
 }
-
 function wireCollaborativeForms() {
   const createForm = $("collabCreateForm");
   const listNameInput = $("collabListName");
@@ -3721,6 +3902,183 @@ function setSocialStatus(message, variant) {
   }
 }
 
+function getFollowNoteValue() {
+  return typeof state.followNote === "string" ? state.followNote.trim() : "";
+}
+
+function setFollowNoteValue(note) {
+  if (typeof note !== "string") {
+    state.followNote = "";
+    return state.followNote;
+  }
+  const trimmed = note.replace(/[\u0000-\u001F\u007F]/g, "").slice(0, MAX_FOLLOW_NOTE_LENGTH).trim();
+  state.followNote = trimmed;
+  return state.followNote;
+}
+
+function buildFollowNoteTemplate() {
+  const username = state.session && state.session.username ? state.session.username : "";
+  const displayName = username ? formatSocialDisplayName(username) : "a movie fan";
+  return `Hey! It's ${displayName} from Smart Movie Match—let's swap watchlists!`;
+}
+
+async function renderInviteQr(link) {
+  const qrImage = $("socialInviteQrImage");
+  const downloadBtn = $("socialInviteQrDownload");
+  const statusEl = $("socialInviteQrStatus");
+  if (!qrImage || !downloadBtn) {
+    return;
+  }
+
+  if (!link) {
+    state.inviteQr = { link: "", dataUrl: "", generating: false };
+    qrImage.hidden = true;
+    qrImage.removeAttribute("src");
+    downloadBtn.disabled = true;
+    delete downloadBtn.dataset.downloadUrl;
+    if (statusEl) {
+      statusEl.textContent = "";
+      statusEl.removeAttribute("data-variant");
+    }
+    return;
+  }
+
+  if (state.inviteQr.link === link && state.inviteQr.dataUrl && !state.inviteQr.generating) {
+    qrImage.src = state.inviteQr.dataUrl;
+    qrImage.hidden = false;
+    downloadBtn.disabled = false;
+    if (statusEl) {
+      statusEl.textContent = "Scan to swap movie lists.";
+      statusEl.dataset.variant = "success";
+    }
+    return;
+  }
+
+  const requestId = ++inviteQrRequest;
+  state.inviteQr = { link, dataUrl: "", generating: true };
+  downloadBtn.disabled = true;
+  if (statusEl) {
+    statusEl.textContent = "Generating QR code…";
+    statusEl.dataset.variant = "loading";
+  }
+
+  try {
+    const dataUrl = await generateInviteQrRemote(link);
+    if (requestId !== inviteQrRequest) {
+      return;
+    }
+    state.inviteQr = { link, dataUrl, generating: false };
+    qrImage.src = dataUrl;
+    qrImage.hidden = false;
+    downloadBtn.disabled = false;
+    downloadBtn.dataset.downloadUrl = dataUrl;
+    if (statusEl) {
+      statusEl.textContent = "Scan to swap movie lists.";
+      statusEl.dataset.variant = "success";
+    }
+  } catch (error) {
+    if (requestId !== inviteQrRequest) {
+      return;
+    }
+    state.inviteQr = { link: "", dataUrl: "", generating: false };
+    qrImage.hidden = true;
+    qrImage.removeAttribute("src");
+    downloadBtn.disabled = true;
+    delete downloadBtn.dataset.downloadUrl;
+    if (statusEl) {
+      statusEl.textContent =
+        error instanceof Error ? error.message : "Couldn't create a QR code right now.";
+      statusEl.dataset.variant = "error";
+    }
+  }
+}
+
+function downloadInviteQr() {
+  const dataUrl = $("socialInviteQrDownload")?.dataset.downloadUrl;
+  if (!dataUrl) {
+    return;
+  }
+  const filename = state.session && state.session.username
+    ? `smart-movie-match-${state.session.username}-invite.png`
+    : "smart-movie-match-invite.png";
+  const link = document.createElement("a");
+  link.href = dataUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function extractHandlesFromCsv(text) {
+  if (typeof text !== "string") {
+    return [];
+  }
+  const lines = text.split(/\r?\n/);
+  if (!lines.length) {
+    return [];
+  }
+  const handles = new Set();
+  let headerIndex = -1;
+  lines.forEach((line, index) => {
+    if (!line) {
+      return;
+    }
+    const cells = splitCsvLine(line);
+    if (!cells.length) {
+      return;
+    }
+    if (index === 0) {
+      const possibleHeaderIndex = cells.findIndex((cell) => /handle/i.test(cell));
+      if (possibleHeaderIndex !== -1) {
+        headerIndex = possibleHeaderIndex;
+        return;
+      }
+    }
+    if (headerIndex >= 0 && headerIndex < cells.length) {
+      const normalized = canonicalHandle(cells[headerIndex]);
+      if (normalized) {
+        handles.add(normalized);
+      }
+      return;
+    }
+    cells.forEach((cell) => {
+      const normalized = canonicalHandle(cell);
+      if (normalized) {
+        handles.add(normalized);
+      }
+    });
+  });
+  return Array.from(handles);
+}
+
+function splitCsvLine(line) {
+  const result = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+    if (char === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  if (current !== "" || line.endsWith(",")) {
+    result.push(current.trim());
+  }
+  return result;
+}
+
 function updateSocialInviteLink(session = state.session) {
   const inviteLinkEl = $("socialInviteLink");
   const inviteCopyBtn = $("socialInviteCopyBtn");
@@ -3738,6 +4096,7 @@ function updateSocialInviteLink(session = state.session) {
       inviteStatus.textContent = "";
       inviteStatus.removeAttribute("data-variant");
     }
+    renderInviteQr("");
     return;
   }
   const shareUrl = new URL(window.location.href);
@@ -3752,6 +4111,7 @@ function updateSocialInviteLink(session = state.session) {
     inviteStatus.textContent = "";
     inviteStatus.removeAttribute("data-variant");
   }
+  renderInviteQr(inviteLinkEl.value);
 }
 
 function updateSocialCount(id, value) {
@@ -3917,6 +4277,20 @@ function buildSuggestionCard(suggestion, onFollow) {
     tag.className = "social-suggestion-tag";
     tag.dataset.variant = "favorite";
     tag.textContent = favorite;
+    tags.appendChild(tag);
+  });
+  suggestion.sharedWatchHistory.slice(0, 2).forEach((title) => {
+    const tag = document.createElement("span");
+    tag.className = "social-suggestion-tag";
+    tag.dataset.variant = "watched";
+    tag.textContent = title;
+    tags.appendChild(tag);
+  });
+  suggestion.sharedWatchParties.slice(0, 2).forEach((summary) => {
+    const tag = document.createElement("span");
+    tag.className = "social-suggestion-tag";
+    tag.dataset.variant = "party";
+    tag.textContent = summary;
     tags.appendChild(tag);
   });
   if (tags.childElementCount) {
@@ -4279,7 +4653,7 @@ async function handleFollowFromList(username, button) {
   setSocialStatus(`Following @${normalized.toLowerCase()}…`, "loading");
 
   try {
-    await followUserByUsername(normalized);
+    await followUserByUsername(normalized, { note: getFollowNoteValue() });
     setSocialStatus(`Now following @${normalized.toLowerCase()}.`, "success");
   } catch (error) {
     setSocialStatus(
