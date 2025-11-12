@@ -3513,6 +3513,8 @@ function renderSocialConnections() {
   const presence = overview && overview.presence && typeof overview.presence === 'object' ? overview.presence : {};
   const badges = Array.isArray(overview.badges) ? overview.badges : state.socialOverview?.badges || [];
   const collabLists = collabState && collabState.lists ? collabState.lists : { owned: [], shared: [], invites: [] };
+  const watchParties =
+    collabState && collabState.watchParties ? collabState.watchParties : { upcoming: [], invites: [] };
   const collaborations = {
     owned: Array.isArray(collabLists.owned) ? collabLists.owned.length : 0,
     shared: Array.isArray(collabLists.shared) ? collabLists.shared.length : 0,
@@ -3521,7 +3523,65 @@ function renderSocialConnections() {
 
   const followingSet = new Set(following);
   const followersSet = new Set(followers);
-  const mutualSet = new Set(mutualFollowers);
+  const availableSuggestions = suggestions.filter((suggestion) => {
+    return suggestion && suggestion.username && !followingSet.has(suggestion.username);
+  });
+  const activeEntries = following
+    .map((username) => ({ username, presence: presence[username] }))
+    .filter((entry) => entry.presence && entry.presence.state);
+  const activeCount = activeEntries.length;
+  const invitesWaitingCount =
+    (Array.isArray(collabLists.invites) ? collabLists.invites.length : 0) +
+    (Array.isArray(watchParties.invites) ? watchParties.invites.length : 0);
+  const upcomingPartiesCount = Array.isArray(watchParties.upcoming) ? watchParties.upcoming.length : 0;
+
+  const leadActiveName = activeEntries.length ? formatSocialDisplayName(activeEntries[0].username) : "";
+  const activeOthersCount = Math.max(activeEntries.length - 1, 0);
+  const activeMessages = {
+    empty: "No friends online right now.",
+    singular: leadActiveName ? `${leadActiveName} is online now.` : "One friend is online now.",
+    plural:
+      leadActiveName && activeOthersCount > 0
+        ? `${leadActiveName} and ${formatCountLabel(activeOthersCount, "1 more friend", `${activeOthersCount.toLocaleString()} more friends`)} are online.`
+        : `${activeCount.toLocaleString()} friends are online now.`
+  };
+
+  const invitesEmptyMessage =
+    upcomingPartiesCount > 0
+      ? formatCountLabel(
+          upcomingPartiesCount,
+          "One watch party is on your calendar.",
+          `${upcomingPartiesCount.toLocaleString()} watch parties are on your calendar.`
+        )
+      : "You’re all caught up on invites.";
+  const invitesMessages = {
+    empty: invitesEmptyMessage,
+    singular: "One invite waiting for you.",
+    plural:
+      invitesWaitingCount > 1
+        ? `${invitesWaitingCount.toLocaleString()} invites waiting for you.`
+        : "Multiple invites waiting for you."
+  };
+
+  const topSuggestion = availableSuggestions[0];
+  const suggestionLeadName = topSuggestion
+    ? topSuggestion.displayName || formatSocialDisplayName(topSuggestion.username)
+    : "";
+  const suggestionOthersCount = Math.max(availableSuggestions.length - 1, 0);
+  const suggestionsMessages = {
+    empty: "Follow more friends to get fresh matches.",
+    singular: suggestionLeadName
+      ? `${suggestionLeadName} is a promising match.`
+      : "We found a promising match for you.",
+    plural:
+      suggestionLeadName && suggestionOthersCount > 0
+        ? `${suggestionLeadName} and ${formatCountLabel(
+            suggestionOthersCount,
+            "1 more member",
+            `${suggestionOthersCount.toLocaleString()} more members`
+          )} look like great matches.`
+        : `${availableSuggestions.length.toLocaleString()} promising matches waiting.`
+  };
 
   updateSocialCount("followersCount", Number.isFinite(counts.followers) ? counts.followers : followers.length);
   updateSocialCount(
@@ -3539,6 +3599,28 @@ function renderSocialConnections() {
   updateSocialCount(
     "socialFollowersHeadingCount",
     Number.isFinite(counts.followers) ? counts.followers : followers.length
+  );
+
+  updateSocialHighlight(
+    "socialHighlightActive",
+    "socialHighlightActiveCount",
+    "socialHighlightActiveNote",
+    activeCount,
+    activeMessages
+  );
+  updateSocialHighlight(
+    "socialHighlightInvites",
+    "socialHighlightInvitesCount",
+    "socialHighlightInvitesNote",
+    invitesWaitingCount,
+    invitesMessages
+  );
+  updateSocialHighlight(
+    "socialHighlightSuggestions",
+    "socialHighlightSuggestionsCount",
+    "socialHighlightSuggestionsNote",
+    availableSuggestions.length,
+    suggestionsMessages
   );
 
   const badgeListEl = $("socialBadgeList");
@@ -3570,9 +3652,6 @@ function renderSocialConnections() {
   const presenceListEl = $("socialPresenceList");
   if (presenceListEl) {
     presenceListEl.innerHTML = "";
-    const activeEntries = following
-      .map((username) => ({ username, presence: presence[username] }))
-      .filter((entry) => entry.presence && entry.presence.state);
     if (!activeEntries.length) {
       const empty = document.createElement("p");
       empty.className = "social-presence-empty";
@@ -3701,9 +3780,6 @@ function renderSocialConnections() {
   const suggestionsEmptyEl = $("socialSuggestionsEmpty");
   if (suggestionsListEl && suggestionsEmptyEl) {
     suggestionsListEl.innerHTML = "";
-    const availableSuggestions = suggestions.filter((suggestion) => {
-      return suggestion && suggestion.username && !followingSet.has(suggestion.username);
-    });
     if (!availableSuggestions.length) {
       suggestionsListEl.hidden = true;
       suggestionsEmptyEl.hidden = false;
@@ -4406,6 +4482,56 @@ function updateSocialInviteLink(session = state.session) {
     inviteStatus.removeAttribute("data-variant");
   }
   renderInviteQr(inviteLinkEl.value);
+}
+
+function updateSocialHighlight(cardId, countId, noteId, count, messages = {}) {
+  const card = $(cardId);
+  const countEl = $(countId);
+  const noteEl = $(noteId);
+  if (!card || !countEl || !noteEl) {
+    return;
+  }
+  const safeCount = Number.isFinite(count) ? Number(count) : 0;
+  countEl.textContent = safeCount.toLocaleString();
+  if (safeCount <= 0) {
+    card.dataset.state = "empty";
+    noteEl.textContent = formatHighlightMessage(messages.empty, safeCount);
+    return;
+  }
+  card.dataset.state = "active";
+  if (safeCount === 1) {
+    noteEl.textContent =
+      formatHighlightMessage(messages.singular, safeCount) ||
+      formatHighlightMessage(messages.plural, safeCount);
+    return;
+  }
+  noteEl.textContent =
+    formatHighlightMessage(messages.plural, safeCount) ||
+    formatHighlightMessage(messages.singular, safeCount);
+}
+
+function formatHighlightMessage(template, count) {
+  if (!template) {
+    return "";
+  }
+  if (typeof template === "function") {
+    try {
+      return template(count);
+    } catch (error) {
+      return "";
+    }
+  }
+  return String(template);
+}
+
+function formatCountLabel(count, singularLabel, pluralLabel, zeroLabel = "") {
+  if (count === 1) {
+    return singularLabel;
+  }
+  if (count > 1) {
+    return pluralLabel;
+  }
+  return zeroLabel;
 }
 
 function updateSocialCount(id, value) {

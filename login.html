@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="assets/css/app.css" />
   </head>
-  <body class="auth-body">
+  <body class="auth-body has-mobile-toolbar">
     <main class="auth-page">
       <section class="auth-card" aria-labelledby="authTitle">
         <div class="auth-card-header">
@@ -103,7 +103,7 @@
         </form>
         <div id="authStatus" class="auth-status" role="status" aria-live="polite"></div>
       </section>
-      <aside class="auth-aside">
+      <aside id="authAside" class="auth-aside">
         <div class="auth-aside-inner">
           <h2 class="auth-aside-title">Why create an account?</h2>
           <ul class="auth-aside-list">
@@ -115,6 +115,22 @@
         </div>
       </aside>
     </main>
+
+    <nav class="mobile-toolbar" aria-label="Smart Movie Match navigation">
+      <a class="mobile-toolbar-action" href="index.html">
+        <span class="mobile-toolbar-icon" aria-hidden="true">🏠</span>
+        <span class="mobile-toolbar-label">Discover</span>
+      </a>
+      <a class="mobile-toolbar-action" href="#authForm" aria-current="page">
+        <span class="mobile-toolbar-icon" aria-hidden="true">🔐</span>
+        <span class="mobile-toolbar-label">Sign in</span>
+      </a>
+      <a class="mobile-toolbar-action" href="#authAside">
+        <span class="mobile-toolbar-icon" aria-hidden="true">✨</span>
+        <span class="mobile-toolbar-label">Why join?</span>
+      </a>
+    </nav>
+
     <script type="module" src="assets/js/auth-page.js"></script>
   </body>
 </html>
