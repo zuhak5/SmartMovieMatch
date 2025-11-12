@@ -100,6 +100,7 @@ const state = {
   recommendationFilters: { topRated: false, streaming: false, fresh: false },
   collectionFilters: { genre: "", sort: "recent" },
   theme: null,
+  activePreset: null,
   highlightPreview: "live",
   onboardingSeen: false,
   onboardingStep: 0,
@@ -154,6 +155,7 @@ let socialProfileActiveUsername = null;
 let socialProfileRequestId = 0;
 let socialProfileReturnFocus = null;
 let socialProfileInitialized = false;
+let settingsScrollObserver = null;
 
 const GENRE_ICON_MAP = {
   "28": "💥", // Action
@@ -169,6 +171,9 @@ const GENRE_ICON_MAP = {
   "10749": "❤️", // Romance
   "10751": "👨‍👩‍👧", // Family
 };
+
+const GENRE_DONUT_COLORS = ["#f97316", "#a855f7", "#38bdf8", "#facc15"];
+const VIBE_PRESET_SELECTOR = '[data-vibe-preset]';
 
 const PRESENCE_STATUS_PRESET_MAP = new Map(PRESENCE_STATUS_PRESETS.map((preset) => [preset.key, preset]));
 
@@ -1033,6 +1038,7 @@ function init() {
     );
     if (isAccountSettingsContext()) {
       populateAccountSettings();
+      setupSettingsScrollSpy();
       if (window.location.hash === "#snapshots" && session && session.token) {
         window.requestAnimationFrame(() => {
           openAccountSettings("snapshots");
@@ -1087,6 +1093,8 @@ function init() {
       });
     }
   }
+
+  setupSettingsScrollSpy();
 }
 
 function wireEvents() {
@@ -1387,13 +1395,33 @@ function wireEvents() {
 
   const updatePreview = () => updatePreferencesPreview();
 
-  document
-    .querySelectorAll('input[name="genre"]')
-    .forEach((checkbox) =>
-      checkbox.addEventListener("change", () => {
-        updatePreview();
-      })
-    );
+  document.querySelectorAll('input[name="genre"]').forEach((checkbox) =>
+    checkbox.addEventListener("change", () => {
+      syncPresetSelectionFromGenres();
+      updatePreview();
+    })
+  );
+
+  document.querySelectorAll(VIBE_PRESET_SELECTOR).forEach((button) => {
+    button.addEventListener("click", () => {
+      playUiClick();
+      applyPresetFromButton(button);
+    });
+  });
+
+  document.querySelectorAll('[data-empty-scroll]').forEach((button) => {
+    button.addEventListener("click", () => {
+      const selector = button.getAttribute("data-empty-scroll");
+      playUiClick();
+      if (!selector) {
+        return;
+      }
+      const target = document.querySelector(selector);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  });
 
   const recNudgeBtn = $("recNudgeBtn");
   if (recNudgeBtn) {
@@ -1647,28 +1675,63 @@ function isAccountSettingsOpen() {
   return isAccountSettingsContext();
 }
 
-function setActiveSettingsSection(section, { updateHash = true } = {}) {
+function setActiveSettingsSection(section, { updateHash = true, fromScroll = false } = {}) {
   const normalized = section === "security" || section === "snapshots" ? section : "profile";
   state.activeSettingsSection = normalized;
-  document.querySelectorAll('[data-settings-section]').forEach((panel) => {
+  const panels = Array.from(document.querySelectorAll('[data-settings-section]'));
+  const navButtons = Array.from(document.querySelectorAll('[data-settings-target]'));
+  panels.forEach((panel) => {
     const target = panel.getAttribute('data-settings-section');
     const match = target === normalized;
-    panel.hidden = !match;
-    panel.setAttribute('aria-hidden', match ? "false" : "true");
+    panel.hidden = false;
+    panel.setAttribute('aria-hidden', 'false');
     panel.classList.toggle('is-active', match);
   });
-  document.querySelectorAll('[data-settings-target]').forEach((button) => {
+  navButtons.forEach((button) => {
     const target = button.getAttribute('data-settings-target');
     const match = target === normalized;
     button.classList.toggle('is-active', match);
-    button.setAttribute('aria-pressed', match ? "true" : "false");
+    button.setAttribute('aria-selected', match ? "true" : "false");
   });
-  if (updateHash) {
+  if (updateHash && !fromScroll) {
     const hash = normalized === "profile" ? "#profile" : normalized === "security" ? "#security" : "#snapshots";
     if (window.location.hash !== hash) {
       window.history.replaceState(null, "", hash);
     }
   }
+}
+
+function setupSettingsScrollSpy() {
+  if (!isAccountSettingsContext()) {
+    if (settingsScrollObserver) {
+      settingsScrollObserver.disconnect();
+      settingsScrollObserver = null;
+    }
+    return;
+  }
+  const sections = Array.from(document.querySelectorAll('[data-settings-section]'));
+  if (!sections.length) {
+    return;
+  }
+  if (settingsScrollObserver) {
+    settingsScrollObserver.disconnect();
+  }
+  settingsScrollObserver = new IntersectionObserver(
+    (entries) => {
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+      if (!visible.length) {
+        return;
+      }
+      const targetSection = visible[0].target.getAttribute('data-settings-section');
+      if (targetSection && targetSection !== state.activeSettingsSection) {
+        setActiveSettingsSection(targetSection, { updateHash: false, fromScroll: true });
+      }
+    },
+    { threshold: [0.35, 0.55], rootMargin: '-30% 0px -40% 0px' }
+  );
+  sections.forEach((section) => settingsScrollObserver.observe(section));
 }
 
 function openAccountSettings(section = "profile") {
@@ -1681,6 +1744,7 @@ function openAccountSettings(section = "profile") {
 
   if (page === "account-settings") {
     populateAccountSettings();
+    setupSettingsScrollSpy();
     window.setTimeout(() => {
       setActiveSettingsSection(section, { updateHash: true });
       if (section === "snapshots") {
@@ -1768,6 +1832,9 @@ function populateAccountSettings() {
       updateAvatarRemoveAvailability(false);
     }
   }
+
+  setSettingsSaveIndicator("All changes saved", "idle");
+  setupSettingsScrollSpy();
 }
 
 async function handleProfileSubmit(event) {
@@ -1815,6 +1882,7 @@ async function handleProfileSubmit(event) {
 
   statusEl.textContent = "Saving profile…";
   statusEl.dataset.variant = "loading";
+  setSettingsSaveIndicator("Saving profile…", "loading");
 
   try {
     await updateProfile({
@@ -1830,9 +1898,11 @@ async function handleProfileSubmit(event) {
       avatarInput.value = "";
     }
     populateAccountSettings();
+    setSettingsSaveIndicator("Profile updated.", "success");
   } catch (error) {
     statusEl.textContent = error.message || "Couldn’t update your profile.";
     statusEl.dataset.variant = "error";
+    setSettingsSaveIndicator("Profile update failed.", "error");
   }
 }
 
@@ -1872,6 +1942,7 @@ async function handleSecuritySubmit(event) {
 
   statusEl.textContent = "Updating password…";
   statusEl.dataset.variant = "loading";
+  setSettingsSaveIndicator("Updating password…", "loading");
 
   try {
     await changePassword({ currentPassword, newPassword });
@@ -1881,9 +1952,11 @@ async function handleSecuritySubmit(event) {
     newInput.value = "";
     confirmInput.value = "";
     updatePasswordChecklist(checklist, "", "");
+    setSettingsSaveIndicator("Password updated.", "success");
   } catch (error) {
     statusEl.textContent = error.message || "Couldn’t update your password.";
     statusEl.dataset.variant = "error";
+    setSettingsSaveIndicator("Password update failed.", "error");
   }
 }
 
@@ -2009,6 +2082,11 @@ function refreshProfileOverviewCallout(options = {}) {
   const tasteList = $("profileCalloutTasteList");
   const tasteSubtitle = $("profileCalloutTasteSubtitle");
   const syncBadge = $("profileCalloutSyncBadge");
+  const genreDonut = $("profileGenreDonut");
+  const genreLegend = $("profileGenreLegend");
+  const genreMeta = $("profileGenreMeta");
+  const activityTimeline = $("profileActivityTimeline");
+  const activityMeta = $("profileActivityMeta");
 
   const favoritesCount = Array.isArray(state.favorites) ? state.favorites.length : 0;
   const watchedCount = Array.isArray(state.watchedMovies) ? state.watchedMovies.length : 0;
@@ -2130,6 +2208,36 @@ function refreshProfileOverviewCallout(options = {}) {
     }
   }
 
+  const genreMap = new Map();
+  const addGenresFrom = (items) => {
+    if (!Array.isArray(items)) {
+      return;
+    }
+    items.forEach((entry) => {
+      if (!entry || !Array.isArray(entry.genres)) {
+        return;
+      }
+      entry.genres.forEach((genre) => {
+        if (!genre) {
+          return;
+        }
+        const normalized = genre.trim().toLowerCase();
+        if (!normalized) {
+          return;
+        }
+        if (!genreMap.has(normalized)) {
+          genreMap.set(normalized, { label: genre.trim(), count: 0 });
+        }
+        const data = genreMap.get(normalized);
+        data.count += 1;
+      });
+    });
+  };
+
+  addGenresFrom(state.favorites);
+  addGenresFrom(state.watchedMovies);
+  const topGenres = Array.from(genreMap.values()).sort((a, b) => b.count - a.count).slice(0, 3);
+
   const computeViewingStreak = () => {
     if (!Array.isArray(state.watchedMovies) || !state.watchedMovies.length) {
       return 0;
@@ -2170,36 +2278,6 @@ function refreshProfileOverviewCallout(options = {}) {
 
   if (tasteList) {
     tasteList.innerHTML = "";
-    const genreMap = new Map();
-    const addGenresFrom = (items) => {
-      if (!Array.isArray(items)) {
-        return;
-      }
-      items.forEach((entry) => {
-        if (!entry || !Array.isArray(entry.genres)) {
-          return;
-        }
-        entry.genres.forEach((genre) => {
-          if (!genre) {
-            return;
-          }
-          const normalized = genre.trim().toLowerCase();
-          if (!normalized) {
-            return;
-          }
-          if (!genreMap.has(normalized)) {
-            genreMap.set(normalized, { label: genre.trim(), count: 0 });
-          }
-          const data = genreMap.get(normalized);
-          data.count += 1;
-        });
-      });
-    };
-
-    addGenresFrom(state.favorites);
-    addGenresFrom(state.watchedMovies);
-
-    const topGenres = Array.from(genreMap.values()).sort((a, b) => b.count - a.count).slice(0, 3);
     const highlightItems = [];
 
     if (topGenres.length) {
@@ -2323,6 +2401,135 @@ function refreshProfileOverviewCallout(options = {}) {
     }
   } else if (genreEmpty) {
     genreEmpty.hidden = uniqueGenres.length > 0;
+  }
+
+  if (genreDonut && genreLegend) {
+    genreLegend.innerHTML = "";
+    if (!topGenres.length) {
+      genreDonut.dataset.state = "empty";
+      genreDonut.style.background = "";
+      if (genreMeta) {
+        genreMeta.textContent = "Pick a few genres to visualize.";
+      }
+      const placeholder = document.createElement("li");
+      placeholder.className = "profile-genre-legend-empty";
+      placeholder.textContent = "Waiting for favorites…";
+      genreLegend.appendChild(placeholder);
+    } else {
+      const totalGenreEntries = Array.from(genreMap.values()).reduce(
+        (sum, entry) => sum + entry.count,
+        0
+      );
+      const segments = [];
+      let start = 0;
+      topGenres.forEach((entry, index) => {
+        const ratio = totalGenreEntries ? entry.count / totalGenreEntries : 0;
+        const percent = Math.max(3, Math.round(ratio * 100));
+        const color = GENRE_DONUT_COLORS[index % GENRE_DONUT_COLORS.length];
+        const end = index === topGenres.length - 1 ? 100 : Math.min(100, start + percent);
+        segments.push(`${color} ${start}% ${end}%`);
+        const item = document.createElement("li");
+        item.className = "profile-genre-legend-item";
+        const dot = document.createElement("span");
+        dot.className = "profile-genre-legend-dot";
+        dot.style.setProperty("--legend-color", color);
+        dot.setAttribute("aria-hidden", "true");
+        const label = document.createElement("span");
+        label.className = "profile-genre-legend-label";
+        label.textContent = entry.label;
+        const value = document.createElement("span");
+        value.className = "profile-genre-legend-value";
+        value.textContent = `${Math.round(ratio * 100)}%`;
+        item.appendChild(dot);
+        item.appendChild(label);
+        item.appendChild(value);
+        genreLegend.appendChild(item);
+        start = end;
+      });
+      genreDonut.style.background = `conic-gradient(${segments.join(",")})`;
+      genreDonut.dataset.state = "ready";
+      if (genreMeta) {
+        genreMeta.textContent = "Top genres from your saved taste.";
+      }
+    }
+  }
+
+  if (activityTimeline) {
+    activityTimeline.innerHTML = "";
+    const activityBuckets = new Map();
+    const normalizeTimestamp = (value) => {
+      if (typeof value === "number" && Number.isFinite(value)) {
+        return value;
+      }
+      if (typeof value === "string" && value.trim()) {
+        const parsed = Date.parse(value);
+        if (!Number.isNaN(parsed)) {
+          return parsed;
+        }
+      }
+      return null;
+    };
+    const recordActivity = (raw, type) => {
+      const timestamp = normalizeTimestamp(raw);
+      if (timestamp === null) {
+        return;
+      }
+      const date = new Date(timestamp);
+      if (Number.isNaN(date.getTime())) {
+        return;
+      }
+      const key = date.toISOString().slice(0, 10);
+      const bucket = activityBuckets.get(key) || { count: 0, types: new Set() };
+      bucket.count += 1;
+      bucket.types.add(type);
+      activityBuckets.set(key, bucket);
+    };
+
+    state.watchedMovies.forEach((movie) => {
+      if (!movie) {
+        return;
+      }
+      recordActivity(movie.loggedAt || movie.syncedAt || movie.updatedAt || movie.timestamp, "watched");
+    });
+    state.favorites.forEach((favorite) => {
+      if (!favorite) {
+        return;
+      }
+      recordActivity(favorite.addedAt || favorite.syncedAt || favorite.updatedAt, "favorite");
+    });
+
+    const timelineData = [];
+    const today = new Date();
+    for (let offset = 6; offset >= 0; offset -= 1) {
+      const day = new Date(today);
+      day.setDate(today.getDate() - offset);
+      const key = day.toISOString().slice(0, 10);
+      const bucket = activityBuckets.get(key);
+      const count = bucket ? bucket.count : 0;
+      const chip = document.createElement("div");
+      chip.className = "profile-activity-chip";
+      chip.dataset.level = count ? String(Math.min(3, count)) : "0";
+      chip.setAttribute("role", "listitem");
+      const label = document.createElement("span");
+      label.className = "profile-activity-chip-label";
+      label.textContent = day.toLocaleDateString(undefined, { weekday: "short" });
+      const tooltipDate = day.toLocaleDateString(undefined, { month: "long", day: "numeric" });
+      chip.title = count
+        ? `${count} action${count === 1 ? "" : "s"} logged on ${tooltipDate}.`
+        : `No activity on ${tooltipDate}.`;
+      chip.appendChild(label);
+      activityTimeline.appendChild(chip);
+      timelineData.push({ label: tooltipDate, count });
+    }
+
+    if (activityMeta) {
+      const latestActive = [...timelineData].reverse().find((entry) => entry.count > 0);
+      activityMeta.textContent = latestActive
+        ? `Last activity: ${latestActive.count} logged ${latestActive.label}.`
+        : "No activity logged yet.";
+    }
+  } else if (activityMeta) {
+    activityMeta.textContent = "No activity logged yet.";
   }
 
   const renderSnapshotList = (
@@ -2530,6 +2737,70 @@ function refreshProfileOverviewCallout(options = {}) {
 }
 
 
+function clearActivePresetUi() {
+  document.querySelectorAll(VIBE_PRESET_SELECTOR).forEach((button) => {
+    button.classList.remove("is-active");
+    button.setAttribute("aria-pressed", "false");
+  });
+}
+
+function syncPresetSelectionFromGenres() {
+  if (!state.activePreset) {
+    return;
+  }
+  const selectedGenres = Array.from(
+    document.querySelectorAll('label.genre-pill input[name="genre"]:checked')
+  ).map((input) => input.value);
+  const presetGenres = Array.isArray(state.activePreset.genres)
+    ? state.activePreset.genres
+    : [];
+  const matches =
+    selectedGenres.length === presetGenres.length &&
+    presetGenres.every((genre) => selectedGenres.includes(genre));
+  if (!matches) {
+    state.activePreset = null;
+    clearActivePresetUi();
+  }
+}
+
+function applyPresetFromButton(button) {
+  if (!button) {
+    return;
+  }
+  const key = button.getAttribute("data-vibe-preset");
+  if (!key) {
+    return;
+  }
+  const currentKey = state.activePreset ? state.activePreset.key : null;
+  if (currentKey === key) {
+    state.activePreset = null;
+    clearActivePresetUi();
+    updatePreferencesPreview();
+    return;
+  }
+
+  const rawGenres = button.getAttribute("data-preset-genres") || "";
+  const genres = rawGenres
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const title = button.getAttribute("data-preset-title") || button.textContent.trim();
+  const summary = button.getAttribute("data-preset-summary") || "";
+  const icon = button.getAttribute("data-preset-icon") || "🎬";
+  state.activePreset = { key, genres, title, summary, icon };
+
+  document.querySelectorAll('input[name="genre"]').forEach((checkbox) => {
+    checkbox.checked = genres.includes(checkbox.value);
+  });
+
+  document.querySelectorAll(VIBE_PRESET_SELECTOR).forEach((presetBtn) => {
+    const match = presetBtn.getAttribute("data-vibe-preset") === key;
+    presetBtn.classList.toggle("is-active", match);
+    presetBtn.setAttribute("aria-pressed", match ? "true" : "false");
+  });
+  updatePreferencesPreview();
+}
+
 function updatePreferencesPreview() {
   const container = $("preferencesPreview");
   if (!container) {
@@ -2565,6 +2836,29 @@ function updatePreferencesPreview() {
   title.className = "preferences-preview-title";
   title.textContent = "Live summary";
   container.appendChild(title);
+
+  if (state.activePreset) {
+    const presetBanner = document.createElement("div");
+    presetBanner.className = "preferences-preview-preset";
+    const iconEl = document.createElement("span");
+    iconEl.className = "preferences-preview-preset-icon";
+    iconEl.textContent = state.activePreset.icon || "✨";
+    iconEl.setAttribute("aria-hidden", "true");
+    const textWrap = document.createElement("div");
+    textWrap.className = "preferences-preview-preset-body";
+    const heading = document.createElement("span");
+    heading.className = "preferences-preview-preset-title";
+    heading.textContent = state.activePreset.title || "Preset applied";
+    const summary = document.createElement("span");
+    summary.className = "preferences-preview-preset-summary";
+    summary.textContent =
+      state.activePreset.summary || "You can fine-tune the checkboxes below.";
+    textWrap.appendChild(heading);
+    textWrap.appendChild(summary);
+    presetBanner.appendChild(iconEl);
+    presetBanner.appendChild(textWrap);
+    container.appendChild(presetBanner);
+  }
 
   const listsWrap = document.createElement("div");
   listsWrap.className = "preferences-collection-lists";
@@ -2888,8 +3182,9 @@ async function getRecommendations(isShuffleOnly) {
 
     setRecError("");
     setRecStatus(
-      "Thinking through your taste and calling TMDB / OMDb / YouTube...",
-      true
+      "Calling TMDB for live discovery…",
+      true,
+      { step: 1, total: 4, label: "TMDB discovery" }
     );
     resetRecommendationsState();
     showSkeletons();
@@ -2944,6 +3239,12 @@ async function getRecommendations(isShuffleOnly) {
       return;
     }
 
+    setRecStatus(
+      "Scoring picks against your vibe…",
+      true,
+      { step: 2, total: 4, label: "Scoring taste" }
+    );
+
     const topCandidates = scoreAndSelectCandidates(
       candidates,
       {
@@ -2975,6 +3276,12 @@ async function getRecommendations(isShuffleOnly) {
       return;
     }
 
+    setRecStatus(
+      "Pulling OMDb details and IMDb ratings…",
+      true,
+      { step: 3, total: 4, label: "OMDb details" }
+    );
+
     const omdbResults = await fetchOmdbForCandidates(topCandidates, { signal });
 
     if (isStale() || signal.aborted) {
@@ -2997,6 +3304,12 @@ async function getRecommendations(isShuffleOnly) {
       updateRecommendationsView();
       return;
     }
+
+    setRecStatus(
+      "Fetching trailers and availability…",
+      true,
+      { step: 4, total: 4, label: "Trailers" }
+    );
 
     const withTrailers = await fetchTrailersForMovies(nonNullOmdb, { signal });
 
@@ -3330,7 +3643,8 @@ function handleToggleFavorite(payload) {
       (tmdbMovie && tmdbMovie.overview) ||
       (omdbMovie && omdbMovie.Plot && omdbMovie.Plot !== "N/A" ? omdbMovie.Plot : ""),
     genres,
-    rating
+    rating,
+    addedAt: Date.now()
   });
 
   const tmdbIdValue = tmdbMovie && (tmdbMovie.id || tmdbMovie.tmdb_id)
@@ -3595,6 +3909,15 @@ function setSyncStatus(message, variant = "muted") {
       el.dataset.variant = variant;
     }
   });
+}
+
+function setSettingsSaveIndicator(message, variant = "idle") {
+  const indicator = $("settingsSaveIndicator");
+  if (!indicator) {
+    return;
+  }
+  indicator.textContent = message;
+  indicator.dataset.variant = variant;
 }
 
 function updateSettingsSyncCards(session) {
@@ -7023,6 +7346,11 @@ function applyPreferencesSnapshot(snapshot) {
     return;
   }
 
+  if (state.activePreset) {
+    state.activePreset = null;
+    clearActivePresetUi();
+  }
+
   if (Array.isArray(snapshot.selectedGenres)) {
     const selected = new Set(snapshot.selectedGenres.map(String));
     document.querySelectorAll('input[name="genre"]').forEach((checkbox) => {
@@ -7097,6 +7425,19 @@ function applyFavoritesList(favorites) {
     return;
   }
 
+  const normalizeTimestamp = (value) => {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Date.parse(value);
+      if (!Number.isNaN(parsed)) {
+        return parsed;
+      }
+    }
+    return null;
+  };
+
   const normalized = favorites
     .map((entry) => {
       if (!entry || typeof entry !== "object") {
@@ -7122,7 +7463,17 @@ function applyFavoritesList(favorites) {
             ? entry.rating
             : typeof entry.rating === "string" && entry.rating.trim() !== ""
             ? Number(entry.rating)
-            : null
+            : null,
+        addedAt:
+          normalizeTimestamp(
+            entry.addedAt ||
+              entry.added_at ||
+              entry.syncedAt ||
+              entry.synced_at ||
+              entry.updatedAt ||
+              entry.updated_at ||
+              null
+          )
       };
     })
     .filter(Boolean);

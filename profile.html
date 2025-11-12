@@ -111,6 +111,30 @@
                     <span id="profileCalloutSyncMeta" class="profile-callout-meta">Sign in to start syncing automatically.</span>
                   </div>
                 </div>
+                <div class="profile-insight-grid">
+                  <article class="profile-insight-card">
+                    <header class="profile-insight-card-header">
+                      <span class="profile-callout-label">Genre mix</span>
+                      <span id="profileGenreMeta" class="profile-callout-meta">Pick a few genres to visualize.</span>
+                    </header>
+                    <div class="profile-genre-visual">
+                      <div
+                        class="profile-genre-donut"
+                        id="profileGenreDonut"
+                        role="img"
+                        aria-label="Genre distribution overview"
+                      ></div>
+                      <ul class="profile-genre-legend" id="profileGenreLegend"></ul>
+                    </div>
+                  </article>
+                  <article class="profile-insight-card">
+                    <header class="profile-insight-card-header">
+                      <span class="profile-callout-label">Recent activity</span>
+                      <span id="profileActivityMeta" class="profile-callout-meta">No activity logged yet.</span>
+                    </header>
+                    <div class="profile-activity-timeline" id="profileActivityTimeline" role="list"></div>
+                  </article>
+                </div>
                 <div class="profile-callout-progress-card" role="group" aria-label="Favorite milestone progress">
                   <div
                     id="profileCalloutProgress"

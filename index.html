@@ -184,6 +184,84 @@
         </p>
 
         <form id="prefsForm">
+          <section class="vibe-preset-panel" aria-label="Starter vibe presets">
+            <div class="vibe-preset-header">
+              <div>
+                <p class="vibe-preset-eyebrow">Need inspiration?</p>
+                <h3 class="vibe-preset-title">Jump in with a preset</h3>
+                <p class="vibe-preset-subtitle">
+                  Tap a card to auto-select genres. You can still tweak the list afterward.
+                </p>
+              </div>
+            </div>
+            <div class="vibe-preset-grid" role="group">
+              <button
+                type="button"
+                class="vibe-preset-card"
+                data-vibe-preset="cozy-sci-fi"
+                data-preset-genres="878,12,53"
+                data-preset-title="Cozy sci-fi night"
+                data-preset-summary="Hopeful space adventures & low-key thrills"
+                data-preset-icon="🌌"
+                aria-pressed="false"
+              >
+                <span class="vibe-preset-icon" aria-hidden="true">🌌</span>
+                <span class="vibe-preset-copy">
+                  <span>Cozy sci-fi night</span>
+                  <span class="vibe-preset-meta">Hopeful space adventures &amp; low-key thrills</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                class="vibe-preset-card"
+                data-vibe-preset="feel-good"
+                data-preset-genres="10751,16,35"
+                data-preset-title="Feel-good family time"
+                data-preset-summary="Animated laughs &amp; family comfort picks"
+                data-preset-icon="🧸"
+                aria-pressed="false"
+              >
+                <span class="vibe-preset-icon" aria-hidden="true">🧸</span>
+                <span class="vibe-preset-copy">
+                  <span>Feel-good family time</span>
+                  <span class="vibe-preset-meta">Animated laughs &amp; cozy comfort picks</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                class="vibe-preset-card"
+                data-vibe-preset="midnight-mystery"
+                data-preset-genres="9648,53,80"
+                data-preset-title="Midnight mystery run"
+                data-preset-summary="Twisty thrillers with noir vibes"
+                data-preset-icon="🌙"
+                aria-pressed="false"
+              >
+                <span class="vibe-preset-icon" aria-hidden="true">🌙</span>
+                <span class="vibe-preset-copy">
+                  <span>Midnight mystery run</span>
+                  <span class="vibe-preset-meta">Twisty thrillers with noir vibes</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                class="vibe-preset-card"
+                data-vibe-preset="indie-hearts"
+                data-preset-genres="18,10749,35"
+                data-preset-title="Indie hearts club"
+                data-preset-summary="Character dramas &amp; offbeat romances"
+                data-preset-icon="💖"
+                aria-pressed="false"
+              >
+                <span class="vibe-preset-icon" aria-hidden="true">💖</span>
+                <span class="vibe-preset-copy">
+                  <span>Indie hearts club</span>
+                  <span class="vibe-preset-meta">Character dramas &amp; offbeat romances</span>
+                </span>
+              </button>
+            </div>
+          </section>
+
           <!-- Genres -->
           <div class="field-group">
             <div class="field-label-row">
@@ -282,12 +360,7 @@
           </div>
 
 
-          <div class="preferences-preview" id="preferencesPreview" aria-live="polite">
-            <div class="preferences-preview-title">Live summary</div>
-            <div class="preferences-preview-empty">
-              Choose genres or mark movies as favorites/watched and I’ll summarize them here in real time.
-            </div>
-          </div>
+          <div class="preferences-preview" id="preferencesPreview" aria-live="polite"></div>
 
           <div class="button-row">
             <button type="submit" class="btn-primary">
@@ -354,14 +427,38 @@
           </div>
           <div id="favoritesView" class="collection-view active" role="tabpanel" aria-labelledby="favoritesTab">
             <div id="favoritesList" class="favorites-list"></div>
-            <div id="favoritesEmpty" class="empty-state">
-              Save favorites from the discovery grid to keep them handy here.
+            <div id="favoritesEmpty" class="empty-state empty-state-card">
+              <div class="empty-state-illustration" aria-hidden="true">⭐</div>
+              <div class="empty-state-body">
+                <h3>Build a favorites lane</h3>
+                <p>Tap the star on any recommendation to stash it for later or share with friends.</p>
+                <div class="empty-state-carousel" aria-hidden="true">
+                  <span class="empty-state-chip">Indie rom-com</span>
+                  <span class="empty-state-chip">Cult classic</span>
+                  <span class="empty-state-chip">Feel-good sports</span>
+                </div>
+                <button type="button" class="btn-secondary" data-empty-scroll="#recommendationsPanel">
+                  Browse live recommendations
+                </button>
+              </div>
             </div>
           </div>
           <div id="watchedView" class="collection-view" role="tabpanel" aria-labelledby="watchedTab">
             <div id="watchedList" class="watched-panel-list"></div>
-            <div id="watchedEmpty" class="empty-state">
-              Mark recommendations as <strong>“I’ve watched this”</strong> to log them for future tuning.
+            <div id="watchedEmpty" class="empty-state empty-state-card">
+              <div class="empty-state-illustration" aria-hidden="true">🎟️</div>
+              <div class="empty-state-body">
+                <h3>Keep a watched streak</h3>
+                <p>Mark recommendations as <strong>“I’ve watched this”</strong> so I can bias future batches.</p>
+                <div class="empty-state-carousel" aria-hidden="true">
+                  <span class="empty-state-chip">Thriller Friday</span>
+                  <span class="empty-state-chip">Animated matinée</span>
+                  <span class="empty-state-chip">Classic noir</span>
+                </div>
+                <button type="button" class="btn-subtle" data-empty-scroll="#recommendationsPanel">
+                  See how it works
+                </button>
+              </div>
             </div>
             <div class="collection-actions">
               <button type="button" class="btn-subtle btn-subtle-danger" id="clearWatchedBtn">
@@ -427,10 +524,22 @@
             aria-live="polite"
             aria-atomic="true"
           >
-            <span class="status-dot" id="recStatusDot"></span>
-            <span id="recStatusText">
-              No calls made yet. Hit “Find movies for me” to start.
-            </span>
+            <div class="status-primary">
+              <span class="status-dot" id="recStatusDot"></span>
+              <span id="recStatusText">
+                No calls made yet. Hit “Find movies for me” to start.
+              </span>
+            </div>
+            <div
+              class="status-progress"
+              id="recStatusProgress"
+              role="progressbar"
+              aria-hidden="true"
+              hidden
+            >
+              <span class="status-progress-fill"></span>
+            </div>
+            <span class="status-progress-stage" id="recStatusStage" hidden></span>
           </div>
 
           <div id="recError" class="error-text" role="alert"></div>

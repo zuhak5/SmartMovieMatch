@@ -95,6 +95,7 @@ function initAuthPage() {
     document.querySelectorAll('[data-password-toggle]')
   );
   const socialButtons = Array.from(document.querySelectorAll(".auth-social-btn"));
+  const modeTabs = Array.from(document.querySelectorAll('[data-auth-mode]'));
 
   if (!form || !toggleBtn || !status || !submitBtn || !passwordInput) {
     return;
@@ -137,6 +138,27 @@ function initAuthPage() {
       avatarPlaceholder.style.display = "";
     }
   }
+
+  const applyMode = (nextMode) => {
+    const normalized = nextMode === "signup" ? "signup" : "login";
+    if (state.mode === normalized) {
+      return;
+    }
+    state.mode = normalized;
+    if (state.mode === "login") {
+      if (nameInput) {
+        nameInput.value = "";
+      }
+      if (avatarInput) {
+        avatarInput.value = "";
+      }
+      clearAvatarPreview();
+    }
+    updateModeUi({ nameGroup, avatarGroup, passwordChecklist, modeTabs });
+    applyPasswordStrength(passwordInput.value, passwordStrength);
+    applyPasswordChecklist(passwordInput.value, passwordChecklist);
+    status.innerHTML = "";
+  };
 
   if (avatarInput && avatarCircle) {
     avatarInput.addEventListener("change", () => {
@@ -239,25 +261,24 @@ function initAuthPage() {
     });
   }
 
-  updateModeUi({ nameGroup, avatarGroup, passwordChecklist });
+  updateModeUi({ nameGroup, avatarGroup, passwordChecklist, modeTabs });
   applyPasswordStrength(passwordInput.value, passwordStrength);
   applyPasswordChecklist(passwordInput.value, passwordChecklist);
 
   toggleBtn.addEventListener("click", () => {
-    state.mode = state.mode === "login" ? "signup" : "login";
-    if (state.mode === "login") {
-      if (nameInput) {
-        nameInput.value = "";
+    playUiClick();
+    const nextMode = state.mode === "login" ? "signup" : "login";
+    applyMode(nextMode);
+  });
+
+  modeTabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const tabMode = tab.getAttribute("data-auth-mode") === "signup" ? "signup" : "login";
+      if (tabMode !== state.mode) {
+        playUiClick();
+        applyMode(tabMode);
       }
-      if (avatarInput) {
-        avatarInput.value = "";
-      }
-      clearAvatarPreview();
-    }
-    updateModeUi({ nameGroup, avatarGroup, passwordChecklist });
-    applyPasswordStrength(passwordInput.value, passwordStrength);
-    applyPasswordChecklist(passwordInput.value, passwordChecklist);
-    status.innerHTML = "";
+    });
   });
 
   form.addEventListener("submit", async (event) => {
@@ -328,10 +349,11 @@ if (document.readyState === "loading") {
   initAuthPage();
 }
 
-function updateModeUi({ nameGroup, avatarGroup, passwordChecklist }) {
+function updateModeUi({ nameGroup, avatarGroup, passwordChecklist, modeTabs }) {
   const title = $("authTitle");
   const toggleBtn = $("authModeToggle");
   const form = $("authForm");
+  const subtitle = $("authSubtitle");
 
   if (!title || !toggleBtn || !form) {
     return;
@@ -341,6 +363,9 @@ function updateModeUi({ nameGroup, avatarGroup, passwordChecklist }) {
     title.textContent = "Create your account";
     toggleBtn.textContent = "Already have one? Log in";
     form.setAttribute("aria-describedby", "authStatus");
+    if (subtitle) {
+      subtitle.textContent = "Set a name and avatar so your profile feels personal.";
+    }
     if (nameGroup) {
       nameGroup.hidden = false;
       nameGroup.style.display = "flex";
@@ -357,6 +382,9 @@ function updateModeUi({ nameGroup, avatarGroup, passwordChecklist }) {
     title.textContent = "Welcome back";
     toggleBtn.textContent = "Need an account? Sign up";
     form.setAttribute("aria-describedby", "authStatus");
+    if (subtitle) {
+      subtitle.textContent = "Sign in to sync your taste profile and watched history across devices.";
+    }
     if (nameGroup) {
       nameGroup.hidden = true;
       nameGroup.style.display = "none";
@@ -369,6 +397,15 @@ function updateModeUi({ nameGroup, avatarGroup, passwordChecklist }) {
       passwordChecklist.hidden = true;
       passwordChecklist.setAttribute("aria-hidden", "true");
     }
+  }
+
+  if (Array.isArray(modeTabs) && modeTabs.length) {
+    modeTabs.forEach((tab) => {
+      const tabMode = tab.getAttribute("data-auth-mode") === "signup" ? "signup" : "login";
+      const active = tabMode === state.mode;
+      tab.classList.toggle("is-active", active);
+      tab.setAttribute("aria-selected", active ? "true" : "false");
+    });
   }
 }
 
