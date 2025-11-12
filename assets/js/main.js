@@ -36,7 +36,11 @@ import {
   respondWatchPartyRemote,
   subscribeToCollaborativeState,
   getCollaborativeStateSnapshot,
-  generateInviteQrRemote
+  generateInviteQrRemote,
+  PRESENCE_STATUS_PRESETS,
+  setPresenceStatusPreset,
+  getPresenceStatusPreset,
+  subscribeToPresenceStatusPreset
 } from "./social.js";
 import {
   renderWatchedList,
@@ -59,6 +63,7 @@ const MAX_FOLLOW_NOTE_LENGTH = 180;
 let inviteQrRequest = 0;
 
 const RECOMMENDATION_LAYOUT_STORAGE_KEY = "smm.recommendation-layout.v1";
+const PRESENCE_STATUS_STORAGE_KEY = "smm.presence-status.v1";
 
 const state = {
   watchedMovies: [],
@@ -66,6 +71,7 @@ const state = {
   followingUsers: [],
   socialOverview: getSocialOverviewSnapshot(),
   collaborativeState: getCollaborativeStateSnapshot(),
+  presenceStatusPreset: getPresenceStatusPreset(),
   lastRecSeed: Math.random(),
   activeCollectionView: "favorites",
   session: null,
@@ -129,6 +135,9 @@ let unsubscribeFollowing = null;
 let unsubscribeNotifications = null;
 let unsubscribeSocialOverview = null;
 let unsubscribeCollaborative = null;
+let unsubscribePresenceStatus = null;
+const presenceStatusButtons = new Map();
+let presenceStatusFeedbackTimer = null;
 
 const GENRE_ICON_MAP = {
   "28": "💥", // Action
@@ -144,6 +153,8 @@ const GENRE_ICON_MAP = {
   "10749": "❤️", // Romance
   "10751": "👨‍👩‍👧", // Family
 };
+
+const PRESENCE_STATUS_PRESET_MAP = new Map(PRESENCE_STATUS_PRESETS.map((preset) => [preset.key, preset]));
 
 const THEME_STORAGE_KEY = "smm.theme.v1";
 const ONBOARDING_STORAGE_KEY = "smm.onboarding.v1";
@@ -964,7 +975,10 @@ function init() {
   );
 
   subscribeToSession((session) => {
+    const previousSession = state.session;
     state.session = session;
+    const wasSignedIn = Boolean(previousSession && previousSession.token);
+    const isSignedIn = Boolean(session && session.token);
     hydrateFromSession(session);
     updateAccountUi(session);
     updateSnapshotPreviews(session);
@@ -976,6 +990,19 @@ function init() {
       }
     } else if (typeof state.socialSearchReset === "function") {
       state.socialSearchReset({ showPrompt: true });
+    }
+    if (!wasSignedIn && isSignedIn) {
+      const storedPreset = getStoredPresenceStatusPreset();
+      const currentPreset = normalizePresenceStatusKey(getPresenceStatusPreset());
+      if (storedPreset !== currentPreset) {
+        setPresenceStatusPreset(storedPreset, { silent: true })
+          .then((normalized) => {
+            persistPresenceStatusPreset(normalized);
+          })
+          .catch((error) => {
+            console.warn('Failed to sync presence status preset after sign-in', error);
+          });
+      }
     }
     if (!session || !session.token) {
       state.notifications = [];
@@ -3848,6 +3875,7 @@ function setupSocialFeatures() {
   });
   state.collaborativeState = getCollaborativeStateSnapshot();
   renderSocialConnections();
+  wirePresenceStatusControls();
   wireFollowForm();
   wireCollaborativeForms();
   if (unsubscribeNotifications) {
@@ -3856,6 +3884,258 @@ function setupSocialFeatures() {
   unsubscribeNotifications = subscribeToNotifications((payload) => {
     renderNotificationCenter(payload);
   });
+}
+
+function wirePresenceStatusControls() {
+  const container = $("socialStatusPresets");
+  const listEl = $("socialStatusPresetList");
+  if (!container || !listEl) {
+    return;
+  }
+
+  presenceStatusButtons.clear();
+  listEl.innerHTML = "";
+  PRESENCE_STATUS_PRESETS.forEach((preset) => {
+    const button = createPresenceStatusButton(preset);
+    presenceStatusButtons.set(preset.key, button);
+    listEl.appendChild(button);
+  });
+
+  if (unsubscribePresenceStatus) {
+    unsubscribePresenceStatus();
+  }
+  unsubscribePresenceStatus = subscribeToPresenceStatusPreset((presetKey) => {
+    applyPresenceStatusUi(presetKey, { silent: true });
+  });
+
+  const storedPreset = getStoredPresenceStatusPreset();
+  const currentPreset = normalizePresenceStatusKey(getPresenceStatusPreset());
+
+  if (state.session && state.session.token) {
+    if (storedPreset !== currentPreset) {
+      setPresenceStatusPreset(storedPreset, { silent: true })
+        .then((normalized) => {
+          persistPresenceStatusPreset(normalized);
+        })
+        .catch((error) => {
+          console.warn('Failed to sync presence status preset', error);
+        });
+    } else {
+      applyPresenceStatusUi(currentPreset, { silent: true });
+    }
+  } else {
+    applyPresenceStatusUi(storedPreset, { silent: true });
+    setPresenceStatusPreset(storedPreset, { sync: false, silent: true }).catch(() => {});
+  }
+
+  updatePresenceStatusAvailability(state.session);
+}
+
+function createPresenceStatusButton(preset) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'social-status-btn';
+  button.dataset.status = preset.key;
+  button.setAttribute('aria-pressed', 'false');
+  const icon = document.createElement('span');
+  icon.className = 'social-status-icon';
+  icon.textContent = preset.icon;
+  const text = document.createElement('span');
+  text.className = 'social-status-text';
+  const label = document.createElement('span');
+  label.className = 'social-status-label';
+  label.textContent = preset.label;
+  const description = document.createElement('span');
+  description.className = 'social-status-desc';
+  description.textContent = preset.description;
+  text.appendChild(label);
+  text.appendChild(description);
+  button.appendChild(icon);
+  button.appendChild(text);
+  button.addEventListener('click', () => handlePresenceStatusClick(preset.key));
+  return button;
+}
+
+function applyPresenceStatusUi(presetKey, options = {}) {
+  const normalized = normalizePresenceStatusKey(presetKey);
+  state.presenceStatusPreset = normalized;
+  setPresenceStatusButtonsActive(normalized);
+  if (!options.silent) {
+    const preset = PRESENCE_STATUS_PRESET_MAP.get(normalized) || PRESENCE_STATUS_PRESET_MAP.get('default');
+    if (preset) {
+      const message =
+        normalized === 'default'
+          ? 'Status cleared. You’ll appear just browsing.'
+          : `${preset.label} is live for friends.`;
+      setPresenceStatusFeedback(message, 'success');
+    }
+  }
+  return normalized;
+}
+
+function setPresenceStatusButtonsActive(activeKey) {
+  presenceStatusButtons.forEach((button, key) => {
+    const isActive = key === activeKey;
+    button.classList.toggle('is-active', isActive);
+    button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
+}
+
+async function handlePresenceStatusClick(presetKey) {
+  const normalized = normalizePresenceStatusKey(presetKey);
+  const preset = PRESENCE_STATUS_PRESET_MAP.get(normalized) || PRESENCE_STATUS_PRESET_MAP.get('default');
+  if (!state.session || !state.session.token) {
+    setPresenceStatusFeedback('Sign in to share a status with friends.', 'muted');
+    return;
+  }
+  if (normalized === state.presenceStatusPreset) {
+    if (preset && normalized !== 'default') {
+      setPresenceStatusFeedback(`${preset.label} is already active.`, 'muted');
+    }
+    return;
+  }
+  setPresenceStatusFeedback('Updating status…', 'loading');
+  try {
+    const applied = await setPresenceStatusPreset(normalized);
+    persistPresenceStatusPreset(applied);
+    const successMessage =
+      applied === 'default'
+        ? 'Status cleared. You’ll appear just browsing.'
+        : `${preset?.label || 'Status'} is live for friends.`;
+    setPresenceStatusFeedback(successMessage, 'success');
+  } catch (error) {
+    const message = error && error.message ? String(error.message) : 'Unable to update your status right now.';
+    setPresenceStatusFeedback(message, 'error');
+  }
+}
+
+function setPresenceStatusFeedback(message, variant) {
+  if (presenceStatusFeedbackTimer) {
+    window.clearTimeout(presenceStatusFeedbackTimer);
+    presenceStatusFeedbackTimer = null;
+  }
+  const feedbackEl = $("socialStatusFeedback");
+  if (!feedbackEl) {
+    return;
+  }
+  if (!message) {
+    feedbackEl.textContent = '';
+    feedbackEl.hidden = true;
+    feedbackEl.removeAttribute('data-variant');
+    return;
+  }
+  feedbackEl.textContent = message;
+  feedbackEl.hidden = false;
+  if (variant) {
+    feedbackEl.dataset.variant = variant;
+  } else {
+    feedbackEl.removeAttribute('data-variant');
+  }
+  const persistentVariants = new Set(['loading', 'muted']);
+  if (!persistentVariants.has(variant)) {
+    presenceStatusFeedbackTimer = window.setTimeout(() => {
+      feedbackEl.textContent = '';
+      feedbackEl.hidden = true;
+      feedbackEl.removeAttribute('data-variant');
+      presenceStatusFeedbackTimer = null;
+    }, 5000);
+  }
+}
+
+function normalizePresenceStatusKey(value) {
+  if (typeof value !== 'string') {
+    return 'default';
+  }
+  const trimmed = value.trim().toLowerCase();
+  return PRESENCE_STATUS_PRESET_MAP.has(trimmed) ? trimmed : 'default';
+}
+
+function getStoredPresenceStatusPreset() {
+  try {
+    const stored = window.localStorage.getItem(PRESENCE_STATUS_STORAGE_KEY);
+    return normalizePresenceStatusKey(stored || 'default');
+  } catch (error) {
+    console.warn('Unable to read presence status preference', error);
+    return 'default';
+  }
+}
+
+function persistPresenceStatusPreset(value) {
+  const normalized = normalizePresenceStatusKey(value);
+  try {
+    if (normalized === 'default') {
+      window.localStorage.removeItem(PRESENCE_STATUS_STORAGE_KEY);
+    } else {
+      window.localStorage.setItem(PRESENCE_STATUS_STORAGE_KEY, normalized);
+    }
+  } catch (error) {
+    console.warn('Unable to store presence status preference', error);
+  }
+  return normalized;
+}
+
+function updatePresenceStatusAvailability(session) {
+  const hasSession = Boolean(session && session.token);
+  presenceStatusButtons.forEach((button) => {
+    button.disabled = !hasSession;
+    if (hasSession) {
+      button.setAttribute('aria-disabled', 'false');
+    } else {
+      button.setAttribute('aria-disabled', 'true');
+    }
+  });
+  const container = $("socialStatusPresets");
+  if (container) {
+    container.dataset.state = hasSession ? 'ready' : 'signin';
+  }
+  if (hasSession) {
+    setPresenceStatusFeedback('', null);
+  } else {
+    setPresenceStatusFeedback('Sign in to share a status with friends.', 'muted');
+  }
+}
+
+function getPresenceEntryStatusKey(entry) {
+  if (!entry || !entry.presence) {
+    return 'default';
+  }
+  const raw = typeof entry.presence.statusPreset === 'string' ? entry.presence.statusPreset : 'default';
+  return normalizePresenceStatusKey(raw);
+}
+
+function buildPresenceHighlightSentence(entry) {
+  if (!entry || !entry.presence) {
+    return 'is online now.';
+  }
+  if (entry.presence.state === 'watching' && entry.presence.movieTitle) {
+    return `is watching ${entry.presence.movieTitle}.`;
+  }
+  if (entry.presence.state === 'away') {
+    return 'stepped away for a moment.';
+  }
+  const preset = PRESENCE_STATUS_PRESET_MAP.get(getPresenceEntryStatusKey(entry));
+  if (preset && preset.key !== 'default') {
+    return preset.highlight || `${preset.label} right now.`;
+  }
+  return 'is online now.';
+}
+
+function formatPresenceListStatus(entry) {
+  if (!entry || !entry.presence) {
+    return 'Online';
+  }
+  if (entry.presence.state === 'watching' && entry.presence.movieTitle) {
+    return `Watching ${entry.presence.movieTitle}`;
+  }
+  if (entry.presence.state === 'away') {
+    return 'Away';
+  }
+  const preset = PRESENCE_STATUS_PRESET_MAP.get(getPresenceEntryStatusKey(entry));
+  if (preset && preset.key !== 'default') {
+    const label = preset.shortLabel || preset.label;
+    return preset.icon ? `${preset.icon} ${label}` : label;
+  }
+  return 'Online';
 }
 
 function wireFollowForm() {
@@ -4648,12 +4928,23 @@ function renderSocialConnections() {
 
   const leadActiveName = activeEntries.length ? formatSocialDisplayName(activeEntries[0].username) : "";
   const activeOthersCount = Math.max(activeEntries.length - 1, 0);
+  const leadHighlightSentence = activeEntries.length ? buildPresenceHighlightSentence(activeEntries[0]) : '';
+  const effectiveHighlightSentence = leadHighlightSentence || 'is online now.';
+  const effectiveHighlightClause = effectiveHighlightSentence.replace(/\.\s*$/, '');
   const activeMessages = {
     empty: "No friends online right now.",
-    singular: leadActiveName ? `${leadActiveName} is online now.` : "One friend is online now.",
+    singular: leadActiveName
+      ? `${leadActiveName} ${effectiveHighlightSentence}`
+      : `One friend ${effectiveHighlightSentence}`,
     plural:
       leadActiveName && activeOthersCount > 0
-        ? `${leadActiveName} and ${formatCountLabel(activeOthersCount, "1 more friend", `${activeOthersCount.toLocaleString()} more friends`)} are online.`
+        ? `${leadActiveName} ${effectiveHighlightClause}, plus ${formatCountLabel(
+            activeOthersCount,
+            "1 more friend",
+            `${activeOthersCount.toLocaleString()} more friends`
+          )} online.`
+        : leadActiveName
+        ? `${leadActiveName} ${effectiveHighlightSentence}`
         : `${activeCount.toLocaleString()} friends are online now.`
   };
 
@@ -4777,14 +5068,10 @@ function renderSocialConnections() {
         name.textContent = formatSocialDisplayName(entry.username);
         const state = document.createElement("span");
         state.className = "social-presence-state";
-        state.dataset.state = entry.presence.state;
-        if (entry.presence.state === "watching" && entry.presence.movieTitle) {
-          state.textContent = `Watching ${entry.presence.movieTitle}`;
-        } else if (entry.presence.state === "away") {
-          state.textContent = "Away";
-        } else {
-          state.textContent = "Online";
-        }
+        const statusKey = getPresenceEntryStatusKey(entry);
+        state.dataset.state = entry.presence.state || "online";
+        state.dataset.statusPreset = statusKey;
+        state.textContent = formatPresenceListStatus(entry);
         row.appendChild(name);
         row.appendChild(state);
         presenceListEl.appendChild(row);
@@ -6219,6 +6506,7 @@ function updateSocialSectionVisibility(session) {
   if (submitBtn) {
     submitBtn.disabled = !hasSession;
   }
+  updatePresenceStatusAvailability(session);
   if (!hasSession) {
     setSocialStatus("", null);
   }

@@ -33,6 +33,7 @@ const MIN_SEARCH_LENGTH = 2;
 const STREAM_HEARTBEAT_MS = 20000;
 const PRESENCE_TTL_MS = 120000;
 const REVIEW_REACTIONS = ['👍', '❤️', '😂', '😮'];
+const PRESENCE_STATUS_PRESETS = new Set(['default', 'available', 'comedy', 'rewatch']);
 
 const streamClients = new Set();
 const presenceMap = new Map();
@@ -1287,7 +1288,10 @@ async function handleUpdatePresence(req, payload) {
       movieContext = movie;
     }
   }
-  recordPresence(user.username, { state, movie: movieContext, source: 'ping' });
+  const presetRaw = typeof payload.statusPreset === 'string' ? payload.statusPreset.trim().toLowerCase() : undefined;
+  const statusPreset =
+    presetRaw && PRESENCE_STATUS_PRESETS.has(presetRaw) ? presetRaw : presetRaw === 'default' ? 'default' : undefined;
+  recordPresence(user.username, { state, movie: movieContext, statusPreset, source: 'ping' });
   broadcastPresenceSnapshot();
   return { body: { ok: true } };
 }
@@ -3125,7 +3129,7 @@ function listWatchPartySummary(store, username) {
   return { upcoming, invites };
 }
 
-function recordPresence(username, { state, movie, source }) {
+function recordPresence(username, { state, movie, statusPreset, source }) {
   const canonical = canonicalUsername(username);
   if (!canonical) {
     return;
@@ -3138,7 +3142,13 @@ function recordPresence(username, { state, movie, source }) {
     source: source || existing.source || 'manual',
     movieTmdbId: movie && movie.tmdbId ? movie.tmdbId : existing.movieTmdbId || null,
     movieImdbId: movie && movie.imdbId ? movie.imdbId : existing.movieImdbId || null,
-    movieTitle: movie && movie.title ? movie.title : existing.movieTitle || null
+    movieTitle: movie && movie.title ? movie.title : existing.movieTitle || null,
+    statusPreset:
+      statusPreset !== undefined
+        ? PRESENCE_STATUS_PRESETS.has(statusPreset)
+          ? statusPreset
+          : 'default'
+        : existing.statusPreset || 'default'
   });
   schedulePresenceCleanup();
 }
@@ -3158,6 +3168,7 @@ function buildPresenceSnapshot() {
     snapshot[key] = {
       state: entry.state || 'online',
       updatedAt: entry.updatedAt,
+      statusPreset: entry.statusPreset || 'default',
       movieTitle: entry.movieTitle || null,
       movieTmdbId: entry.movieTmdbId || null,
       movieImdbId: entry.movieImdbId || null
