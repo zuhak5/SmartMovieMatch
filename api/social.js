@@ -2,6 +2,7 @@ const fs = require('fs/promises');
 const path = require('path');
 const https = require('https');
 const { randomUUID } = require('crypto');
+const { setInterval: nodeSetInterval, clearInterval: nodeClearInterval } = require('timers');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -23,15 +24,42 @@ function enableLocalFallback(reason, error) {
 }
 
 const MAX_REVIEW_LENGTH = 600;
+const MAX_LONG_REVIEW_LENGTH = 2400;
 const MAX_SUGGESTION_RESULTS = 8;
 const SEARCH_RESULT_LIMIT = 6;
 const MIN_SEARCH_LENGTH = 2;
+const STREAM_HEARTBEAT_MS = 20000;
+const PRESENCE_TTL_MS = 120000;
+const REVIEW_REACTIONS = ['👍', '❤️', '😂', '😮'];
+
+const streamClients = new Set();
+const presenceMap = new Map();
+
+let presenceCleanupTimer = null;
 
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
 
+  if (req.method === 'GET') {
+    try {
+      await handleStreamRequest(req, res);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        if (!res.headersSent) {
+          res.status(error.status).json({ error: error.message });
+        }
+      } else {
+        console.error('Stream request failed', error);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Unable to open live updates stream.' });
+        }
+      }
+    }
+    return;
+  }
+
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
+    res.setHeader('Allow', 'GET, POST');
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
@@ -83,6 +111,45 @@ module.exports = async (req, res) => {
       case 'searchUsers':
         result = await handleSearchUsers(req, payload);
         break;
+      case 'postReviewReply':
+        result = await handlePostReviewReply(req, payload);
+        break;
+      case 'listReviewThread':
+        result = await handleListReviewThread(req, payload);
+        break;
+      case 'reactToReview':
+        result = await handleReactToReview(req, payload);
+        break;
+      case 'removeReviewReaction':
+        result = await handleRemoveReviewReaction(req, payload);
+        break;
+      case 'listCollaborativeState':
+        result = await handleListCollaborativeState(req, payload);
+        break;
+      case 'createCollaborativeList':
+        result = await handleCreateCollaborativeList(req, payload);
+        break;
+      case 'inviteCollaborator':
+        result = await handleInviteCollaborator(req, payload);
+        break;
+      case 'respondCollaboratorInvite':
+        result = await handleRespondCollaboratorInvite(req, payload);
+        break;
+      case 'addCollaborativeItem':
+        result = await handleAddCollaborativeItem(req, payload);
+        break;
+      case 'removeCollaborativeItem':
+        result = await handleRemoveCollaborativeItem(req, payload);
+        break;
+      case 'scheduleWatchParty':
+        result = await handleScheduleWatchParty(req, payload);
+        break;
+      case 'respondWatchParty':
+        result = await handleRespondWatchParty(req, payload);
+        break;
+      case 'updatePresence':
+        result = await handleUpdatePresence(req, payload);
+        break;
       default:
         res.status(400).json({ error: 'Unsupported action' });
         return;
@@ -108,6 +175,104 @@ async function handleListFollowing(req, payload) {
       ...overview
     }
   };
+}
+
+async function handleStreamRequest(req, res) {
+  const parsed = new URL(req.url || '/api/social', 'http://localhost');
+  const channel = parsed.searchParams.get('channel') || 'notifications';
+  const token = parsed.searchParams.get('token') || '';
+  if (!token) {
+    throw new HttpError(401, 'Missing session token.');
+  }
+  const { user } = await authenticate({ headers: req.headers }, { token });
+  const username = canonicalUsername(user && user.username ? user.username : '');
+  if (!username) {
+    throw new HttpError(401, 'Session expired. Sign in again.');
+  }
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-store',
+    Connection: 'keep-alive'
+  });
+
+  const client = {
+    username,
+    channel,
+    res,
+    closed: false,
+    heartbeat: nodeSetInterval(() => {
+      try {
+        res.write(':\n\n');
+      } catch (error) {
+        cleanupStreamClient(client);
+      }
+    }, STREAM_HEARTBEAT_MS)
+  };
+
+  streamClients.add(client);
+
+  const snapshot = buildPresenceSnapshot();
+  res.write(`event: ready\ndata: ${JSON.stringify({ channel, presence: snapshot })}\n\n`);
+
+  recordPresence(username, { state: 'online', source: channel });
+  broadcastPresenceSnapshot();
+
+  req.on('close', () => {
+    cleanupStreamClient(client);
+    recordPresence(username, { state: 'away', source: 'stream' });
+    broadcastPresenceSnapshot();
+  });
+}
+
+function cleanupStreamClient(client) {
+  if (!client || client.closed) {
+    return;
+  }
+  client.closed = true;
+  if (client.heartbeat) {
+    nodeClearInterval(client.heartbeat);
+  }
+  try {
+    client.res.end();
+  } catch (error) {
+    // Ignore close errors.
+  }
+  streamClients.delete(client);
+}
+
+function pushStreamEvent(client, eventName, payload) {
+  if (!client || client.closed) {
+    return;
+  }
+  try {
+    client.res.write(`event: ${eventName}\ndata: ${JSON.stringify(payload)}\n\n`);
+  } catch (error) {
+    cleanupStreamClient(client);
+  }
+}
+
+function broadcastNotificationToStreams(entry) {
+  if (!entry || !entry.username) {
+    return;
+  }
+  const payload = {
+    notification: {
+      id: entry.id,
+      type: entry.type,
+      actor: entry.actor || null,
+      message: entry.message,
+      movieTitle: entry.movieTitle || null,
+      movieTmdbId: entry.movieTmdbId || null,
+      movieImdbId: entry.movieImdbId || null,
+      createdAt: entry.createdAt || new Date().toISOString()
+    }
+  };
+  streamClients.forEach((client) => {
+    if (client.username === entry.username) {
+      pushStreamEvent(client, 'notification', payload);
+    }
+  });
 }
 
 async function handleFollowUser(req, payload) {
@@ -195,8 +360,7 @@ async function handleUpsertReview(req, payload) {
     throw new HttpError(400, 'Enter a rating between 0 and 10.');
   }
 
-  const body = typeof reviewInput.body === 'string' ? reviewInput.body.trim() : '';
-  const hasSpoilers = Boolean(reviewInput.hasSpoilers);
+  const content = normalizeReviewContent(reviewInput);
   const resolvedMovie = await resolveMovieIdentifiers(movie);
   if (!usingLocalStore() && !resolvedMovie.imdbId) {
     throw new HttpError(400, 'Missing IMDb ID for this movie. Try another recommendation.');
@@ -205,13 +369,15 @@ async function handleUpsertReview(req, payload) {
     username: user.username,
     movie: resolvedMovie,
     rating,
-    body: body ? body.slice(0, MAX_REVIEW_LENGTH) : null,
-    hasSpoilers
+    body: content.capsule || null,
+    hasSpoilers: content.hasSpoilers,
+    fullText: content.fullText || null,
+    segments: content.segments
   });
   await broadcastReviewActivity({
     actor: user.username,
     movie: resolvedMovie,
-    body
+    body: content.capsule
   });
 
   const following = new Set(await listFollowing(user.username));
@@ -505,6 +671,602 @@ async function handleSearchUsers(req, payload) {
   };
 }
 
+async function handlePostReviewReply(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const movie = normalizeMovieInput(payload.movie);
+  if (!movie || !movie.tmdbId || !movie.title) {
+    throw new HttpError(400, 'Missing movie identifiers.');
+  }
+  const reviewUsername = canonicalUsername(payload.reviewUsername || '');
+  if (!reviewUsername) {
+    throw new HttpError(400, 'Missing review owner.');
+  }
+  const reviewIdRaw = typeof payload.reviewId === 'string' ? payload.reviewId.trim() : '';
+  const parentIdRaw = typeof payload.parentId === 'string' ? payload.parentId.trim() : '';
+  const bodyRaw = typeof payload.body === 'string' ? payload.body.trim() : '';
+  if (!bodyRaw) {
+    throw new HttpError(400, 'Enter a reply before posting.');
+  }
+  const resolvedMovie = await resolveMovieIdentifiers(movie);
+  const targetReviewId = await ensureReviewId({
+    movie: resolvedMovie,
+    reviewUsername,
+    reviewId: reviewIdRaw || null,
+    requireRemote: !usingLocalStore()
+  });
+  if (!targetReviewId) {
+    throw new HttpError(404, 'Unable to locate that review.');
+  }
+  const mentions = extractMentions(bodyRaw);
+  const comment = await addReviewComment({
+    reviewId: targetReviewId,
+    reviewUsername,
+    username: user.username,
+    movie: resolvedMovie,
+    body: bodyRaw,
+    parentId: parentIdRaw || null,
+    mentions
+  });
+  const threadEntries = await listReviewComments({
+    movie: resolvedMovie,
+    reviewId: targetReviewId,
+    reviewUsername
+  });
+  const commentMap = new Map();
+  threadEntries.forEach((entry) => {
+    commentMap.set(entry.id, entry);
+  });
+  const notifyTargets = new Set();
+  if (reviewUsername && reviewUsername !== user.username) {
+    notifyTargets.add(reviewUsername);
+  }
+  if (comment.parentCommentId) {
+    const parent = commentMap.get(comment.parentCommentId);
+    if (parent && parent.username && parent.username !== user.username) {
+      notifyTargets.add(parent.username);
+    }
+  }
+  mentions
+    .filter((mention) => mention && mention !== user.username)
+    .forEach((mention) => notifyTargets.add(mention));
+  await Promise.all(
+    Array.from(notifyTargets).map((target) =>
+      enqueueNotification({
+        username: target,
+        type: mentions.includes(target) ? 'mention' : 'review_reply',
+        actor: user.username,
+        movie: resolvedMovie
+      })
+    )
+  );
+  const comments = mapCommentEntries(threadEntries, user.username);
+  return {
+    body: {
+      ok: true,
+      comments,
+      mentions: Array.from(new Set(mentions))
+    }
+  };
+}
+
+async function handleListReviewThread(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const movie = normalizeMovieInput(payload.movie);
+  if (!movie || !movie.tmdbId || !movie.title) {
+    throw new HttpError(400, 'Missing movie identifiers.');
+  }
+  const reviewUsername = canonicalUsername(payload.reviewUsername || '');
+  if (!reviewUsername) {
+    throw new HttpError(400, 'Missing review owner.');
+  }
+  const reviewIdRaw = typeof payload.reviewId === 'string' ? payload.reviewId.trim() : '';
+  const resolvedMovie = await resolveMovieIdentifiers(movie);
+  const targetReviewId = await ensureReviewId({
+    movie: resolvedMovie,
+    reviewUsername,
+    reviewId: reviewIdRaw || null,
+    requireRemote: !usingLocalStore()
+  });
+  if (!targetReviewId) {
+    throw new HttpError(404, 'Unable to locate that review.');
+  }
+  const threadEntries = await listReviewComments({
+    movie: resolvedMovie,
+    reviewId: targetReviewId,
+    reviewUsername
+  });
+  return {
+    body: {
+      ok: true,
+      comments: mapCommentEntries(threadEntries, user.username)
+    }
+  };
+}
+
+async function handleReactToReview(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const movie = normalizeMovieInput(payload.movie);
+  if (!movie || !movie.tmdbId || !movie.title) {
+    throw new HttpError(400, 'Missing movie identifiers.');
+  }
+  const reviewUsername = canonicalUsername(payload.reviewUsername || '');
+  if (!reviewUsername) {
+    throw new HttpError(400, 'Missing review owner.');
+  }
+  const reviewIdRaw = typeof payload.reviewId === 'string' ? payload.reviewId.trim() : '';
+  const reaction = typeof payload.reaction === 'string' ? payload.reaction.trim() : '';
+  if (!REVIEW_REACTIONS.includes(reaction)) {
+    throw new HttpError(400, 'Unsupported reaction.');
+  }
+  const resolvedMovie = await resolveMovieIdentifiers(movie);
+  const targetReviewId = await ensureReviewId({
+    movie: resolvedMovie,
+    reviewUsername,
+    reviewId: reviewIdRaw || null,
+    requireRemote: !usingLocalStore()
+  });
+  if (!targetReviewId) {
+    throw new HttpError(404, 'Unable to locate that review.');
+  }
+  const timestamp = new Date().toISOString();
+  let entries;
+  if (usingLocalStore()) {
+    entries = await reactToReviewLocal({
+      movie: resolvedMovie,
+      reviewUsername,
+      reviewId: targetReviewId,
+      username: user.username,
+      emoji: reaction,
+      timestamp
+    });
+  } else {
+    enableLocalFallback('storing review reactions', new Error('Review reactions are local-only.'));
+    entries = await reactToReviewLocal({
+      movie: resolvedMovie,
+      reviewUsername,
+      reviewId: targetReviewId,
+      username: user.username,
+      emoji: reaction,
+      timestamp
+    });
+  }
+  if (reviewUsername !== user.username) {
+    await enqueueNotification({
+      username: reviewUsername,
+      type: 'review_reaction',
+      actor: user.username,
+      movie: resolvedMovie,
+      timestamp
+    });
+  }
+  const summary = summarizeReactions(entries, user.username);
+  return { body: { ok: true, reactions: summary } };
+}
+
+async function handleRemoveReviewReaction(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const movie = normalizeMovieInput(payload.movie);
+  if (!movie || !movie.tmdbId || !movie.title) {
+    throw new HttpError(400, 'Missing movie identifiers.');
+  }
+  const reviewUsername = canonicalUsername(payload.reviewUsername || '');
+  if (!reviewUsername) {
+    throw new HttpError(400, 'Missing review owner.');
+  }
+  const reviewIdRaw = typeof payload.reviewId === 'string' ? payload.reviewId.trim() : '';
+  const resolvedMovie = await resolveMovieIdentifiers(movie);
+  const targetReviewId = await ensureReviewId({
+    movie: resolvedMovie,
+    reviewUsername,
+    reviewId: reviewIdRaw || null,
+    requireRemote: !usingLocalStore()
+  });
+  if (!targetReviewId) {
+    throw new HttpError(404, 'Unable to locate that review.');
+  }
+  let entries;
+  if (usingLocalStore()) {
+    entries = await removeReactionLocal({
+      movie: resolvedMovie,
+      reviewUsername,
+      reviewId: targetReviewId,
+      username: user.username
+    });
+  } else {
+    enableLocalFallback('removing review reaction', new Error('Review reactions are local-only.'));
+    entries = await removeReactionLocal({
+      movie: resolvedMovie,
+      reviewUsername,
+      reviewId: targetReviewId,
+      username: user.username
+    });
+  }
+  const summary = summarizeReactions(entries, user.username);
+  return { body: { ok: true, reactions: summary } };
+}
+
+async function handleListCollaborativeState(req, payload) {
+  const { user } = await authenticate(req, payload);
+  if (!usingLocalStore()) {
+    return {
+      body: {
+        ok: true,
+        lists: { owned: [], shared: [], invites: [] },
+        watchParties: { upcoming: [], invites: [] }
+      }
+    };
+  }
+  const store = await readSocialStore();
+  const lists = listCollaborativeSummary(store, user.username);
+  const watchParties = listWatchPartySummary(store, user.username);
+  return {
+    body: {
+      ok: true,
+      lists,
+      watchParties
+    }
+  };
+}
+
+async function handleCreateCollaborativeList(req, payload) {
+  const { user } = await authenticate(req, payload);
+  if (!usingLocalStore()) {
+    throw new HttpError(501, 'Collaborative lists are only available in local demo mode.');
+  }
+  const nameRaw = typeof payload.name === 'string' ? payload.name.trim() : '';
+  if (nameRaw.length < 3) {
+    throw new HttpError(400, 'Name your list with at least 3 characters.');
+  }
+  const description = typeof payload.description === 'string' ? payload.description.trim() : '';
+  const visibility = payload.visibility === 'private' ? 'private' : 'friends';
+  const timestamp = new Date().toISOString();
+  const store = await readSocialStore();
+  const list = {
+    id: randomUUID(),
+    owner: user.username,
+    name: nameRaw,
+    description,
+    visibility,
+    collaborators: [],
+    invites: [],
+    items: [],
+    createdAt: timestamp,
+    updatedAt: timestamp
+  };
+  store.collabLists.push(list);
+  await writeSocialStore(store);
+  return {
+    body: {
+      ok: true,
+      list: formatCollaborativeListForUser(list, user.username)
+    }
+  };
+}
+
+async function handleInviteCollaborator(req, payload) {
+  const { user } = await authenticate(req, payload);
+  if (!usingLocalStore()) {
+    throw new HttpError(501, 'Collaborative invites require local mode.');
+  }
+  const listId = typeof payload.listId === 'string' ? payload.listId.trim() : '';
+  const target = canonicalUsername(payload.username || '');
+  if (!listId || !target) {
+    throw new HttpError(400, 'Select a collaborator to invite.');
+  }
+  if (target === user.username) {
+    throw new HttpError(400, 'You are already part of this list.');
+  }
+  const store = await readSocialStore();
+  const list = store.collabLists.find((entry) => entry.id === listId);
+  if (!list) {
+    throw new HttpError(404, 'Could not find that collaborative list.');
+  }
+  if (list.owner !== user.username) {
+    throw new HttpError(403, 'Only the list owner can invite collaborators.');
+  }
+  const timestamp = new Date().toISOString();
+  list.invites = Array.isArray(list.invites) ? list.invites : [];
+  list.collaborators = Array.isArray(list.collaborators) ? list.collaborators : [];
+  const alreadyCollaborator = list.collaborators.some((entry) => canonicalUsername(entry.username) === target);
+  if (alreadyCollaborator) {
+    throw new HttpError(400, 'They already have edit access.');
+  }
+  const pending = list.invites.find((invite) => canonicalUsername(invite.username) === target && invite.status === 'pending');
+  if (pending) {
+    throw new HttpError(400, 'Invite already pending.');
+  }
+  list.invites.push({
+    username: target,
+    invitedBy: user.username,
+    status: 'pending',
+    invitedAt: timestamp
+  });
+  list.updatedAt = timestamp;
+  await writeSocialStore(store);
+  await enqueueNotification({
+    username: target,
+    type: 'collab_invite',
+    actor: user.username,
+    movie: { title: list.name }
+  });
+  return {
+    body: {
+      ok: true,
+      list: formatCollaborativeListForUser(list, user.username)
+    }
+  };
+}
+
+async function handleRespondCollaboratorInvite(req, payload) {
+  const { user } = await authenticate(req, payload);
+  if (!usingLocalStore()) {
+    throw new HttpError(501, 'Collaborative invites require local mode.');
+  }
+  const listId = typeof payload.listId === 'string' ? payload.listId.trim() : '';
+  const decision = (typeof payload.decision === 'string' ? payload.decision.trim().toLowerCase() : '').replace(/[^a-z]/g, '');
+  if (!listId) {
+    throw new HttpError(400, 'Missing collaborative list identifier.');
+  }
+  if (!['accept', 'decline'].includes(decision)) {
+    throw new HttpError(400, 'Choose to accept or decline the invite.');
+  }
+  const store = await readSocialStore();
+  const list = store.collabLists.find((entry) => entry.id === listId);
+  if (!list) {
+    throw new HttpError(404, 'Could not find that collaborative list.');
+  }
+  list.invites = Array.isArray(list.invites) ? list.invites : [];
+  const inviteIndex = list.invites.findIndex(
+    (invite) => canonicalUsername(invite.username) === user.username && invite.status === 'pending'
+  );
+  if (inviteIndex === -1) {
+    throw new HttpError(404, 'No pending invite found.');
+  }
+  const timestamp = new Date().toISOString();
+  const invite = list.invites[inviteIndex];
+  if (decision === 'accept') {
+    list.collaborators = Array.isArray(list.collaborators) ? list.collaborators : [];
+    list.collaborators.push({ username: user.username, joinedAt: timestamp });
+    list.invites.splice(inviteIndex, 1);
+    list.updatedAt = timestamp;
+    await writeSocialStore(store);
+    await enqueueNotification({
+      username: list.owner,
+      type: 'collab_accept',
+      actor: user.username,
+      movie: { title: list.name }
+    });
+  } else {
+    list.invites[inviteIndex] = {
+      ...invite,
+      status: 'declined',
+      respondedAt: timestamp
+    };
+    list.updatedAt = timestamp;
+    await writeSocialStore(store);
+  }
+  const state = listCollaborativeSummary(store, user.username);
+  return {
+    body: {
+      ok: true,
+      lists: state
+    }
+  };
+}
+
+async function handleAddCollaborativeItem(req, payload) {
+  const { user } = await authenticate(req, payload);
+  if (!usingLocalStore()) {
+    throw new HttpError(501, 'Collaborative list editing requires local mode.');
+  }
+  const listId = typeof payload.listId === 'string' ? payload.listId.trim() : '';
+  if (!listId) {
+    throw new HttpError(400, 'Select a collaborative list first.');
+  }
+  const movie = normalizeMovieInput(payload.movie);
+  if (!movie || !movie.tmdbId || !movie.title) {
+    throw new HttpError(400, 'Missing movie identifiers.');
+  }
+  const notes = typeof payload.notes === 'string' ? payload.notes.trim() : '';
+  const resolvedMovie = await resolveMovieIdentifiers(movie);
+  const store = await readSocialStore();
+  const list = store.collabLists.find((entry) => entry.id === listId);
+  if (!list) {
+    throw new HttpError(404, 'Could not find that collaborative list.');
+  }
+  const actor = canonicalUsername(user.username);
+  const hasAccess = list.owner === actor || (Array.isArray(list.collaborators) && list.collaborators.some((entry) => canonicalUsername(entry.username) === actor));
+  if (!hasAccess) {
+    throw new HttpError(403, 'You do not have permission to edit this list.');
+  }
+  list.items = Array.isArray(list.items) ? list.items : [];
+  const exists = list.items.some((item) => item.tmdbId === resolvedMovie.tmdbId);
+  if (exists) {
+    throw new HttpError(400, 'That movie is already on the list.');
+  }
+  const timestamp = new Date().toISOString();
+  list.items.push({
+    tmdbId: resolvedMovie.tmdbId,
+    imdbId: resolvedMovie.imdbId || null,
+    title: resolvedMovie.title,
+    notes,
+    addedBy: user.username,
+    addedAt: timestamp
+  });
+  list.updatedAt = timestamp;
+  await writeSocialStore(store);
+  return {
+    body: {
+      ok: true,
+      list: formatCollaborativeListForUser(list, user.username)
+    }
+  };
+}
+
+async function handleRemoveCollaborativeItem(req, payload) {
+  const { user } = await authenticate(req, payload);
+  if (!usingLocalStore()) {
+    throw new HttpError(501, 'Collaborative list editing requires local mode.');
+  }
+  const listId = typeof payload.listId === 'string' ? payload.listId.trim() : '';
+  const tmdbId = normalizeId(payload.tmdbId || payload.movieTmdbId || payload.movieId);
+  if (!listId || !tmdbId) {
+    throw new HttpError(400, 'Missing list or movie identifiers.');
+  }
+  const store = await readSocialStore();
+  const list = store.collabLists.find((entry) => entry.id === listId);
+  if (!list) {
+    throw new HttpError(404, 'Could not find that collaborative list.');
+  }
+  const actor = canonicalUsername(user.username);
+  const hasAccess = list.owner === actor || (Array.isArray(list.collaborators) && list.collaborators.some((entry) => canonicalUsername(entry.username) === actor));
+  if (!hasAccess) {
+    throw new HttpError(403, 'You do not have permission to edit this list.');
+  }
+  const before = Array.isArray(list.items) ? list.items.length : 0;
+  list.items = Array.isArray(list.items)
+    ? list.items.filter((item) => item.tmdbId !== tmdbId)
+    : [];
+  if (list.items.length === before) {
+    throw new HttpError(404, 'That movie is not on this list.');
+  }
+  list.updatedAt = new Date().toISOString();
+  await writeSocialStore(store);
+  return {
+    body: {
+      ok: true,
+      list: formatCollaborativeListForUser(list, user.username)
+    }
+  };
+}
+
+async function handleScheduleWatchParty(req, payload) {
+  const { user } = await authenticate(req, payload);
+  if (!usingLocalStore()) {
+    throw new HttpError(501, 'Watch parties are not yet available with remote storage.');
+  }
+  const movie = normalizeMovieInput(payload.movie);
+  if (!movie || !movie.tmdbId || !movie.title) {
+    throw new HttpError(400, 'Missing movie identifiers.');
+  }
+  const resolvedMovie = await resolveMovieIdentifiers(movie);
+  const whenRaw = typeof payload.scheduledFor === 'string' ? payload.scheduledFor.trim() : '';
+  if (!whenRaw) {
+    throw new HttpError(400, 'Choose a date for your watch party.');
+  }
+  const when = new Date(whenRaw);
+  if (Number.isNaN(when.getTime())) {
+    throw new HttpError(400, 'Enter a valid watch party date.');
+  }
+  const note = typeof payload.note === 'string' ? payload.note.trim() : '';
+  const invitees = Array.isArray(payload.invitees)
+    ? Array.from(new Set(payload.invitees.map((entry) => canonicalUsername(entry)).filter(Boolean)))
+    : [];
+  const timestamp = new Date().toISOString();
+  const store = await readSocialStore();
+  const party = {
+    id: randomUUID(),
+    host: user.username,
+    movieTmdbId: resolvedMovie.tmdbId,
+    movieImdbId: resolvedMovie.imdbId || null,
+    movieTitle: resolvedMovie.title,
+    scheduledFor: when.toISOString(),
+    note,
+    invitees: invitees.map((username) => ({ username, response: 'pending' })),
+    createdAt: timestamp
+  };
+  store.watchParties.push(party);
+  await writeSocialStore(store);
+  await Promise.all(
+    invitees.map((invitee) =>
+      enqueueNotification({
+        username: invitee,
+        type: 'watch_party',
+        actor: user.username,
+        movie: { title: resolvedMovie.title }
+      })
+    )
+  );
+  const watchParties = listWatchPartySummary(store, user.username);
+  return {
+    body: {
+      ok: true,
+      party: formatWatchPartyForUser(party, user.username),
+      watchParties
+    }
+  };
+}
+
+async function handleRespondWatchParty(req, payload) {
+  const { user } = await authenticate(req, payload);
+  if (!usingLocalStore()) {
+    throw new HttpError(501, 'Watch parties are not yet available with remote storage.');
+  }
+  const partyId = typeof payload.partyId === 'string' ? payload.partyId.trim() : '';
+  if (!partyId) {
+    throw new HttpError(400, 'Missing watch party identifier.');
+  }
+  const decision = (typeof payload.response === 'string' ? payload.response.trim().toLowerCase() : '').replace(/[^a-z]/g, '');
+  if (!['accept', 'decline', 'maybe'].includes(decision)) {
+    throw new HttpError(400, 'Select attending, maybe, or decline.');
+  }
+  const store = await readSocialStore();
+  const party = store.watchParties.find((entry) => entry.id === partyId);
+  if (!party) {
+    throw new HttpError(404, 'Watch party not found.');
+  }
+  if (party.host === user.username) {
+    party.note = typeof payload.note === 'string' ? payload.note.trim() : party.note || '';
+    if (payload.scheduledFor) {
+      const next = new Date(String(payload.scheduledFor));
+      if (!Number.isNaN(next.getTime())) {
+        party.scheduledFor = next.toISOString();
+      }
+    }
+  }
+  party.invitees = Array.isArray(party.invitees) ? party.invitees : [];
+  const invite = party.invitees.find((entry) => canonicalUsername(entry.username) === user.username);
+  if (!invite && party.host !== user.username) {
+    throw new HttpError(403, 'You are not invited to this watch party.');
+  }
+  if (invite) {
+    invite.response = decision;
+    invite.respondedAt = new Date().toISOString();
+  }
+  await writeSocialStore(store);
+  if (party.host !== user.username) {
+    await enqueueNotification({
+      username: party.host,
+      type: 'watch_party_update',
+      actor: user.username,
+      movie: { title: party.movieTitle }
+    });
+  }
+  return {
+    body: {
+      ok: true,
+      party: formatWatchPartyForUser(party, user.username)
+    }
+  };
+}
+
+async function handleUpdatePresence(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const stateRaw = typeof payload.state === 'string' ? payload.state.trim().toLowerCase() : 'online';
+  const allowedStates = new Set(['online', 'away', 'watching']);
+  const state = allowedStates.has(stateRaw) ? stateRaw : 'online';
+  let movieContext = null;
+  if (payload.movie) {
+    const movie = normalizeMovieInput(payload.movie);
+    if (movie && movie.tmdbId && movie.title) {
+      movieContext = movie;
+    }
+  }
+  recordPresence(user.username, { state, movie: movieContext, source: 'ping' });
+  broadcastPresenceSnapshot();
+  return { body: { ok: true } };
+}
+
 async function authenticate(req, payload) {
   const token = extractToken(req, payload);
   if (!token) {
@@ -620,6 +1382,18 @@ async function listFollowers(username) {
 async function buildSocialOverview(username) {
   const graph = await loadSocialGraph(username);
   const suggestions = await buildFollowSuggestions(graph);
+  let badges = [];
+  let collaborations = { owned: 0, shared: 0, invites: 0 };
+  if (usingLocalStore()) {
+    const store = await readSocialStore();
+    badges = computeRecognitionBadgesFromStore(store, username);
+    const summary = listCollaborativeSummary(store, username);
+    collaborations = {
+      owned: summary.owned.length,
+      shared: summary.shared.length,
+      invites: summary.invites.length
+    };
+  }
   return {
     following: graph.following,
     followers: graph.followers,
@@ -629,7 +1403,10 @@ async function buildSocialOverview(username) {
       followers: graph.followers.length,
       mutual: graph.mutualFollowers.length
     },
-    suggestions
+    suggestions,
+    presence: buildPresenceSnapshot(),
+    badges,
+    collaborations
   };
 }
 
@@ -1157,6 +1934,8 @@ async function fetchMovieReviews(movie, followingSet, currentUsername) {
       .sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
     const reviews = rows.map((row) => mapReviewRow(row, followingSet, currentUsername));
     const likeMap = new Map();
+    const reactionMap = new Map();
+    const commentMap = new Map();
     store.reviewLikes
       .filter((entry) => entry.movieTmdbId === movie.tmdbId)
       .forEach((entry) => {
@@ -1166,10 +1945,32 @@ async function fetchMovieReviews(movie, followingSet, currentUsername) {
         }
         likeMap.get(key).push(entry);
       });
+    store.reviewReactions
+      .filter((entry) => entry.movieTmdbId === movie.tmdbId)
+      .forEach((entry) => {
+        const key = entry.reviewId || buildLocalReviewId(entry.movieTmdbId, entry.reviewUsername);
+        if (!reactionMap.has(key)) {
+          reactionMap.set(key, []);
+        }
+        reactionMap.get(key).push(entry);
+      });
+    store.reviewComments
+      .filter((entry) => entry.movieTmdbId === movie.tmdbId)
+      .forEach((entry) => {
+        const key = entry.reviewId || buildLocalReviewId(entry.movieTmdbId, entry.reviewUsername);
+        if (!commentMap.has(key)) {
+          commentMap.set(key, []);
+        }
+        commentMap.get(key).push(entry);
+      });
     reviews.forEach((review) => {
       const lookupKey = review.id || buildLocalReviewId(movie.tmdbId, review.username);
       const likes = likeMap.get(lookupKey) || likeMap.get(review.username) || [];
       review.likes = summarizeLikes(likes, currentUsername);
+      const reactions = reactionMap.get(lookupKey) || reactionMap.get(review.username) || [];
+      review.reactions = summarizeReactions(reactions, currentUsername);
+      const comments = commentMap.get(lookupKey) || commentMap.get(review.username) || [];
+      review.comments = mapCommentEntries(comments, currentUsername);
     });
     const myReview = reviews.find((review) => review.username === currentUsername) || null;
     const stats = calculateReviewStats(reviews);
@@ -1235,7 +2036,7 @@ async function fetchMovieReviews(movie, followingSet, currentUsername) {
   return { reviews, myReview, stats };
 }
 
-async function upsertReview({ username, movie, rating, body, hasSpoilers }) {
+async function upsertReview({ username, movie, rating, body, hasSpoilers, fullText, segments }) {
   const timestamp = new Date().toISOString();
   if (usingLocalStore()) {
     const store = await readSocialStore();
@@ -1253,6 +2054,9 @@ async function upsertReview({ username, movie, rating, body, hasSpoilers }) {
       movieTitle: movie.title,
       rating,
       body: body || null,
+      capsule: body || null,
+      fullText: fullText || null,
+      segments: Array.isArray(segments) ? segments : existing?.segments || null,
       hasSpoilers,
       createdAt: timestamp,
       updatedAt: timestamp
@@ -1262,6 +2066,9 @@ async function upsertReview({ username, movie, rating, body, hasSpoilers }) {
         ...existing,
         rating,
         body: body || null,
+        capsule: body || null,
+        fullText: fullText || existing?.fullText || null,
+        segments: Array.isArray(segments) ? segments : existing?.segments || null,
         hasSpoilers,
         updatedAt: timestamp,
         movieTitle: movie.title,
@@ -1293,7 +2100,15 @@ async function upsertReview({ username, movie, rating, body, hasSpoilers }) {
     });
   } catch (error) {
     enableLocalFallback('saving a review', error);
-    return upsertReview({ username, movie, rating, body, hasSpoilers });
+    return upsertReview({
+      username,
+      movie,
+      rating,
+      body,
+      hasSpoilers,
+      fullText,
+      segments
+    });
   }
 }
 
@@ -1323,12 +2138,26 @@ async function userExists(username) {
 function mapReviewRow(row, followingSet, currentUsername) {
   const username = row.username || row.author_username || '';
   const fallbackId = buildLocalReviewId(row.movieTmdbId || row.movie_tmdb_id, username);
+  const segments = Array.isArray(row.segments)
+    ? row.segments
+        .map((segment) => ({
+          text: typeof segment.text === 'string' ? segment.text : '',
+          spoiler: Boolean(segment.spoiler)
+        }))
+        .filter((segment) => segment.text)
+    : parseReviewSegments(row.fullText || row.body || '');
+  const capsule = buildCapsuleFromSegments(segments, row.body || row.capsule || row.fullText || '');
+  const fullText = typeof row.fullText === 'string' && row.fullText ? row.fullText : row.body || '';
   return {
     id: row.id || row.reviewId || fallbackId || null,
     username,
     rating: typeof row.rating === 'number' ? Number(row.rating) : row.rating ? Number(row.rating) : null,
-    body: row.body || null,
-    hasSpoilers: Boolean(row.has_spoilers || row.hasSpoilers || row.is_spoiler),
+    body: capsule || null,
+    capsule: capsule || null,
+    fullText: fullText || null,
+    segments,
+    hasSpoilers:
+      Boolean(row.has_spoilers || row.hasSpoilers || row.is_spoiler) || segments.some((segment) => segment.spoiler),
     createdAt: row.created_at || row.createdAt || null,
     updatedAt: row.updated_at || row.updatedAt || row.created_at || row.createdAt || null,
     isFriend: username !== currentUsername && followingSet.has(username),
@@ -1642,11 +2471,13 @@ async function enqueueNotification({ store, username, type, actor, movie, timest
   if (usingLocalStore()) {
     if (store) {
       store.notifications.push(entry);
+      broadcastNotificationToStreams(entry);
       return entry;
     }
     const nextStore = await readSocialStore();
     nextStore.notifications.push(entry);
     await writeSocialStore(nextStore);
+    broadcastNotificationToStreams(entry);
     return entry;
   }
 
@@ -1664,6 +2495,7 @@ async function enqueueNotification({ store, username, type, actor, movie, timest
         }
       ]
     });
+    broadcastNotificationToStreams(entry);
   } catch (error) {
     enableLocalFallback('queuing a notification', error);
     return enqueueNotification({ store, username, type, actor, movie, timestamp });
@@ -1681,12 +2513,24 @@ function formatNotificationMessage(type, context = {}) {
       return `${actor} mentioned you in a review for ${title}.`;
     case 'review_like':
       return `${actor} liked your review for ${title}.`;
+    case 'review_reply':
+      return `${actor} replied to your community note on ${title}.`;
+    case 'review_reaction':
+      return `${actor} reacted to your review for ${title}.`;
     case 'friend_review':
       return `${actor} posted a new review for ${title}.`;
     case 'friend_watchlist':
       return `${actor} added ${title} to their watchlist.`;
     case 'friend_favorite':
       return `${actor} favorited ${title}.`;
+    case 'collab_invite':
+      return `${actor} invited you to co-curate “${title || 'their list'}”.`;
+    case 'collab_accept':
+      return `${actor} joined your collaborative list “${title || 'Untitled'}”.`;
+    case 'watch_party':
+      return `${actor} invited you to a watch party for ${title}.`;
+    case 'watch_party_update':
+      return `${actor} updated their watch party RSVP for ${title}.`;
     default:
       return `New activity from ${actor}.`;
   }
@@ -1737,12 +2581,490 @@ function summarizeLikes(entries, currentUsername) {
   return { count, hasLiked };
 }
 
+function summarizeReactions(entries, currentUsername) {
+  const totals = {};
+  let mine = null;
+  const ordered = Array.isArray(entries)
+    ? entries
+        .map((entry) => ({
+          emoji: entry.emoji || entry.reaction || entry.symbol || null,
+          username: entry.username || entry.reactedBy || entry.actor || null,
+          createdAt: entry.createdAt || entry.created_at || null
+        }))
+        .filter((entry) => entry.emoji && REVIEW_REACTIONS.includes(entry.emoji))
+    : [];
+  ordered.sort((a, b) => {
+    const timeA = a.createdAt || '';
+    const timeB = b.createdAt || '';
+    return timeB.localeCompare(timeA);
+  });
+  ordered.forEach((entry) => {
+    totals[entry.emoji] = (totals[entry.emoji] || 0) + 1;
+    if (entry.username === currentUsername && mine === null) {
+      mine = entry.emoji;
+    }
+  });
+  REVIEW_REACTIONS.forEach((emoji) => {
+    if (!totals[emoji]) {
+      totals[emoji] = 0;
+    }
+  });
+  const recent = ordered.slice(0, 6);
+  return {
+    totals,
+    mine,
+    count: ordered.length,
+    recent
+  };
+}
+
+function mapCommentEntries(entries, currentUsername) {
+  if (!Array.isArray(entries) || !entries.length) {
+    return [];
+  }
+  const normalized = entries
+    .map((entry) => ({
+      id: entry.id || entry.commentId || null,
+      username: entry.username || entry.author || null,
+      body: entry.body || '',
+      createdAt: entry.createdAt || entry.created_at || null,
+      parentId: entry.parentCommentId || entry.parent_id || null,
+      mentions: Array.isArray(entry.mentions)
+        ? entry.mentions.map((mention) => canonicalUsername(mention)).filter(Boolean)
+        : [],
+      isSelf: (entry.username || entry.author || '') === currentUsername
+    }))
+    .filter((entry) => entry.id && entry.username && entry.body);
+  normalized.sort((a, b) => {
+    return (a.createdAt || '').localeCompare(b.createdAt || '');
+  });
+  const lookup = new Map();
+  const roots = [];
+  normalized.forEach((comment) => {
+    comment.replies = [];
+    lookup.set(comment.id, comment);
+  });
+  normalized.forEach((comment) => {
+    if (comment.parentId && lookup.has(comment.parentId)) {
+      lookup.get(comment.parentId).replies.push(comment);
+    } else {
+      roots.push(comment);
+    }
+  });
+  const sortReplies = (list) => {
+    list.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+    list.forEach((item) => {
+      if (Array.isArray(item.replies) && item.replies.length) {
+        sortReplies(item.replies);
+      }
+    });
+  };
+  sortReplies(roots);
+  return roots;
+}
+
+function formatCollaborativeListForUser(list, username) {
+  if (!list) {
+    return null;
+  }
+  const role = list.owner === username ? 'owner' : list.collaborators?.some((entry) => entry.username === username) ? 'editor' : 'viewer';
+  const collaboratorUsernames = [list.owner]
+    .concat(Array.isArray(list.collaborators) ? list.collaborators.map((entry) => entry.username) : [])
+    .map((handle) => canonicalUsername(handle))
+    .filter(Boolean);
+  const pendingInvites = Array.isArray(list.invites)
+    ? list.invites.filter((invite) => invite.status === 'pending').map((invite) => canonicalUsername(invite.username)).filter(Boolean)
+    : [];
+  const previewItems = Array.isArray(list.items) ? list.items.slice(0, 4) : [];
+  return {
+    id: list.id,
+    name: list.name,
+    description: list.description || '',
+    role,
+    owner: list.owner,
+    movieCount: Array.isArray(list.items) ? list.items.length : 0,
+    collaborators: collaboratorUsernames,
+    pendingInvites,
+    updatedAt: list.updatedAt || list.createdAt || null,
+    createdAt: list.createdAt || null,
+    visibility: list.visibility || 'friends',
+    preview: previewItems.map((item) => ({
+      tmdbId: item.tmdbId || null,
+      imdbId: item.imdbId || null,
+      title: item.title || '',
+      addedBy: item.addedBy || null,
+      addedAt: item.addedAt || null
+    }))
+  };
+}
+
+function listCollaborativeSummary(store, username) {
+  const owned = [];
+  const shared = [];
+  const invites = [];
+  const canonical = canonicalUsername(username);
+  if (!Array.isArray(store.collabLists)) {
+    return { owned, shared, invites };
+  }
+  store.collabLists.forEach((list) => {
+    const normalized = formatCollaborativeListForUser(list, canonical);
+    if (!normalized) {
+      return;
+    }
+    const inviteMatches = Array.isArray(list.invites)
+      ? list.invites.find((invite) => canonicalUsername(invite.username) === canonical && invite.status === 'pending')
+      : null;
+    if (list.owner === canonical) {
+      owned.push(normalized);
+      return;
+    }
+    const isCollaborator = Array.isArray(list.collaborators)
+      ? list.collaborators.some((entry) => canonicalUsername(entry.username) === canonical)
+      : false;
+    if (inviteMatches) {
+      invites.push({
+        id: list.id,
+        name: list.name,
+        owner: list.owner,
+        invitedAt: inviteMatches.invitedAt || list.updatedAt || list.createdAt || null,
+        description: list.description || ''
+      });
+      return;
+    }
+    if (isCollaborator) {
+      shared.push(normalized);
+    }
+  });
+  return { owned, shared, invites };
+}
+
+function formatWatchPartyForUser(party, username) {
+  if (!party) {
+    return null;
+  }
+  const canonical = canonicalUsername(username);
+  const invite = Array.isArray(party.invitees)
+    ? party.invitees.find((entry) => canonicalUsername(entry.username) === canonical)
+    : null;
+  const response = invite ? invite.response || 'pending' : party.host === canonical ? 'host' : 'none';
+  return {
+    id: party.id,
+    host: party.host,
+    movie: {
+      title: party.movieTitle || '',
+      tmdbId: party.movieTmdbId || null,
+      imdbId: party.movieImdbId || null
+    },
+    scheduledFor: party.scheduledFor || null,
+    createdAt: party.createdAt || null,
+    note: party.note || '',
+    response,
+    invitees: Array.isArray(party.invitees)
+      ? party.invitees.map((entry) => ({
+          username: canonicalUsername(entry.username),
+          response: entry.response || 'pending'
+        }))
+      : []
+  };
+}
+
+function listWatchPartySummary(store, username) {
+  const canonical = canonicalUsername(username);
+  if (!Array.isArray(store.watchParties)) {
+    return { upcoming: [], invites: [] };
+  }
+  const upcoming = [];
+  const invites = [];
+  store.watchParties.forEach((party) => {
+    const formatted = formatWatchPartyForUser(party, canonical);
+    if (!formatted) {
+      return;
+    }
+    if (party.host === canonical || (formatted.response && formatted.response !== 'pending' && formatted.response !== 'none')) {
+      upcoming.push(formatted);
+    } else if (formatted.response === 'pending') {
+      invites.push(formatted);
+    }
+  });
+  return { upcoming, invites };
+}
+
+function recordPresence(username, { state, movie, source }) {
+  const canonical = canonicalUsername(username);
+  if (!canonical) {
+    return;
+  }
+  const now = Date.now();
+  const existing = presenceMap.get(canonical) || {};
+  presenceMap.set(canonical, {
+    state: state || existing.state || 'online',
+    updatedAt: now,
+    source: source || existing.source || 'manual',
+    movieTmdbId: movie && movie.tmdbId ? movie.tmdbId : existing.movieTmdbId || null,
+    movieImdbId: movie && movie.imdbId ? movie.imdbId : existing.movieImdbId || null,
+    movieTitle: movie && movie.title ? movie.title : existing.movieTitle || null
+  });
+  schedulePresenceCleanup();
+}
+
+function buildPresenceSnapshot() {
+  const now = Date.now();
+  const snapshot = {};
+  presenceMap.forEach((entry, key) => {
+    if (!entry) {
+      presenceMap.delete(key);
+      return;
+    }
+    if (now - entry.updatedAt > PRESENCE_TTL_MS) {
+      presenceMap.delete(key);
+      return;
+    }
+    snapshot[key] = {
+      state: entry.state || 'online',
+      updatedAt: entry.updatedAt,
+      movieTitle: entry.movieTitle || null,
+      movieTmdbId: entry.movieTmdbId || null,
+      movieImdbId: entry.movieImdbId || null
+    };
+  });
+  return snapshot;
+}
+
+function broadcastPresenceSnapshot() {
+  const snapshot = buildPresenceSnapshot();
+  streamClients.forEach((client) => {
+    pushStreamEvent(client, 'presence', { presence: snapshot });
+  });
+}
+
+function schedulePresenceCleanup() {
+  if (presenceCleanupTimer) {
+    return;
+  }
+  presenceCleanupTimer = setTimeout(() => {
+    presenceCleanupTimer = null;
+    const before = presenceMap.size;
+    const snapshot = buildPresenceSnapshot();
+    if (presenceMap.size !== before) {
+      streamClients.forEach((client) => {
+        pushStreamEvent(client, 'presence', { presence: snapshot });
+      });
+    }
+    if (presenceMap.size) {
+      schedulePresenceCleanup();
+    }
+  }, PRESENCE_TTL_MS);
+}
+
+function computeRecognitionBadgesFromStore(store, username) {
+  const canonical = canonicalUsername(username);
+  if (!canonical) {
+    return [];
+  }
+  const reviews = Array.isArray(store.reviews)
+    ? store.reviews.filter((entry) => canonicalUsername(entry.username) === canonical)
+    : [];
+  const likes = Array.isArray(store.reviewLikes)
+    ? store.reviewLikes.filter((entry) => canonicalUsername(entry.reviewUsername) === canonical)
+    : [];
+  const comments = Array.isArray(store.reviewComments)
+    ? store.reviewComments.filter((entry) => canonicalUsername(entry.username) === canonical)
+    : [];
+  const hostedParties = Array.isArray(store.watchParties)
+    ? store.watchParties.filter((party) => canonicalUsername(party.host) === canonical)
+    : [];
+
+  const badges = [];
+  if (reviews.length >= 5) {
+    badges.push({
+      key: 'prolific-reviewer',
+      label: 'Prolific Reviewer',
+      description: `Published ${reviews.length} community notes.`
+    });
+  }
+  if (likes.length >= 10) {
+    badges.push({
+      key: 'community-favorite',
+      label: 'Community Favorite',
+      description: `Earned ${likes.length} reactions from friends.`
+    });
+  }
+  if (comments.length >= 5) {
+    badges.push({
+      key: 'conversation-starter',
+      label: 'Conversation Starter',
+      description: `Jumped into ${comments.length} community threads.`
+    });
+  }
+  if (hostedParties.length >= 1) {
+    badges.push({
+      key: 'event-planner',
+      label: 'Event Planner',
+      description: `Hosted ${hostedParties.length} watch party${hostedParties.length === 1 ? '' : 'ies'}.`
+    });
+  }
+
+  const streak = computeReviewStreak(reviews);
+  if (streak >= 3) {
+    badges.push({
+      key: 'streak-keeper',
+      label: 'Streak Keeper',
+      description: `Shared notes ${streak} days in a row.`
+    });
+  }
+  return badges;
+}
+
+function computeReviewStreak(reviews) {
+  if (!Array.isArray(reviews) || !reviews.length) {
+    return 0;
+  }
+  const timestamps = reviews
+    .map((review) => review.updatedAt || review.createdAt || null)
+    .filter(Boolean)
+    .map((value) => new Date(value))
+    .filter((date) => !Number.isNaN(date.getTime()))
+    .sort((a, b) => b.getTime() - a.getTime());
+  if (!timestamps.length) {
+    return 0;
+  }
+  let streak = 1;
+  let current = timestamps[0];
+  for (let index = 1; index < timestamps.length; index += 1) {
+    const next = timestamps[index];
+    const diffDays = Math.floor((current.getTime() - next.getTime()) / (24 * 60 * 60 * 1000));
+    if (diffDays === 1) {
+      streak += 1;
+      current = next;
+    } else if (diffDays > 1) {
+      break;
+    }
+  }
+  return streak;
+}
+
 function buildLocalReviewId(tmdbId, username) {
   const normalizedUsername = canonicalUsername(username);
   if (!tmdbId || !normalizedUsername) {
     return null;
   }
   return `${tmdbId}:${normalizedUsername}`;
+}
+
+async function addReviewComment({
+  reviewId,
+  reviewUsername,
+  username,
+  movie,
+  body,
+  parentId,
+  mentions
+}) {
+  const trimmed = typeof body === 'string' ? body.trim() : '';
+  if (!trimmed) {
+    throw new HttpError(400, 'Enter a reply before posting.');
+  }
+  const timestamp = new Date().toISOString();
+  const uniqueMentions = Array.isArray(mentions)
+    ? Array.from(new Set(mentions.map((mention) => canonicalUsername(mention)).filter(Boolean)))
+    : [];
+  if (usingLocalStore()) {
+    const store = await readSocialStore();
+    const entry = {
+      id: randomUUID(),
+      reviewId,
+      reviewUsername,
+      username,
+      body: trimmed,
+      parentCommentId: parentId || null,
+      mentions: uniqueMentions,
+      movieTmdbId: movie.tmdbId,
+      movieImdbId: movie.imdbId || null,
+      movieTitle: movie.title,
+      createdAt: timestamp
+    };
+    store.reviewComments.push(entry);
+    await writeSocialStore(store);
+    return entry;
+  }
+  try {
+    await supabaseFetch('review_comments', {
+      method: 'POST',
+      body: [
+        {
+          review_id: reviewId,
+          username,
+          body: trimmed,
+          parent_comment_id: parentId || null
+        }
+      ]
+    });
+  } catch (error) {
+    enableLocalFallback('posting a review reply', error);
+    return addReviewComment({
+      reviewId,
+      reviewUsername,
+      username,
+      movie,
+      body: trimmed,
+      parentId,
+      mentions: uniqueMentions
+    });
+  }
+  return {
+    id: randomUUID(),
+    reviewId,
+    reviewUsername,
+    username,
+    body: trimmed,
+    parentCommentId: parentId || null,
+    mentions: uniqueMentions,
+    movieTmdbId: movie.tmdbId,
+    movieImdbId: movie.imdbId || null,
+    movieTitle: movie.title,
+    createdAt: timestamp
+  };
+}
+
+async function listReviewComments({ movie, reviewId, reviewUsername }) {
+  if (usingLocalStore()) {
+    const store = await readSocialStore();
+    return store.reviewComments.filter((entry) => {
+      if (!entry) {
+        return false;
+      }
+      if (entry.reviewId && reviewId) {
+        return entry.reviewId === reviewId;
+      }
+      return entry.movieTmdbId === movie.tmdbId && entry.reviewUsername === reviewUsername;
+    });
+  }
+  if (!reviewId) {
+    return [];
+  }
+  try {
+    const rows = await supabaseFetch('review_comments', {
+      query: {
+        select: 'id,username,body,parent_comment_id,created_at',
+        review_id: `eq.${reviewId}`,
+        order: 'created_at.asc'
+      }
+    });
+    if (!Array.isArray(rows)) {
+      return [];
+    }
+    return rows.map((row) => ({
+      id: row.id,
+      username: row.username,
+      body: row.body,
+      parentCommentId: row.parent_comment_id || null,
+      createdAt: row.created_at || null,
+      mentions: extractMentions(row.body || '')
+    }));
+  } catch (error) {
+    enableLocalFallback('loading review replies', error);
+    return listReviewComments({ movie, reviewId, reviewUsername });
+  }
 }
 
 async function likeReviewLocal({ movie, reviewUsername, reviewId, likedBy, timestamp }) {
@@ -1804,6 +3126,49 @@ async function unlikeReviewLocal({ movie, reviewUsername, reviewId, likedBy }) {
     return entry.movieTmdbId === movie.tmdbId && entry.reviewUsername === reviewUsername;
   });
   return summarizeLikes(likes, likedBy);
+}
+
+async function reactToReviewLocal({ movie, reviewUsername, reviewId, username, emoji, timestamp }) {
+  const store = await readSocialStore();
+  const fallbackId = buildLocalReviewId(movie.tmdbId, reviewUsername);
+  const id = reviewId || fallbackId;
+  store.reviewReactions = store.reviewReactions.filter((entry) => {
+    if (!entry) {
+      return false;
+    }
+    const matchesReview = entry.reviewId === id || entry.reviewUsername === reviewUsername;
+    return !(matchesReview && entry.username === username);
+  });
+  store.reviewReactions.push({
+    reviewId: id,
+    reviewUsername,
+    movieTmdbId: movie.tmdbId,
+    movieImdbId: movie.imdbId || null,
+    movieTitle: movie.title,
+    username,
+    emoji,
+    createdAt: timestamp
+  });
+  await writeSocialStore(store);
+  return store.reviewReactions.filter((entry) => entry.reviewId === id || entry.reviewUsername === reviewUsername);
+}
+
+async function removeReactionLocal({ movie, reviewUsername, reviewId, username }) {
+  const store = await readSocialStore();
+  const fallbackId = buildLocalReviewId(movie.tmdbId, reviewUsername);
+  const id = reviewId || fallbackId;
+  const before = store.reviewReactions.length;
+  store.reviewReactions = store.reviewReactions.filter((entry) => {
+    if (!entry) {
+      return false;
+    }
+    const matchesReview = entry.reviewId === id || entry.reviewUsername === reviewUsername;
+    return !(matchesReview && entry.username === username);
+  });
+  if (before !== store.reviewReactions.length) {
+    await writeSocialStore(store);
+  }
+  return store.reviewReactions.filter((entry) => entry.reviewId === id || entry.reviewUsername === reviewUsername);
 }
 
 async function fetchReviewLikeSummary({ reviewId, movie, reviewUsername, currentUsername }) {
@@ -2101,6 +3466,23 @@ function normalizeRating(value) {
   return Math.round(clamped * 10) / 10;
 }
 
+function normalizeReviewContent(input = {}) {
+  const capsuleRaw = typeof input.body === 'string' ? input.body.trim() : '';
+  const longRaw = typeof input.fullText === 'string' ? input.fullText.trim() : '';
+  const preferred = longRaw || capsuleRaw;
+  const fullText = preferred ? preferred.slice(0, MAX_LONG_REVIEW_LENGTH).trim() : '';
+  const segments = parseReviewSegments(fullText || capsuleRaw);
+  const derivedCapsule = capsuleRaw || buildCapsuleFromSegments(segments, preferred);
+  const capsule = derivedCapsule ? derivedCapsule.slice(0, MAX_REVIEW_LENGTH).trim() : '';
+  const hasSpoilers = Boolean(input.hasSpoilers) || segments.some((segment) => segment.spoiler);
+  return {
+    capsule,
+    fullText,
+    segments,
+    hasSpoilers
+  };
+}
+
 function canonicalUsername(username) {
   if (typeof username !== 'string') {
     return '';
@@ -2126,6 +3508,63 @@ function titleCase(value) {
   }
   const lower = value.toLowerCase();
   return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+
+function parseReviewSegments(text) {
+  if (!text) {
+    return [];
+  }
+  const normalized = text.replace(/\r\n/g, '\n');
+  const segments = [];
+  const spoilerRegex = /\[spoiler\]([\s\S]*?)\[\/spoiler\]/gi;
+  let lastIndex = 0;
+  let match;
+  while ((match = spoilerRegex.exec(normalized))) {
+    const start = match.index;
+    if (start > lastIndex) {
+      const chunk = normalized.slice(lastIndex, start);
+      pushSegmentChunks(segments, chunk, false);
+    }
+    const spoilerContent = match[1] || '';
+    pushSegmentChunks(segments, spoilerContent, true);
+    lastIndex = start + match[0].length;
+  }
+  if (lastIndex < normalized.length) {
+    const chunk = normalized.slice(lastIndex);
+    pushSegmentChunks(segments, chunk, false);
+  }
+  return segments;
+}
+
+function pushSegmentChunks(segments, raw, spoiler) {
+  if (!raw) {
+    return;
+  }
+  const cleaned = raw.replace(/\s+$/g, '').replace(/^\s+/g, '');
+  const blocks = cleaned.split(/\n{2,}/);
+  blocks.forEach((block) => {
+    const text = block.replace(/\s*\n\s*/g, '\n').trim();
+    if (text) {
+      segments.push({ text, spoiler: Boolean(spoiler) });
+    }
+  });
+}
+
+function buildCapsuleFromSegments(segments, fallback = '') {
+  const plainText = Array.isArray(segments)
+    ? segments
+        .filter((segment) => segment && !segment.spoiler)
+        .map((segment) => segment.text)
+        .join(' ')
+    : '';
+  const basis = (plainText || fallback || '').replace(/\s+/g, ' ').trim();
+  if (!basis) {
+    return '';
+  }
+  if (basis.length <= MAX_REVIEW_LENGTH) {
+    return basis;
+  }
+  return `${basis.slice(0, MAX_REVIEW_LENGTH - 1).trimEnd()}…`;
 }
 
 function extractToken(req, payload) {
@@ -2196,10 +3635,24 @@ async function readSocialStore() {
       reviews: Array.isArray(parsed.reviews) ? parsed.reviews.slice() : [],
       reviewLikes: Array.isArray(parsed.reviewLikes) ? parsed.reviewLikes.slice() : [],
       notifications: Array.isArray(parsed.notifications) ? parsed.notifications.slice() : [],
-      activity: Array.isArray(parsed.activity) ? parsed.activity.slice() : legacyLibrary
+      activity: Array.isArray(parsed.activity) ? parsed.activity.slice() : legacyLibrary,
+      reviewComments: Array.isArray(parsed.reviewComments) ? parsed.reviewComments.slice() : [],
+      reviewReactions: Array.isArray(parsed.reviewReactions) ? parsed.reviewReactions.slice() : [],
+      collabLists: Array.isArray(parsed.collabLists) ? parsed.collabLists.slice() : [],
+      watchParties: Array.isArray(parsed.watchParties) ? parsed.watchParties.slice() : []
     };
   } catch (error) {
-    return { follows: [], reviews: [], reviewLikes: [], notifications: [], activity: [] };
+    return {
+      follows: [],
+      reviews: [],
+      reviewLikes: [],
+      notifications: [],
+      activity: [],
+      reviewComments: [],
+      reviewReactions: [],
+      collabLists: [],
+      watchParties: []
+    };
   }
 }
 
@@ -2210,7 +3663,11 @@ async function writeSocialStore(store) {
       reviews: Array.isArray(store.reviews) ? store.reviews : [],
       reviewLikes: Array.isArray(store.reviewLikes) ? store.reviewLikes : [],
       notifications: Array.isArray(store.notifications) ? store.notifications : [],
-      activity: Array.isArray(store.activity) ? store.activity : []
+      activity: Array.isArray(store.activity) ? store.activity : [],
+      reviewComments: Array.isArray(store.reviewComments) ? store.reviewComments : [],
+      reviewReactions: Array.isArray(store.reviewReactions) ? store.reviewReactions : [],
+      collabLists: Array.isArray(store.collabLists) ? store.collabLists : [],
+      watchParties: Array.isArray(store.watchParties) ? store.watchParties : []
     },
     null,
     2

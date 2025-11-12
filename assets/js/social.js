@@ -2,8 +2,10 @@ import { loadSession, subscribeToSession } from './auth.js';
 
 const SOCIAL_ENDPOINT = '/api/social';
 const MAX_REVIEW_LENGTH = 600;
+const MAX_LONG_REVIEW_LENGTH = 2400;
 
 const NOTIFICATION_POLL_INTERVAL = 45000;
+const REVIEW_REACTIONS = ['👍', '❤️', '😂', '😮'];
 
 const state = {
   session: loadSession(),
@@ -11,6 +13,8 @@ const state = {
   followingLoaded: false,
   followingLoading: false,
   socialOverview: createDefaultSocialOverview(),
+  presence: {},
+  badges: [],
   sections: new Set(),
   sectionsByKey: new Map(),
   reviewCache: new Map(),
@@ -19,13 +23,21 @@ const state = {
   notificationsLoading: false,
   notificationTimer: null,
   notificationSeen: new Set(),
-  toastHost: null
+  toastHost: null,
+  notificationStream: null,
+  notificationRetry: 0,
+  collabState: {
+    lists: { owned: [], shared: [], invites: [] },
+    watchParties: { upcoming: [], invites: [] }
+  },
+  presenceTicker: null
 };
 
 const followingSubscribers = new Set();
 const reviewSubscribers = new Map();
 const notificationSubscribers = new Set();
 const socialOverviewSubscribers = new Set();
+const collaborativeSubscribers = new Set();
 
 subscribeToSession((session) => {
   state.session = session;
@@ -35,15 +47,24 @@ subscribeToSession((session) => {
     state.followingLoaded = false;
     state.followingLoading = false;
     state.socialOverview = createDefaultSocialOverview();
+    state.presence = {};
+    state.badges = [];
+    state.collabState = {
+      lists: { owned: [], shared: [], invites: [] },
+      watchParties: { upcoming: [], invites: [] }
+    };
     state.reviewCache.clear();
     state.notifications = [];
     state.notificationsLoaded = false;
     state.notificationsLoading = false;
     state.notificationSeen.clear();
     stopNotificationPolling();
+    stopNotificationStream();
+    stopPresenceTicker();
     notifyNotificationSubscribers();
     notifyFollowingSubscribers();
     notifySocialOverviewSubscribers();
+    notifyCollaborativeSubscribers();
     state.sections.forEach((section) => hideSection(section));
     return;
   }
@@ -55,6 +76,9 @@ subscribeToSession((session) => {
   state.notificationsLoading = false;
   loadNotifications().catch(() => {});
   startNotificationPolling();
+  startNotificationStream();
+  startPresenceTicker();
+  loadCollaborativeState().catch(() => {});
   state.sections.forEach((section) => showSection(section));
 });
 
@@ -66,6 +90,54 @@ export function initSocialFeatures() {
     loadNotifications().catch(() => {});
     startNotificationPolling();
   }
+  if (state.session && state.session.token) {
+    startNotificationStream();
+    startPresenceTicker();
+    loadCollaborativeState().catch(() => {});
+  }
+}
+
+export function refreshCollaborativeState() {
+  return loadCollaborativeState();
+}
+
+export function subscribeToCollaborativeState(callback) {
+  if (typeof callback !== 'function') {
+    return () => {};
+  }
+  collaborativeSubscribers.add(callback);
+  try {
+    callback(cloneCollaborativeState(state.collabState));
+  } catch (error) {
+    console.warn('Collaborative subscriber error', error);
+  }
+  return () => {
+    collaborativeSubscribers.delete(callback);
+  };
+}
+
+export function getCollaborativeStateSnapshot() {
+  return cloneCollaborativeState(state.collabState);
+}
+
+export async function createCollaborativeListRemote({ name, description, visibility = 'friends' }) {
+  return callSocial('createCollaborativeList', { name, description, visibility });
+}
+
+export async function inviteCollaboratorRemote({ listId, username }) {
+  return callSocial('inviteCollaborator', { listId, username });
+}
+
+export async function respondCollaboratorInviteRemote({ listId, decision }) {
+  return callSocial('respondCollaboratorInvite', { listId, decision });
+}
+
+export async function scheduleWatchPartyRemote({ movie, scheduledFor, note, invitees }) {
+  return callSocial('scheduleWatchParty', { movie, scheduledFor, note, invitees });
+}
+
+export async function respondWatchPartyRemote({ partyId, response, note }) {
+  return callSocial('respondWatchParty', { partyId, response, note });
 }
 
 export function buildCommunitySection(movieContext) {
@@ -142,6 +214,30 @@ export function buildCommunitySection(movieContext) {
   textField.appendChild(textLabel);
   textField.appendChild(textArea);
 
+  const advancedDetails = document.createElement('details');
+  advancedDetails.className = 'community-advanced';
+  const advancedSummary = document.createElement('summary');
+  advancedSummary.textContent = 'Add long-form thoughts & spoiler tags';
+  advancedDetails.appendChild(advancedSummary);
+  const longField = document.createElement('div');
+  longField.className = 'community-form-field';
+  const longLabel = document.createElement('label');
+  longLabel.setAttribute('for', `communityLong-${tmdbId}`);
+  longLabel.textContent = 'Extended review (optional)';
+  const longArea = document.createElement('textarea');
+  longArea.id = `communityLong-${tmdbId}`;
+  longArea.className = 'input-base community-long-textarea';
+  longArea.rows = 6;
+  longArea.maxLength = MAX_LONG_REVIEW_LENGTH;
+  longArea.placeholder = 'Go deeper here. Wrap spoilers like [spoiler]This text[/spoiler].';
+  const helperText = document.createElement('p');
+  helperText.className = 'community-advanced-hint';
+  helperText.textContent = 'Use [spoiler]…[/spoiler] to hide specific paragraphs. The short review above stays as your quick take.';
+  longField.appendChild(longLabel);
+  longField.appendChild(longArea);
+  longField.appendChild(helperText);
+  advancedDetails.appendChild(longField);
+
   const flagsRow = document.createElement('div');
   flagsRow.className = 'community-flags-row';
   const spoilerLabel = document.createElement('label');
@@ -170,6 +266,7 @@ export function buildCommunitySection(movieContext) {
 
   form.appendChild(ratingField);
   form.appendChild(textField);
+  form.appendChild(advancedDetails);
   form.appendChild(flagsRow);
   form.appendChild(submitRow);
   section.appendChild(form);
@@ -208,6 +305,8 @@ export function buildCommunitySection(movieContext) {
     form,
     ratingInput,
     textArea,
+    fullTextArea: longArea,
+    advancedDetails,
     spoilerInput,
     submitBtn,
     statusEl,
@@ -534,12 +633,15 @@ async function handleSubmit(sectionState) {
   sectionState.statusEl.dataset.variant = 'loading';
 
   try {
+    const longForm = sectionState.fullTextArea ? sectionState.fullTextArea.value.trim() : '';
+    const hasMarkupSpoilers = /\[spoiler\]/i.test(longForm);
     await callSocial('upsertReview', {
       movie: sectionState.movie,
       review: {
         rating: ratingNumber,
         body: sectionState.textArea.value.trim(),
-        hasSpoilers: sectionState.spoilerInput.checked
+        fullText: longForm,
+        hasSpoilers: sectionState.spoilerInput.checked || hasMarkupSpoilers
       }
     });
     sectionState.statusEl.textContent = 'Review saved.';
@@ -587,6 +689,12 @@ function renderSection(sectionState, cache) {
     sectionState.ratingInput.value = myReview.rating != null ? String(myReview.rating) : '';
     sectionState.textArea.value = myReview.body || '';
     sectionState.spoilerInput.checked = Boolean(myReview.hasSpoilers);
+    if (sectionState.fullTextArea) {
+      sectionState.fullTextArea.value = myReview.fullText || '';
+      if (sectionState.fullTextArea.value && sectionState.advancedDetails && !sectionState.advancedDetails.open) {
+        sectionState.advancedDetails.open = true;
+      }
+    }
   }
 
   sectionState.list.innerHTML = '';
@@ -695,13 +803,24 @@ function renderReviewItem(review, sectionState) {
   const item = document.createElement('article');
   item.className = 'community-review-item';
 
-  const header = document.createElement('div');
+  const header = document.createElement('header');
   header.className = 'community-review-header';
 
   const name = document.createElement('span');
   name.className = 'community-review-author';
   name.textContent = review.isSelf ? 'You' : review.username;
   header.appendChild(name);
+
+  const presenceKey = canonicalUsername(review.username);
+  const presence = presenceKey && state.presence ? state.presence[presenceKey] : null;
+  if (presence && presence.state) {
+    const presencePill = document.createElement('span');
+    presencePill.className = 'community-presence-pill';
+    presencePill.dataset.state = presence.state;
+    const label = presence.state === 'watching' ? 'Watching now' : presence.state === 'away' ? 'Away' : 'Online';
+    presencePill.textContent = presence.movieTitle ? `${label}: ${presence.movieTitle}` : label;
+    header.appendChild(presencePill);
+  }
 
   if (review.isFriend) {
     const friendBadge = document.createElement('span');
@@ -727,8 +846,13 @@ function renderReviewItem(review, sectionState) {
 
   item.appendChild(header);
 
-  const actions = document.createElement('div');
-  actions.className = 'community-review-actions';
+  const bodyContainer = document.createElement('div');
+  bodyContainer.className = 'community-review-body';
+  renderReviewContent(bodyContainer, review);
+  item.appendChild(bodyContainer);
+
+  const metaBar = document.createElement('div');
+  metaBar.className = 'community-review-meta';
 
   if (!review.isSelf && review.username) {
     const followBtn = document.createElement('button');
@@ -762,7 +886,7 @@ function renderReviewItem(review, sectionState) {
         followBtn.disabled = false;
       }
     });
-    actions.appendChild(followBtn);
+    metaBar.appendChild(followBtn);
   }
 
   const likeMeta = normalizeLikeMeta(review.likes);
@@ -780,42 +904,331 @@ function renderReviewItem(review, sectionState) {
     }
     toggleReviewLike(sectionState, review, likeBtn);
   });
-  actions.appendChild(likeBtn);
+  metaBar.appendChild(likeBtn);
 
-  item.appendChild(actions);
+  item.appendChild(metaBar);
 
-  if (review.body) {
-    if (review.hasSpoilers) {
-      const spoilerWrap = document.createElement('div');
-      spoilerWrap.className = 'community-spoiler-wrap';
-      const notice = document.createElement('div');
-      notice.className = 'community-spoiler-notice';
-      notice.textContent = 'Spoiler hidden';
-      const revealBtn = document.createElement('button');
-      revealBtn.type = 'button';
-      revealBtn.className = 'btn-subtle community-spoiler-btn';
-      revealBtn.textContent = 'Reveal spoilers';
-      const body = document.createElement('p');
-      body.className = 'community-review-text is-spoiler is-hidden';
-      body.textContent = review.body;
-      revealBtn.addEventListener('click', () => {
-        body.classList.remove('is-hidden');
-        revealBtn.remove();
-        notice.textContent = 'Spoiler revealed';
-      });
-      spoilerWrap.appendChild(notice);
-      spoilerWrap.appendChild(revealBtn);
-      spoilerWrap.appendChild(body);
-      item.appendChild(spoilerWrap);
-    } else {
-      const body = document.createElement('p');
-      body.className = 'community-review-text';
-      body.textContent = review.body;
-      item.appendChild(body);
-    }
+  const reactionBar = renderReactionBar(review, sectionState);
+  if (reactionBar) {
+    item.appendChild(reactionBar);
+  }
+
+  const thread = renderCommentThread(review, sectionState);
+  if (thread) {
+    item.appendChild(thread);
   }
 
   return item;
+}
+
+function renderReviewContent(container, review) {
+  container.innerHTML = '';
+  const previewText = review.capsule || review.body || '';
+  const hasPreview = Boolean(previewText);
+  if (hasPreview) {
+    const previewEl = document.createElement('p');
+    previewEl.className = 'community-review-text';
+    previewEl.textContent = previewText;
+    container.appendChild(previewEl);
+  }
+  const segments = Array.isArray(review.segments) ? review.segments : [];
+  const hasExtended = review.fullText && review.fullText !== previewText && segments.length;
+  if (hasExtended) {
+    const expandBtn = document.createElement('button');
+    expandBtn.type = 'button';
+    expandBtn.className = 'btn-subtle community-expand-btn';
+    expandBtn.textContent = 'Read full review';
+    const longWrap = document.createElement('div');
+    longWrap.className = 'community-review-full';
+    longWrap.hidden = true;
+    renderReviewSegments(longWrap, segments);
+    expandBtn.addEventListener('click', () => {
+      longWrap.hidden = !longWrap.hidden;
+      expandBtn.textContent = longWrap.hidden ? 'Read full review' : 'Hide full review';
+    });
+    container.appendChild(expandBtn);
+    container.appendChild(longWrap);
+  } else if (review.hasSpoilers && segments.length) {
+    const spoilerWrap = document.createElement('div');
+    spoilerWrap.className = 'community-review-full';
+    renderReviewSegments(spoilerWrap, segments);
+    container.appendChild(spoilerWrap);
+  }
+  if (!hasPreview && !segments.length) {
+    const empty = document.createElement('p');
+    empty.className = 'community-review-text community-review-text--empty';
+    empty.textContent = 'No written thoughts yet.';
+    container.appendChild(empty);
+  }
+}
+
+function renderReviewSegments(container, segments) {
+  segments.forEach((segment) => {
+    const text = typeof segment.text === 'string' ? segment.text : '';
+    if (!text) {
+      return;
+    }
+    const paragraphs = text.split(/\n{2,}/).map((part) => part.trim()).filter(Boolean);
+    if (segment.spoiler) {
+      paragraphs.forEach((paragraph) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'community-spoiler-block';
+        const notice = document.createElement('div');
+        notice.className = 'community-spoiler-notice';
+        notice.textContent = 'Spoiler hidden';
+        const revealBtn = document.createElement('button');
+        revealBtn.type = 'button';
+        revealBtn.className = 'btn-subtle community-spoiler-btn';
+        revealBtn.textContent = 'Reveal';
+        const paragraphEl = document.createElement('p');
+        paragraphEl.className = 'community-review-text is-spoiler is-hidden';
+        paragraphEl.textContent = paragraph;
+        revealBtn.addEventListener('click', () => {
+          paragraphEl.classList.remove('is-hidden');
+          revealBtn.remove();
+          notice.textContent = 'Spoiler revealed';
+        });
+        wrap.appendChild(notice);
+        wrap.appendChild(revealBtn);
+        wrap.appendChild(paragraphEl);
+        container.appendChild(wrap);
+      });
+    } else {
+      paragraphs.forEach((paragraph) => {
+        const paragraphEl = document.createElement('p');
+        paragraphEl.className = 'community-review-text';
+        paragraphEl.textContent = paragraph;
+        container.appendChild(paragraphEl);
+      });
+    }
+  });
+}
+
+function renderReactionBar(review, sectionState) {
+  if (!Array.isArray(REVIEW_REACTIONS) || !REVIEW_REACTIONS.length) {
+    return null;
+  }
+  const summary = review && review.reactions && typeof review.reactions === 'object' ? review.reactions : {};
+  const bar = document.createElement('div');
+  bar.className = 'community-review-reactions';
+  REVIEW_REACTIONS.forEach((emoji) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'community-reaction-btn';
+    button.dataset.emoji = emoji;
+    const count = summary.totals && Number.isFinite(summary.totals[emoji]) ? Number(summary.totals[emoji]) : 0;
+    button.textContent = `${emoji} ${count}`;
+    if (summary.mine === emoji) {
+      button.classList.add('is-selected');
+    }
+    if (review.isSelf) {
+      button.disabled = true;
+    }
+    button.addEventListener('click', () => {
+      toggleReviewReaction(sectionState, review, emoji, button);
+    });
+    bar.appendChild(button);
+  });
+  const tally = document.createElement('span');
+  tally.className = 'community-reaction-count';
+  const total = Number.isFinite(summary.count) ? Number(summary.count) : 0;
+  tally.textContent = `${total} ${total === 1 ? 'reaction' : 'reactions'}`;
+  bar.appendChild(tally);
+  return bar;
+}
+
+function renderCommentThread(review, sectionState) {
+  const comments = Array.isArray(review.comments) ? review.comments : [];
+  const container = document.createElement('div');
+  container.className = 'community-review-thread';
+  if (!comments.length) {
+    const empty = document.createElement('p');
+    empty.className = 'community-thread-empty';
+    empty.textContent = 'No replies yet. Start the conversation!';
+    container.appendChild(empty);
+  } else {
+    const list = document.createElement('div');
+    list.className = 'community-comment-list';
+    comments.forEach((comment) => {
+      const node = renderCommentNode(comment, review, sectionState, 0);
+      if (node) {
+        list.appendChild(node);
+      }
+    });
+    container.appendChild(list);
+  }
+  if (state.session && state.session.token) {
+    const form = createReplyForm(review, null, sectionState);
+    container.appendChild(form);
+  }
+  return container;
+}
+
+function renderCommentNode(comment, review, sectionState, depth) {
+  if (!comment || typeof comment !== 'object') {
+    return null;
+  }
+  const wrapper = document.createElement('div');
+  wrapper.className = 'community-comment';
+  if (depth > 0) {
+    wrapper.classList.add('community-comment--nested');
+  }
+  const header = document.createElement('div');
+  header.className = 'community-comment-header';
+  const author = document.createElement('span');
+  author.className = 'community-comment-author';
+  author.textContent = comment.username === state.session?.username ? 'You' : comment.username;
+  header.appendChild(author);
+  const timestamp = document.createElement('span');
+  timestamp.className = 'community-comment-timestamp';
+  timestamp.textContent = formatRelativeTime(comment.createdAt);
+  header.appendChild(timestamp);
+  wrapper.appendChild(header);
+
+  const body = document.createElement('p');
+  body.className = 'community-comment-body';
+  body.textContent = comment.body || '';
+  wrapper.appendChild(body);
+
+  if (state.session && state.session.token) {
+    const replyBtn = document.createElement('button');
+    replyBtn.type = 'button';
+    replyBtn.className = 'btn-subtle community-reply-btn';
+    replyBtn.textContent = 'Reply';
+    let replyForm = null;
+    replyBtn.addEventListener('click', () => {
+      if (replyForm) {
+        replyForm.remove();
+        replyForm = null;
+        replyBtn.setAttribute('aria-expanded', 'false');
+        return;
+      }
+      replyForm = createReplyForm(review, comment.id, sectionState);
+      wrapper.appendChild(replyForm);
+      replyBtn.setAttribute('aria-expanded', 'true');
+    });
+    wrapper.appendChild(replyBtn);
+  }
+
+  if (Array.isArray(comment.replies) && comment.replies.length) {
+    const childList = document.createElement('div');
+    childList.className = 'community-comment-children';
+    comment.replies.forEach((reply) => {
+      const node = renderCommentNode(reply, review, sectionState, depth + 1);
+      if (node) {
+        childList.appendChild(node);
+      }
+    });
+    wrapper.appendChild(childList);
+  }
+  return wrapper;
+}
+
+function createReplyForm(review, parentId, sectionState) {
+  const form = document.createElement('form');
+  form.className = 'community-reply-form';
+  const textarea = document.createElement('textarea');
+  textarea.className = 'input-base community-reply-input';
+  textarea.rows = 2;
+  textarea.required = true;
+  textarea.placeholder = parentId ? 'Reply to this comment…' : 'Leave a reply…';
+  form.appendChild(textarea);
+  const footer = document.createElement('div');
+  footer.className = 'community-reply-footer';
+  const submit = document.createElement('button');
+  submit.type = 'submit';
+  submit.className = 'btn-secondary';
+  submit.textContent = 'Post';
+  footer.appendChild(submit);
+  const status = document.createElement('span');
+  status.className = 'community-reply-status';
+  status.setAttribute('aria-live', 'polite');
+  footer.appendChild(status);
+  form.appendChild(footer);
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    submitReviewReply(sectionState, review, textarea, status, parentId);
+  });
+  return form;
+}
+
+async function submitReviewReply(sectionState, review, textarea, statusEl, parentId) {
+  if (!state.session || !state.session.token) {
+    queueToast('Sign in to reply to community notes.', { variant: 'error' });
+    return;
+  }
+  const message = textarea.value.trim();
+  if (!message) {
+    statusEl.textContent = 'Enter a reply first.';
+    statusEl.dataset.variant = 'error';
+    textarea.focus();
+    return;
+  }
+  const payload = normalizeMovieForApi(sectionState.movie);
+  const target = canonicalUsername(review.username);
+  if (!payload || !target) {
+    return;
+  }
+  statusEl.textContent = 'Posting reply…';
+  statusEl.dataset.variant = 'loading';
+  try {
+    await callSocial('postReviewReply', {
+      movie: payload,
+      reviewUsername: target,
+      reviewId: review.id,
+      parentId: parentId || undefined,
+      body: message
+    });
+    textarea.value = '';
+    statusEl.textContent = 'Reply posted.';
+    statusEl.dataset.variant = 'success';
+    await fetchReviews(sectionState.key, sectionState.movie, true, 'reply');
+  } catch (error) {
+    statusEl.textContent =
+      error instanceof Error ? error.message : 'Unable to post that reply right now.';
+    statusEl.dataset.variant = 'error';
+  }
+}
+
+async function toggleReviewReaction(sectionState, review, emoji, button) {
+  if (!state.session || !state.session.token) {
+    queueToast('Sign in to react to community notes.', { variant: 'error' });
+    return;
+  }
+  const payload = normalizeMovieForApi(sectionState.movie);
+  const target = canonicalUsername(review.username);
+  if (!payload || !target) {
+    return;
+  }
+  const currentReaction = review.reactions && review.reactions.mine ? review.reactions.mine : null;
+  const removing = currentReaction === emoji;
+  if (button) {
+    button.disabled = true;
+    button.classList.add('is-loading');
+  }
+  try {
+    const action = removing ? 'removeReviewReaction' : 'reactToReview';
+    const body = {
+      movie: payload,
+      reviewUsername: target,
+      reviewId: review.id
+    };
+    if (!removing) {
+      body.reaction = emoji;
+    }
+    await callSocial(action, body);
+    await fetchReviews(sectionState.key, sectionState.movie, true, 'reaction');
+  } catch (error) {
+    queueToast(
+      error instanceof Error ? error.message : 'Unable to update reactions right now.',
+      { variant: 'error' }
+    );
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.classList.remove('is-loading');
+    }
+  }
 }
 
 function updateFollowButtonState(button, username) {
@@ -1293,6 +1706,8 @@ async function loadFollowing(force = false) {
     const overview = normalizeSocialOverview(response);
     state.socialOverview = overview;
     state.following = overview.following.slice();
+    state.presence = overview.presence || {};
+    state.badges = Array.isArray(overview.badges) ? overview.badges.slice() : [];
     state.followingLoaded = true;
     notifyFollowingSubscribers();
     notifySocialOverviewSubscribers();
@@ -1321,6 +1736,17 @@ function notifySocialOverviewSubscribers() {
       callback(snapshot);
     } catch (error) {
       console.warn('Social overview subscriber error', error);
+    }
+  });
+}
+
+function notifyCollaborativeSubscribers() {
+  const snapshot = cloneCollaborativeState(state.collabState);
+  collaborativeSubscribers.forEach((callback) => {
+    try {
+      callback(snapshot);
+    } catch (error) {
+      console.warn('Collaborative subscriber error', error);
     }
   });
 }
@@ -1413,6 +1839,172 @@ function stopNotificationPolling() {
   }
 }
 
+function startNotificationStream() {
+  if (!window.EventSource || !state.session || !state.session.token) {
+    return;
+  }
+  if (state.notificationStream) {
+    return;
+  }
+  const url = `/api/social?channel=notifications&token=${encodeURIComponent(state.session.token)}`;
+  try {
+    const source = new EventSource(url);
+    state.notificationStream = source;
+    state.notificationRetry = 0;
+    source.addEventListener('ready', (event) => {
+      try {
+        const data = event && event.data ? JSON.parse(event.data) : {};
+        if (data && data.presence) {
+          state.presence = data.presence;
+          state.socialOverview.presence = data.presence;
+          notifySocialOverviewSubscribers();
+        }
+      } catch (error) {
+        console.warn('Stream ready parse error', error);
+      }
+    });
+    source.addEventListener('notification', (event) => handleStreamNotification(event));
+    source.addEventListener('presence', (event) => handleStreamPresence(event));
+    source.onerror = () => {
+      stopNotificationStream();
+      if (!state.session || !state.session.token) {
+        return;
+      }
+      const delay = Math.min(30000, 2000 * Math.max(1, state.notificationRetry + 1));
+      state.notificationRetry += 1;
+      window.setTimeout(() => startNotificationStream(), delay);
+    };
+  } catch (error) {
+    console.warn('Failed to open notification stream', error);
+  }
+}
+
+function stopNotificationStream() {
+  if (state.notificationStream) {
+    try {
+      state.notificationStream.close();
+    } catch (error) {
+      // ignore
+    }
+    state.notificationStream = null;
+  }
+  state.notificationRetry = 0;
+}
+
+function handleStreamNotification(event) {
+  if (!event || !event.data) {
+    return;
+  }
+  let payload;
+  try {
+    payload = JSON.parse(event.data);
+  } catch (error) {
+    console.warn('Invalid notification event payload', error);
+    return;
+  }
+  const entry = payload && payload.notification ? payload.notification : null;
+  if (!entry || !entry.id) {
+    return;
+  }
+  const normalized = {
+    id: entry.id,
+    type: entry.type || 'activity',
+    actor: entry.actor || null,
+    movieTitle: entry.movieTitle || null,
+    movieTmdbId: entry.movieTmdbId || null,
+    movieImdbId: entry.movieImdbId || null,
+    message: entry.message || '',
+    createdAt: entry.createdAt || new Date().toISOString(),
+    readAt: entry.readAt || null
+  };
+  const existingIndex = state.notifications.findIndex((item) => item.id === normalized.id);
+  if (existingIndex >= 0) {
+    state.notifications[existingIndex] = { ...state.notifications[existingIndex], ...normalized };
+  } else {
+    state.notifications.unshift(normalized);
+  }
+  state.notificationsLoaded = true;
+  if (!state.notificationSeen.has(normalized.id) && normalized.message) {
+    queueToast(normalized.message, { source: 'notification' });
+    state.notificationSeen.add(normalized.id);
+  }
+  notifyNotificationSubscribers();
+}
+
+function handleStreamPresence(event) {
+  if (!event || !event.data) {
+    return;
+  }
+  try {
+    const payload = JSON.parse(event.data);
+    const presence = payload && payload.presence ? payload.presence : {};
+    state.presence = presence;
+    if (state.socialOverview && typeof state.socialOverview === 'object') {
+      state.socialOverview.presence = presence;
+    }
+    notifySocialOverviewSubscribers();
+  } catch (error) {
+    console.warn('Invalid presence event payload', error);
+  }
+}
+
+function startPresenceTicker() {
+  if (!state.session || !state.session.token) {
+    return;
+  }
+  if (state.presenceTicker) {
+    return;
+  }
+  pingPresence('online').catch(() => {});
+  state.presenceTicker = window.setInterval(() => {
+    pingPresence('online').catch(() => {});
+  }, 60000);
+}
+
+function stopPresenceTicker() {
+  if (state.presenceTicker) {
+    window.clearInterval(state.presenceTicker);
+    state.presenceTicker = null;
+  }
+}
+
+async function pingPresence(stateLabel = 'online') {
+  if (!state.session || !state.session.token) {
+    return;
+  }
+  try {
+    await callSocial('updatePresence', { state: stateLabel });
+  } catch (error) {
+    // presence updates are best effort
+  }
+}
+
+async function loadCollaborativeState() {
+  if (!state.session || !state.session.token) {
+    state.collabState = {
+      lists: { owned: [], shared: [], invites: [] },
+      watchParties: { upcoming: [], invites: [] }
+    };
+    notifyCollaborativeSubscribers();
+    return;
+  }
+  try {
+    const response = await callSocial('listCollaborativeState');
+    state.collabState = normalizeCollaborativeState(response);
+    if (state.socialOverview && typeof state.socialOverview === 'object') {
+      state.socialOverview.collaborations = {
+        owned: state.collabState.lists.owned.length,
+        shared: state.collabState.lists.shared.length,
+        invites: state.collabState.lists.invites.length
+      };
+    }
+    notifySocialOverviewSubscribers();
+    notifyCollaborativeSubscribers();
+  } catch (error) {
+    console.warn('Failed to load collaborative state', error);
+  }
+}
+
 function queueToast(message, options = {}) {
   if (!message) {
     return;
@@ -1486,12 +2078,36 @@ function normalizeSocialOverview(payload) {
   const suggestions = rawSuggestions
     .map((entry) => normalizeSocialSuggestion(entry, followersSet, followingSet))
     .filter(Boolean);
+  const presence = payload && typeof payload.presence === 'object' && payload.presence ? payload.presence : {};
+  const badges = Array.isArray(payload && payload.badges)
+    ? payload.badges
+        .map((badge) => {
+          if (!badge || typeof badge !== 'object') {
+            return null;
+          }
+          return {
+            key: String(badge.key || '').trim() || canonicalUsername(badge.label || ''),
+            label: badge.label || '',
+            description: badge.description || ''
+          };
+        })
+        .filter((badge) => badge && badge.label)
+    : [];
+  const collabRaw = payload && typeof payload.collaborations === 'object' ? payload.collaborations : {};
+  const collaborations = {
+    owned: Number.isFinite(collabRaw.owned) ? Number(collabRaw.owned) : 0,
+    shared: Number.isFinite(collabRaw.shared) ? Number(collabRaw.shared) : 0,
+    invites: Number.isFinite(collabRaw.invites) ? Number(collabRaw.invites) : 0
+  };
   return {
     following,
     followers,
     mutualFollowers,
     counts,
-    suggestions
+    suggestions,
+    presence,
+    badges,
+    collaborations
   };
 }
 
@@ -1540,6 +2156,83 @@ function normalizeSocialSuggestion(entry, followersSet, followingSet) {
   };
 }
 
+function normalizeCollaborativeState(payload) {
+  const listsRaw = payload && typeof payload.lists === 'object' ? payload.lists : {};
+  const watchPartiesRaw = payload && typeof payload.watchParties === 'object' ? payload.watchParties : {};
+  return {
+    lists: {
+      owned: Array.isArray(listsRaw.owned) ? listsRaw.owned.map(normalizeCollaborativeListSummary).filter(Boolean) : [],
+      shared: Array.isArray(listsRaw.shared) ? listsRaw.shared.map(normalizeCollaborativeListSummary).filter(Boolean) : [],
+      invites: Array.isArray(listsRaw.invites) ? listsRaw.invites.map(normalizeCollaborativeInvite).filter(Boolean) : []
+    },
+    watchParties: {
+      upcoming: Array.isArray(watchPartiesRaw.upcoming)
+        ? watchPartiesRaw.upcoming.map(normalizeWatchPartySummary).filter(Boolean)
+        : [],
+      invites: Array.isArray(watchPartiesRaw.invites)
+        ? watchPartiesRaw.invites.map(normalizeWatchPartySummary).filter(Boolean)
+        : []
+    }
+  };
+}
+
+function normalizeCollaborativeListSummary(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+  return {
+    id: entry.id,
+    name: entry.name || 'Untitled list',
+    description: entry.description || '',
+    role: entry.role || 'viewer',
+    owner: entry.owner || '',
+    movieCount: Number.isFinite(entry.movieCount) ? Number(entry.movieCount) : 0,
+    collaborators: Array.isArray(entry.collaborators) ? entry.collaborators.slice() : [],
+    pendingInvites: Array.isArray(entry.pendingInvites) ? entry.pendingInvites.slice() : [],
+    updatedAt: entry.updatedAt || null,
+    createdAt: entry.createdAt || null,
+    visibility: entry.visibility || 'friends',
+    preview: Array.isArray(entry.preview)
+      ? entry.preview.map((item) => ({
+          tmdbId: item.tmdbId || null,
+          imdbId: item.imdbId || null,
+          title: item.title || '',
+          addedBy: item.addedBy || null,
+          addedAt: item.addedAt || null
+        }))
+      : []
+  };
+}
+
+function normalizeCollaborativeInvite(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+  return {
+    id: entry.id,
+    name: entry.name || 'Untitled list',
+    owner: entry.owner || '',
+    invitedAt: entry.invitedAt || null,
+    description: entry.description || ''
+  };
+}
+
+function normalizeWatchPartySummary(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+  return {
+    id: entry.id,
+    host: entry.host || '',
+    movie: entry.movie || { title: '', tmdbId: null, imdbId: null },
+    scheduledFor: entry.scheduledFor || null,
+    createdAt: entry.createdAt || null,
+    note: entry.note || '',
+    response: entry.response || 'pending',
+    invitees: Array.isArray(entry.invitees) ? entry.invitees.slice() : []
+  };
+}
+
 function cloneSocialOverview(overview) {
   if (!overview || typeof overview !== 'object') {
     return createDefaultSocialOverview();
@@ -1584,7 +2277,78 @@ function cloneSocialOverview(overview) {
           followsYou: Boolean(entry.followsYou),
           reason: entry.reason || ''
         }))
+      : [],
+    presence:
+      overview.presence && typeof overview.presence === 'object'
+        ? { ...overview.presence }
+        : {},
+    badges: Array.isArray(overview.badges)
+      ? overview.badges.map((badge) => ({
+          key: badge.key,
+          label: badge.label,
+          description: badge.description
+        }))
+      : [],
+    collaborations:
+      overview.collaborations && typeof overview.collaborations === 'object'
+        ? {
+            owned: Number.isFinite(overview.collaborations.owned)
+              ? Number(overview.collaborations.owned)
+              : 0,
+            shared: Number.isFinite(overview.collaborations.shared)
+              ? Number(overview.collaborations.shared)
+              : 0,
+            invites: Number.isFinite(overview.collaborations.invites)
+              ? Number(overview.collaborations.invites)
+              : 0
+          }
+        : { owned: 0, shared: 0, invites: 0 }
+  };
+}
+
+function cloneCollaborativeState(collabState) {
+  if (!collabState || typeof collabState !== 'object') {
+    return {
+      lists: { owned: [], shared: [], invites: [] },
+      watchParties: { upcoming: [], invites: [] }
+    };
+  }
+  const mapList = (entry) => ({
+    ...entry,
+    collaborators: Array.isArray(entry.collaborators) ? entry.collaborators.slice() : [],
+    pendingInvites: Array.isArray(entry.pendingInvites) ? entry.pendingInvites.slice() : [],
+    preview: Array.isArray(entry.preview)
+      ? entry.preview.map((item) => ({ ...item }))
       : []
+  });
+  return {
+    lists: {
+      owned: Array.isArray(collabState.lists?.owned)
+        ? collabState.lists.owned.map(mapList)
+        : [],
+      shared: Array.isArray(collabState.lists?.shared)
+        ? collabState.lists.shared.map(mapList)
+        : [],
+      invites: Array.isArray(collabState.lists?.invites)
+        ? collabState.lists.invites.map((entry) => ({ ...entry }))
+        : []
+    },
+    watchParties: {
+      upcoming: Array.isArray(collabState.watchParties?.upcoming)
+        ? collabState.watchParties.upcoming.map((entry) => ({
+            ...entry,
+            movie: entry.movie ? { ...entry.movie } : { title: '', tmdbId: null, imdbId: null },
+            invitees: Array.isArray(entry.invitees) ? entry.invitees.map((invite) => ({ ...invite })) : []
+          }))
+        : [],
+      invites: Array.isArray(collabState.watchParties?.invites)
+        ? collabState.watchParties.invites.map((entry) => ({
+            ...entry,
+            movie: entry.movie ? { ...entry.movie } : { title: '', tmdbId: null, imdbId: null },
+            invitees: Array.isArray(entry.invitees) ? entry.invitees.map((invite) => ({ ...invite })) : []
+          }))
+        : []
+    }
   };
 }
 
@@ -1598,7 +2362,10 @@ function createDefaultSocialOverview() {
       followers: 0,
       mutual: 0
     },
-    suggestions: []
+    suggestions: [],
+    presence: {},
+    badges: [],
+    collaborations: { owned: 0, shared: 0, invites: 0 }
   };
 }
 

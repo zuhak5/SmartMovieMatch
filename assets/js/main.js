@@ -27,7 +27,15 @@ import {
   getSocialOverviewSnapshot,
   subscribeToNotifications,
   acknowledgeNotifications,
-  recordLibraryActivity
+  recordLibraryActivity,
+  refreshCollaborativeState,
+  createCollaborativeListRemote,
+  inviteCollaboratorRemote,
+  respondCollaboratorInviteRemote,
+  scheduleWatchPartyRemote,
+  respondWatchPartyRemote,
+  subscribeToCollaborativeState,
+  getCollaborativeStateSnapshot
 } from "./social.js";
 import {
   renderWatchedList,
@@ -49,6 +57,7 @@ const state = {
   favorites: [],
   followingUsers: [],
   socialOverview: getSocialOverviewSnapshot(),
+  collaborativeState: getCollaborativeStateSnapshot(),
   lastRecSeed: Math.random(),
   activeCollectionView: "favorites",
   session: null,
@@ -85,6 +94,7 @@ let profileCalloutPulseTimer = null;
 let unsubscribeFollowing = null;
 let unsubscribeNotifications = null;
 let unsubscribeSocialOverview = null;
+let unsubscribeCollaborative = null;
 
 const GENRE_ICON_MAP = {
   "28": "💥", // Action
@@ -2418,8 +2428,17 @@ function setupSocialFeatures() {
     renderSocialConnections();
   });
   state.socialOverview = getSocialOverviewSnapshot();
+  if (unsubscribeCollaborative) {
+    unsubscribeCollaborative();
+  }
+  unsubscribeCollaborative = subscribeToCollaborativeState((collabState) => {
+    state.collaborativeState = collabState;
+    renderSocialConnections();
+  });
+  state.collaborativeState = getCollaborativeStateSnapshot();
   renderSocialConnections();
   wireFollowForm();
+  wireCollaborativeForms();
   if (unsubscribeNotifications) {
     unsubscribeNotifications();
   }
@@ -2844,13 +2863,186 @@ function wireFollowForm() {
   }
 }
 
+function wireCollaborativeForms() {
+  const createForm = $("collabCreateForm");
+  const listNameInput = $("collabListName");
+  const listDescriptionInput = $("collabListDescription");
+  const visibilitySelect = $("collabListVisibility");
+  if (createForm && !createForm.dataset.wired) {
+    createForm.dataset.wired = "true";
+    createForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!state.session || !state.session.token) {
+        window.location.href = "login.html";
+        return;
+      }
+      const name = listNameInput ? listNameInput.value.trim() : "";
+      if (name.length < 3) {
+        setCollabStatus("Name your list with at least 3 characters.", "error");
+        if (listNameInput) {
+          listNameInput.focus();
+        }
+        return;
+      }
+      const description = listDescriptionInput ? listDescriptionInput.value.trim() : "";
+      const visibility = visibilitySelect && visibilitySelect.value === "private" ? "private" : "friends";
+      const submitButton = createForm.querySelector("button[type=\"submit\"]");
+      if (submitButton) {
+        submitButton.disabled = true;
+      }
+      setCollabStatus("Creating collaborative list…", "loading");
+      try {
+        await createCollaborativeListRemote({ name, description, visibility });
+        setCollabStatus(`Created “${name}”.`, "success");
+        createForm.reset();
+        if (visibilitySelect) {
+          visibilitySelect.value = "friends";
+        }
+        await refreshCollaborativeState();
+      } catch (error) {
+        setCollabStatus(
+          error instanceof Error ? error.message : "Couldn’t create that list right now.",
+          "error"
+        );
+      } finally {
+        if (submitButton) {
+          submitButton.disabled = false;
+        }
+      }
+    });
+  }
+
+  const watchForm = $("watchPartyForm");
+  const watchTitleInput = $("watchPartyTitle");
+  const watchTmdbInput = $("watchPartyTmdbId");
+  const watchImdbInput = $("watchPartyImdbId");
+  const watchDateInput = $("watchPartyDatetime");
+  const watchNoteInput = $("watchPartyNote");
+  const watchInviteInput = $("watchPartyInvitees");
+  if (watchForm && !watchForm.dataset.wired) {
+    watchForm.dataset.wired = "true";
+    watchForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!state.session || !state.session.token) {
+        window.location.href = "login.html";
+        return;
+      }
+      const title = watchTitleInput ? watchTitleInput.value.trim() : "";
+      if (title.length < 2) {
+        setCollabStatus("Add a movie title for your watch party.", "error");
+        if (watchTitleInput) {
+          watchTitleInput.focus();
+        }
+        return;
+      }
+      const tmdbId = watchTmdbInput ? watchTmdbInput.value.trim() : "";
+      const imdbId = watchImdbInput ? watchImdbInput.value.trim() : "";
+      if (!tmdbId && !imdbId) {
+        setCollabStatus("Provide a TMDB or IMDb ID so we can match the movie.", "error");
+        if (watchTmdbInput) {
+          watchTmdbInput.focus();
+        }
+        return;
+      }
+      const whenRaw = watchDateInput ? watchDateInput.value.trim() : "";
+      if (!whenRaw) {
+        setCollabStatus("Choose a date and time for your watch party.", "error");
+        if (watchDateInput) {
+          watchDateInput.focus();
+        }
+        return;
+      }
+      const whenDate = new Date(whenRaw);
+      if (Number.isNaN(whenDate.getTime())) {
+        setCollabStatus("Enter a valid date and time.", "error");
+        if (watchDateInput) {
+          watchDateInput.focus();
+        }
+        return;
+      }
+      const note = watchNoteInput ? watchNoteInput.value.trim() : "";
+      const invitees = parseInviteHandles(watchInviteInput ? watchInviteInput.value : "");
+      const submitButton = watchForm.querySelector("button[type=\"submit\"]");
+      if (submitButton) {
+        submitButton.disabled = true;
+      }
+      setCollabStatus("Scheduling watch party…", "loading");
+      try {
+        await scheduleWatchPartyRemote({
+          movie: { title, tmdbId: tmdbId || null, imdbId: imdbId || null },
+          scheduledFor: whenDate.toISOString(),
+          note,
+          invitees
+        });
+        setCollabStatus("Watch party scheduled!", "success");
+        watchForm.reset();
+        await refreshCollaborativeState();
+      } catch (error) {
+        setCollabStatus(
+          error instanceof Error ? error.message : "Couldn’t schedule that watch party right now.",
+          "error"
+        );
+      } finally {
+        if (submitButton) {
+          submitButton.disabled = false;
+        }
+      }
+    });
+  }
+
+  const refreshBtn = $("collabRefreshBtn");
+  if (refreshBtn && !refreshBtn.dataset.wired) {
+    refreshBtn.dataset.wired = "true";
+    refreshBtn.addEventListener("click", async () => {
+      if (!state.session || !state.session.token) {
+        window.location.href = "login.html";
+        return;
+      }
+      playUiClick();
+      refreshBtn.disabled = true;
+      setCollabStatus("Refreshing collaborative state…", "loading");
+      try {
+        await refreshCollaborativeState();
+        setCollabStatus("Collaborative lists updated.", "success");
+      } catch (error) {
+        setCollabStatus(
+          error instanceof Error ? error.message : "Couldn’t refresh collaborative data right now.",
+          "error"
+        );
+      } finally {
+        refreshBtn.disabled = false;
+      }
+    });
+  }
+
+  function parseInviteHandles(raw) {
+    if (!raw) {
+      return [];
+    }
+    const currentUser = state.session && state.session.username ? canonicalHandle(state.session.username) : null;
+    return raw
+      .split(/[\s,]+/)
+      .map((value) => canonicalHandle(value))
+      .filter((value) => value && value !== currentUser);
+  }
+}
+
 function renderSocialConnections() {
   const overview = state.socialOverview || getSocialOverviewSnapshot();
+  const collabState = state.collaborativeState || getCollaborativeStateSnapshot();
   const following = Array.isArray(overview.following) ? overview.following : [];
   const followers = Array.isArray(overview.followers) ? overview.followers : [];
   const mutualFollowers = Array.isArray(overview.mutualFollowers) ? overview.mutualFollowers : [];
   const suggestions = Array.isArray(overview.suggestions) ? overview.suggestions : [];
   const counts = overview && overview.counts ? overview.counts : {};
+  const presence = overview && overview.presence && typeof overview.presence === 'object' ? overview.presence : {};
+  const badges = Array.isArray(overview.badges) ? overview.badges : state.socialOverview?.badges || [];
+  const collabLists = collabState && collabState.lists ? collabState.lists : { owned: [], shared: [], invites: [] };
+  const collaborations = {
+    owned: Array.isArray(collabLists.owned) ? collabLists.owned.length : 0,
+    shared: Array.isArray(collabLists.shared) ? collabLists.shared.length : 0,
+    invites: Array.isArray(collabLists.invites) ? collabLists.invites.length : 0
+  };
 
   const followingSet = new Set(following);
   const followersSet = new Set(followers);
@@ -2873,6 +3065,87 @@ function renderSocialConnections() {
     "socialFollowersHeadingCount",
     Number.isFinite(counts.followers) ? counts.followers : followers.length
   );
+
+  const badgeListEl = $("socialBadgeList");
+  const badgeEmptyEl = $("socialBadgeEmpty");
+  if (badgeListEl && badgeEmptyEl) {
+    badgeListEl.innerHTML = "";
+    if (!badges.length) {
+      badgeListEl.hidden = true;
+      badgeEmptyEl.hidden = false;
+    } else {
+      badges.forEach((badge) => {
+        const chip = document.createElement("div");
+        chip.className = "social-badge";
+        const title = document.createElement("span");
+        title.className = "social-badge-title";
+        title.textContent = badge.label;
+        const description = document.createElement("span");
+        description.className = "social-badge-desc";
+        description.textContent = badge.description || "";
+        chip.appendChild(title);
+        chip.appendChild(description);
+        badgeListEl.appendChild(chip);
+      });
+      badgeListEl.hidden = false;
+      badgeEmptyEl.hidden = true;
+    }
+  }
+
+  const presenceListEl = $("socialPresenceList");
+  if (presenceListEl) {
+    presenceListEl.innerHTML = "";
+    const activeEntries = following
+      .map((username) => ({ username, presence: presence[username] }))
+      .filter((entry) => entry.presence && entry.presence.state);
+    if (!activeEntries.length) {
+      const empty = document.createElement("p");
+      empty.className = "social-presence-empty";
+      empty.textContent = "No friends online right now.";
+      presenceListEl.appendChild(empty);
+    } else {
+      activeEntries.forEach((entry) => {
+        const row = document.createElement("div");
+        row.className = "social-presence-row";
+        const name = document.createElement("span");
+        name.className = "social-presence-name";
+        name.textContent = formatSocialDisplayName(entry.username);
+        const state = document.createElement("span");
+        state.className = "social-presence-state";
+        state.dataset.state = entry.presence.state;
+        if (entry.presence.state === "watching" && entry.presence.movieTitle) {
+          state.textContent = `Watching ${entry.presence.movieTitle}`;
+        } else if (entry.presence.state === "away") {
+          state.textContent = "Away";
+        } else {
+          state.textContent = "Online";
+        }
+        row.appendChild(name);
+        row.appendChild(state);
+        presenceListEl.appendChild(row);
+      });
+    }
+  }
+
+  const collabSummaryEl = $("socialCollabSummary");
+  if (collabSummaryEl) {
+    collabSummaryEl.innerHTML = "";
+    const summary = collaborations || { owned: 0, shared: 0, invites: 0 };
+    const owned = document.createElement("div");
+    owned.className = "social-collab-pill";
+    owned.innerHTML = `<strong>${summary.owned || 0}</strong> owned lists`;
+    const shared = document.createElement("div");
+    shared.className = "social-collab-pill";
+    shared.innerHTML = `<strong>${summary.shared || 0}</strong> shared lists`;
+    const invites = document.createElement("div");
+    invites.className = "social-collab-pill";
+    invites.innerHTML = `<strong>${summary.invites || 0}</strong> invites waiting`;
+    collabSummaryEl.appendChild(owned);
+    collabSummaryEl.appendChild(shared);
+    collabSummaryEl.appendChild(invites);
+  }
+
+  renderCollaborativeSections(collabState);
 
   const mutualListEl = $("socialMutualList");
   const mutualEmptyEl = $("socialMutualEmpty");
@@ -2970,6 +3243,464 @@ function renderSocialConnections() {
         suggestionsListEl.appendChild(card);
       });
     }
+  }
+}
+
+function renderCollaborativeSections(collabStateInput) {
+  const collab = collabStateInput && typeof collabStateInput === "object"
+    ? collabStateInput
+    : getCollaborativeStateSnapshot();
+  const lists = collab && typeof collab === "object" && collab.lists ? collab.lists : {};
+  const watchParties = collab && typeof collab === "object" && collab.watchParties ? collab.watchParties : {};
+
+  renderCollaborativeListCollection(lists.owned, "collabOwnedList", "collabOwnedEmpty", "owner");
+  renderCollaborativeListCollection(lists.shared, "collabSharedList", "collabSharedEmpty", "shared");
+  renderCollaborativeInviteCollection(lists.invites, "collabInviteList", "collabInviteEmpty");
+  renderWatchPartyCollection(watchParties.upcoming, "watchPartyList", "watchPartyEmpty", "upcoming");
+  renderWatchPartyCollection(watchParties.invites, "watchPartyInviteList", "watchPartyInviteEmpty", "invite");
+}
+
+function renderCollaborativeListCollection(entries, listId, emptyId, mode) {
+  const container = $(listId);
+  const empty = $(emptyId);
+  if (!container || !empty) {
+    return;
+  }
+  container.innerHTML = "";
+  const list = Array.isArray(entries) ? entries.slice() : [];
+  if (!list.length) {
+    container.hidden = true;
+    empty.hidden = false;
+    return;
+  }
+  list.sort((a, b) => {
+    const aTime = Math.max(toTimestamp(a?.updatedAt), toTimestamp(a?.createdAt));
+    const bTime = Math.max(toTimestamp(b?.updatedAt), toTimestamp(b?.createdAt));
+    return bTime - aTime;
+  });
+  container.hidden = false;
+  empty.hidden = true;
+  list.forEach((entry) => {
+    const card = buildCollaborativeListCard(entry, mode);
+    container.appendChild(card);
+  });
+}
+
+function renderCollaborativeInviteCollection(entries, listId, emptyId) {
+  const container = $(listId);
+  const empty = $(emptyId);
+  if (!container || !empty) {
+    return;
+  }
+  container.innerHTML = "";
+  const list = Array.isArray(entries) ? entries.slice() : [];
+  if (!list.length) {
+    container.hidden = true;
+    empty.hidden = false;
+    return;
+  }
+  list.sort((a, b) => {
+    return toTimestamp(b?.invitedAt) - toTimestamp(a?.invitedAt);
+  });
+  container.hidden = false;
+  empty.hidden = true;
+  list.forEach((entry) => {
+    const card = buildCollaborativeInviteCard(entry);
+    container.appendChild(card);
+  });
+}
+
+function renderWatchPartyCollection(entries, listId, emptyId, mode) {
+  const container = $(listId);
+  const empty = $(emptyId);
+  if (!container || !empty) {
+    return;
+  }
+  container.innerHTML = "";
+  const list = Array.isArray(entries) ? entries.slice() : [];
+  if (!list.length) {
+    container.hidden = true;
+    empty.hidden = false;
+    return;
+  }
+  list.sort((a, b) => {
+    const aTime = toTimestamp(a?.scheduledFor || a?.createdAt);
+    const bTime = toTimestamp(b?.scheduledFor || b?.createdAt);
+    return aTime - bTime;
+  });
+  container.hidden = false;
+  empty.hidden = true;
+  list.forEach((entry) => {
+    const card = buildWatchPartyCard(entry, mode);
+    container.appendChild(card);
+  });
+}
+
+function buildCollaborativeListCard(entry, mode) {
+  const card = document.createElement("article");
+  card.className = "collab-list-card";
+  card.dataset.role = mode;
+
+  const header = document.createElement("header");
+  header.className = "collab-list-card-header";
+  const title = document.createElement("h4");
+  title.textContent = entry.name || "Untitled list";
+  header.appendChild(title);
+  const count = document.createElement("span");
+  count.className = "collab-list-count";
+  count.textContent = formatMovieCount(entry.movieCount);
+  header.appendChild(count);
+  card.appendChild(header);
+
+  if (entry.description) {
+    const desc = document.createElement("p");
+    desc.className = "collab-list-desc";
+    desc.textContent = entry.description;
+    card.appendChild(desc);
+  }
+
+  const meta = document.createElement("div");
+  meta.className = "collab-list-meta";
+  const metaParts = [];
+  if (mode === "owner") {
+    metaParts.push("You own this list");
+  } else if (entry.owner) {
+    metaParts.push(`Owner: @${entry.owner}`);
+  }
+  if (entry.visibility === "private") {
+    metaParts.push("Private access");
+  } else {
+    metaParts.push("Friends can view");
+  }
+  const updatedLabel = formatTimeAgo(entry.updatedAt || entry.createdAt);
+  if (updatedLabel) {
+    metaParts.push(`Updated ${updatedLabel}`);
+  }
+  meta.textContent = metaParts.join(" • ");
+  card.appendChild(meta);
+
+  if (Array.isArray(entry.preview) && entry.preview.length) {
+    const preview = document.createElement("div");
+    preview.className = "collab-list-preview";
+    entry.preview.forEach((item) => {
+      if (!item || !item.title) {
+        return;
+      }
+      const pill = document.createElement("span");
+      pill.className = "collab-chip";
+      pill.dataset.variant = "movie";
+      pill.textContent = item.title;
+      preview.appendChild(pill);
+    });
+    card.appendChild(preview);
+  }
+
+  const collaborators = Array.isArray(entry.collaborators)
+    ? entry.collaborators.filter((handle) => canonicalHandle(handle) && canonicalHandle(handle) !== canonicalHandle(entry.owner))
+    : [];
+  if (collaborators.length) {
+    const row = document.createElement("div");
+    row.className = "collab-list-collaborators";
+    const label = document.createElement("span");
+    label.className = "collab-chip collab-chip--label";
+    label.textContent = "Collaborators";
+    row.appendChild(label);
+    collaborators.forEach((handle) => {
+      const chip = document.createElement("span");
+      chip.className = "collab-chip";
+      chip.textContent = formatSocialDisplayName(handle);
+      row.appendChild(chip);
+    });
+    card.appendChild(row);
+  }
+
+  if (mode === "owner" && Array.isArray(entry.pendingInvites) && entry.pendingInvites.length) {
+    const pending = document.createElement("p");
+    pending.className = "collab-list-pending";
+    pending.textContent = `Pending invites: ${entry.pendingInvites.map((handle) => `@${handle}`).join(", ")}`;
+    card.appendChild(pending);
+  }
+
+  if (mode === "owner") {
+    const actions = document.createElement("div");
+    actions.className = "collab-list-actions";
+    const inviteBtn = document.createElement("button");
+    inviteBtn.type = "button";
+    inviteBtn.className = "btn-subtle";
+    inviteBtn.textContent = "Invite collaborator";
+    inviteBtn.addEventListener("click", () => {
+      playUiClick();
+      handleInviteCollaboratorAction(entry, inviteBtn);
+    });
+    actions.appendChild(inviteBtn);
+    card.appendChild(actions);
+  }
+
+  return card;
+}
+
+function buildCollaborativeInviteCard(entry) {
+  const card = document.createElement("article");
+  card.className = "collab-list-card collab-list-card--invite";
+
+  const header = document.createElement("header");
+  header.className = "collab-list-card-header";
+  const title = document.createElement("h4");
+  title.textContent = entry.name || "Collaborative list invite";
+  header.appendChild(title);
+  card.appendChild(header);
+
+  const meta = document.createElement("div");
+  meta.className = "collab-list-meta";
+  const parts = [];
+  if (entry.owner) {
+    parts.push(`Owner: @${entry.owner}`);
+  }
+  const invitedAt = formatTimeAgo(entry.invitedAt);
+  if (invitedAt) {
+    parts.push(`Invited ${invitedAt}`);
+  }
+  meta.textContent = parts.join(" • ");
+  card.appendChild(meta);
+
+  if (entry.description) {
+    const desc = document.createElement("p");
+    desc.className = "collab-list-desc";
+    desc.textContent = entry.description;
+    card.appendChild(desc);
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "collab-list-actions";
+  const acceptBtn = document.createElement("button");
+  acceptBtn.type = "button";
+  acceptBtn.className = "btn-secondary";
+  acceptBtn.textContent = "Accept";
+  acceptBtn.addEventListener("click", () => {
+    playUiClick();
+    handleCollaboratorInviteDecision(entry.id, "accept", acceptBtn, actions);
+  });
+  const declineBtn = document.createElement("button");
+  declineBtn.type = "button";
+  declineBtn.className = "btn-subtle btn-subtle-danger";
+  declineBtn.textContent = "Decline";
+  declineBtn.addEventListener("click", () => {
+    playUiClick();
+    handleCollaboratorInviteDecision(entry.id, "decline", declineBtn, actions);
+  });
+  actions.appendChild(acceptBtn);
+  actions.appendChild(declineBtn);
+  card.appendChild(actions);
+
+  return card;
+}
+
+function buildWatchPartyCard(entry, mode) {
+  const card = document.createElement("article");
+  card.className = "watch-party-card";
+  card.dataset.mode = mode;
+
+  const header = document.createElement("header");
+  header.className = "watch-party-card-header";
+  const title = document.createElement("h4");
+  title.textContent = entry.movie && entry.movie.title ? entry.movie.title : "Watch party";
+  header.appendChild(title);
+  card.appendChild(header);
+
+  const meta = document.createElement("div");
+  meta.className = "watch-party-meta";
+  const metaParts = [];
+  const schedule = formatWatchPartyDate(entry.scheduledFor);
+  if (schedule) {
+    metaParts.push(schedule);
+  }
+  if (entry.host) {
+    metaParts.push(`Host: @${entry.host}`);
+  }
+  meta.textContent = metaParts.join(" • ");
+  card.appendChild(meta);
+
+  if (entry.note) {
+    const note = document.createElement("p");
+    note.className = "watch-party-note";
+    note.textContent = entry.note;
+    card.appendChild(note);
+  }
+
+  if (mode === "upcoming" && Array.isArray(entry.invitees) && entry.invitees.length) {
+    const roster = document.createElement("div");
+    roster.className = "watch-party-roster";
+    entry.invitees.forEach((invite) => {
+      if (!invite || !invite.username) {
+        return;
+      }
+      const chip = document.createElement("span");
+      chip.className = "watch-party-chip";
+      chip.dataset.state = invite.response || "pending";
+      chip.textContent = `${formatSocialDisplayName(invite.username)} – ${formatPartyResponse(invite.response)}`;
+      roster.appendChild(chip);
+    });
+    card.appendChild(roster);
+  }
+
+  const username = state.session && state.session.username ? canonicalHandle(state.session.username) : null;
+  if (mode === "upcoming" && username && entry.host !== username) {
+    const mine = Array.isArray(entry.invitees)
+      ? entry.invitees.find((invite) => canonicalHandle(invite.username) === username)
+      : null;
+    if (mine) {
+      const response = document.createElement("p");
+      response.className = "watch-party-response";
+      response.textContent = `You responded: ${formatPartyResponse(mine.response)}`;
+      card.appendChild(response);
+    }
+  }
+
+  if (mode === "invite") {
+    const actions = document.createElement("div");
+    actions.className = "watch-party-actions";
+    const acceptBtn = document.createElement("button");
+    acceptBtn.type = "button";
+    acceptBtn.className = "btn-secondary";
+    acceptBtn.textContent = "Accept";
+    acceptBtn.addEventListener("click", () => {
+      playUiClick();
+      handleWatchPartyResponseAction(entry.id, "accept", acceptBtn, actions);
+    });
+    const maybeBtn = document.createElement("button");
+    maybeBtn.type = "button";
+    maybeBtn.className = "btn-subtle";
+    maybeBtn.textContent = "Maybe";
+    maybeBtn.addEventListener("click", () => {
+      playUiClick();
+      handleWatchPartyResponseAction(entry.id, "maybe", maybeBtn, actions);
+    });
+    const declineBtn = document.createElement("button");
+    declineBtn.type = "button";
+    declineBtn.className = "btn-subtle btn-subtle-danger";
+    declineBtn.textContent = "Decline";
+    declineBtn.addEventListener("click", () => {
+      playUiClick();
+      handleWatchPartyResponseAction(entry.id, "decline", declineBtn, actions);
+    });
+    actions.appendChild(acceptBtn);
+    actions.appendChild(maybeBtn);
+    actions.appendChild(declineBtn);
+    card.appendChild(actions);
+  }
+
+  return card;
+}
+
+async function handleInviteCollaboratorAction(entry, button) {
+  if (!entry || !entry.id) {
+    return;
+  }
+  const username = window.prompt("Invite which username to collaborate?");
+  if (!username) {
+    return;
+  }
+  const trimmed = username.trim();
+  if (!trimmed) {
+    return;
+  }
+  const previousDisabled = button.disabled;
+  button.disabled = true;
+  setCollabStatus(`Inviting @${trimmed.toLowerCase()}…`, "loading");
+  try {
+    await inviteCollaboratorRemote({ listId: entry.id, username: trimmed });
+    setCollabStatus(`Invite sent to @${trimmed.toLowerCase()}.`, "success");
+    await refreshCollaborativeState();
+  } catch (error) {
+    setCollabStatus(error instanceof Error ? error.message : "Couldn’t send that invite.", "error");
+  } finally {
+    button.disabled = previousDisabled;
+  }
+}
+
+async function handleCollaboratorInviteDecision(listId, decision, button, actionGroup) {
+  if (!listId) {
+    return;
+  }
+  const buttons = actionGroup ? Array.from(actionGroup.querySelectorAll("button")) : [button];
+  buttons.forEach((btn) => {
+    btn.disabled = true;
+  });
+  setCollabStatus(
+    decision === "accept" ? "Joining collaborative list…" : "Declining invite…",
+    "loading"
+  );
+  try {
+    await respondCollaboratorInviteRemote({ listId, decision });
+    setCollabStatus(
+      decision === "accept" ? "You’re now a collaborator!" : "Invite declined.",
+      "success"
+    );
+    await refreshCollaborativeState();
+  } catch (error) {
+    setCollabStatus(
+      error instanceof Error ? error.message : "Couldn’t update the invite right now.",
+      "error"
+    );
+  } finally {
+    buttons.forEach((btn) => {
+      btn.disabled = false;
+    });
+  }
+}
+
+async function handleWatchPartyResponseAction(partyId, response, button, actionGroup) {
+  if (!partyId) {
+    return;
+  }
+  const buttons = actionGroup ? Array.from(actionGroup.querySelectorAll("button")) : [button];
+  buttons.forEach((btn) => {
+    btn.disabled = true;
+  });
+  setCollabStatus("Updating watch party RSVP…", "loading");
+  try {
+    await respondWatchPartyRemote({ partyId, response });
+    setCollabStatus("Response recorded.", "success");
+    await refreshCollaborativeState();
+  } catch (error) {
+    setCollabStatus(
+      error instanceof Error ? error.message : "Couldn’t update your RSVP right now.",
+      "error"
+    );
+  } finally {
+    buttons.forEach((btn) => {
+      btn.disabled = false;
+    });
+  }
+}
+
+function setCollabStatus(message, variant) {
+  const statusEl = $("socialCollabStatus");
+  if (!statusEl) {
+    return;
+  }
+  if (message) {
+    statusEl.textContent = message;
+  } else {
+    statusEl.textContent = "";
+  }
+  if (variant) {
+    statusEl.dataset.variant = variant;
+  } else {
+    statusEl.removeAttribute("data-variant");
+  }
+  if (message) {
+    const stamp = String(Date.now());
+    statusEl.dataset.stamp = stamp;
+    window.setTimeout(() => {
+      if (statusEl.dataset.stamp === stamp) {
+        statusEl.textContent = "";
+        statusEl.removeAttribute("data-variant");
+        delete statusEl.dataset.stamp;
+      }
+    }, 5000);
+  } else {
+    delete statusEl.dataset.stamp;
   }
 }
 
@@ -3238,6 +3969,105 @@ function summarizeNames(list, max = 2) {
   }
   const visible = formatted.slice(0, max);
   return `${visible.join(", ")} +${formatted.length - max} more`;
+}
+
+function toTimestamp(value) {
+  if (!value) {
+    return 0;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return 0;
+  }
+  return date.getTime();
+}
+
+function canonicalHandle(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.trim().toLowerCase();
+}
+
+function formatMovieCount(count) {
+  const number = Number.isFinite(count) ? Number(count) : 0;
+  const safe = Math.max(0, number);
+  return `${safe} film${safe === 1 ? "" : "s"}`;
+}
+
+function formatTimeAgo(value) {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 0) {
+    return date.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit"
+    });
+  }
+  const diffSeconds = Math.floor(diffMs / 1000);
+  if (diffSeconds < 45) {
+    return "moments ago";
+  }
+  if (diffSeconds < 90) {
+    return "about a minute ago";
+  }
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) {
+    return `${diffMinutes} minute${diffMinutes === 1 ? "" : "s"} ago`;
+  }
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+  }
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 14) {
+    return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+  }
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric"
+  });
+}
+
+function formatWatchPartyDate(value) {
+  if (!value) {
+    return "Scheduled soon";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Scheduled soon";
+  }
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function formatPartyResponse(response) {
+  switch (response) {
+    case "accept":
+    case "accepted":
+      return "Attending";
+    case "maybe":
+      return "Maybe";
+    case "decline":
+    case "declined":
+      return "Declined";
+    case "host":
+      return "Host";
+    default:
+      return "Pending";
+  }
 }
 
 function renderNotificationCenter(payload = {}) {
