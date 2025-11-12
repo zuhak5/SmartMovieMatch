@@ -3047,128 +3047,6 @@ body[data-page="account-settings"] .app-main {
   }
 }
 
-.profile-callout-taste {
-  display: grid;
-  gap: 0.6rem;
-}
-
-.profile-callout-taste-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: grid;
-  gap: 0.55rem;
-}
-
-.profile-callout-taste-item {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.6rem;
-  align-items: center;
-  background: rgba(15, 23, 42, 0.52);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: calc(var(--radius-md) - 2px);
-  padding: 0.55rem 0.75rem;
-}
-
-.profile-callout-taste-icon {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 0.8rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(56, 189, 248, 0.2);
-  box-shadow: 0 0 8px rgba(56, 189, 248, 0.25);
-  font-size: 1.15rem;
-}
-
-.profile-callout-taste-text {
-  display: grid;
-  gap: 0.2rem;
-}
-
-.profile-callout-taste-title {
-  font-weight: 600;
-  color: rgba(226, 232, 240, 0.94);
-  font-size: 0.85rem;
-}
-
-.profile-callout-taste-meta {
-  font-size: 0.78rem;
-  color: rgba(148, 163, 184, 0.85);
-}
-
-.profile-callout-taste-empty {
-  font-size: 0.8rem;
-  color: rgba(148, 163, 184, 0.85);
-  padding: 0.55rem 0.65rem;
-  border-radius: calc(var(--radius-md) - 2px);
-  background: rgba(15, 23, 42, 0.45);
-  border: 1px dashed rgba(148, 163, 184, 0.28);
-}
-
-.profile-callout-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: center;
-}
-
-.profile-callout-quick-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.profile-callout-quick-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.45rem 0.9rem;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  background: rgba(15, 23, 42, 0.5);
-  color: rgba(226, 232, 240, 0.92);
-  font-size: 0.82rem;
-  text-decoration: none;
-  cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease, transform 0.2s ease;
-}
-
-.profile-callout-quick-link:hover,
-.profile-callout-quick-link:focus-visible {
-  border-color: rgba(96, 165, 250, 0.5);
-  background: rgba(37, 99, 235, 0.22);
-  color: #fff;
-  transform: translateY(-1px);
-  outline: none;
-}
-
-.profile-callout-quick-link > span {
-  font-size: 1rem;
-}
-
-.profile-callout-quick-link:focus-visible {
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35);
-}
-
-.profile-section-pulse {
-  animation: profileSectionPulse 1.1s ease;
-}
-
-@keyframes profileSectionPulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(96, 165, 250, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(96, 165, 250, 0);
-  }
-}
-
 .profile-callout-footnotes {
   display: flex;
   flex-wrap: wrap;
@@ -6176,6 +6054,7 @@ form.settings-section {
       font-size: 0.8rem;
       color: rgba(203, 213, 225, 0.78);
       margin-top: 0.2rem;
+      margin-bottom: 0.4rem;
       flex-wrap: wrap;
     }
 
@@ -6215,8 +6094,14 @@ form.settings-section {
     }
 
     .error-text {
+      display: none;
       color: var(--error);
       font-size: 0.8rem;
+      margin: 0 0 0.75rem;
+    }
+
+    .error-text.is-visible {
+      display: block;
     }
 
     /* Skeleton loading */
