@@ -1617,7 +1617,7 @@ function highlightProfileOverview() {
 
   const page = document.body ? document.body.getAttribute("data-page") : null;
   if (page !== "profile-overview") {
-    window.location.href = "profile";
+    window.location.href = "profile.html";
   }
 }
 
