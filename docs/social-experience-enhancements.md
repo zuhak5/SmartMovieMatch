@@ -8,7 +8,7 @@
 
 ### 1. Smarter Friend Discovery and Onboarding
 
-**Goals**
+**Goals*
 - Remove friction from the first-hour experience so that new members connect with at least three friends before leaving the onboarding flow.
 - Help returning users continue expanding their network with low-effort, privacy-preserving suggestions that feel relevant and timely.
 
