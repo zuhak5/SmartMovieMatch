@@ -21,7 +21,10 @@ import {
   subscribeToFollowing,
   followUserByUsername,
   unfollowUserByUsername,
-  getFollowingSnapshot
+  getFollowingSnapshot,
+  subscribeToNotifications,
+  acknowledgeNotifications,
+  recordLibraryActivity
 } from "./social.js";
 import {
   renderWatchedList,
@@ -46,6 +49,8 @@ const state = {
   activeCollectionView: "favorites",
   session: null,
   accountMenuOpen: false,
+  notificationPanelOpen: false,
+  notifications: [],
   accountAvatarPreviewUrl: null,
   accountRemoveAvatar: false,
   watchedSyncTimer: null,
@@ -73,6 +78,7 @@ let profileCalloutSnapshot = {
 };
 let profileCalloutPulseTimer = null;
 let unsubscribeFollowing = null;
+let unsubscribeNotifications = null;
 
 const GENRE_ICON_MAP = {
   "28": "💥", // Action
@@ -345,6 +351,11 @@ function init() {
     updateAccountUi(session);
     updateSnapshotPreviews(session);
     updateSocialSectionVisibility(session);
+    if (!session || !session.token) {
+      state.notifications = [];
+      closeNotificationPanel();
+      renderNotificationCenter();
+    }
     setSyncStatus(
       session
         ? "Signed in – your taste profile syncs automatically."
@@ -362,6 +373,7 @@ function init() {
   });
 
   wireEvents();
+  renderNotificationCenter();
 
   if (window.location.hash === "#profileOverview" || window.location.hash === "#overview") {
     window.requestAnimationFrame(() => {
@@ -386,12 +398,29 @@ function wireEvents() {
   const avatarInput = $("accountAvatarInput");
   const avatarUploadBtn = $("accountAvatarUpload");
   const avatarRemoveBtn = $("accountAvatarRemove");
+  const notificationBell = $("notificationBell");
+  const notificationPanel = $("notificationPanel");
+  const notificationMarkRead = $("notificationMarkRead");
 
   if (accountProfileBtn && accountMenu) {
     accountProfileBtn.addEventListener("click", (event) => {
       event.stopPropagation();
       playUiClick();
       toggleAccountMenu();
+    });
+  }
+
+  if (notificationBell) {
+    notificationBell.addEventListener("click", (event) => {
+      event.stopPropagation();
+      playUiClick();
+      toggleNotificationPanel();
+    });
+  }
+
+  if (notificationMarkRead) {
+    notificationMarkRead.addEventListener("click", () => {
+      acknowledgeNotifications();
     });
   }
 
@@ -406,14 +435,32 @@ function wireEvents() {
   }
 
   document.addEventListener("click", (event) => {
-    if (!state.accountMenuOpen) {
-      return;
+    if (state.accountMenuOpen) {
+      const container = accountProfile || (accountProfileBtn ? accountProfileBtn.parentElement : null);
+      if (!container || !container.contains(event.target)) {
+        closeAccountMenu();
+      }
     }
-    const container = accountProfile || (accountProfileBtn ? accountProfileBtn.parentElement : null);
-    if (container && container.contains(event.target)) {
-      return;
+    if (state.notificationPanelOpen) {
+      const bell = notificationBell;
+      const panel = notificationPanel;
+      const isBell = bell && bell.contains(event.target);
+      const isPanel = panel && panel.contains(event.target);
+      if (!isBell && !isPanel) {
+        closeNotificationPanel();
+      }
     }
-    closeAccountMenu();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      if (state.accountMenuOpen) {
+        closeAccountMenu();
+      }
+      if (state.notificationPanelOpen) {
+        closeNotificationPanel();
+      }
+    }
   });
 
   document.addEventListener("keydown", (event) => {
@@ -1891,8 +1938,24 @@ function revealMoreRecommendations() {
   updateRecommendationsView();
 }
 
-function handleMarkWatched(omdbMovie) {
+function handleMarkWatched(omdbMovie, tmdbMovie) {
   const added = markAsWatched(omdbMovie);
+  if (added) {
+    const tmdbId = tmdbMovie && (tmdbMovie.id || tmdbMovie.tmdb_id)
+      ? String(tmdbMovie.id || tmdbMovie.tmdb_id)
+      : null;
+    const title =
+      (omdbMovie && omdbMovie.Title) ||
+      (tmdbMovie && (tmdbMovie.title || tmdbMovie.original_title)) ||
+      "";
+    if (tmdbId && title) {
+      recordLibraryActivity('watchlist_add', {
+        tmdbId,
+        imdbId: omdbMovie && omdbMovie.imdbID ? omdbMovie.imdbID : null,
+        title
+      });
+    }
+  }
   return added;
 }
 
@@ -1987,6 +2050,17 @@ function handleToggleFavorite(payload) {
     genres,
     rating
   });
+
+  const tmdbIdValue = tmdbMovie && (tmdbMovie.id || tmdbMovie.tmdb_id)
+    ? String(tmdbMovie.id || tmdbMovie.tmdb_id)
+    : null;
+  if (tmdbIdValue) {
+    recordLibraryActivity('favorite_add', {
+      tmdbId: tmdbIdValue,
+      imdbId: imdbID,
+      title
+    });
+  }
 
   refreshFavoritesUi();
   scheduleFavoritesSync();
@@ -2324,6 +2398,12 @@ function setupSocialFeatures() {
   state.followingUsers = getFollowingSnapshot();
   renderFollowingList();
   wireFollowForm();
+  if (unsubscribeNotifications) {
+    unsubscribeNotifications();
+  }
+  unsubscribeNotifications = subscribeToNotifications((payload) => {
+    renderNotificationCenter(payload);
+  });
 }
 
 function wireFollowForm() {
@@ -2413,6 +2493,161 @@ function renderFollowingList() {
 
     listEl.appendChild(item);
   });
+}
+
+function renderNotificationCenter(payload = {}) {
+  const bell = $("notificationBell");
+  const countEl = $("notificationCount");
+  const panel = $("notificationPanel");
+  const listEl = $("notificationList");
+  const emptyEl = $("notificationEmpty");
+  if (!bell || !countEl || !panel || !listEl || !emptyEl) {
+    return;
+  }
+
+  const hasSession = Boolean(state.session && state.session.token);
+  bell.hidden = !hasSession;
+  if (!hasSession) {
+    state.notificationPanelOpen = false;
+    bell.setAttribute("aria-expanded", "false");
+    countEl.hidden = true;
+    listEl.innerHTML = "";
+    listEl.hidden = true;
+    emptyEl.hidden = false;
+    panel.hidden = true;
+    return;
+  }
+
+  const notifications = Array.isArray(payload.notifications)
+    ? payload.notifications
+    : Array.isArray(state.notifications)
+    ? state.notifications
+    : [];
+  state.notifications = notifications.slice();
+  const unreadCount = typeof payload.unreadCount === "number"
+    ? payload.unreadCount
+    : countUnreadNotifications();
+
+  if (unreadCount > 0) {
+    countEl.hidden = false;
+    countEl.textContent = String(unreadCount);
+    bell.classList.add("has-unread");
+  } else {
+    countEl.hidden = true;
+    bell.classList.remove("has-unread");
+  }
+
+  listEl.innerHTML = "";
+  if (!notifications.length) {
+    listEl.hidden = true;
+    emptyEl.hidden = false;
+  } else {
+    listEl.hidden = false;
+    emptyEl.hidden = true;
+    notifications.forEach((note) => {
+      const item = document.createElement("div");
+      item.className = "notification-item";
+      item.setAttribute("role", "listitem");
+      if (!note.readAt) {
+        item.dataset.unread = "true";
+      } else {
+        delete item.dataset.unread;
+      }
+      const icon = document.createElement("span");
+      icon.className = "notification-item-icon";
+      icon.textContent = getNotificationIcon(note.type);
+      icon.setAttribute("aria-hidden", "true");
+
+      const body = document.createElement("div");
+      body.className = "notification-item-body";
+
+      const message = document.createElement("div");
+      message.className = "notification-item-message";
+      message.textContent = note.message || "Activity update.";
+
+      const meta = document.createElement("div");
+      meta.className = "notification-item-meta";
+      meta.textContent = formatNotificationTimestamp(note.createdAt);
+
+      body.appendChild(message);
+      if (meta.textContent) {
+        body.appendChild(meta);
+      }
+      item.appendChild(icon);
+      item.appendChild(body);
+      listEl.appendChild(item);
+    });
+  }
+
+  if (state.notificationPanelOpen) {
+    panel.hidden = false;
+    bell.setAttribute("aria-expanded", "true");
+  } else {
+    panel.hidden = true;
+    bell.setAttribute("aria-expanded", "false");
+  }
+}
+
+function toggleNotificationPanel() {
+  if (!state.session || !state.session.token) {
+    window.location.href = "login.html";
+    return;
+  }
+  state.notificationPanelOpen = !state.notificationPanelOpen;
+  renderNotificationCenter();
+  if (state.notificationPanelOpen) {
+    acknowledgeNotifications();
+  }
+}
+
+function countUnreadNotifications() {
+  if (!Array.isArray(state.notifications)) {
+    return 0;
+  }
+  return state.notifications.filter((note) => !note || note.readAt ? false : true).length;
+}
+
+function openNotificationPanel() {
+  if (state.notificationPanelOpen) {
+    return;
+  }
+  state.notificationPanelOpen = true;
+  renderNotificationCenter();
+  acknowledgeNotifications();
+}
+
+function closeNotificationPanel() {
+  if (!state.notificationPanelOpen) {
+    return;
+  }
+  state.notificationPanelOpen = false;
+  renderNotificationCenter();
+}
+
+function getNotificationIcon(type) {
+  switch (type) {
+    case "follow":
+      return "🤝";
+    case "mention":
+      return "📣";
+    case "review_like":
+      return "👍";
+    case "friend_review":
+      return "📝";
+    case "friend_watchlist":
+      return "👀";
+    case "friend_favorite":
+      return "❤️";
+    default:
+      return "🔔";
+  }
+}
+
+function formatNotificationTimestamp(timestamp) {
+  if (!timestamp) {
+    return "";
+  }
+  return formatSyncTime(timestamp);
 }
 
 async function handleUnfollowUser(username, button) {

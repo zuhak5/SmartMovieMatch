@@ -742,7 +742,7 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites,
     if (watchedBtn.classList.contains("watched")) {
       return false;
     }
-    const added = handlers.onMarkWatched ? handlers.onMarkWatched(omdb) : true;
+    const added = handlers.onMarkWatched ? handlers.onMarkWatched(omdb, tmdb) : true;
     if (added) {
       markButtonAsWatched(watchedBtn, title, watchedStateIcon, { animate: true });
     }

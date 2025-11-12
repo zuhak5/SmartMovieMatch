@@ -3,6 +3,8 @@ import { loadSession, subscribeToSession } from './auth.js';
 const SOCIAL_ENDPOINT = '/api/social';
 const MAX_REVIEW_LENGTH = 600;
 
+const NOTIFICATION_POLL_INTERVAL = 45000;
+
 const state = {
   session: loadSession(),
   following: [],
@@ -10,11 +12,18 @@ const state = {
   followingLoading: false,
   sections: new Set(),
   sectionsByKey: new Map(),
-  reviewCache: new Map()
+  reviewCache: new Map(),
+  notifications: [],
+  notificationsLoaded: false,
+  notificationsLoading: false,
+  notificationTimer: null,
+  notificationSeen: new Set(),
+  toastHost: null
 };
 
 const followingSubscribers = new Set();
 const reviewSubscribers = new Map();
+const notificationSubscribers = new Set();
 
 subscribeToSession((session) => {
   state.session = session;
@@ -24,6 +33,12 @@ subscribeToSession((session) => {
     state.followingLoaded = false;
     state.followingLoading = false;
     state.reviewCache.clear();
+    state.notifications = [];
+    state.notificationsLoaded = false;
+    state.notificationsLoading = false;
+    state.notificationSeen.clear();
+    stopNotificationPolling();
+    notifyNotificationSubscribers();
     notifyFollowingSubscribers();
     state.sections.forEach((section) => hideSection(section));
     return;
@@ -31,12 +46,20 @@ subscribeToSession((session) => {
   state.followingLoaded = false;
   state.followingLoading = false;
   loadFollowing().catch(() => {});
+  state.notificationsLoaded = false;
+  state.notificationsLoading = false;
+  loadNotifications().catch(() => {});
+  startNotificationPolling();
   state.sections.forEach((section) => showSection(section));
 });
 
 export function initSocialFeatures() {
   if (state.session && state.session.token && !state.followingLoaded && !state.followingLoading) {
     loadFollowing().catch(() => {});
+  }
+  if (state.session && state.session.token && !state.notificationsLoaded && !state.notificationsLoading) {
+    loadNotifications().catch(() => {});
+    startNotificationPolling();
   }
 }
 
@@ -200,6 +223,8 @@ export function buildCommunitySection(movieContext) {
     friendActivityInitialized: false,
     friendActivitySeenAt: null,
     lastFriendActivity: null,
+    lastRenderOrigin: null,
+    friendToastAt: null,
     list,
     empty,
     emptyDefaultMessage: empty.textContent,
@@ -256,6 +281,51 @@ export function subscribeToFollowing(callback) {
   return () => {
     followingSubscribers.delete(callback);
   };
+}
+
+export function subscribeToNotifications(callback) {
+  if (typeof callback !== 'function') {
+    return () => {};
+  }
+  notificationSubscribers.add(callback);
+  try {
+    callback({
+      notifications: state.notifications.slice(),
+      unreadCount: countUnreadNotifications()
+    });
+  } catch (error) {
+    console.warn('Notification subscriber error', error);
+  }
+  return () => {
+    notificationSubscribers.delete(callback);
+  };
+}
+
+export async function acknowledgeNotifications() {
+  if (!state.session || !state.session.token || !state.notificationsLoaded) {
+    return;
+  }
+  try {
+    const response = await callSocial('ackNotifications');
+    applyNotificationPayload(response);
+  } catch (error) {
+    console.warn('Failed to acknowledge notifications', error);
+  }
+}
+
+export async function recordLibraryActivity(action, movie) {
+  if (!state.session || !state.session.token) {
+    return;
+  }
+  const payload = normalizeMovieForApi(movie);
+  if (!payload) {
+    return;
+  }
+  try {
+    await callSocial('recordLibraryAction', { action, movie: payload });
+  } catch (error) {
+    console.warn('Failed to record library activity', error);
+  }
 }
 
 export async function followUserByUsername(username) {
@@ -339,6 +409,8 @@ function hideSection(sectionState) {
   sectionState.friendActivityInitialized = false;
   sectionState.friendActivitySeenAt = null;
   sectionState.lastFriendActivity = null;
+  sectionState.lastRenderOrigin = null;
+  sectionState.friendToastAt = null;
   if (sectionState.unsubscribe) {
     sectionState.unsubscribe();
     sectionState.unsubscribe = null;
@@ -356,24 +428,24 @@ function showSection(sectionState) {
       renderSection(sectionState, data);
     });
   }
-  ensureReviewsLoaded(sectionState.key, sectionState.movie);
+  ensureReviewsLoaded(sectionState.key, sectionState.movie, false, 'load');
 }
 
-async function ensureReviewsLoaded(key, movie, force = false) {
+async function ensureReviewsLoaded(key, movie, force = false, origin = 'load') {
   const cache = state.reviewCache.get(key);
   if (!force && cache && !cache.loading) {
     return;
   }
-  await fetchReviews(key, movie, force);
+  await fetchReviews(key, movie, force, origin);
 }
 
-async function fetchReviews(key, movie, force = false) {
+async function fetchReviews(key, movie, force = false, origin = 'load') {
   if (!state.session || !state.session.token) {
     return;
   }
   let cache = state.reviewCache.get(key);
   if (!cache) {
-    cache = { loading: false, error: null, reviews: [], myReview: null, stats: null };
+    cache = { loading: false, error: null, reviews: [], myReview: null, stats: null, lastOrigin: null };
     state.reviewCache.set(key, cache);
   }
   if (cache.loading && !force) {
@@ -387,6 +459,7 @@ async function fetchReviews(key, movie, force = false) {
     cache.reviews = Array.isArray(response.reviews) ? response.reviews : [];
     cache.myReview = response.myReview || null;
     cache.stats = response.stats || computeReviewStats(cache.reviews);
+    cache.lastOrigin = origin;
   } catch (error) {
     cache.error = error instanceof Error ? error.message : 'Unable to load reviews.';
   } finally {
@@ -446,8 +519,11 @@ function renderSection(sectionState, cache) {
     myReview = null,
     loading = false,
     error = null,
-    stats = null
+    stats = null,
+    lastOrigin = 'load'
   } = data;
+
+  sectionState.lastRenderOrigin = lastOrigin || 'load';
 
   if (loading) {
     sectionState.loadingIndicator.hidden = false;
@@ -487,7 +563,7 @@ function renderSection(sectionState, cache) {
   sectionState.empty.hidden = true;
 
   filteredReviews.forEach((review) => {
-    sectionState.list.appendChild(renderReviewItem(review));
+    sectionState.list.appendChild(renderReviewItem(review, sectionState));
   });
 }
 
@@ -570,7 +646,7 @@ function setSectionFilter(sectionState, nextFilter) {
   renderSection(sectionState, cache);
 }
 
-function renderReviewItem(review) {
+function renderReviewItem(review, sectionState) {
   const item = document.createElement('article');
   item.className = 'community-review-item';
 
@@ -606,6 +682,63 @@ function renderReviewItem(review) {
 
   item.appendChild(header);
 
+  const actions = document.createElement('div');
+  actions.className = 'community-review-actions';
+
+  if (!review.isSelf && review.username) {
+    const followBtn = document.createElement('button');
+    followBtn.type = 'button';
+    followBtn.className = 'btn-subtle community-follow-btn';
+    updateFollowButtonState(followBtn, review.username);
+    followBtn.addEventListener('click', async () => {
+      const target = canonicalUsername(review.username);
+      if (!target) {
+        return;
+      }
+      const currentlyFollowing = state.following.includes(target);
+      followBtn.disabled = true;
+      followBtn.classList.add('is-loading');
+      try {
+        if (currentlyFollowing) {
+          await unfollowUserByUsername(target);
+          queueToast(`Unfollowed ${review.username}.`);
+        } else {
+          await followUserByUsername(target);
+          queueToast(`Following ${review.username}.`);
+        }
+      } catch (error) {
+        queueToast(
+          error instanceof Error ? error.message : 'Unable to update follow status right now.',
+          { variant: 'error' }
+        );
+      } finally {
+        followBtn.classList.remove('is-loading');
+        updateFollowButtonState(followBtn, review.username);
+        followBtn.disabled = false;
+      }
+    });
+    actions.appendChild(followBtn);
+  }
+
+  const likeMeta = normalizeLikeMeta(review.likes);
+  const likeBtn = document.createElement('button');
+  likeBtn.type = 'button';
+  likeBtn.className = 'btn-subtle community-like-btn';
+  if (review.isSelf) {
+    likeBtn.disabled = true;
+    likeBtn.setAttribute('aria-disabled', 'true');
+  }
+  updateLikeButtonState(likeBtn, likeMeta);
+  likeBtn.addEventListener('click', () => {
+    if (!sectionState || !sectionState.movie || review.isSelf) {
+      return;
+    }
+    toggleReviewLike(sectionState, review, likeBtn);
+  });
+  actions.appendChild(likeBtn);
+
+  item.appendChild(actions);
+
   if (review.body) {
     if (review.hasSpoilers) {
       const spoilerWrap = document.createElement('div');
@@ -638,6 +771,91 @@ function renderReviewItem(review) {
   }
 
   return item;
+}
+
+function updateFollowButtonState(button, username) {
+  if (!button) {
+    return;
+  }
+  const normalized = canonicalUsername(username);
+  const isFollowing = normalized ? state.following.includes(normalized) : false;
+  button.dataset.following = isFollowing ? 'true' : 'false';
+  button.textContent = isFollowing ? 'Following' : 'Follow';
+  if (isFollowing) {
+    button.classList.add('is-active');
+    button.setAttribute('aria-pressed', 'true');
+  } else {
+    button.classList.remove('is-active');
+    button.setAttribute('aria-pressed', 'false');
+  }
+}
+
+function normalizeLikeMeta(likes) {
+  if (!likes || typeof likes !== 'object') {
+    return { count: 0, hasLiked: false };
+  }
+  const count = typeof likes.count === 'number' ? likes.count : 0;
+  const hasLiked = Boolean(likes.hasLiked);
+  return { count, hasLiked };
+}
+
+function updateLikeButtonState(button, meta) {
+  if (!button) {
+    return;
+  }
+  const normalized = normalizeLikeMeta(meta);
+  const countLabel = normalized.count === 1 ? 'Like' : 'Likes';
+  button.textContent = `👍 ${normalized.count} ${countLabel}`;
+  button.dataset.count = String(normalized.count);
+  if (normalized.hasLiked) {
+    button.classList.add('is-liked');
+    button.setAttribute('aria-pressed', 'true');
+  } else {
+    button.classList.remove('is-liked');
+    button.setAttribute('aria-pressed', 'false');
+  }
+}
+
+async function toggleReviewLike(sectionState, review, button) {
+  if (!state.session || !state.session.token) {
+    queueToast('Sign in to react to community notes.', { variant: 'error' });
+    return;
+  }
+  const payload = normalizeMovieForApi(sectionState && sectionState.movie);
+  const target = canonicalUsername(review && review.username ? review.username : '');
+  if (!payload || !target) {
+    return;
+  }
+  const currentlyLiked = button && button.classList.contains('is-liked');
+  if (button) {
+    button.disabled = true;
+    button.classList.add('is-loading');
+  }
+  try {
+    const response = await callSocial(currentlyLiked ? 'unlikeReview' : 'likeReview', {
+      movie: payload,
+      reviewUsername: target
+    });
+    if (response && response.likes) {
+      updateLikeButtonState(button, response.likes);
+    }
+    await fetchReviews(
+      sectionState.key,
+      sectionState.movie,
+      true,
+      currentlyLiked ? 'unlike' : 'like'
+    );
+  } catch (error) {
+    queueToast(
+      error instanceof Error ? error.message : 'Unable to react to this review right now.',
+      { variant: 'error' }
+    );
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.classList.remove('is-loading');
+    }
+  }
 }
 
 function renderSummary(sectionState, stats) {
@@ -823,6 +1041,16 @@ function updateFriendBadge(sectionState, friendTimestamp) {
     badge.hidden = false;
     badge.classList.add('is-visible');
     badge.setAttribute('aria-label', 'New friend review');
+    if (
+      sectionState.lastRenderOrigin === 'refresh' &&
+      friendTimestamp &&
+      sectionState.friendToastAt !== friendTimestamp &&
+      sectionState.movie &&
+      sectionState.movie.title
+    ) {
+      queueToast(`New friend review for “${sectionState.movie.title}”.`, { variant: 'success' });
+      sectionState.friendToastAt = friendTimestamp;
+    }
   } else {
     badge.hidden = true;
     badge.classList.remove('is-visible');
@@ -1036,12 +1264,151 @@ function notifyFollowingSubscribers() {
   });
 }
 
+function notifyNotificationSubscribers() {
+  const payload = {
+    notifications: state.notifications.slice(),
+    unreadCount: countUnreadNotifications()
+  };
+  notificationSubscribers.forEach((callback) => {
+    try {
+      callback(payload);
+    } catch (error) {
+      console.warn('Notification subscriber error', error);
+    }
+  });
+}
+
+function countUnreadNotifications() {
+  return state.notifications.filter((entry) => !entry.readAt).length;
+}
+
+async function loadNotifications(force = false) {
+  if (!state.session || !state.session.token) {
+    return;
+  }
+  if (state.notificationsLoading && !force) {
+    return;
+  }
+  state.notificationsLoading = true;
+  try {
+    const response = await callSocial('listNotifications');
+    applyNotificationPayload(response);
+  } catch (error) {
+    console.warn('Failed to load notifications', error);
+  } finally {
+    state.notificationsLoading = false;
+  }
+}
+
+function applyNotificationPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return;
+  }
+  const list = Array.isArray(payload.notifications) ? payload.notifications : [];
+  const normalized = list.map((entry) => ({
+    id: entry.id || String(Math.random()),
+    type: entry.type || 'activity',
+    actor: entry.actor || null,
+    movieTitle: entry.movieTitle || null,
+    movieTmdbId: entry.movieTmdbId || null,
+    movieImdbId: entry.movieImdbId || null,
+    message: entry.message || '',
+    createdAt: entry.createdAt || null,
+    readAt: entry.readAt || null
+  }));
+  const seenBefore = new Set(state.notifications.map((entry) => entry.id));
+  const newNotifications = normalized.filter((entry) => !seenBefore.has(entry.id));
+  state.notifications = normalized;
+  const shouldAnnounce = state.notificationsLoaded;
+  state.notificationsLoaded = true;
+  newNotifications.forEach((entry) => {
+    if (!state.notificationSeen.has(entry.id)) {
+      if (entry.message && shouldAnnounce) {
+        queueToast(entry.message, { source: 'notification' });
+      }
+      state.notificationSeen.add(entry.id);
+    }
+  });
+  notifyNotificationSubscribers();
+}
+
+function startNotificationPolling() {
+  if (state.notificationTimer) {
+    window.clearInterval(state.notificationTimer);
+    state.notificationTimer = null;
+  }
+  if (!state.session || !state.session.token) {
+    return;
+  }
+  state.notificationTimer = window.setInterval(() => {
+    loadNotifications(true).catch(() => {});
+  }, NOTIFICATION_POLL_INTERVAL);
+}
+
+function stopNotificationPolling() {
+  if (state.notificationTimer) {
+    window.clearInterval(state.notificationTimer);
+    state.notificationTimer = null;
+  }
+}
+
+function queueToast(message, options = {}) {
+  if (!message) {
+    return;
+  }
+  const host = getToastHost();
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  const variant = options.variant || 'info';
+  toast.dataset.variant = variant;
+  toast.textContent = message;
+  host.appendChild(toast);
+  window.requestAnimationFrame(() => {
+    toast.classList.add('is-visible');
+  });
+  const timeout = typeof options.duration === 'number' ? options.duration : 5000;
+  window.setTimeout(() => {
+    toast.classList.remove('is-visible');
+    window.setTimeout(() => {
+      toast.remove();
+    }, 300);
+  }, timeout);
+}
+
+function getToastHost() {
+  if (state.toastHost && document.body.contains(state.toastHost)) {
+    return state.toastHost;
+  }
+  const host = document.createElement('div');
+  host.className = 'toast-host';
+  document.body.appendChild(host);
+  state.toastHost = host;
+  return host;
+}
+
+function normalizeMovieForApi(movie) {
+  if (!movie || typeof movie !== 'object') {
+    return null;
+  }
+  const tmdbId = normalizeId(movie.tmdbId || movie.tmdbID || movie.id);
+  const title = typeof movie.title === 'string' ? movie.title : movie.movieTitle || '';
+  if (!tmdbId || !title) {
+    return null;
+  }
+  return {
+    tmdbId,
+    imdbId: movie.imdbId || movie.imdbID || null,
+    title
+  };
+}
+
 function refreshAllSections() {
   state.sections.forEach((section) => {
     if (section.visible) {
-      fetchReviews(section.key, section.movie, true);
+      fetchReviews(section.key, section.movie, true, 'refresh');
     }
   });
+  loadNotifications(true).catch(() => {});
 }
 
 async function callSocial(action, payload = {}) {
