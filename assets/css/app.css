@@ -3561,6 +3561,78 @@ form.settings-section {
       background: rgba(15, 23, 42, 0.98);
     }
 
+    .movie-community-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      margin-top: 0.45rem;
+    }
+
+    .movie-community-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.28rem;
+      border-radius: 999px;
+      padding: 0.16rem 0.65rem;
+      font-size: 0.72rem;
+      line-height: 1;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      color: rgba(226, 232, 240, 0.95);
+    }
+
+    .movie-community-chip.is-friends {
+      border-color: rgba(129, 140, 248, 0.5);
+      background: rgba(129, 140, 248, 0.14);
+      color: rgba(199, 210, 254, 0.95);
+    }
+
+    .movie-community-chip.is-friends[data-empty="true"] {
+      color: rgba(148, 163, 184, 0.78);
+      background: rgba(15, 23, 42, 0.6);
+      border-style: dashed;
+    }
+
+    .movie-community-activity {
+      margin-top: 0.32rem;
+      font-size: 0.7rem;
+      color: rgba(148, 163, 184, 0.85);
+    }
+
+    .movie-community-badge {
+      position: absolute;
+      top: 0.6rem;
+      right: 2.35rem;
+      width: 0.6rem;
+      height: 0.6rem;
+      border-radius: 50%;
+      background: rgba(244, 114, 182, 0.95);
+      box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.95), 0 4px 12px rgba(244, 114, 182, 0.6);
+      opacity: 0;
+      transform: scale(0.6);
+      transition: opacity var(--transition-fast), transform var(--transition-fast);
+      pointer-events: none;
+    }
+
+    .movie-community-badge.is-visible {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    @media (max-width: 720px) {
+      .movie-community-badge {
+        top: 0.55rem;
+        right: 2.05rem;
+      }
+    }
+
+    @media (max-width: 540px) {
+      .movie-community-badge {
+        top: 0.5rem;
+        right: 1.85rem;
+      }
+    }
+
     .movie-state-icons {
       display: flex;
       gap: 0.35rem;

@@ -423,6 +423,7 @@ function calculateReviewStats(reviews) {
   let friendRatings = 0;
   let friendRatingSum = 0;
   let latestTimestamp = null;
+  let friendLatestTimestamp = null;
 
   reviews.forEach((review) => {
     if (!review) {
@@ -445,11 +446,15 @@ function calculateReviewStats(reviews) {
       }
     }
 
+    const timestamp = review.updatedAt || review.createdAt || null;
     if (review.isFriend) {
       friendReviews += 1;
+      if (timestamp && typeof timestamp === 'string') {
+        if (!friendLatestTimestamp || timestamp > friendLatestTimestamp) {
+          friendLatestTimestamp = timestamp;
+        }
+      }
     }
-
-    const timestamp = review.updatedAt || review.createdAt || null;
     if (timestamp && typeof timestamp === 'string') {
       if (!latestTimestamp || timestamp > latestTimestamp) {
         latestTimestamp = timestamp;
@@ -464,7 +469,8 @@ function calculateReviewStats(reviews) {
     friendReviews,
     friendRatings,
     friendAverageRating: friendRatings ? Math.round((friendRatingSum / friendRatings) * 10) / 10 : null,
-    lastReviewAt: latestTimestamp
+    lastReviewAt: latestTimestamp,
+    friendLastReviewAt: friendLatestTimestamp
   };
 }
 
