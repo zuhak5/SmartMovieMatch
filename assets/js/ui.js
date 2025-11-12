@@ -25,10 +25,10 @@ export function setRecError(text) {
   }
   if (text) {
     el.textContent = text;
-    el.style.display = "block";
+    el.classList.add("is-visible");
   } else {
     el.textContent = "";
-    el.style.display = "none";
+    el.classList.remove("is-visible");
   }
 }
 
