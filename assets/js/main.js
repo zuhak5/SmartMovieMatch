@@ -53,7 +53,8 @@ import {
   showSkeletons,
   setRecStatus,
   setRecError,
-  showToast
+  showToast,
+  highlightRecommendationCard
 } from "./ui.js";
 import { $ } from "./dom.js";
 import { playUiClick, playExpandSound } from "./sound.js";
@@ -72,6 +73,22 @@ const MAX_WATCH_PARTY_SUGGESTIONS = 6;
 const COLLAB_DISCUSSION_MAX_LENGTH = 220;
 
 let inviteQrRequest = 0;
+
+const SOCIAL_NOTIFICATION_TYPES = new Set([
+  "follow",
+  "mention",
+  "review_like",
+  "review_reply",
+  "review_reaction",
+  "friend_review",
+  "friend_watchlist",
+  "friend_favorite",
+  "collab_invite",
+  "collab_accept",
+  "watch_party",
+  "watch_party_update",
+  "watch_party_reminder"
+]);
 
 const RECOMMENDATION_LAYOUT_STORAGE_KEY = "smm.recommendation-layout.v1";
 const PRESENCE_STATUS_STORAGE_KEY = "smm.presence-status.v1";
@@ -92,6 +109,7 @@ const state = {
   accountMenuOpen: false,
   notificationPanelOpen: false,
   notifications: [],
+  notificationFocusTarget: null,
   accountAvatarPreviewUrl: null,
   accountRemoveAvatar: false,
   socialSearchReset: null,
@@ -919,6 +937,7 @@ function init() {
   state.watchedMovies = [];
   state.favorites = [];
   state.session = loadSession();
+  state.notificationFocusTarget = getNotificationDeepLinkTarget();
   setupSocialFeatures();
   hydrateFromSession(state.session);
   refreshWatchedUi();
@@ -998,6 +1017,7 @@ function init() {
 
   wireEvents();
   renderNotificationCenter();
+  maybeApplyPageContextFromQuery();
 
   if (!state.onboardingSeen) {
     window.setTimeout(() => {
@@ -1029,6 +1049,100 @@ function init() {
   }
 
   maybeReloadSocialProfilePage();
+}
+
+function getNotificationDeepLinkTarget() {
+  const page = document.body ? document.body.getAttribute("data-page") : null;
+  if (page !== "discovery") {
+    return null;
+  }
+  const params = new URLSearchParams(window.location.search);
+  const tmdbId = params.get("movie") || params.get("tmdb");
+  const imdbId = params.get("imdb");
+  const title = params.get("title");
+  if (!tmdbId && !imdbId && !title) {
+    return null;
+  }
+  const context = (params.get("context") || params.get("notification") || "").toLowerCase();
+  return {
+    tmdbId: tmdbId ? tmdbId.trim() : "",
+    imdbId: imdbId ? imdbId.trim() : "",
+    title: title ? title.trim() : "",
+    focusCommunity: context === "community" || context === "review"
+  };
+}
+
+function maybeFocusNotificationTarget() {
+  if (!state.notificationFocusTarget || document.body?.getAttribute("data-page") !== "discovery") {
+    return;
+  }
+  const didFocus = highlightRecommendationCard(state.notificationFocusTarget, {
+    expand: true,
+    focusCommunity: state.notificationFocusTarget.focusCommunity,
+    scrollBlock: "center"
+  });
+  if (didFocus) {
+    state.notificationFocusTarget = null;
+    clearNotificationQueryParams();
+  }
+}
+
+function clearNotificationQueryParams() {
+  if (!window.history || typeof window.history.replaceState !== "function") {
+    return;
+  }
+  const url = new URL(window.location.href);
+  const keys = ["movie", "tmdb", "imdb", "title", "context", "notification", "source"];
+  let mutated = false;
+  keys.forEach((key) => {
+    if (url.searchParams.has(key)) {
+      url.searchParams.delete(key);
+      mutated = true;
+    }
+  });
+  if (!mutated) {
+    return;
+  }
+  const nextSearch = url.searchParams.toString();
+  const next = `${url.pathname}${nextSearch ? `?${nextSearch}` : ""}${url.hash || ""}`;
+  window.history.replaceState({}, document.title, next);
+}
+
+function maybeApplyPageContextFromQuery() {
+  const page = document.body ? document.body.getAttribute("data-page") : null;
+  if (page !== "profile-overview") {
+    return;
+  }
+  const params = new URLSearchParams(window.location.search);
+  const context = (params.get("context") || params.get("notification") || "").toLowerCase();
+  if (!context) {
+    return;
+  }
+  let targetId = "";
+  switch (context) {
+    case "party":
+      targetId = "watchPartyInviteList";
+      break;
+    case "collab":
+      targetId = "collabInviteList";
+      break;
+    case "social":
+    case "follow":
+    default:
+      targetId = "socialConnectionsSection";
+      break;
+  }
+  const target = document.getElementById(targetId);
+  if (target) {
+    window.requestAnimationFrame(() => {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      target.classList.add("profile-section-pulse");
+      window.setTimeout(() => {
+        target.classList.remove("profile-section-pulse");
+      }, 1800);
+    });
+  }
+  clearNotificationQueryParams();
 }
 
 function wireEvents() {
@@ -1512,6 +1626,34 @@ function openProfilePage() {
   }
 
   window.location.href = "profile.html";
+}
+
+function openProfileDeepLink(context = "social") {
+  if (!state.session || !state.session.token) {
+    window.location.href = "login.html";
+    return;
+  }
+  const url = new URL("profile.html", window.location.origin);
+  const normalized = typeof context === "string" ? context.toLowerCase() : "social";
+  let hash = "";
+  switch (normalized) {
+    case "party":
+      hash = "watchPartyInviteList";
+      break;
+    case "collab":
+      hash = "collabInviteList";
+      break;
+    case "social":
+    case "follow":
+    default:
+      hash = "socialConnectionsSection";
+      break;
+  }
+  url.searchParams.set("context", normalized);
+  if (hash) {
+    url.hash = `#${hash}`;
+  }
+  window.location.href = url.toString();
 }
 
 function highlightCollectionSection(target) {
@@ -3223,6 +3365,7 @@ function updateRecommendationsView() {
   });
   updateShowMoreButton();
   updateRecommendationsMeta();
+  maybeFocusNotificationTarget();
 }
 
 function updateShowMoreButton() {
@@ -3718,11 +3861,7 @@ function wireSocialFirstRunCta() {
   socialFirstRunCtaWired = true;
   button.addEventListener("click", () => {
     playUiClick();
-    if (state.session && state.session.token) {
-      window.location.href = "profile.html#socialConnectionsSection";
-    } else {
-      window.location.href = "login.html";
-    }
+    openProfileDeepLink("social");
   });
 }
 
@@ -8782,7 +8921,9 @@ function renderNotificationCenter(payload = {}) {
   const unreadCount = typeof payload.unreadCount === "number"
     ? payload.unreadCount
     : countUnreadNotifications();
+  const unreadSocial = countUnreadSocialNotifications(notifications);
   const hasSession = Boolean(state.session && state.session.token);
+  updateSocialActivityIndicator(hasSession && unreadSocial > 0);
 
   // Keep the friends activity feed in sync with the latest notification payload
   // even if the notification UI isn't present on the current page.
@@ -8817,7 +8958,6 @@ function renderNotificationCenter(payload = {}) {
     countEl.hidden = true;
     bell.classList.remove("has-unread");
   }
-
   listEl.innerHTML = "";
   if (!notifications.length) {
     listEl.hidden = true;
@@ -8825,65 +8965,30 @@ function renderNotificationCenter(payload = {}) {
   } else {
     listEl.hidden = false;
     emptyEl.hidden = true;
-    notifications.forEach((note) => {
-      const item = document.createElement("div");
-      item.className = "notification-item";
-      item.setAttribute("role", "listitem");
-      if (!note.readAt) {
-        item.dataset.unread = "true";
-      } else {
-        delete item.dataset.unread;
+    const groups = groupNotificationsForDisplay(notifications);
+    groups.forEach((group) => {
+      const section = document.createElement("section");
+      section.className = "notification-group";
+      const header = document.createElement("div");
+      header.className = "notification-group-header";
+      const title = document.createElement("span");
+      title.className = "notification-group-title";
+      title.textContent = group.title;
+      header.appendChild(title);
+      if (group.description) {
+        const description = document.createElement("span");
+        description.className = "notification-group-description";
+        description.textContent = group.description;
+        header.appendChild(description);
       }
-      const icon = document.createElement("span");
-      icon.className = "notification-item-icon";
-      icon.textContent = getNotificationIcon(note.type);
-      icon.setAttribute("aria-hidden", "true");
-
-      const body = document.createElement("div");
-      body.className = "notification-item-body";
-
-      const message = document.createElement("div");
-      message.className = "notification-item-message";
-      const rawMessage = typeof note.message === "string" ? note.message.trim() : "";
-      const messageText = rawMessage || "Activity update.";
-      const actorHandle = typeof note.actor === "string" ? note.actor.trim() : "";
-      if (actorHandle) {
-        const actorLabel = formatSocialDisplayName(actorHandle) || `@${actorHandle}`;
-        const actorLink = createInlineProfileLink(actorHandle, {
-          label: actorLabel,
-          className: "notification-actor-link"
-        });
-        if (actorLink) {
-          message.appendChild(actorLink);
-          const normalizedMessage = messageText;
-          const startsWithActor = normalizedMessage.toLowerCase().startsWith(actorHandle.toLowerCase());
-          const remainder = startsWithActor
-            ? normalizedMessage.slice(actorHandle.length)
-            : normalizedMessage;
-          if (remainder) {
-            const needsSpace = !startsWithActor && !remainder.startsWith(" ");
-            message.appendChild(
-              document.createTextNode(needsSpace ? ` ${remainder}` : remainder)
-            );
-          }
-        } else {
-          message.textContent = messageText;
+      section.appendChild(header);
+      group.items.forEach((note) => {
+        const item = buildNotificationItem(note);
+        if (item) {
+          section.appendChild(item);
         }
-      } else {
-        message.textContent = messageText;
-      }
-
-      const meta = document.createElement("div");
-      meta.className = "notification-item-meta";
-      meta.textContent = formatNotificationTimestamp(note.createdAt);
-
-      body.appendChild(message);
-      if (meta.textContent) {
-        body.appendChild(meta);
-      }
-      item.appendChild(icon);
-      item.appendChild(body);
-      listEl.appendChild(item);
+      });
+      listEl.appendChild(section);
     });
   }
 
@@ -8956,6 +9061,200 @@ function formatNotificationTimestamp(timestamp) {
     return "";
   }
   return formatSyncTime(timestamp);
+}
+
+function groupNotificationsForDisplay(notifications) {
+  const buckets = { social: [], system: [] };
+  notifications.forEach((note) => {
+    if (!note) {
+      return;
+    }
+    const category = getNotificationCategory(note);
+    const key = category === "social" ? "social" : "system";
+    buckets[key].push(note);
+  });
+  return [
+    {
+      key: "social",
+      title: "New from your friends",
+      description: "Follows, reviews & invites",
+      items: buckets.social
+    },
+    {
+      key: "system",
+      title: "Account & sync",
+      description: "Security alerts & sync status",
+      items: buckets.system
+    }
+  ].filter((group) => group.items.length);
+}
+
+function buildNotificationItem(note) {
+  if (!note) {
+    return null;
+  }
+  const item = document.createElement("div");
+  item.className = "notification-item";
+  item.setAttribute("role", "listitem");
+  if (!note.readAt) {
+    item.dataset.unread = "true";
+  } else {
+    delete item.dataset.unread;
+  }
+  const icon = document.createElement("span");
+  icon.className = "notification-item-icon";
+  icon.textContent = getNotificationIcon(note.type);
+  icon.setAttribute("aria-hidden", "true");
+
+  const body = document.createElement("div");
+  body.className = "notification-item-body";
+  const message = document.createElement("div");
+  message.className = "notification-item-message";
+  const rawMessage = typeof note.message === "string" ? note.message.trim() : "";
+  const messageText = rawMessage || "Activity update.";
+  const actorHandle = typeof note.actor === "string" ? note.actor.trim() : "";
+  if (actorHandle) {
+    const actorLabel = formatSocialDisplayName(actorHandle) || `@${actorHandle}`;
+    const actorLink = createInlineProfileLink(actorHandle, {
+      label: actorLabel,
+      className: "notification-actor-link"
+    });
+    if (actorLink) {
+      message.appendChild(actorLink);
+      const normalizedMessage = messageText;
+      const startsWithActor = normalizedMessage.toLowerCase().startsWith(actorHandle.toLowerCase());
+      const remainder = startsWithActor
+        ? normalizedMessage.slice(actorHandle.length)
+        : normalizedMessage;
+      if (remainder) {
+        const needsSpace = !startsWithActor && !remainder.startsWith(" ");
+        message.appendChild(document.createTextNode(needsSpace ? ` ${remainder}` : remainder));
+      }
+    } else {
+      message.textContent = messageText;
+    }
+  } else {
+    message.textContent = messageText;
+  }
+
+  const meta = document.createElement("div");
+  meta.className = "notification-item-meta";
+  meta.textContent = formatNotificationTimestamp(note.createdAt);
+
+  body.appendChild(message);
+  if (meta.textContent) {
+    body.appendChild(meta);
+  }
+
+  const action = buildNotificationAction(note);
+  if (action) {
+    const actionRow = document.createElement("div");
+    actionRow.className = "notification-item-actions";
+    actionRow.appendChild(action);
+    body.appendChild(actionRow);
+  }
+
+  item.appendChild(icon);
+  item.appendChild(body);
+  return item;
+}
+
+function buildNotificationAction(note) {
+  const type = typeof note?.type === "string" ? note.type.toLowerCase() : "";
+  switch (type) {
+    case "follow":
+      return createNotificationActionButton("Open social hub", () => openProfileDeepLink("social"));
+    case "collab_invite":
+      return createNotificationActionButton("Review invite", () => openProfileDeepLink("collab"));
+    case "collab_accept":
+      return createNotificationActionButton("See the list", () => openProfileDeepLink("collab"));
+    case "watch_party":
+      return createNotificationActionButton("View watch party", () => openProfileDeepLink("party"));
+    case "watch_party_update":
+    case "watch_party_reminder":
+      return createNotificationActionButton("Open RSVP", () => openProfileDeepLink("party"));
+    default:
+      break;
+  }
+  if (note && (note.movieTmdbId || note.movieImdbId || note.movieTitle)) {
+    const label = type && (type.includes("review") || type === "mention")
+      ? "View discussion"
+      : "Open movie";
+    return createNotificationActionButton(label, () => {
+      openMovieContextFromNotification(note, { context: "community" });
+    });
+  }
+  return null;
+}
+
+function createNotificationActionButton(label, handler) {
+  if (typeof handler !== "function") {
+    return null;
+  }
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "notification-action-btn";
+  btn.textContent = label;
+  btn.addEventListener("click", () => {
+    playUiClick();
+    handler();
+  });
+  return btn;
+}
+
+function openMovieContextFromNotification(note, options = {}) {
+  if (!note) {
+    return;
+  }
+  if (!state.session || !state.session.token) {
+    window.location.href = "login.html";
+    return;
+  }
+  const url = new URL("index.html", window.location.origin);
+  const tmdbId = note.movieTmdbId || note.tmdbId;
+  const imdbId = note.movieImdbId || note.imdbId;
+  if (tmdbId) {
+    url.searchParams.set("movie", String(tmdbId));
+  } else if (imdbId) {
+    url.searchParams.set("imdb", String(imdbId));
+  } else if (note.movieTitle) {
+    url.searchParams.set("title", note.movieTitle);
+  } else {
+    openProfileDeepLink("social");
+    return;
+  }
+  const context = options.context || "community";
+  url.searchParams.set("context", context);
+  url.searchParams.set("source", "notification");
+  window.location.href = url.toString();
+}
+
+function updateSocialActivityIndicator(hasUnread) {
+  const indicator = $("socialActivityIndicator");
+  const profileBtn = $("accountProfileBtn");
+  if (!indicator || !profileBtn) {
+    return;
+  }
+  if (hasUnread) {
+    indicator.hidden = false;
+    indicator.setAttribute("aria-hidden", "false");
+  } else {
+    indicator.hidden = true;
+    indicator.setAttribute("aria-hidden", "true");
+  }
+  profileBtn.classList.toggle("has-social-unread", hasUnread);
+}
+
+function getNotificationCategory(note) {
+  const type = typeof note?.type === "string" ? note.type.toLowerCase() : "";
+  return SOCIAL_NOTIFICATION_TYPES.has(type) ? "social" : "system";
+}
+
+function countUnreadSocialNotifications(list = state.notifications) {
+  if (!Array.isArray(list)) {
+    return 0;
+  }
+  return list.filter((entry) => entry && !entry.readAt && getNotificationCategory(entry) === "social").length;
 }
 
 async function handleUnfollowUser(username, button) {
