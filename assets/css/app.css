@@ -37,8 +37,8 @@ body {
 
 section,
 div {
-  padding-right: 8px;
-  padding-left: 8px;
+  padding-right: 5px;
+  padding-left: 5px;
 }
 
 body[data-theme="light"] {
