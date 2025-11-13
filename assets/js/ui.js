@@ -1327,8 +1327,11 @@ export function renderRecommendations(items, watchedMovies, options = {}) {
 }
 
 function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLookup, handlers) {
-  const imdbID =
-    getOmdbField(omdb, "imdbID") || (tmdb && tmdb.imdb_id ? tmdb.imdb_id : "");
+  const hasReliableTmdb = Boolean(tmdb && (tmdb.id || tmdb.tmdb_id || tmdb.tmdbId || tmdb.title || tmdb.original_title));
+  const hasReliableOmdb = Boolean(omdb && omdb.__source !== "tmdb-fallback");
+  const omdbImdbId = getOmdbField(omdb, "imdbID");
+  const tmdbImdbId = tmdb && tmdb.imdb_id ? tmdb.imdb_id : "";
+  const imdbID = omdbImdbId || tmdbImdbId || "";
   const tmdbId = tmdb && (tmdb.id || tmdb.tmdb_id || tmdb.tmdbId)
     ? tmdb.id || tmdb.tmdb_id || tmdb.tmdbId
     : null;
@@ -1341,12 +1344,28 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
   const title = tmdbTitle || omdbTitle || "Unknown title";
   const originalTitle = tmdb && tmdb.original_title && tmdb.original_title !== title ? tmdb.original_title : null;
   const catalogTitle = omdbTitle && omdbTitle !== title ? omdbTitle : null;
-  const releaseIso = formatIsoDate(tmdb && tmdb.release_date ? tmdb.release_date : getOmdbField(omdb, "Released"));
-  const releaseFriendly = formatFriendlyDate(tmdb && tmdb.release_date ? tmdb.release_date : releaseIso);
-  const year = releaseIso ? releaseIso.slice(0, 4) : getOmdbField(omdb, "Year") || "";
-  const runtime = formatRuntimeValue(tmdb?.runtime, getOmdbField(omdb, "Runtime"));
+  const omdbReleased = getOmdbField(omdb, "Released");
+  const tmdbReleaseDate = tmdb && tmdb.release_date ? tmdb.release_date : null;
+  const releaseIso = formatIsoDate(tmdbReleaseDate || omdbReleased);
+  const releaseFriendly = formatFriendlyDate(tmdbReleaseDate || releaseIso);
+  const releaseSource = tmdbReleaseDate ? "tmdb" : omdbReleased ? "omdb" : null;
+  const omdbYearValue = getOmdbField(omdb, "Year") || "";
+  const year = releaseIso ? releaseIso.slice(0, 4) : omdbYearValue;
+  const omdbRuntime = getOmdbField(omdb, "Runtime");
+  const hasTmdbRuntime = Boolean(
+    tmdb && typeof tmdb.runtime === "number" && Number.isFinite(tmdb.runtime) && tmdb.runtime > 0
+  );
+  const tmdbRuntimeMinutes = hasTmdbRuntime ? tmdb.runtime : null;
+  const runtime = formatRuntimeValue(tmdbRuntimeMinutes, omdbRuntime);
+  const runtimeSource = tmdbRuntimeMinutes ? "tmdb" : omdbRuntime ? "omdb" : null;
   const rated = getOmdbField(omdb, "Rated");
-  const languages = buildLanguageList(tmdb, getOmdbField(omdb, "Language"));
+  const omdbLanguage = getOmdbField(omdb, "Language");
+  const languages = buildLanguageList(tmdb, omdbLanguage);
+  const tmdbHasLanguageData = Boolean(
+    (tmdb && Array.isArray(tmdb.spoken_languages) && tmdb.spoken_languages.length) ||
+      (tmdb && tmdb.original_language)
+  );
+  const languageSource = tmdbHasLanguageData ? "tmdb" : omdbLanguage ? "omdb" : null;
   const director = getOmdbField(omdb, "Director");
   const writer = getOmdbField(omdb, "Writer");
   const actors = splitOmdbList(omdb, "Actors", 3).join(", ") || null;
@@ -1368,6 +1387,9 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
   const metascore = getOmdbField(omdb, "Metascore");
   const ratingsMap = buildOmdbRatingsMap(omdb);
   const genres = buildGenreList(tmdb, omdb);
+  const tmdbHasGenres = Boolean(tmdb && Array.isArray(tmdb.genre_ids) && tmdb.genre_ids.length);
+  const genreSource = tmdbHasGenres ? "tmdb" : genres.length ? "omdb" : null;
+  const imdbIdSource = omdbImdbId ? "omdb" : tmdbImdbId ? "tmdb" : null;
 
   const card = document.createElement("article");
   card.className = "movie-card collapsed";
@@ -1574,23 +1596,40 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
 
   const summaryMeta = document.createElement("div");
   summaryMeta.className = "movie-detail-grid";
-  appendDetail(summaryMeta, "Director", director || "—");
-  appendDetail(summaryMeta, "Writer", writer || "—");
-  appendDetail(summaryMeta, "Main cast", actors || "—");
-  appendDetail(summaryMeta, "Country", country || "—");
-  appendDetail(summaryMeta, "Awards", awards || "—");
-  appendDetail(summaryMeta, "Box office", boxOffice || "—");
-  appendDetail(summaryMeta, "Rated", rated || "Not rated");
-  appendDetail(summaryMeta, "Runtime", runtime || "Unknown");
+  appendDetail(summaryMeta, "Director", director || "—", { source: "omdb" });
+  appendDetail(summaryMeta, "Writer", writer || "—", { source: "omdb" });
+  appendDetail(summaryMeta, "Main cast", actors || "—", { source: "omdb" });
+  appendDetail(summaryMeta, "Country", country || "—", { source: "omdb" });
+  appendDetail(summaryMeta, "Awards", awards || "—", { source: "omdb" });
+  appendDetail(summaryMeta, "Box office", boxOffice || "—", { source: "omdb" });
+  appendDetail(summaryMeta, "Rated", rated || "Not rated", { source: "omdb" });
+  appendDetail(summaryMeta, "Runtime", runtime || "Unknown", { source: runtimeSource });
   appendDetail(
     summaryMeta,
     "Genres",
-    genres.length ? genres.map((genre) => genre.label).join(", ") : "—"
+    genres.length ? genres.map((genre) => genre.label).join(", ") : "—",
+    { source: genreSource }
   );
-  appendDetail(summaryMeta, "Release (ISO)", releaseIso || "—");
-  appendDetail(summaryMeta, "Primary language", languages.length ? languages.join(", ") : "—");
-  appendDetail(summaryMeta, "IMDb ID", imdbID || "—");
-  appendDetail(summaryMeta, "TMDb ID", tmdbId ? String(tmdbId) : "—");
+  appendDetail(summaryMeta, "Release (ISO)", releaseIso || "—", { source: releaseSource });
+  appendDetail(
+    summaryMeta,
+    "Primary language",
+    languages.length ? languages.join(", ") : "—",
+    { source: languageSource }
+  );
+  appendDetail(summaryMeta, "IMDb ID", imdbID || "—", { source: imdbIdSource });
+  appendDetail(summaryMeta, "TMDb ID", tmdbId ? String(tmdbId) : "—", { source: "tmdb" });
+
+  const missingDetailSources = [];
+  if (!hasReliableOmdb) {
+    missingDetailSources.push("omdb");
+  }
+  if (!hasReliableTmdb) {
+    missingDetailSources.push("tmdb");
+  }
+  if (missingDetailSources.length) {
+    removeDetailItemsBySource(summaryMeta, missingDetailSources);
+  }
 
   const plotEl = document.createElement("div");
   plotEl.className = "movie-plot";
@@ -1822,7 +1861,9 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
     trailerArea.appendChild(fallback);
   }
 
-  details.appendChild(summaryMeta);
+  if (summaryMeta.childElementCount) {
+    details.appendChild(summaryMeta);
+  }
   if (factGrid.childElementCount) {
     details.appendChild(factGrid);
   }
@@ -1951,9 +1992,20 @@ export function highlightRecommendationCard(target, options = {}) {
   return true;
 }
 
-function appendDetail(container, label, value) {
+function appendDetail(container, label, value, options = {}) {
   const item = document.createElement("div");
   item.className = "detail-item";
+  const sourceList = Array.isArray(options.sources)
+    ? options.sources
+    : options.source
+    ? [options.source]
+    : [];
+  const normalizedSources = sourceList
+    .map((source) => (typeof source === "string" ? source.trim() : ""))
+    .filter(Boolean);
+  if (normalizedSources.length) {
+    item.dataset.sources = normalizedSources.join(" ");
+  }
   const dt = document.createElement("span");
   dt.className = "detail-label";
   dt.textContent = label;
@@ -1963,6 +2015,25 @@ function appendDetail(container, label, value) {
   item.appendChild(dt);
   item.appendChild(dd);
   container.appendChild(item);
+  return item;
+}
+
+function removeDetailItemsBySource(container, missingSources) {
+  if (!container || !Array.isArray(missingSources) || !missingSources.length) {
+    return;
+  }
+  const items = container.querySelectorAll(".detail-item");
+  items.forEach((item) => {
+    const attr = item.dataset.sources;
+    if (!attr) {
+      return;
+    }
+    const sources = attr.split(/\s+/).filter(Boolean);
+    const shouldRemove = sources.some((source) => missingSources.includes(source));
+    if (shouldRemove) {
+      item.remove();
+    }
+  });
 }
 
 function formatReasons(reasons) {
