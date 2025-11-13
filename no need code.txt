@@ -1,0 +1,68 @@
+<div id="highlightPreview" class="highlight-preview" aria-live="polite">
+        <div class="highlight-preview-label">Preview</div>
+        
+      <div class="highlight-preview-content" data-highlight-preview="live"><span class="highlight-preview-icon" aria-hidden="true">⚡</span><div><div class="highlight-preview-title">Live movie fetch</div><div class="highlight-preview-text">Watch cards fill with trailers, art, and metadata as I blend TMDB and OMDb in real time.</div></div></div></div>
+-	  
+	  <div class="settings-quick-links" role="group" aria-label="Account settings sections">
+              <button type="button" class="settings-quick-link" data-settings-section-trigger="profile">
+                <span aria-hidden="true">👤</span>
+                Profile
+              </button>
+              <button type="button" class="settings-quick-link" data-settings-section-trigger="security">
+                <span aria-hidden="true">🔐</span>
+                Security
+              </button>
+              <button type="button" class="settings-quick-link" data-settings-section-trigger="snapshots">
+                <span aria-hidden="true">🗂️</span>
+                Snapshots
+              </button>
+            </div>
+-
+<aside class="settings-rail" aria-label="Settings navigation">
+              <div class="settings-rail-inner">
+                <p class="settings-rail-label">Sections</p>
+                <nav class="settings-nav" role="tablist" aria-orientation="vertical">
+                  <button type="button" class="settings-nav-btn is-active" data-settings-target="profile" role="tab" aria-selected="true">
+                    Profile
+                  </button>
+                  <button type="button" class="settings-nav-btn" data-settings-target="security" role="tab" aria-selected="false">
+                    Security
+                  </button>
+                  <button type="button" class="settings-nav-btn" data-settings-target="snapshots" role="tab" aria-selected="false">
+                    Snapshots
+                  </button>
+                </nav>
+                <div id="settingsSaveIndicator" class="settings-save-indicator" role="status" aria-live="polite" data-variant="idle">All changes saved</div>
+              </div>
+            </aside>
+-
+<section class="settings-card settings-card-wide" data-settings-section="snapshots" id="accountSnapshotsSection" aria-labelledby="accountSnapshotsHeading" aria-hidden="false">
+                <div id="snapshots" class="settings-anchor" aria-hidden="true"></div>
+                <div class="settings-card-header">
+                  <h2 id="accountSnapshotsHeading">Cloud snapshots</h2>
+                  <p>These copies refresh every time Smart Movie Match syncs.</p>
+                </div>
+                <div class="snapshot-grid">
+                  <article class="snapshot-card">
+                    <h3>Preferences</h3>
+                    <pre id="snapshotPreferences" class="snapshot-pre" aria-live="polite">{
+  "mood": "any",
+  "name": "Admin",
+  "seed": 0.4694203410385982,
+  "timestamp": "2025-11-12T22:29:43.212Z",
+  "moodIntensity": 1,
+  "watchedSample": [],
+  "favoriteTitles": [],
+  "selectedGenres": []
+}</pre>
+                  </article>
+                  <article class="snapshot-card">
+                    <h3>Watched history</h3>
+                    <pre id="snapshotWatched" class="snapshot-pre" aria-live="polite">No watched history stored yet.</pre>
+                  </article>
+                  <article class="snapshot-card">
+                    <h3>Favorites</h3>
+                    <pre id="snapshotFavorites" class="snapshot-pre" aria-live="polite">No favorites stored yet.</pre>
+                  </article>
+                </div>
+              </section>
