@@ -433,9 +433,7 @@ Goal: “What should I watch right now?” + “What are my people into?” shou
 
 Make #recommendationsPanel visually primary.
 
-On desktop: keep the two-column grid, but in the right column put Recommendations first, then #collectionsPanel (saved lists) below it. At the moment Your saved lists sits above recs, which is mostly empty for new users.
-
-On mobile (.right-column): change the order so the stack becomes:
+(.right-column): change the order so the stack becomes:
 
 #preferencesPanel (“Your vibe”)
 
@@ -513,7 +511,7 @@ Display name
 
 Tagline (from profile.tagline if present)
 
-Move the Followers / Following / Mutual followers stats (currently in .social-overview-stats) up into this hero row on desktop, and directly below it on mobile. That gives users an immediate “social snapshot”.
+Move the Followers / Following / Mutual followers stats (currently in .social-overview-stats) up into this hero row. That gives users an immediate “social snapshot”.
 
 ### B. Simplify the “pulse” card layout
 
@@ -535,7 +533,6 @@ In .profile-callout-quick-links, visually group links into:
 
 “Your account” (Manage account settings / back to discovery)
 
-On desktop, consider turning these into a horizontal button row with icons; on mobile, a vertical list with clearer spacing. These are powerful “do next” actions; they should look tappable, not like fine print.
 
 ### D. Clean up the social section hierarchy
 
@@ -592,13 +589,6 @@ You already get these arrays (sharedFavorites, sharedWatchHistory, sharedWatchPa
 
 renderProfileTagSection renders headings like Shared favorites, Shared genres, Recently watched overlap, Watch parties together each with their chip list.
 
-On desktop, render them in a two-by-two grid instead of a long vertical list:
-
-Row 1: Shared favorites | Shared genres
-
-Row 2: Recently watched overlap | Watch parties together
-
-Add a small count badge next to each H3 title (e.g. “Shared favorites (8)”) so people can scan where the strongest overlap lives even before reading chips.
 
 ### C. Make mutual connections more visible
 
@@ -629,17 +619,13 @@ On mobile, ensure these tabs are full-width buttons stacked or a segmented contr
 
 ### B. Move key benefits closer to the form
 
-Right now, the “Why create an account?” content is in the right aside. That’s great on desktop but invisible on mobile.
-
-On smaller screens, duplicate or collapse the top 2–3 bullet benefits directly under the auth-card-subtitle, so people see:
+duplicate or collapse the top 2–3 bullet benefits directly under the auth-card-subtitle, so people see:
 
 “Sync your taste profile”
 
 “See friends’ trends”
 
 “Join collaborative watchlists”
-
-On desktop, keep the aside but make the bullet list slightly shorter and focused on unique value, not generic “store your preferences securely”.
 
 ### C. Clarify social context in microcopy
 
@@ -699,7 +685,7 @@ Use a 2-step visual layout:
 
 Step 1: “Confirm current password”
 
-Step 2: “Choose a new password” (new + confirm side by side on desktop, stacked on mobile).
+Step 2: “Choose a new password” (new + confirm side by side )
 
 Under the “Email verification” checkbox area (currently mostly static text), add a tiny line of copy:
 
@@ -722,114 +708,6 @@ On mobile, make this a horizontal pill strip at the top of #accountSettingsConte
 
 ## 1. index – Home / Discovery
 
-### Desktop – first viewport
-
-Layout: Two-column layout under a global header.
-
-Header (full width, top):
-
-Left: App logo + “SmartMovieMatch”.
-
-Center: Main nav (e.g. Home, Community, Watch Parties).
-
-Right: Search bar, notification bell (with small social badge if new activity), avatar/menu.
-
-Main content:
-Left column (about 30–35% width) – “Your vibe & filters”
-
-Current vibe card (top of left column)
-
-Title: “Your current vibe”
-
-Big pill: e.g. “Cozy Sci-Fi Night”.
-
-Line of microcopy: “Adjust your vibe to change what you see.”
-
-Link/button: “Change vibe” → opens presets/controls below.
-
-Vibe presets & mood buttons (directly under current vibe)
-
-Grid of large tappable pills/cards, e.g.:
-
-“Light & funny”
-
-“Mind-bending”
-
-“Date night”
-
-You can see 4–6 without scrolling.
-
-Genre & basic filter chips (under presets)
-
-Section title: “Fine-tune genres”
-
-Chip list: Action, Comedy, Drama, Horror, Sci-Fi, etc.
-
-Optional sliders/toggles: “Minimum rating”, “Streaming only”, etc.
-
-Social nudge / friend suggestion block (bottom of first viewport or just below)
-
-Shown if user has few/no friends.
-
-Card:
-
-“See what your friends are watching”
-
-Button: “Find people to follow”.
-
-Right column (about 65–70% width) – “What to watch + social”
-
-Main Recommendations panel (top-right, highest priority)
-
-Header bar:
-
-Left: “Your picks for tonight”
-
-Subline: “Based on your vibe and taste.”
-
-Right: a compact “Filters summary” pill:
-
-“Cozy Sci-Fi • IMDb 7+ • Streaming now”
-
-Below: movie card grid (2–4 columns).
-
-Each movie card shows:
-
-Poster, title, year, rating.
-
-Social strip below title:
-
-“3 friends watched · Avg friend rating 8.4”
-
-Friend avatar row (1–3 small circles).
-
-Quick actions: “Details”, “Add to list”, maybe a “★ Rate”.
-
-Friends Activity row (just under main rec grid)
-
-Section title: “From your friends”.
-
-Horizontally scrollable row of cards:
-
-Card type 1: “Recently watched by friends”
-
-Card type 2: “New lists from people you follow”
-
-Card type 3: “Recent reviews from friends”
-
-Each card shows a friend avatar, movie title/list title, small snippet.
-
-Your Saved Lists / Collections (below Friends Activity)
-
-Section title: “Your lists & collections”.
-
-Grid or list of user lists; collaborative lists have a small “👥” badge.
-
-Secondary social cue: “3 friends follow this list”.
-
-
-
-### Mobile – first viewport
 
 Layout: Single column, stacked.
 
@@ -855,115 +733,6 @@ Then: “Your lists & collections”.
 
 ## 2. profile – My Profile Overview
 
-### Desktop – first viewport
-
-Layout: Single main column with a clearly defined hero at the top and two columns below.
-
-Profile hero (full width at top):
-
-Left side of hero: Identity
-
-Large avatar.
-
-Display name.
-
-@handle/username.
-
-Tagline: “Sci-fi nerd, rom-com defender, cries at sports movies.”
-
-Center of hero: Social & stats
-
-Row of stats:
-
-“Followers”, “Following”, “Mutuals”.
-
-Clickable (open follower/following lists).
-
-Quick glimpses:
-
-“Taste match avg with followers: 74%” (optional but nice).
-
-Right side of hero: Quick actions
-
-Button group:
-
-“Edit profile”
-
-“View library”
-
-“Find people to follow”
-
-Taste summary strip (under hero content, full width)
-
-A slim band with text like:
-
-“Mostly Sci-Fi, Drama, and Thriller · Tends toward highly-rated cult classics · Loves rewatchable comfort films.”
-
-Small mini-chart or icon-based summary can sit here.
-
-Below hero – two-column content
-
-Left column – “My taste & library”
-
-Pinned content card
-
-Title: “Pinned by you”
-
-Pinned list: “All-time comfort movies”
-
-Pinned review: one highlighted review.
-
-Library stats & taste breakdown
-
-Genre chart, number of movies watched, recent streak.
-
-Short text highlight: “Most-watched decade: 1990s”.
-
-Recent activity snapshot
-
-“Recently watched”
-
-“Recent reviews”
-
-Each item with tiny icon + link to detail.
-
-Right column – “Social & connections”
-
-Social circle overview
-
-Mini grid:
-
-“Close friends” (people you interact with most).
-
-“Mutuals” preview.
-
-“View all followers” / “View all following” links.
-
-Presence & status
-
-Current status chip: “Available for watch party”.
-
-Small toggle or presets: “Just browsing”, “In the mood for comedies”.
-
-Collaborative lists & watch parties
-
-List of collaborative lists with icons.
-
-Future or ongoing watch parties with labels like “Lobby open”.
-
-Suggested people to follow
-
-Card row: each card shows:
-
-Avatar, handle, key overlap snippet:
-
-“Shares 12 favorites”
-
-“Also into horror & sci-fi”.
-
-
-
-### Mobile – first viewport
 
 Order from top to scroll:
 
@@ -991,87 +760,6 @@ Columns collapse into stacked blocks; actions like “Edit profile”, “View l
 
 ## 3. peeruser – Someone Else’s Profile
 
-### Desktop – first viewport
-
-Layout: Similar to profile, but centered on “Should I follow/engage?”
-
-Peer hero (full width):
-
-Left: Identity
-
-Avatar, display name, handle, tagline.
-
-Center: Social/taste relationship
-
-Big badge: “Taste match: 82%” (or “High / Medium / Low” match).
-
-Small text: “You both love quirky sci-fi and 90s thrillers.”
-
-Right: Action & social stats
-
-Primary button: “Follow” / “Unfollow”.
-
-Secondary: “Start a watch party” or “Invite to list”.
-
-Stats: Followers, Following, Mutuals.
-
-Tiny row of mutual follower avatars: “Followed by Alex, Sam + 3 more”.
-
-Below hero – two-column content
-
-Left column – “How you overlap”
-
-Overlap grid (2×2)
-
-Panel 1: “Shared favorites”
-
-A few posters, “View all”.
-
-Panel 2: “Shared genres”
-
-Chips like Sci-Fi, Horror; highlight overlaps.
-
-Panel 3: “Overlapping recent watches”
-
-Movies you both watched in last X days.
-
-Panel 4: “Watch parties together”
-
-“You’ve joined 2 of the same parties” or “No parties together yet”.
-
-Compatibility notes
-
-Short text block:
-
-“You agree on slow-burn thrillers but disagree on slapstick comedies.”
-
-Right column – “Their world”
-
-Pinned content
-
-Their pinned list (e.g. “Top 20 Comfort Movies”).
-
-Their pinned review.
-
-Top lists & activity
-
-“Popular lists” (sorted by followers/likes).
-
-“Recent reviews” snippet.
-
-Engagement prompts
-
-Buttons:
-
-“Follow”
-
-“Clone this list”
-
-“Plan a watch party around their list”.
-
-
-
-### Mobile – first viewport
 
 Order from top:
 
@@ -1097,65 +785,7 @@ Engagement prompts at the bottom (sticky follow button could also be used on scr
 
 ## 4. login – Sign In / Create Account
 
-### Desktop – first viewport
 
-Layout: Two-column layout: left for form, right for benefits/story.
-
-Left column – Auth card
-
-Auth header
-
-Title: “Welcome back” / “Create your account”.
-
-Small subtitle: “Sign in to sync your taste and see friends’ picks.”
-
-Mode switcher
-
-Tab or segmented control:
-
-“Sign in”
-
-“Create account”
-
-Form area
-
-Inputs appropriate to mode (email/password vs name/email/password).
-
-Clear, compact error text right under fields or near submit.
-
-Submit + secondary actions
-
-Main button (Sign in / Create account).
-
-Secondary: “Forgot password?”, “Continue as guest” (if supported).
-
-Tiny social proof line under form
-
-e.g. “Join your friends in collaborative watch lists and watch parties.”
-
-Right column – Benefits / social value
-
-Headline
-
-“Why create a SmartMovieMatch account?”
-
-Bullets (3–4 items)
-
-“Sync your taste profile across devices.”
-
-“See when friends watch or rate something you love.”
-
-“Join collaborative lists and watch parties.”
-
-“Get smarter recommendations as you watch.”
-
-Small testimonial-style card (optional)
-
-Quote: “I never run out of movie ideas because I see what my friends are into.”
-
-
-
-### Mobile – first viewport
 
 Order from top:
 
@@ -1177,81 +807,6 @@ The benefits panel is collapsed into a section under the form so the user still 
 
 ## 5. account-settings – Profile & Security
 
-### Desktop – first viewport
-
-Layout: Left-side mini navigation, right-side content.
-
-Left sidebar (navigation):
-
-Section title: “Settings”.
-
-Nav items (anchors or tabs):
-
-“Profile”
-
-“Security”
-
-Optional: “Notifications” (if you later add it).
-
-Right content area
-
-If signed out:
-
-Centered card:
-
-Title: “Sign in to manage your settings”.
-
-Text: “Manage your profile, security, and social visibility once you’re signed in.”
-
-Button: “Go to login”.
-
-If signed in – Profile tab active:
-
-Profile card – “Your public identity”
-
-Fields:
-
-Display name.
-
-Handle/username.
-
-Avatar upload.
-
-Tagline.
-
-Helper microcopy under each:
-
-e.g. under display name: “Shown to friends and collaborators.”
-
-under avatar: “Used on your profile, comments, and watch parties.”
-
-Social visibility hints (inline)
-
-Small text block:
-
-“Your name, avatar, and tagline appear on your profile, in reviews, and in friend suggestions.”
-
-Save/cancel buttons aligned at bottom of card.
-
-Security tab:
-
-Security card – “Account security”
-
-Email (possibly readonly or editable depending on app).
-
-Current password + New password + Confirm password (grouped visually as steps).
-
-Email verification status:
-
-“Verified” or “Not verified” with a button “Resend verification”.
-
-Security microcopy
-
-“Used to sign in and receive security alerts (e.g., new device logins).”
-
-
-
-### Mobile – first viewport
 
 Order from top:
 
@@ -1449,198 +1004,6 @@ Make Follow / collaborate / start watch party very obvious.
 Show their activity that’s relevant to you (lists, reviews, parties).
 
 
-
-## 2. Desktop layout – section by section
-
-### A. Context banner (optional but powerful)
-
-WHEN: Only when you arrive via a notification (follow, invite, reply, etc.)
-
-Slim bar under the site header, above the hero.
-
-Examples:
-
-“Alex recently followed you · [Follow back]”
-
-“Sam invited you to a watch party: Horror Night · [View party]”
-
-“Maya replied to your review of Dune · [View discussion]”
-
-Right side: small “×” to dismiss.
-
-This explains why you’re looking at this person.
-
-
-
-### B. Hero section (always visible at top)
-
-Full-width block; this is the “who is this + should I follow them?” moment.
-
-Left side – identity
-
-Big avatar
-
-Display name
-
-@handle
-
-Tagline: one line of “movie personality”
-
-“Sci-fi obsessive, romcom curious, hates jump-scare horror.”
-
-Center – taste compatibility
-
-Badge or meter:
-
-“Taste match: 82% (High)”
-
-Under it: one short sentence:
-
-“You both love slow-burn sci-fi and 90s thrillers.”
-
-Optional: mini chips:
-
-Shared favorite genres: Sci-Fi, Thriller, Drama
-
-Right side – actions & social stats
-
-Primary button:
-
-Follow / Unfollow
-
-Secondary actions:
-
-“Invite to watch party”
-
-“Add to collaborative list”
-
-Stats row:
-
-Followers · Following · Mutuals (clickable)
-
-Under stats: tiny mutual avatar row:
-
-“Followed by Alex, Sam + 2 more”
-
-
-
-### C. Main content – two-column body
-
-Below the hero, split into left: overlap and right: their stuff & activity.
-
-#### Left column: “How you overlap”
-
-This is like a visual compatibility dashboard.
-
-1. Overlap grid (2×2)
-
-Each block is a small card with a title, count, and content:
-
-Shared favorites
-
-Title: “Shared favorites (8)”
-
-Show 3–6 posters you both marked as favorite.
-
-Link: “View all shared favorites”
-
-Shared genres
-
-Title: “Shared genres (5)”
-
-Chips: Sci-Fi, Horror, Drama, etc.
-
-Optional: highlight top 2–3 as “Strong overlap”.
-
-Overlapping recent watches
-
-Title: “Recently watched overlap (4)”
-
-Show movies you both watched in the last X days.
-
-It explains “not just old favorites, we’re currently aligned.”
-
-Watch parties together
-
-Title: “Watch parties together (1)” or “None yet”.
-
-If any: show party name, small date badge.
-
-If none: friendly placeholder:
-
-“You haven’t watched anything together yet. Start a watch party?”
-
-2. Compatibility notes
-
-Simple text card under the grid:
-
-“You usually agree on slow-burn thrillers, but they rate slapstick comedies higher than you.”
-
-This can be generated from rating patterns, but even a placeholder note for now is fine.
-
-
-
-#### Right column: “Their world + activity”
-
-This side answers: “Why are they interesting?” and “What can I engage with?”
-
-1. Pinned content
-
-Card: “Pinned by them”
-
-One pinned list
-
-“All-time Comfort Movies”
-
-One pinned review
-
-Short excerpt like “Blade Runner 2049 is my rainy-day masterpiece…”
-
-Each has “View list” / “Read full review”.
-
-2. Top lists
-
-Section: “Popular lists”
-
-Show 2–4 lists, sorted by followers/likes.
-
-Each row:
-
-List title
-
-Small description or top 3 posters
-
-Social stat: “12 followers · 3 collaborators”
-
-Quick actions:
-
-“View list”
-
-“Clone list” or “Save to my lists”
-
-3. Recent activity feed
-
-Section: “Recent activity” or “What they’ve been up to”
-
-Reuse notification-style items but scoped to this user:
-
-“Alex created a new list: Underrated 90s Sci-Fi”
-
-“Alex reviewed Arrival – 9/10: ‘Beautiful and haunting…’”
-
-“Alex joined watch party Sunday Mystery Night”
-
-Each entry clickable to the relevant movie/list/party.
-
-Order: newest first.
-
-This is where they feel “alive” and not just a static profile.
-
-
-
-## 3. Mobile layout – stack it cleanly
-
-On mobile, everything becomes one column, but keep the same priority.
 
 Order from top to scroll:
 
