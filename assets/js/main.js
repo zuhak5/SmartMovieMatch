@@ -101,10 +101,8 @@ const state = {
   collectionFilters: { genre: "", sort: "recent" },
   theme: null,
   activePreset: null,
-  highlightPreview: "live",
   onboardingSeen: false,
   onboardingStep: 0,
-  activeSettingsSection: "profile",
   gridVisibleRecommendations: 0,
   sessionHydration: {
     token: null,
@@ -155,7 +153,6 @@ let socialProfileActiveUsername = null;
 let socialProfileRequestId = 0;
 let socialProfileReturnFocus = null;
 let socialProfileInitialized = false;
-let settingsScrollObserver = null;
 
 const GENRE_ICON_MAP = {
   "28": "💥", // Action
@@ -179,30 +176,6 @@ const PRESENCE_STATUS_PRESET_MAP = new Map(PRESENCE_STATUS_PRESETS.map((preset) 
 
 const THEME_STORAGE_KEY = "smm.theme.v1";
 const ONBOARDING_STORAGE_KEY = "smm.onboarding.v1";
-
-const HIGHLIGHT_PREVIEWS = {
-  live: {
-    icon: "⚡",
-    title: "Live movie fetch",
-    text:
-      "Watch cards fill with trailers, art, and metadata as I blend TMDB and OMDb in real time."
-  },
-  taste: {
-    icon: "🧠",
-    title: "Adaptive taste engine",
-    text: "Mark titles as favorites or watched and I’ll immediately reshape future batches."
-  },
-  filters: {
-    icon: "🎯",
-    title: "Precision tuning",
-    text: "Combine genres, moods, runtimes, and quick filters to zero-in on tonight’s pick."
-  },
-  community: {
-    icon: "🤝",
-    title: "Community pulse",
-    text: "See which films are trending with friends and jump into collaborative watchlists."
-  }
-};
 
 function getStoredRecommendationLayout() {
   try {
@@ -340,49 +313,6 @@ function handleThemeToggle() {
     text: nextTheme === "light" ? "Enjoy a brighter palette." : "Enjoy the cinematic dark mode.",
     icon: nextTheme === "light" ? "☀️" : "🌙"
   });
-}
-
-function updateHighlightPreview(key) {
-  const preview = $("highlightPreview");
-  if (!preview) {
-    return;
-  }
-  const data = HIGHLIGHT_PREVIEWS[key] || HIGHLIGHT_PREVIEWS.live;
-  preview.querySelectorAll(".highlight-preview-content").forEach((node) => {
-    node.remove();
-  });
-  const content = document.createElement("div");
-  content.className = "highlight-preview-content";
-  content.dataset.highlightPreview = key;
-
-  const iconEl = document.createElement("span");
-  iconEl.className = "highlight-preview-icon";
-  iconEl.textContent = data.icon;
-  iconEl.setAttribute("aria-hidden", "true");
-
-  const textWrap = document.createElement("div");
-  const titleEl = document.createElement("div");
-  titleEl.className = "highlight-preview-title";
-  titleEl.textContent = data.title;
-  const textEl = document.createElement("div");
-  textEl.className = "highlight-preview-text";
-  textEl.textContent = data.text;
-  textWrap.appendChild(titleEl);
-  textWrap.appendChild(textEl);
-
-  content.appendChild(iconEl);
-  content.appendChild(textWrap);
-  preview.appendChild(content);
-}
-
-function setActiveHighlight(key) {
-  const normalized = HIGHLIGHT_PREVIEWS[key] ? key : "live";
-  state.highlightPreview = normalized;
-  document.querySelectorAll(".highlight-card").forEach((btn) => {
-    const match = btn.getAttribute("data-highlight") === normalized;
-    btn.setAttribute("aria-pressed", match ? "true" : "false");
-  });
-  updateHighlightPreview(normalized);
 }
 
 function normalizeGenreValue(value) {
@@ -968,7 +898,6 @@ function init() {
   applyTheme(initialTheme, { persist: false });
   state.onboardingSeen = hasCompletedOnboarding();
   state.recommendationLayout = getStoredRecommendationLayout();
-  setActiveHighlight(state.highlightPreview);
   updateRecommendationLayout();
 
   state.watchedMovies = [];
@@ -980,7 +909,6 @@ function init() {
   refreshFavoritesUi();
   switchCollectionView(state.activeCollectionView);
   updateAccountUi(state.session);
-  updateSnapshotPreviews(state.session);
   updateSocialSectionVisibility(state.session);
   if (isAccountSettingsContext() && state.session && state.session.token) {
     populateAccountSettings();
@@ -999,7 +927,6 @@ function init() {
     const isSignedIn = Boolean(session && session.token);
     hydrateFromSession(session);
     updateAccountUi(session);
-    updateSnapshotPreviews(session);
     updateSocialSectionVisibility(session);
     updateSocialInviteLink(session);
     if (!session || !session.token) {
@@ -1035,10 +962,16 @@ function init() {
     );
     if (isAccountSettingsContext()) {
       populateAccountSettings();
-      setupSettingsScrollSpy();
-      if (window.location.hash === "#snapshots" && session && session.token) {
+      if (window.location.hash === "#security" && session && session.token) {
         window.requestAnimationFrame(() => {
-          openAccountSettings("snapshots");
+          const anchor = document.getElementById("security");
+          if (anchor) {
+            anchor.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+          const securityInput = $("currentPasswordInput");
+          if (securityInput) {
+            securityInput.focus();
+          }
         });
       }
     }
@@ -1061,44 +994,32 @@ function init() {
     });
   }
 
-  if (isAccountSettingsContext()) {
+  if (isAccountSettingsContext() && state.session && state.session.token) {
     const hash = window.location.hash ? window.location.hash.replace("#", "") : "";
-    const validSection = hash === "snapshots" || hash === "security" || hash === "profile";
-    if (validSection && state.session && state.session.token) {
-      window.requestAnimationFrame(() => {
-        setActiveSettingsSection(hash, { updateHash: false });
-        if (hash === "snapshots") {
-          const anchor = document.getElementById("snapshots");
-          if (anchor) {
-            anchor.scrollIntoView({ behavior: "smooth", block: "start" });
-          }
-        } else if (hash === "security") {
-          const securityInput = $("currentPasswordInput");
-          if (securityInput) {
-            securityInput.focus();
-          }
-        } else {
-          const displayNameInput = $("accountDisplayName");
-          if (displayNameInput) {
-            displayNameInput.focus();
-          }
+    window.requestAnimationFrame(() => {
+      if (hash === "security") {
+        const anchor = document.getElementById("security");
+        if (anchor) {
+          anchor.scrollIntoView({ behavior: "smooth", block: "start" });
         }
-      });
-    } else if (document.querySelector('[data-settings-section]')) {
-      window.requestAnimationFrame(() => {
-        setActiveSettingsSection(state.activeSettingsSection, { updateHash: false });
-      });
-    }
+        const securityInput = $("currentPasswordInput");
+        if (securityInput) {
+          securityInput.focus();
+        }
+      } else {
+        const displayNameInput = $("accountDisplayName");
+        if (displayNameInput) {
+          displayNameInput.focus();
+        }
+      }
+    });
   }
-
-  setupSettingsScrollSpy();
 }
 
 function wireEvents() {
   const accountProfileBtn = $("accountProfileBtn");
   const accountMenu = $("accountMenu");
   const accountProfile = $("accountProfile");
-  const viewSnapshotsBtn = $("viewSnapshotsBtn");
   const profileForm = $("accountProfileForm");
   const securityForm = $("accountSecurityForm");
   const avatarInput = $("accountAvatarInput");
@@ -1135,26 +1056,6 @@ function wireEvents() {
       handleThemeToggle();
     });
   }
-
-  document.querySelectorAll(".highlight-card").forEach((card) => {
-    card.addEventListener("click", () => {
-      const key = card.getAttribute("data-highlight") || "live";
-      if (state.highlightPreview !== key) {
-        playUiClick();
-        setActiveHighlight(key);
-      }
-    });
-    card.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        const key = card.getAttribute("data-highlight") || "live";
-        if (state.highlightPreview !== key) {
-          playUiClick();
-          setActiveHighlight(key);
-        }
-      }
-    });
-  });
 
   if (notificationBell) {
     notificationBell.addEventListener("click", (event) => {
@@ -1348,13 +1249,6 @@ function wireEvents() {
     }
   });
 
-  if (viewSnapshotsBtn) {
-    viewSnapshotsBtn.addEventListener("click", () => {
-      playUiClick();
-      openAccountSettings("snapshots");
-    });
-  }
-
   if (profileForm) {
     profileForm.addEventListener("submit", handleProfileSubmit);
   }
@@ -1502,9 +1396,6 @@ function wireEvents() {
       event.preventDefault();
       playUiClick();
       switch (action) {
-        case "snapshots":
-          openAccountSettings("snapshots");
-          break;
         case "favorites":
         case "watched":
           highlightCollectionSection(action);
@@ -1523,21 +1414,6 @@ function wireEvents() {
       }
       playUiClick();
       handleManualSyncRequest(target);
-    });
-  });
-
-  document.querySelectorAll("[data-settings-section-trigger]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const section = button.getAttribute("data-settings-section-trigger");
-      if (!section) {
-        return;
-      }
-      playUiClick();
-      setActiveSettingsSection(section);
-      const panel = document.querySelector(`[data-settings-section="${section}"]`);
-      if (panel) {
-        panel.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
     });
   });
 
@@ -1668,69 +1544,6 @@ function isAccountSettingsContext() {
   return page === "account-settings";
 }
 
-function isAccountSettingsOpen() {
-  return isAccountSettingsContext();
-}
-
-function setActiveSettingsSection(section, { updateHash = true, fromScroll = false } = {}) {
-  const normalized = section === "security" || section === "snapshots" ? section : "profile";
-  state.activeSettingsSection = normalized;
-  const panels = Array.from(document.querySelectorAll('[data-settings-section]'));
-  const navButtons = Array.from(document.querySelectorAll('[data-settings-target]'));
-  panels.forEach((panel) => {
-    const target = panel.getAttribute('data-settings-section');
-    const match = target === normalized;
-    panel.hidden = false;
-    panel.setAttribute('aria-hidden', 'false');
-    panel.classList.toggle('is-active', match);
-  });
-  navButtons.forEach((button) => {
-    const target = button.getAttribute('data-settings-target');
-    const match = target === normalized;
-    button.classList.toggle('is-active', match);
-    button.setAttribute('aria-selected', match ? "true" : "false");
-  });
-  if (updateHash && !fromScroll) {
-    const hash = normalized === "profile" ? "#profile" : normalized === "security" ? "#security" : "#snapshots";
-    if (window.location.hash !== hash) {
-      window.history.replaceState(null, "", hash);
-    }
-  }
-}
-
-function setupSettingsScrollSpy() {
-  if (!isAccountSettingsContext()) {
-    if (settingsScrollObserver) {
-      settingsScrollObserver.disconnect();
-      settingsScrollObserver = null;
-    }
-    return;
-  }
-  const sections = Array.from(document.querySelectorAll('[data-settings-section]'));
-  if (!sections.length) {
-    return;
-  }
-  if (settingsScrollObserver) {
-    settingsScrollObserver.disconnect();
-  }
-  settingsScrollObserver = new IntersectionObserver(
-    (entries) => {
-      const visible = entries
-        .filter((entry) => entry.isIntersecting)
-        .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
-      if (!visible.length) {
-        return;
-      }
-      const targetSection = visible[0].target.getAttribute('data-settings-section');
-      if (targetSection && targetSection !== state.activeSettingsSection) {
-        setActiveSettingsSection(targetSection, { updateHash: false, fromScroll: true });
-      }
-    },
-    { threshold: [0.35, 0.55], rootMargin: '-30% 0px -40% 0px' }
-  );
-  sections.forEach((section) => settingsScrollObserver.observe(section));
-}
-
 function openAccountSettings(section = "profile") {
   if (!state.session || !state.session.token) {
     window.location.href = "login.html";
@@ -1738,23 +1551,25 @@ function openAccountSettings(section = "profile") {
   }
 
   const page = document.body ? document.body.getAttribute("data-page") : null;
+  const normalized = section === "security" ? "security" : "profile";
 
   if (page === "account-settings") {
     populateAccountSettings();
-    setupSettingsScrollSpy();
     window.setTimeout(() => {
-      setActiveSettingsSection(section, { updateHash: true });
-      if (section === "snapshots") {
-        const anchor = document.getElementById("snapshots");
+      if (normalized === "security") {
+        const anchor = document.getElementById("security");
         if (anchor) {
           anchor.scrollIntoView({ behavior: "smooth", block: "start" });
         }
-      } else if (section === "security") {
         const securityInput = $("currentPasswordInput");
         if (securityInput) {
           securityInput.focus();
         }
       } else {
+        const profileAnchor = document.getElementById("profile");
+        if (profileAnchor) {
+          profileAnchor.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
         const displayNameInput = $("accountDisplayName");
         if (displayNameInput) {
           displayNameInput.focus();
@@ -1765,9 +1580,7 @@ function openAccountSettings(section = "profile") {
   }
 
   let target = "account-settings.html";
-  if (section === "snapshots") {
-    target += "#snapshots";
-  } else if (section === "security") {
+  if (normalized === "security") {
     target += "#security";
   }
   window.location.href = target;
@@ -1830,8 +1643,6 @@ function populateAccountSettings() {
     }
   }
 
-  setSettingsSaveIndicator("All changes saved", "idle");
-  setupSettingsScrollSpy();
 }
 
 async function handleProfileSubmit(event) {
@@ -1879,7 +1690,6 @@ async function handleProfileSubmit(event) {
 
   statusEl.textContent = "Saving profile…";
   statusEl.dataset.variant = "loading";
-  setSettingsSaveIndicator("Saving profile…", "loading");
 
   try {
     await updateProfile({
@@ -1895,11 +1705,9 @@ async function handleProfileSubmit(event) {
       avatarInput.value = "";
     }
     populateAccountSettings();
-    setSettingsSaveIndicator("Profile updated.", "success");
   } catch (error) {
     statusEl.textContent = error.message || "Couldn’t update your profile.";
     statusEl.dataset.variant = "error";
-    setSettingsSaveIndicator("Profile update failed.", "error");
   }
 }
 
@@ -1939,7 +1747,6 @@ async function handleSecuritySubmit(event) {
 
   statusEl.textContent = "Updating password…";
   statusEl.dataset.variant = "loading";
-  setSettingsSaveIndicator("Updating password…", "loading");
 
   try {
     await changePassword({ currentPassword, newPassword });
@@ -1949,11 +1756,9 @@ async function handleSecuritySubmit(event) {
     newInput.value = "";
     confirmInput.value = "";
     updatePasswordChecklist(checklist, "", "");
-    setSettingsSaveIndicator("Password updated.", "success");
   } catch (error) {
     statusEl.textContent = error.message || "Couldn’t update your password.";
     statusEl.dataset.variant = "error";
-    setSettingsSaveIndicator("Password update failed.", "error");
   }
 }
 
@@ -3908,15 +3713,6 @@ function setSyncStatus(message, variant = "muted") {
   });
 }
 
-function setSettingsSaveIndicator(message, variant = "idle") {
-  const indicator = $("settingsSaveIndicator");
-  if (!indicator) {
-    return;
-  }
-  indicator.textContent = message;
-  indicator.dataset.variant = variant;
-}
-
 function updateSettingsSyncCards(session) {
   const hasSession = Boolean(session && session.token);
   const prefCount = session && session.preferencesSnapshot && Array.isArray(session.preferencesSnapshot.selectedGenres)
@@ -4055,9 +3851,6 @@ function updateSyncInsights(session) {
   if (overviewSignedOut) {
     overviewSignedOut.hidden = hasSession;
   }
-  if (viewSnapshotsBtn) {
-    viewSnapshotsBtn.disabled = !hasSession;
-  }
 
   const timeline = $("profileOverviewTimeline");
   if (timeline) {
@@ -4089,9 +3882,7 @@ function updateSyncInsights(session) {
           activeMeta: watchedCount
             ? `${watchedCount} title${watchedCount === 1 ? "" : "s"} logged`
             : "Log watched titles to keep progress in sync.",
-          emptyMeta: "Log watched titles to keep progress in sync.",
-          action: "snapshots",
-          cta: "View snapshots"
+          emptyMeta: "Log watched titles to keep progress in sync."
         },
         {
           icon: "⭐",
@@ -4101,9 +3892,7 @@ function updateSyncInsights(session) {
           activeMeta: favoritesCount
             ? `${favoritesCount} favorite${favoritesCount === 1 ? "" : "s"} saved`
             : "Save movies you love so they’re backed up everywhere.",
-          emptyMeta: "Save movies you love so they’re backed up everywhere.",
-          action: "snapshots",
-          cta: "View snapshots"
+          emptyMeta: "Save movies you love so they’re backed up everywhere."
         }
       ];
 
@@ -4152,38 +3941,6 @@ function updateSyncInsights(session) {
   }
 
   refreshProfileOverviewCallout();
-}
-
-function updateSnapshotPreviews(session) {
-  const preferencesEl = $("snapshotPreferences");
-  const watchedEl = $("snapshotWatched");
-  const favoritesEl = $("snapshotFavorites");
-
-  if (!preferencesEl || !watchedEl || !favoritesEl) {
-    return;
-  }
-
-  if (!session || !session.token) {
-    preferencesEl.textContent = "Sign in to sync your preferences.";
-    watchedEl.textContent = "Sign in to sync your watched history.";
-    favoritesEl.textContent = "Sign in to sync your favorites.";
-    return;
-  }
-
-  const prettify = (value, fallback) => {
-    if (!value || (Array.isArray(value) && value.length === 0)) {
-      return fallback;
-    }
-    try {
-      return JSON.stringify(value, null, 2);
-    } catch (error) {
-      return fallback;
-    }
-  };
-
-  preferencesEl.textContent = prettify(session.preferencesSnapshot, "No preference snapshot stored yet.");
-  watchedEl.textContent = prettify(session.watchedHistory, "No watched history stored yet.");
-  favoritesEl.textContent = prettify(session.favoritesList, "No favorites stored yet.");
 }
 
 function setupSocialFeatures() {
