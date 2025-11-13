@@ -8446,10 +8446,6 @@ body.auth-body {
 }
 
 @media (max-width: 600px) {
-  body.has-mobile-toolbar {
-    padding-bottom: 5.5rem;
-  }
-
   .social-signed-out {
     margin-inline: 0;
     justify-self: stretch;
@@ -8514,72 +8510,6 @@ body.auth-body {
 
   .recommendations-meta {
     font-size: 0.7rem;
-  }
-}
-
-.mobile-toolbar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  gap: 0.65rem;
-  padding: 0.45rem 0.85rem;
-  padding-bottom: calc(0.45rem + env(safe-area-inset-bottom, 0px));
-  background: rgba(3, 7, 18, 0.92);
-  border-top: 1px solid rgba(71, 85, 105, 0.35);
-  box-shadow: 0 -18px 40px rgba(2, 6, 23, 0.65);
-  backdrop-filter: blur(22px);
-  z-index: 200;
-}
-
-.mobile-toolbar-action {
-  flex: 1;
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-  padding: 0.45rem 0.55rem;
-  border-radius: 1rem;
-  text-decoration: none;
-  color: rgba(226, 232, 240, 0.8);
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  transition:
-    background-color var(--transition-fast),
-    color var(--transition-fast),
-    transform var(--transition-fast);
-}
-
-.mobile-toolbar-action:hover,
-.mobile-toolbar-action:focus-visible {
-  color: var(--text-strong);
-  background: rgba(96, 165, 250, 0.16);
-  transform: translateY(-1px);
-}
-
-.mobile-toolbar-action[aria-current="page"] {
-  color: var(--text-strong);
-  background: rgba(96, 165, 250, 0.22);
-  box-shadow: 0 12px 28px rgba(59, 130, 246, 0.35);
-}
-
-.mobile-toolbar-icon {
-  font-size: 1.2rem;
-  line-height: 1;
-}
-
-.mobile-toolbar-label {
-  line-height: 1.2;
-}
-
-@media (max-width: 720px) {
-  .mobile-toolbar {
-    display: flex;
   }
 }
 
