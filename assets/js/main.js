@@ -75,6 +75,8 @@ let inviteQrRequest = 0;
 
 const RECOMMENDATION_LAYOUT_STORAGE_KEY = "smm.recommendation-layout.v1";
 const PRESENCE_STATUS_STORAGE_KEY = "smm.presence-status.v1";
+const PRESENCE_DURATION_STORAGE_KEY = "smm.presence-duration-minutes.v1";
+const PRESENCE_EXPIRY_STORAGE_KEY = "smm.presence-expiry.v1";
 
 const state = {
   watchedMovies: [],
@@ -83,6 +85,7 @@ const state = {
   socialOverview: getSocialOverviewSnapshot(),
   collaborativeState: getCollaborativeStateSnapshot(),
   presenceStatusPreset: getPresenceStatusPreset(),
+  presenceStatusDuration: getStoredPresenceStatusDuration(),
   lastRecSeed: Math.random(),
   activeCollectionView: "favorites",
   session: null,
@@ -152,6 +155,8 @@ let unsubscribePresenceStatus = null;
 let unsubscribeProfileOpen = null;
 const presenceStatusButtons = new Map();
 let presenceStatusFeedbackTimer = null;
+let presenceStatusExpiryTimer = null;
+let activePresenceShareForm = null;
 let socialProfileOverlay = null;
 let socialProfileCloseBtn = null;
 let socialProfileTitleEl = null;
@@ -3206,13 +3211,15 @@ function updateRecommendationsView() {
   const visible = total ? Math.min(total, state.visibleRecommendations || fallbackVisible) : 0;
   const items = total ? filtered.slice(0, visible) : [];
   updateRecommendationLayout();
+  const presenceSpotlights = buildPresenceSpotlights(3);
   renderRecommendations(items, state.watchedMovies, {
     favorites: state.favorites,
     onMarkWatched: handleMarkWatched,
     onToggleFavorite: handleToggleFavorite,
     community: {
       buildSection: buildCommunitySection
-    }
+    },
+    presenceSpotlights
   });
   updateShowMoreButton();
   updateRecommendationsMeta();
@@ -3826,8 +3833,29 @@ function wirePresenceStatusControls() {
     unsubscribePresenceStatus();
   }
   unsubscribePresenceStatus = subscribeToPresenceStatusPreset((presetKey) => {
-    applyPresenceStatusUi(presetKey, { silent: true });
+    applyPresenceStatusUi(presetKey, { silent: true, source: 'subscription' });
   });
+
+  const durationSelect = $("socialStatusDuration");
+  if (durationSelect) {
+    const storedDuration =
+      typeof state.presenceStatusDuration === 'number'
+        ? state.presenceStatusDuration
+        : getStoredPresenceStatusDuration();
+    durationSelect.value = String(storedDuration || 0);
+    durationSelect.addEventListener('change', () => {
+      const minutes = Math.max(0, parseInt(durationSelect.value, 10) || 0);
+      state.presenceStatusDuration = minutes;
+      persistPresenceStatusDuration(minutes);
+      if (state.presenceStatusPreset !== 'default') {
+        if (minutes > 0) {
+          updatePresenceExpiryForPreset(state.presenceStatusPreset, { force: true });
+        } else {
+          clearPresenceStatusExpiry();
+        }
+      }
+    });
+  }
 
   const storedPreset = getStoredPresenceStatusPreset();
   const currentPreset = normalizePresenceStatusKey(getPresenceStatusPreset());
@@ -3842,14 +3870,15 @@ function wirePresenceStatusControls() {
           console.warn('Failed to sync presence status preset', error);
         });
     } else {
-      applyPresenceStatusUi(currentPreset, { silent: true });
+      applyPresenceStatusUi(currentPreset, { silent: true, source: 'hydrate' });
     }
   } else {
-    applyPresenceStatusUi(storedPreset, { silent: true });
+    applyPresenceStatusUi(storedPreset, { silent: true, source: 'hydrate' });
     setPresenceStatusPreset(storedPreset, { sync: false, silent: true }).catch(() => {});
   }
 
   updatePresenceStatusAvailability(state.session);
+  hydratePresenceExpiryState();
 }
 
 function createPresenceStatusButton(preset) {
@@ -3881,6 +3910,7 @@ function applyPresenceStatusUi(presetKey, options = {}) {
   const normalized = normalizePresenceStatusKey(presetKey);
   state.presenceStatusPreset = normalized;
   setPresenceStatusButtonsActive(normalized);
+  syncPresenceExpiryState(normalized, options);
   if (!options.silent) {
     const preset = PRESENCE_STATUS_PRESET_MAP.get(normalized) || PRESENCE_STATUS_PRESET_MAP.get('default');
     if (preset) {
@@ -3919,6 +3949,7 @@ async function handlePresenceStatusClick(presetKey) {
   try {
     const applied = await setPresenceStatusPreset(normalized);
     persistPresenceStatusPreset(applied);
+    updatePresenceExpiryForPreset(applied);
     const successMessage =
       applied === 'default'
         ? 'Status cleared. You’ll appear just browsing.'
@@ -3995,6 +4026,158 @@ function persistPresenceStatusPreset(value) {
   return normalized;
 }
 
+function getStoredPresenceStatusDuration() {
+  try {
+    const stored = window.localStorage.getItem(PRESENCE_DURATION_STORAGE_KEY);
+    const minutes = parseInt(stored || '0', 10);
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      return 0;
+    }
+    return minutes;
+  } catch (error) {
+    console.warn('Unable to read presence status duration', error);
+    return 0;
+  }
+}
+
+function persistPresenceStatusDuration(value) {
+  const minutes = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+  try {
+    if (!minutes) {
+      window.localStorage.removeItem(PRESENCE_DURATION_STORAGE_KEY);
+    } else {
+      window.localStorage.setItem(PRESENCE_DURATION_STORAGE_KEY, String(minutes));
+    }
+  } catch (error) {
+    console.warn('Unable to store presence status duration', error);
+  }
+  return minutes;
+}
+
+function getStoredPresenceStatusExpiry() {
+  try {
+    const stored = window.localStorage.getItem(PRESENCE_EXPIRY_STORAGE_KEY);
+    if (!stored) {
+      return 0;
+    }
+    const timestamp = parseInt(stored, 10);
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  } catch (error) {
+    console.warn('Unable to read presence status expiry', error);
+    return 0;
+  }
+}
+
+function persistPresenceStatusExpiry(timestamp) {
+  const normalized = Number.isFinite(timestamp) && timestamp > 0 ? Math.floor(timestamp) : 0;
+  try {
+    if (!normalized) {
+      window.localStorage.removeItem(PRESENCE_EXPIRY_STORAGE_KEY);
+    } else {
+      window.localStorage.setItem(PRESENCE_EXPIRY_STORAGE_KEY, String(normalized));
+    }
+  } catch (error) {
+    console.warn('Unable to store presence status expiry', error);
+  }
+  return normalized;
+}
+
+function clearPresenceStatusExpiry() {
+  if (presenceStatusExpiryTimer) {
+    window.clearTimeout(presenceStatusExpiryTimer);
+    presenceStatusExpiryTimer = null;
+  }
+  persistPresenceStatusExpiry(0);
+}
+
+function schedulePresenceExpiry(timestamp) {
+  if (presenceStatusExpiryTimer) {
+    window.clearTimeout(presenceStatusExpiryTimer);
+    presenceStatusExpiryTimer = null;
+  }
+  if (!timestamp) {
+    clearPresenceStatusExpiry();
+    return;
+  }
+  const delay = Math.max(0, timestamp - Date.now());
+  if (delay <= 0) {
+    handlePresenceStatusExpiry();
+    return;
+  }
+  persistPresenceStatusExpiry(timestamp);
+  presenceStatusExpiryTimer = window.setTimeout(() => {
+    presenceStatusExpiryTimer = null;
+    handlePresenceStatusExpiry();
+  }, delay);
+}
+
+function hydratePresenceExpiryState() {
+  const expiresAt = getStoredPresenceStatusExpiry();
+  if (!expiresAt) {
+    return;
+  }
+  if (expiresAt <= Date.now()) {
+    handlePresenceStatusExpiry();
+    return;
+  }
+  schedulePresenceExpiry(expiresAt);
+}
+
+async function handlePresenceStatusExpiry() {
+  clearPresenceStatusExpiry();
+  if (state.presenceStatusPreset === 'default') {
+    return;
+  }
+  try {
+    await setPresenceStatusPreset('default');
+    persistPresenceStatusPreset('default');
+    setPresenceStatusFeedback('Status expired. You’re back to “Just browsing”.', 'muted');
+    showToast({
+      title: 'Status reset',
+      text: 'Your status expired, so you’re back to “Just browsing”.',
+      icon: '⏱️'
+    });
+  } catch (error) {
+    const message = error && error.message ? String(error.message) : 'Status expired, but we could not reset it.';
+    setPresenceStatusFeedback(message, 'error');
+  }
+}
+
+function syncPresenceExpiryState(presetKey, options = {}) {
+  if (presetKey === 'default') {
+    clearPresenceStatusExpiry();
+    return;
+  }
+  const source = options.source || '';
+  if (source === 'subscription' || source === 'remote' || source === 'hydrate') {
+    const expiresAt = getStoredPresenceStatusExpiry();
+    if (expiresAt) {
+      schedulePresenceExpiry(expiresAt);
+    }
+    return;
+  }
+  updatePresenceExpiryForPreset(presetKey);
+}
+
+function updatePresenceExpiryForPreset(presetKey, { force = false } = {}) {
+  if (presetKey === 'default') {
+    clearPresenceStatusExpiry();
+    return;
+  }
+  const duration =
+    typeof state.presenceStatusDuration === 'number'
+      ? state.presenceStatusDuration
+      : getStoredPresenceStatusDuration();
+  if (!duration || duration <= 0) {
+    if (force) {
+      clearPresenceStatusExpiry();
+    }
+    return;
+  }
+  const expiresAt = Date.now() + duration * 60000;
+  schedulePresenceExpiry(expiresAt);
+}
+
 function updatePresenceStatusAvailability(session) {
   const hasSession = Boolean(session && session.token);
   presenceStatusButtons.forEach((button) => {
@@ -4057,6 +4240,23 @@ function formatPresenceListStatus(entry) {
     return preset.icon ? `${preset.icon} ${label}` : label;
   }
   return 'Online';
+}
+
+function formatPresenceChipSummary(entry) {
+  if (!entry || !entry.presence) {
+    return 'Online now';
+  }
+  if (entry.presence.state === 'watching' && entry.presence.movieTitle) {
+    return `Watching ${entry.presence.movieTitle}`;
+  }
+  if (entry.presence.state === 'away') {
+    return 'Away for now';
+  }
+  const preset = PRESENCE_STATUS_PRESET_MAP.get(getPresenceEntryStatusKey(entry));
+  if (preset && preset.key !== 'default') {
+    return preset.shortLabel || preset.label;
+  }
+  return 'Online now';
 }
 
 function wireFollowForm() {
@@ -5102,6 +5302,63 @@ function formatFriendActivityAction(entry) {
   return `logged ${movie}`;
 }
 
+function getPresenceOverviewMap(overview = state.socialOverview || getSocialOverviewSnapshot()) {
+  if (overview && overview.presence && typeof overview.presence === 'object') {
+    return overview.presence;
+  }
+  return {};
+}
+
+function buildPresenceSpotlights(limit = 2) {
+  const overview = state.socialOverview || getSocialOverviewSnapshot();
+  const following = Array.isArray(overview.following) ? overview.following : [];
+  const presenceMap = getPresenceOverviewMap(overview);
+  const entries = following
+    .map((username) => {
+      const normalized = canonicalHandle(username);
+      if (!normalized) {
+        return null;
+      }
+      return { username: normalized, presence: presenceMap[normalized] };
+    })
+    .filter((entry) => entry && entry.presence && entry.presence.state && entry.presence.state !== 'offline');
+  if (!entries.length) {
+    return [];
+  }
+  entries.sort((a, b) => presenceEntryWeight(b) - presenceEntryWeight(a));
+  return entries.slice(0, limit).map((entry) => {
+    const statusKey = getPresenceEntryStatusKey(entry);
+    const preset = PRESENCE_STATUS_PRESET_MAP.get(statusKey);
+    return {
+      username: entry.username,
+      displayName: formatSocialDisplayName(entry.username),
+      message: buildPresenceHighlightSentence(entry),
+      statusKey,
+      icon: preset?.icon || '👥'
+    };
+  });
+}
+
+function presenceEntryWeight(entry) {
+  if (!entry || !entry.presence) {
+    return 0;
+  }
+  if (entry.presence.state === 'watching') {
+    return 4;
+  }
+  const status = getPresenceEntryStatusKey(entry);
+  if (status === 'available') {
+    return 3;
+  }
+  if (status && status !== 'default') {
+    return 2;
+  }
+  if (entry.presence.state === 'away') {
+    return 0.5;
+  }
+  return 1;
+}
+
 function renderSocialConnections() {
   const overview = state.socialOverview || getSocialOverviewSnapshot();
   const collabState = state.collaborativeState || getCollaborativeStateSnapshot();
@@ -5295,6 +5552,25 @@ function renderSocialConnections() {
         state.dataset.statusPreset = statusKey;
         state.textContent = formatPresenceListStatus(entry);
         row.appendChild(state);
+        const shareForm = createPresenceShareForm(entry.username);
+        const actions = document.createElement('div');
+        actions.className = 'social-presence-actions';
+        const inviteBtn = document.createElement('button');
+        inviteBtn.type = 'button';
+        inviteBtn.className = 'social-presence-action-btn';
+        inviteBtn.textContent = 'Invite to party';
+        inviteBtn.addEventListener('click', () => handlePresenceInviteAction(entry.username));
+        actions.appendChild(inviteBtn);
+        const shareBtn = document.createElement('button');
+        shareBtn.type = 'button';
+        shareBtn.className = 'social-presence-action-btn';
+        shareBtn.textContent = 'Send a rec';
+        shareBtn.addEventListener('click', () => togglePresenceShareForm(shareForm));
+        actions.appendChild(shareBtn);
+        row.appendChild(actions);
+        if (shareForm) {
+          row.appendChild(shareForm);
+        }
         presenceListEl.appendChild(row);
       });
     }
@@ -5416,6 +5692,168 @@ function renderSocialConnections() {
         suggestionsListEl.appendChild(card);
       });
     }
+  }
+}
+
+function handlePresenceInviteAction(username) {
+  const normalized = canonicalHandle(username);
+  if (!normalized) {
+    return;
+  }
+  if (!state.session || !state.session.token) {
+    showToast({
+      title: 'Sign in to invite friends',
+      text: 'Sign in to schedule a watch party with your friends.',
+      icon: '🔒'
+    });
+    return;
+  }
+  const inviteInput = $("watchPartyInvitees");
+  const form = $("watchPartyForm");
+  if (!inviteInput || !form) {
+    showToast({
+      title: 'Open the watch party planner',
+      text: 'Head to the Social tab to schedule a watch party.',
+      icon: '🎬'
+    });
+    return;
+  }
+  const existing = inviteInput.value
+    ? inviteInput.value
+        .split(',')
+        .map((value) => canonicalHandle(value))
+        .filter(Boolean)
+    : [];
+  if (!existing.includes(normalized)) {
+    existing.push(normalized);
+  }
+  inviteInput.value = existing.join(', ');
+  inviteInput.dispatchEvent(new Event('input', { bubbles: true }));
+  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showToast({
+    title: 'Invite queued',
+    text: `Added ${formatSocialDisplayName(normalized)} to your invite list.`,
+    icon: '🎉'
+  });
+}
+
+function createPresenceShareForm(username) {
+  const form = document.createElement('form');
+  form.className = 'social-presence-share';
+  form.hidden = true;
+  form.noValidate = true;
+  const label = document.createElement('label');
+  label.className = 'sr-only';
+  label.textContent = `Recommend a title to ${formatSocialDisplayName(username)}`;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'input-base input-text';
+  input.placeholder = 'Movie or show title';
+  input.maxLength = 80;
+  input.required = true;
+  const actions = document.createElement('div');
+  actions.className = 'social-presence-share-actions';
+  const sendBtn = document.createElement('button');
+  sendBtn.type = 'submit';
+  sendBtn.className = 'btn-secondary';
+  sendBtn.textContent = 'Send recommendation';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'btn-subtle';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', () => closePresenceShareForm(form));
+  actions.appendChild(sendBtn);
+  actions.appendChild(cancelBtn);
+  const status = document.createElement('p');
+  status.className = 'social-presence-share-status';
+  status.setAttribute('aria-live', 'polite');
+  form.appendChild(label);
+  form.appendChild(input);
+  form.appendChild(actions);
+  form.appendChild(status);
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    handlePresenceShareSubmit({ form, input, status, username });
+  });
+  return form;
+}
+
+function togglePresenceShareForm(form) {
+  if (!form) {
+    return;
+  }
+  if (activePresenceShareForm && activePresenceShareForm !== form) {
+    closePresenceShareForm(activePresenceShareForm);
+  }
+  const willOpen = form.hidden;
+  if (willOpen) {
+    form.hidden = false;
+    activePresenceShareForm = form;
+    const input = form.querySelector('input');
+    if (input) {
+      input.focus();
+    }
+  } else {
+    closePresenceShareForm(form);
+  }
+}
+
+function closePresenceShareForm(form) {
+  if (!form) {
+    return;
+  }
+  form.hidden = true;
+  const input = form.querySelector('input');
+  if (input) {
+    input.value = '';
+  }
+  const status = form.querySelector('.social-presence-share-status');
+  if (status) {
+    setPresenceShareStatus(status, '');
+  }
+  if (activePresenceShareForm === form) {
+    activePresenceShareForm = null;
+  }
+}
+
+function handlePresenceShareSubmit({ form, input, status, username }) {
+  if (!state.session || !state.session.token) {
+    setPresenceShareStatus(status, 'Sign in to send recommendations.', 'error');
+    return;
+  }
+  const title = input.value.trim();
+  if (!title) {
+    setPresenceShareStatus(status, 'Add a movie title before sending.', 'error');
+    input.focus();
+    return;
+  }
+  setPresenceShareStatus(status, 'Sending your recommendation…', 'muted');
+  window.setTimeout(() => {
+    const displayName = formatSocialDisplayName(username) || 'your friend';
+    setPresenceShareStatus(status, `Sent “${title}” to ${displayName}.`, 'success');
+    showToast({
+      title: 'Recommendation sent',
+      text: `We’ll nudge ${displayName} to check out “${title}”.`,
+      icon: '📮'
+    });
+    closePresenceShareForm(form);
+  }, 200);
+}
+
+function setPresenceShareStatus(element, text, variant) {
+  if (!element) {
+    return;
+  }
+  if (!text) {
+    element.textContent = '';
+    element.removeAttribute('data-variant');
+    return;
+  }
+  element.textContent = text;
+  if (variant) {
+    element.dataset.variant = variant;
+  } else {
+    element.removeAttribute('data-variant');
   }
 }
 
@@ -5793,6 +6231,11 @@ function buildCollaborativeListCard(entry, mode) {
     card.appendChild(preview);
   }
 
+  const presenceRow = buildCollaborativePresenceRow(entry);
+  if (presenceRow) {
+    card.appendChild(presenceRow);
+  }
+
   const voteSection = buildCollaborativeVoteList(entry, canCollaborate);
   if (voteSection) {
     card.appendChild(voteSection);
@@ -5864,6 +6307,58 @@ function buildCollaborativeListCard(entry, mode) {
   }
 
   return card;
+}
+
+function buildCollaborativePresenceRow(entry) {
+  const handles = new Set();
+  if (entry.owner) {
+    const ownerHandle = canonicalHandle(entry.owner);
+    if (ownerHandle) {
+      handles.add(ownerHandle);
+    }
+  }
+  if (Array.isArray(entry.collaborators)) {
+    entry.collaborators.forEach((handle) => {
+      const normalized = canonicalHandle(handle);
+      if (normalized) {
+        handles.add(normalized);
+      }
+    });
+  }
+  if (!handles.size) {
+    return null;
+  }
+  const presenceMap = getPresenceOverviewMap();
+  const members = Array.from(handles)
+    .map((username) => ({ username, presence: presenceMap[username] }))
+    .filter((record) => record.presence && record.presence.state && record.presence.state !== 'offline');
+  if (!members.length) {
+    return null;
+  }
+  members.sort((a, b) => presenceEntryWeight(b) - presenceEntryWeight(a));
+  const row = document.createElement('div');
+  row.className = 'collab-presence-row';
+  const label = document.createElement('span');
+  label.className = 'collab-presence-label';
+  label.textContent = 'Now online';
+  row.appendChild(label);
+  const chips = document.createElement('div');
+  chips.className = 'collab-presence-chips';
+  members.slice(0, 3).forEach((member) => {
+    const chip = document.createElement('span');
+    chip.className = 'collab-presence-chip';
+    chip.dataset.status = getPresenceEntryStatusKey(member);
+    chip.textContent = `${formatSocialDisplayName(member.username)} • ${formatPresenceChipSummary(member)}`;
+    chips.appendChild(chip);
+  });
+  if (members.length > 3) {
+    const more = document.createElement('span');
+    more.className = 'collab-presence-chip';
+    more.textContent = `+${members.length - 3} more`;
+    chips.appendChild(more);
+  }
+  row.appendChild(chips);
+  return row;
 }
 
 function buildCollaborativeVoteList(entry, canVote) {

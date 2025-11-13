@@ -869,6 +869,7 @@ export function renderRecommendations(items, watchedMovies, options = {}) {
   const onMarkWatched = typeof options.onMarkWatched === "function" ? options.onMarkWatched : null;
   const onToggleFavorite =
     typeof options.onToggleFavorite === "function" ? options.onToggleFavorite : null;
+  const presenceSpotlights = Array.isArray(options.presenceSpotlights) ? options.presenceSpotlights : null;
 
   const watchedLookup = buildMovieLookup(watchedMovies, { normalizeTitle: false });
   const favoriteLookup = buildMovieLookup(favorites, { normalizeTitle: true });
@@ -892,7 +893,12 @@ export function renderRecommendations(items, watchedMovies, options = {}) {
       item.reasons || [],
       watchedLookup,
       favoriteLookup,
-      { onMarkWatched, onToggleFavorite, community: options.community || null }
+      {
+        onMarkWatched,
+        onToggleFavorite,
+        community: options.community || null,
+        presenceSpotlights
+      }
     );
     fragment.appendChild(card);
   });
@@ -975,6 +981,11 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
     reasonRow.className = "movie-reason";
     reasonRow.textContent = reasonText;
     infoWrap.appendChild(reasonRow);
+  }
+
+  const presenceRow = buildMoviePresenceRow(handlers && handlers.presenceSpotlights);
+  if (presenceRow) {
+    infoWrap.appendChild(presenceRow);
   }
 
   infoWrap.appendChild(titleRow);
@@ -1299,6 +1310,54 @@ function formatReasons(reasons) {
     return topTwo[0];
   }
   return topTwo.join(" • ");
+}
+
+function buildMoviePresenceRow(spotlights) {
+  if (!Array.isArray(spotlights) || !spotlights.length) {
+    return null;
+  }
+  const row = document.createElement("div");
+  row.className = "movie-presence-row";
+  const label = document.createElement("span");
+  label.className = "movie-presence-label";
+  label.textContent = "Friends online";
+  row.appendChild(label);
+  const chips = document.createElement("div");
+  chips.className = "movie-presence-chips";
+  spotlights.slice(0, 3).forEach((spotlight) => {
+    if (!spotlight || !spotlight.displayName) {
+      return;
+    }
+    const chip = document.createElement("span");
+    chip.className = "movie-presence-chip";
+    if (spotlight.statusKey) {
+      chip.dataset.status = spotlight.statusKey;
+    }
+    const icon = document.createElement("span");
+    icon.className = "movie-presence-chip-icon";
+    icon.textContent = spotlight.icon || "👥";
+    chip.appendChild(icon);
+    const name = document.createElement("strong");
+    name.textContent = spotlight.displayName;
+    chip.appendChild(name);
+    const message = document.createElement("span");
+    message.textContent = formatPresenceMessage(spotlight.message);
+    chip.appendChild(message);
+    chips.appendChild(chip);
+  });
+  if (!chips.childElementCount) {
+    return null;
+  }
+  row.appendChild(chips);
+  return row;
+}
+
+function formatPresenceMessage(message) {
+  const text = typeof message === "string" ? message.trim() : "is online now.";
+  if (!text) {
+    return "is online now.";
+  }
+  return text.replace(/\s+/g, " ");
 }
 
 function markButtonAsWatched(btn, title, watchedIcon, options = {}) {
