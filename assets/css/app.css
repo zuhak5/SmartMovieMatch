@@ -1564,22 +1564,25 @@ body[data-theme="light"] .pill-context {
   width: 100%;
 }
 
-.profile-collections-panel {
-  margin-top: 1rem;
-}
-
+.profile-collections-panel,
 .social-panel {
   margin-top: 1rem;
 }
 
-.social-panel .panel-header {
-  align-items: flex-start;
+.profile-collections-panel .panel-inner,
+.social-panel .panel-inner {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1.15rem, 1.5vw, 1.65rem);
+  align-items: stretch;
+  width: 100%;
 }
 
-.social-panel .panel-inner {
-  display: grid;
-  gap: 1.5rem;
-  align-items: stretch;
+@media (max-width: 720px) {
+  .profile-collections-panel .panel-inner,
+  .social-panel .panel-inner {
+    gap: 1.1rem;
+  }
 }
 
 .social-signed-out {
@@ -1589,9 +1592,9 @@ body[data-theme="light"] .pill-context {
   background: rgba(15, 23, 42, 0.72);
   display: grid;
   gap: 0.7rem;
-  width: min(520px, 100%);
-  margin-inline: auto;
-  justify-self: center;
+  width: 100%;
+  margin-inline: 0;
+  justify-self: stretch;
 }
 
 .social-signed-out h3 {
