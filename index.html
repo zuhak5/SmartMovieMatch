@@ -13,11 +13,11 @@
 
 </head>
 <body data-page="discovery" data-theme="dark">
-<div class="app">
+<div class="app" style="padding-right: 3px; padding-left: 3px;">
   <header class="app-header">
-    <div class="account-bar" role="navigation" data-account-state="guest">
+    <div class="account-bar" role="navigation" data-account-state="guest" style="padding-right: 3px; padding-left: 3px;">
       <span id="accountGreeting" class="account-greeting">You’re browsing as guest.</span>
-      <div class="account-bar-actions">
+      <div class="account-bar-actions" style="padding-right: 3px; padding-left: 3px;">
         <button
           id="themeToggle"
           class="btn-theme-toggle"
@@ -43,7 +43,7 @@
         <span id="notificationCount" class="notification-count" hidden>0</span>
         <span class="sr-only">Open notifications</span>
       </button>
-      <div id="accountProfile" class="account-profile" hidden>
+      <div id="accountProfile" class="account-profile" hidden style="padding-right: 3px; padding-left: 3px;">
         <button
           id="accountProfileBtn"
           class="account-pill"
@@ -85,18 +85,18 @@
           </li>
         </ul>
       </div>
-      <div id="notificationPanel" class="notification-panel" role="region" aria-label="Notifications" hidden>
-        <div class="notification-panel-header">
+      <div id="notificationPanel" class="notification-panel" role="region" aria-label="Notifications" hidden style="padding-right: 3px; padding-left: 3px;">
+        <div class="notification-panel-header" style="padding-right: 3px; padding-left: 3px;">
           <span class="notification-panel-title">Notifications</span>
           <button id="notificationMarkRead" class="btn-subtle notification-mark-read" type="button">
             Mark all read
           </button>
         </div>
-        <div id="notificationList" class="notification-list" role="list"></div>
-        <div id="notificationEmpty" class="notification-empty">You’re all caught up!</div>
+        <div id="notificationList" class="notification-list" role="list" style="padding-right: 3px; padding-left: 3px;"></div>
+        <div id="notificationEmpty" class="notification-empty" style="padding-right: 3px; padding-left: 3px;">You’re all caught up!</div>
       </div>
     </div>
-    <div class="app-title-row">
+    <div class="app-title-row" style="padding-right: 3px; padding-left: 3px;">
       <h1 class="app-title">
         🎬 Smart Movie Match
       </h1>
@@ -114,12 +114,12 @@
 
   <main class="app-main">
     <!-- Preferences -->
-    <section id="preferencesPanel" class="panel panel-sticky">
-      <div class="panel-inner">
-        <div class="panel-header">
-          <div>
-            <div class="panel-title">Your vibe</div>
-            <div class="panel-subtitle">Genres, mood &amp; what you’ve liked</div>
+    <section id="preferencesPanel" class="panel panel-sticky" style="padding-right: 3px; padding-left: 3px;">
+      <div class="panel-inner" style="padding-right: 3px; padding-left: 3px;">
+        <div class="panel-header" style="padding-right: 3px; padding-left: 3px;">
+          <div style="padding-right: 3px; padding-left: 3px;">
+            <div class="panel-title" style="padding-right: 3px; padding-left: 3px;">Your vibe</div>
+            <div class="panel-subtitle" style="padding-right: 3px; padding-left: 3px;">Genres, mood &amp; what you’ve liked</div>
           </div>
         </div>
         <p class="hint-text">
@@ -128,9 +128,9 @@
         </p>
 
         <form id="prefsForm">
-          <section class="vibe-preset-panel" aria-label="Starter vibe presets">
-            <div class="vibe-preset-header">
-              <div>
+          <section class="vibe-preset-panel" aria-label="Starter vibe presets" style="padding-right: 3px; padding-left: 3px;">
+            <div class="vibe-preset-header" style="padding-right: 3px; padding-left: 3px;">
+              <div style="padding-right: 3px; padding-left: 3px;">
                 <p class="vibe-preset-eyebrow">Need inspiration?</p>
                 <h3 class="vibe-preset-title">Jump in with a preset</h3>
                 <p class="vibe-preset-subtitle">
@@ -138,7 +138,7 @@
                 </p>
               </div>
             </div>
-            <div class="vibe-preset-grid" role="group">
+            <div class="vibe-preset-grid" role="group" style="padding-right: 3px; padding-left: 3px;">
               <button
                 type="button"
                 class="vibe-preset-card"
@@ -207,14 +207,14 @@
           </section>
 
           <!-- Genres -->
-          <div class="field-group">
-            <div class="field-label-row">
+          <div class="field-group" style="padding-right: 3px; padding-left: 3px;">
+            <div class="field-label-row" style="padding-right: 3px; padding-left: 3px;">
               <label>Genres you enjoy</label>
-              <div class="field-label-secondary">
+              <div class="field-label-secondary" style="padding-right: 3px; padding-left: 3px;">
                 Pick a few – you can mix anything.
               </div>
             </div>
-            <div class="genre-grid">
+            <div class="genre-grid" style="padding-right: 3px; padding-left: 3px;">
               <!-- TMDB genre IDs -->
               <label class="genre-pill">
                 <input type="checkbox" name="genre" value="28" />
@@ -304,9 +304,9 @@
           </div>
 
 
-          <div class="preferences-preview" id="preferencesPreview" aria-live="polite"></div>
+          <div class="preferences-preview" id="preferencesPreview" aria-live="polite" style="padding-right: 3px; padding-left: 3px;"></div>
 
-          <div class="button-row">
+          <div class="button-row" style="padding-right: 3px; padding-left: 3px;">
             <button type="submit" class="btn-primary">
               <span>Find movies for me</span>
               <span aria-hidden="true">🔍</span>
@@ -317,15 +317,15 @@
     </section>
 
     <!-- Right column: collections + recommendations -->
-    <div class="right-column">
-      <section id="collectionsPanel" class="panel collections-panel">
-        <div class="panel-inner">
-          <div class="panel-header collections-header">
-            <div>
-              <div class="panel-title">Your saved lists</div>
-              <div class="panel-subtitle">Favorites and watched picks stay close while you explore.</div>
+    <div class="right-column" style="padding-right: 3px; padding-left: 3px;">
+      <section id="collectionsPanel" class="panel collections-panel" style="padding-right: 3px; padding-left: 3px;">
+        <div class="panel-inner" style="padding-right: 3px; padding-left: 3px;">
+          <div class="panel-header collections-header" style="padding-right: 3px; padding-left: 3px;">
+            <div style="padding-right: 3px; padding-left: 3px;">
+              <div class="panel-title" style="padding-right: 3px; padding-left: 3px;">Your saved lists</div>
+              <div class="panel-subtitle" style="padding-right: 3px; padding-left: 3px;">Favorites and watched picks stay close while you explore.</div>
             </div>
-            <div class="collection-tabs" role="tablist">
+            <div class="collection-tabs" role="tablist" style="padding-right: 3px; padding-left: 3px;">
               <button
                 type="button"
                 class="collection-tab active"
@@ -350,16 +350,16 @@
               </button>
             </div>
           </div>
-          <div class="collection-summary" id="favoritesSummary"></div>
-          <div class="collection-summary" id="watchedSummary"></div>
-          <div class="collection-filters" role="region" aria-label="Collection filters">
-            <div class="collection-filter-group">
+          <div class="collection-summary" id="favoritesSummary" style="padding-right: 3px; padding-left: 3px;"></div>
+          <div class="collection-summary" id="watchedSummary" style="padding-right: 3px; padding-left: 3px;"></div>
+          <div class="collection-filters" role="region" aria-label="Collection filters" style="padding-right: 3px; padding-left: 3px;">
+            <div class="collection-filter-group" style="padding-right: 3px; padding-left: 3px;">
               <label class="collection-filter-label" for="collectionFilterGenre">Filter by genre</label>
               <select id="collectionFilterGenre" class="collection-filter-select">
                 <option value="">All</option>
               </select>
             </div>
-            <div class="collection-filter-group">
+            <div class="collection-filter-group" style="padding-right: 3px; padding-left: 3px;">
               <label class="collection-filter-label" for="collectionFilterSort">Sort by</label>
               <select id="collectionFilterSort" class="collection-filter-select">
                 <option value="recent">Recently added</option>
@@ -369,14 +369,14 @@
               </select>
             </div>
           </div>
-          <div id="favoritesView" class="collection-view active" role="tabpanel" aria-labelledby="favoritesTab">
-            <div id="favoritesList" class="favorites-list"></div>
-            <div id="favoritesEmpty" class="empty-state empty-state-card">
-              <div class="empty-state-illustration" aria-hidden="true">⭐</div>
-              <div class="empty-state-body">
+          <div id="favoritesView" class="collection-view active" role="tabpanel" aria-labelledby="favoritesTab" style="padding-right: 3px; padding-left: 3px;">
+            <div id="favoritesList" class="favorites-list" style="padding-right: 3px; padding-left: 3px;"></div>
+            <div id="favoritesEmpty" class="empty-state empty-state-card" style="padding-right: 3px; padding-left: 3px;">
+              <div class="empty-state-illustration" aria-hidden="true" style="padding-right: 3px; padding-left: 3px;">⭐</div>
+              <div class="empty-state-body" style="padding-right: 3px; padding-left: 3px;">
                 <h3>Build a favorites lane</h3>
                 <p>Tap the star on any recommendation to stash it for later or share with friends.</p>
-                <div class="empty-state-carousel" aria-hidden="true">
+                <div class="empty-state-carousel" aria-hidden="true" style="padding-right: 3px; padding-left: 3px;">
                   <span class="empty-state-chip">Indie rom-com</span>
                   <span class="empty-state-chip">Cult classic</span>
                   <span class="empty-state-chip">Feel-good sports</span>
@@ -387,14 +387,14 @@
               </div>
             </div>
           </div>
-          <div id="watchedView" class="collection-view" role="tabpanel" aria-labelledby="watchedTab">
-            <div id="watchedList" class="watched-panel-list"></div>
-            <div id="watchedEmpty" class="empty-state empty-state-card">
-              <div class="empty-state-illustration" aria-hidden="true">🎟️</div>
-              <div class="empty-state-body">
+          <div id="watchedView" class="collection-view" role="tabpanel" aria-labelledby="watchedTab" style="padding-right: 3px; padding-left: 3px;">
+            <div id="watchedList" class="watched-panel-list" style="padding-right: 3px; padding-left: 3px;"></div>
+            <div id="watchedEmpty" class="empty-state empty-state-card" style="padding-right: 3px; padding-left: 3px;">
+              <div class="empty-state-illustration" aria-hidden="true" style="padding-right: 3px; padding-left: 3px;">🎟️</div>
+              <div class="empty-state-body" style="padding-right: 3px; padding-left: 3px;">
                 <h3>Keep a watched streak</h3>
                 <p>Mark recommendations as <strong>“I’ve watched this”</strong> so I can bias future batches.</p>
-                <div class="empty-state-carousel" aria-hidden="true">
+                <div class="empty-state-carousel" aria-hidden="true" style="padding-right: 3px; padding-left: 3px;">
                   <span class="empty-state-chip">Thriller Friday</span>
                   <span class="empty-state-chip">Animated matinée</span>
                   <span class="empty-state-chip">Classic noir</span>
@@ -404,7 +404,7 @@
                 </button>
               </div>
             </div>
-            <div class="collection-actions">
+            <div class="collection-actions" style="padding-right: 3px; padding-left: 3px;">
               <button type="button" class="btn-subtle btn-subtle-danger" id="clearWatchedBtn">
                 <span>Clear history</span>
                 <span aria-hidden="true">🧹</span>
@@ -414,13 +414,13 @@
         </div>
       </section>
 
-      <section id="recommendationsPanel" class="panel recommendations-panel">
-        <div class="panel-inner">
-          <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
-          <div class="recommendations-header">
-            <div>
-              <div class="recommendations-title" id="recTitle">Recommendations</div>
-              <div class="recommendations-meta">
+      <section id="recommendationsPanel" class="panel recommendations-panel" style="padding-right: 3px; padding-left: 3px;">
+        <div class="panel-inner" style="padding-right: 3px; padding-left: 3px;">
+          <div id="syncStatus" class="sync-status" role="status" aria-live="polite" style="padding-right: 3px; padding-left: 3px;"></div>
+          <div class="recommendations-header" style="padding-right: 3px; padding-left: 3px;">
+            <div style="padding-right: 3px; padding-left: 3px;">
+              <div class="recommendations-title" id="recTitle" style="padding-right: 3px; padding-left: 3px;">Recommendations</div>
+              <div class="recommendations-meta" style="padding-right: 3px; padding-left: 3px;">
                 <span id="recMetaPrimary">Tune your preferences, then I’ll blend TMDB discovery with fresh OMDb details.</span>
                 <span class="pill-mini">
                   <span class="swatch"></span>
@@ -428,22 +428,22 @@
                 </span>
               </div>
             </div>
-            <div>
+            <div style="padding-right: 3px; padding-left: 3px;">
               <button type="button" class="btn-subtle btn-chip btn-chip-muted" id="recNudgeBtn">
                 Shuffle suggestions
               </button>
             </div>
           </div>
 
-          <div class="recommendations-controls" role="region" aria-label="Result view preferences">
-            <div class="control-group">
+          <div class="recommendations-controls" role="region" aria-label="Result view preferences" style="padding-right: 3px; padding-left: 3px;">
+            <div class="control-group" style="padding-right: 3px; padding-left: 3px;">
               <label class="control-label" for="recommendationLayout">Layout</label>
-              <div class="segmented-control" role="radiogroup" aria-label="Recommendation layout">
+              <div class="segmented-control" role="radiogroup" aria-label="Recommendation layout" style="padding-right: 3px; padding-left: 3px;">
                 <button type="button" class="segment" data-layout="grid" aria-pressed="true">Grid</button>
                 <button type="button" class="segment" data-layout="carousel">Carousel</button>
               </div>
             </div>
-            <div class="control-group">
+            <div class="control-group" style="padding-right: 3px; padding-left: 3px;">
               <fieldset class="control-filter-set">
                 <legend class="control-label">Quick filters</legend>
                 <label class="control-chip">
@@ -467,8 +467,8 @@
             class="status-row"
             aria-live="polite"
             aria-atomic="true"
-          >
-            <div class="status-primary">
+           style="padding-right: 3px; padding-left: 3px;">
+            <div class="status-primary" style="padding-right: 3px; padding-left: 3px;">
               <span class="status-dot" id="recStatusDot"></span>
               <span id="recStatusText">
                 No calls made yet. Hit “Find movies for me” to start.
@@ -480,16 +480,16 @@
               role="progressbar"
               aria-hidden="true"
               hidden
-            >
+             style="padding-right: 3px; padding-left: 3px;">
               <span class="status-progress-fill"></span>
             </div>
             <span class="status-progress-stage" id="recStatusStage" hidden></span>
           </div>
 
-          <div id="recError" class="error-text" role="alert"></div>
+          <div id="recError" class="error-text" role="alert" style="padding-right: 3px; padding-left: 3px;"></div>
 
-          <div id="recommendationsGrid" class="recommendations-grid"></div>
-          <div class="recommendations-actions" id="recommendationsActions">
+          <div id="recommendationsGrid" class="recommendations-grid" style="padding-right: 3px; padding-left: 3px;"></div>
+          <div class="recommendations-actions" id="recommendationsActions" style="padding-right: 3px; padding-left: 3px;">
             <button type="button" class="btn-subtle btn-chip" id="showMoreRecsBtn">Show more</button>
           </div>
         </div>
@@ -499,34 +499,34 @@
   </main>
 </div>
 
-  <div id="onboardingCoach" class="onboarding-coach" role="dialog" aria-modal="true" hidden>
-    <div class="onboarding-card">
-      <div class="onboarding-header">
-        <div class="onboarding-step">Step <span id="onboardingStep">1</span> of 3</div>
+  <div id="onboardingCoach" class="onboarding-coach" role="dialog" aria-modal="true" hidden style="padding-right: 3px; padding-left: 3px;">
+    <div class="onboarding-card" style="padding-right: 3px; padding-left: 3px;">
+      <div class="onboarding-header" style="padding-right: 3px; padding-left: 3px;">
+        <div class="onboarding-step" style="padding-right: 3px; padding-left: 3px;">Step <span id="onboardingStep">1</span> of 3</div>
         <button id="onboardingClose" class="onboarding-close" type="button" aria-label="Skip onboarding">✕</button>
       </div>
-      <div id="onboardingContent" class="onboarding-content"></div>
-      <div class="onboarding-actions">
+      <div id="onboardingContent" class="onboarding-content" style="padding-right: 3px; padding-left: 3px;"></div>
+      <div class="onboarding-actions" style="padding-right: 3px; padding-left: 3px;">
         <button id="onboardingBack" class="btn-subtle" type="button">Back</button>
         <button id="onboardingNext" class="btn-primary" type="button">Next</button>
       </div>
     </div>
   </div>
 
-  <div id="globalToastRegion" class="global-toast-region" role="status" aria-live="polite"></div>
+  <div id="globalToastRegion" class="global-toast-region" role="status" aria-live="polite" style="padding-right: 3px; padding-left: 3px;"></div>
 
   <div
     id="socialProfileOverlay"
     class="modal-overlay"
     hidden
     aria-hidden="true"
-  >
+   style="padding-right: 3px; padding-left: 3px;">
     <div
       class="modal social-profile-modal"
       role="dialog"
       aria-modal="true"
       aria-labelledby="socialProfileTitle"
-    >
+     style="padding-right: 3px; padding-left: 3px;">
       <button
         type="button"
         class="modal-close"
@@ -539,8 +539,8 @@
         <h2 id="socialProfileTitle" class="modal-title">Profile preview</h2>
         <p id="socialProfileSubtitle" class="modal-subtitle"></p>
       </header>
-      <div id="socialProfileStatus" class="modal-status" role="status" aria-live="polite"></div>
-      <div id="socialProfileBody" class="modal-section social-profile-body"></div>
+      <div id="socialProfileStatus" class="modal-status" role="status" aria-live="polite" style="padding-right: 3px; padding-left: 3px;"></div>
+      <div id="socialProfileBody" class="modal-section social-profile-body" style="padding-right: 3px; padding-left: 3px;"></div>
     </div>
   </div>
 
