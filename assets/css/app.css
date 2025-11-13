@@ -266,9 +266,10 @@ h6 {
 }
 
 .app {
+  --app-inline-padding: var(--layout-gutter);
   max-width: 1240px;
   margin: 0 auto;
-  padding: calc(var(--layout-vertical) + 0.8rem) var(--layout-gutter)
+  padding: calc(var(--layout-vertical) + 0.8rem) var(--app-inline-padding)
     calc(var(--layout-vertical) + 1.4rem);
   display: flex;
   flex-direction: column;
@@ -279,14 +280,16 @@ h6 {
 
 @media (min-width: 900px) {
   .app {
-    padding: calc(var(--layout-vertical) + 1.3rem)
-      clamp(1.6rem, 3vw + 1.2rem, 3rem) calc(var(--layout-vertical) + 2rem);
+    --app-inline-padding: clamp(1.6rem, 3vw + 1.2rem, 3rem);
+    padding: calc(var(--layout-vertical) + 1.3rem) var(--app-inline-padding)
+      calc(var(--layout-vertical) + 2rem);
   }
 }
 
 @media (max-width: 720px) {
   .app {
-    padding: calc(var(--layout-vertical) + 0.3rem) var(--layout-gutter-compact)
+    --app-inline-padding: var(--layout-gutter-compact);
+    padding: calc(var(--layout-vertical) + 0.3rem) var(--app-inline-padding)
       calc(var(--layout-vertical) + 0.9rem);
     gap: 1.55rem;
   }
@@ -294,8 +297,11 @@ h6 {
 
 @media (max-width: 480px) {
   .app {
-    padding: calc(var(--layout-vertical) - 0.1rem)
-      max(0.85rem, var(--layout-gutter-compact) - 0.15rem)
+    --app-inline-padding: max(
+      0.85rem,
+      calc(var(--layout-gutter-compact) - 0.15rem)
+    );
+    padding: calc(var(--layout-vertical) - 0.1rem) var(--app-inline-padding)
       calc(var(--layout-vertical) + 0.55rem);
     gap: 1.4rem;
   }
@@ -303,22 +309,11 @@ h6 {
 
 @supports (padding: max(0px)) {
   .app {
-    padding-left: 7.5px;
-    padding-right: 7.5px;
-  }
-
-  @media (max-width: 720px) {
-    .app {
-      padding-left: 7.5px;
-      padding-right: 7.5px;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .app {
-      padding-left: 7.5px;
-      padding-right: 7.5px;
-    }
+    padding-left: max(var(--app-inline-padding), env(safe-area-inset-left));
+    padding-right: max(
+      var(--app-inline-padding),
+      env(safe-area-inset-right)
+    );
   }
 }
 
