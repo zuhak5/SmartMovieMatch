@@ -297,27 +297,21 @@ h6 {
 
 @supports (padding: max(0px)) {
   .app {
-    padding-left: max(var(--layout-gutter), env(safe-area-inset-left) + 1rem);
-    padding-right: max(var(--layout-gutter), env(safe-area-inset-right) + 1rem);
+    padding-left: unset;
+    padding-right: unset;
   }
 
   @media (max-width: 720px) {
     .app {
-      padding-left: max(
-        var(--layout-gutter-compact),
-        env(safe-area-inset-left) + 0.85rem
-      );
-      padding-right: max(
-        var(--layout-gutter-compact),
-        env(safe-area-inset-right) + 0.85rem
-      );
+      padding-left: unset;
+      padding-right: unset;
     }
   }
 
   @media (max-width: 480px) {
     .app {
-      padding-left: max(0.85rem, env(safe-area-inset-left) + 0.75rem);
-      padding-right: max(0.85rem, env(safe-area-inset-right) + 0.75rem);
+      padding-left: unset;
+      padding-right: unset;
     }
   }
 }
