@@ -143,6 +143,54 @@ function setViewExpanded(collection, expanded) {
   });
 }
 
+function createImdbLookupKey(value) {
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+  return `imdb:${value.trim().toLowerCase()}`;
+}
+
+function createTitleLookupKey(value, { normalize } = {}) {
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+  const normalized = normalize ? value.trim().toLowerCase() : value.trim();
+  return `title:${normalized}`;
+}
+
+function buildMovieLookup(list, { normalizeTitle = false } = {}) {
+  const lookup = new Set();
+  if (!Array.isArray(list)) {
+    return lookup;
+  }
+  list.forEach((movie) => {
+    if (!movie || typeof movie !== "object") {
+      return;
+    }
+    const imdbKey = createImdbLookupKey(movie.imdbID);
+    if (imdbKey) {
+      lookup.add(imdbKey);
+    }
+    const titleKey = createTitleLookupKey(movie.title, { normalize: normalizeTitle });
+    if (titleKey) {
+      lookup.add(titleKey);
+    }
+  });
+  return lookup;
+}
+
+function hasMovieInLookup(lookup, imdbId, title, { normalizeTitle = false } = {}) {
+  if (!lookup || lookup.size === 0) {
+    return false;
+  }
+  const imdbKey = createImdbLookupKey(imdbId);
+  if (imdbKey && lookup.has(imdbKey)) {
+    return true;
+  }
+  const titleKey = createTitleLookupKey(title, { normalize: normalizeTitle });
+  return titleKey ? lookup.has(titleKey) : false;
+}
+
 export function showToast({ title, text, variant = "info", icon = "🔔", duration = TOAST_DURATION } = {}) {
   const region = $("globalToastRegion");
   if (!region) {
@@ -822,6 +870,10 @@ export function renderRecommendations(items, watchedMovies, options = {}) {
   const onToggleFavorite =
     typeof options.onToggleFavorite === "function" ? options.onToggleFavorite : null;
 
+  const watchedLookup = buildMovieLookup(watchedMovies, { normalizeTitle: false });
+  const favoriteLookup = buildMovieLookup(favorites, { normalizeTitle: true });
+  const fragment = document.createDocumentFragment();
+
   if (!items.length) {
     const msg = document.createElement("div");
     msg.className = "empty-state";
@@ -838,15 +890,17 @@ export function renderRecommendations(items, watchedMovies, options = {}) {
       item.omdb,
       item.trailer,
       item.reasons || [],
-      watchedMovies,
-      favorites,
+      watchedLookup,
+      favoriteLookup,
       { onMarkWatched, onToggleFavorite, community: options.community || null }
     );
-    grid.appendChild(card);
+    fragment.appendChild(card);
   });
+
+  grid.appendChild(fragment);
 }
 
-function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites, handlers) {
+function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLookup, handlers) {
   const imdbID = omdb && omdb.imdbID ? omdb.imdbID : "";
   const tmdbId = tmdb && (tmdb.id || tmdb.tmdb_id || tmdb.tmdbId)
     ? tmdb.id || tmdb.tmdb_id || tmdb.tmdbId
@@ -1041,9 +1095,7 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites,
   watchedBtn.type = "button";
   watchedBtn.className = "watched-btn";
   watchedBtn.innerHTML = `<span class="watched-btn-icon">👁️</span><span>I’ve watched this</span>`;
-  const watchedMatch = watchedMovies.some((movie) =>
-    imdbID ? movie.imdbID === imdbID : movie.title === title
-  );
+  const watchedMatch = hasMovieInLookup(watchedLookup, imdbID, title, { normalizeTitle: false });
   if (watchedMatch) {
     markButtonAsWatched(watchedBtn, title, watchedStateIcon, { animate: false });
   } else {
@@ -1087,11 +1139,7 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedMovies, favorites,
   favoriteBtn.type = "button";
   favoriteBtn.className = "favorite-btn";
   favoriteBtn.innerHTML = `<span class="favorite-btn-icon">♡</span><span>Save to favorites</span>`;
-  const isFavorite = favorites.some((fav) =>
-    imdbID && fav.imdbID
-      ? fav.imdbID === imdbID
-      : fav.title.toLowerCase() === title.toLowerCase()
-  );
+  const isFavorite = hasMovieInLookup(favoriteLookup, imdbID, title, { normalizeTitle: true });
   setFavoriteState(favoriteBtn, isFavorite, favoriteStateIcon, title);
 
   const toggleFavorite = () => {
