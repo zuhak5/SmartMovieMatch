@@ -2,6 +2,7 @@ import { computeWatchedGenreWeights } from "./taste.js";
 import { $ } from "./dom.js";
 import { playExpandSound, playFavoriteSound, playUiClick } from "./sound.js";
 import { acknowledgeFriendActivity } from "./social.js";
+import { TMDB_GENRES } from "./config.js";
 
 const COLLECTION_STATE_KEY = "smm.collection-state.v1";
 const COLLECTION_DEFAULT_STATE = {
@@ -9,6 +10,288 @@ const COLLECTION_DEFAULT_STATE = {
   viewExpanded: { favorites: false, watched: false }
 };
 const TOAST_DURATION = 4200;
+const LANGUAGE_DISPLAY =
+  typeof Intl !== "undefined" && typeof Intl.DisplayNames === "function"
+    ? new Intl.DisplayNames(["en"], { type: "language" })
+    : null;
+
+function getOmdbField(omdb, key) {
+  if (!omdb || omdb.Response === "False") {
+    return null;
+  }
+  const value = omdb[key];
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === "N/A") {
+      return null;
+    }
+    return trimmed;
+  }
+  return null;
+}
+
+function splitOmdbList(omdb, key, limit) {
+  const value = getOmdbField(omdb, key);
+  if (!value) {
+    return [];
+  }
+  const list = value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  if (typeof limit === "number" && limit > 0) {
+    return list.slice(0, limit);
+  }
+  return list;
+}
+
+function formatRuntimeValue(tmdbRuntime, omdbRuntime) {
+  if (typeof tmdbRuntime === "number" && Number.isFinite(tmdbRuntime) && tmdbRuntime > 0) {
+    return `${tmdbRuntime} min`;
+  }
+  if (typeof omdbRuntime === "string" && omdbRuntime.trim() && omdbRuntime.trim() !== "N/A") {
+    return omdbRuntime.trim();
+  }
+  return null;
+}
+
+function formatIsoDate(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  const year = parsed.getUTCFullYear();
+  const month = String(parsed.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatFriendlyDate(value) {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function formatLanguageLabel(code) {
+  if (!code || typeof code !== "string") {
+    return null;
+  }
+  const normalized = code.trim();
+  if (!normalized) {
+    return null;
+  }
+  if (LANGUAGE_DISPLAY) {
+    try {
+      const label = LANGUAGE_DISPLAY.of(normalized.toLowerCase());
+      if (label && typeof label === "string") {
+        return label.replace(/^(.)/, (match) => match.toUpperCase());
+      }
+    } catch (error) {
+      // Fallback to uppercase code below.
+    }
+  }
+  return normalized.toUpperCase();
+}
+
+function buildLanguageList(tmdb, omdbLanguage) {
+  const languages = [];
+  if (tmdb) {
+    if (Array.isArray(tmdb.spoken_languages) && tmdb.spoken_languages.length) {
+      tmdb.spoken_languages.forEach((lang) => {
+        const label = lang?.english_name || lang?.name || formatLanguageLabel(lang?.iso_639_1);
+        if (label) {
+          languages.push(label);
+        }
+      });
+    } else if (tmdb.original_language) {
+      const label = formatLanguageLabel(tmdb.original_language);
+      if (label) {
+        languages.push(label);
+      }
+    }
+  }
+  if (!languages.length && typeof omdbLanguage === "string" && omdbLanguage.trim()) {
+    omdbLanguage
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .forEach((entry) => languages.push(entry));
+  }
+  return languages;
+}
+
+function formatNumberValue(value, { decimals = 0 } = {}) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  const formatter = new Intl.NumberFormat(undefined, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+  });
+  return formatter.format(numeric);
+}
+
+function buildOmdbRatingsMap(omdb) {
+  if (!omdb || omdb.Response === "False" || !Array.isArray(omdb.Ratings)) {
+    return {};
+  }
+  return omdb.Ratings.reduce((map, entry) => {
+    const source = typeof entry?.Source === "string" ? entry.Source.trim() : "";
+    const value = typeof entry?.Value === "string" ? entry.Value.trim() : "";
+    if (!source || !value) {
+      return map;
+    }
+    if (source.includes("Internet Movie Database")) {
+      map.imdb = value;
+    } else if (source.includes("Rotten Tomatoes")) {
+      map.rotten = value;
+    } else if (source.includes("Metacritic")) {
+      map.metacritic = value;
+    }
+    return map;
+  }, {});
+}
+
+function buildGenreList(tmdb, omdb) {
+  if (tmdb && Array.isArray(tmdb.genre_ids) && tmdb.genre_ids.length) {
+    return tmdb.genre_ids
+      .map((id) => ({ id, label: TMDB_GENRES[id] || `Genre ${id}` }))
+      .filter((genre) => Boolean(genre.label));
+  }
+  const omdbGenres = splitOmdbList(omdb, "Genre");
+  return omdbGenres.map((label) => ({ id: null, label }));
+}
+
+function createMetaChip(label, value) {
+  if (!value) {
+    return null;
+  }
+  const chip = document.createElement("span");
+  chip.className = "movie-meta-chip";
+  chip.innerHTML = `<span class="movie-meta-chip-label">${label}</span><span>${value}</span>`;
+  return chip;
+}
+
+function createIdRow(imdbID) {
+  if (!imdbID) {
+    return null;
+  }
+  const row = document.createElement("div");
+  row.className = "movie-id-row";
+  const label = document.createElement("span");
+  label.className = "movie-id-label";
+  label.textContent = "IMDb ID";
+  const value = document.createElement("code");
+  value.className = "movie-id-value";
+  value.textContent = imdbID;
+  row.appendChild(label);
+  row.appendChild(value);
+  return row;
+}
+
+function createFlagRow(tmdb) {
+  if (!tmdb) {
+    return null;
+  }
+  const row = document.createElement("div");
+  row.className = "movie-flag-row";
+  const flags = [
+    tmdb.adult
+      ? { label: "Adult content", variant: "alert", icon: "18+" }
+      : { label: "All audiences", variant: "calm", icon: "✅" },
+    tmdb.video
+      ? { label: "Direct-to-video", variant: "muted", icon: "📼" }
+      : { label: "Feature film", variant: "neutral", icon: "🎞️" }
+  ];
+  flags.forEach((flag) => {
+    const pill = document.createElement("span");
+    pill.className = `movie-flag movie-flag-${flag.variant}`;
+    pill.innerHTML = `<span class="movie-flag-icon">${flag.icon}</span><span>${flag.label}</span>`;
+    row.appendChild(pill);
+  });
+  return row;
+}
+
+function buildSynopsisBlock(text, label) {
+  if (!text) {
+    return null;
+  }
+  const block = document.createElement("div");
+  block.className = "movie-synopsis";
+  const eyebrow = document.createElement("span");
+  eyebrow.className = "movie-synopsis-label";
+  eyebrow.textContent = label || "Synopsis";
+  const paragraph = document.createElement("p");
+  paragraph.textContent = text;
+  block.appendChild(eyebrow);
+  block.appendChild(paragraph);
+  return block;
+}
+
+function appendFactChip(container, label, value) {
+  if (!container || !value) {
+    return;
+  }
+  const chip = document.createElement("div");
+  chip.className = "fact-chip";
+  const factLabel = document.createElement("span");
+  factLabel.className = "fact-chip-label";
+  factLabel.textContent = label;
+  const factValue = document.createElement("span");
+  factValue.className = "fact-chip-value";
+  factValue.textContent = value;
+  chip.appendChild(factLabel);
+  chip.appendChild(factValue);
+  container.appendChild(chip);
+}
+
+function buildRatingBoard(entries) {
+  const visible = entries.filter((entry) => entry && entry.value);
+  if (!visible.length) {
+    return null;
+  }
+  const board = document.createElement("div");
+  board.className = "movie-rating-board";
+  visible.forEach((entry) => {
+    const chip = document.createElement("div");
+    chip.className = "rating-board-chip";
+    const label = document.createElement("span");
+    label.className = "rating-board-label";
+    label.textContent = entry.label;
+    const value = document.createElement("strong");
+    value.className = "rating-board-value";
+    value.textContent = entry.value;
+    chip.appendChild(label);
+    chip.appendChild(value);
+    if (entry.meta) {
+      const meta = document.createElement("span");
+      meta.className = "rating-board-meta";
+      meta.textContent = entry.meta;
+      chip.appendChild(meta);
+    }
+    board.appendChild(chip);
+  });
+  return board;
+}
 
 function formatRelativeTime(timestamp) {
   if (!timestamp) {
@@ -907,24 +1190,47 @@ export function renderRecommendations(items, watchedMovies, options = {}) {
 }
 
 function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLookup, handlers) {
-  const imdbID = omdb && omdb.imdbID ? omdb.imdbID : "";
+  const imdbID =
+    getOmdbField(omdb, "imdbID") || (tmdb && tmdb.imdb_id ? tmdb.imdb_id : "");
   const tmdbId = tmdb && (tmdb.id || tmdb.tmdb_id || tmdb.tmdbId)
     ? tmdb.id || tmdb.tmdb_id || tmdb.tmdbId
     : null;
   const tmdbPoster = tmdb && tmdb.poster_path ? `https://image.tmdb.org/t/p/w342${tmdb.poster_path}` : null;
-  const omdbPoster = omdb && omdb.Poster && omdb.Poster !== "N/A" ? omdb.Poster : null;
+  const omdbPoster = getOmdbField(omdb, "Poster");
   const poster = tmdbPoster || omdbPoster;
-  const title = omdb && omdb.Title ? omdb.Title : tmdb && tmdb.title ? tmdb.title : "Unknown title";
-  const year = omdb && omdb.Year ? omdb.Year : tmdb && tmdb.release_date ? tmdb.release_date.slice(0, 4) : "";
-  const ratingRaw = omdb && omdb.imdbRating ? omdb.imdbRating : null;
-  const imdbRating = ratingRaw && ratingRaw !== "N/A" ? parseFloat(ratingRaw).toFixed(1) : "–";
+  const tmdbBackdrop = tmdb && tmdb.backdrop_path ? `https://image.tmdb.org/t/p/w780${tmdb.backdrop_path}` : null;
+  const omdbTitle = getOmdbField(omdb, "Title");
+  const tmdbTitle = tmdb && (tmdb.title || tmdb.original_title) ? tmdb.title || tmdb.original_title : null;
+  const title = tmdbTitle || omdbTitle || "Unknown title";
+  const originalTitle = tmdb && tmdb.original_title && tmdb.original_title !== title ? tmdb.original_title : null;
+  const catalogTitle = omdbTitle && omdbTitle !== title ? omdbTitle : null;
+  const releaseIso = formatIsoDate(tmdb && tmdb.release_date ? tmdb.release_date : getOmdbField(omdb, "Released"));
+  const releaseFriendly = formatFriendlyDate(tmdb && tmdb.release_date ? tmdb.release_date : releaseIso);
+  const year = releaseIso ? releaseIso.slice(0, 4) : getOmdbField(omdb, "Year") || "";
+  const runtime = formatRuntimeValue(tmdb?.runtime, getOmdbField(omdb, "Runtime"));
+  const rated = getOmdbField(omdb, "Rated");
+  const languages = buildLanguageList(tmdb, getOmdbField(omdb, "Language"));
+  const director = getOmdbField(omdb, "Director");
+  const writer = getOmdbField(omdb, "Writer");
+  const actors = splitOmdbList(omdb, "Actors", 3).join(", ") || null;
+  const country = getOmdbField(omdb, "Country");
+  const awards = getOmdbField(omdb, "Awards");
+  const boxOffice = getOmdbField(omdb, "BoxOffice");
+  const tmdbOverview = tmdb && typeof tmdb.overview === "string" && tmdb.overview.trim() ? tmdb.overview.trim() : "";
+  const omdbPlot = getOmdbField(omdb, "Plot");
+  const primarySynopsis = tmdbOverview || omdbPlot || "No synopsis available for this title.";
+  const ratingRaw = getOmdbField(omdb, "imdbRating");
+  const imdbRatingNumeric = ratingRaw ? parseFloat(ratingRaw) : null;
+  const imdbRating = Number.isFinite(imdbRatingNumeric) ? imdbRatingNumeric.toFixed(1) : "–";
   const tmdbRating = tmdb && typeof tmdb.vote_average === "number" ? tmdb.vote_average.toFixed(1) : "–";
   const tmdbVotes = tmdb && typeof tmdb.vote_count === "number" ? tmdb.vote_count : null;
-  const genres = omdb && omdb.Genre ? omdb.Genre.split(",").map((g) => g.trim()) : [];
-  const plot =
-    omdb && omdb.Plot && omdb.Plot !== "N/A"
-      ? omdb.Plot
-      : "No plot summary available for this title.";
+  const tmdbPopularity = tmdb && typeof tmdb.popularity === "number" ? tmdb.popularity : null;
+  const imdbVotesRaw = getOmdbField(omdb, "imdbVotes");
+  const imdbVotesNumeric = imdbVotesRaw ? Number(imdbVotesRaw.replace(/[,_]/g, "")) : null;
+  const imdbVotesDisplay = imdbVotesNumeric ? imdbVotesNumeric.toLocaleString() : imdbVotesRaw;
+  const metascore = getOmdbField(omdb, "Metascore");
+  const ratingsMap = buildOmdbRatingsMap(omdb);
+  const genres = buildGenreList(tmdb, omdb);
 
   const card = document.createElement("article");
   card.className = "movie-card collapsed";
@@ -942,6 +1248,14 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
   summaryButton.type = "button";
   summaryButton.className = "movie-summary";
   summaryButton.setAttribute("aria-expanded", "false");
+  const summaryBackdrop = document.createElement("div");
+  summaryBackdrop.className = "movie-summary-backdrop";
+  summaryBackdrop.setAttribute("aria-hidden", "true");
+  const backgroundSource = tmdbBackdrop || poster;
+  if (backgroundSource) {
+    summaryBackdrop.style.setProperty("--movie-backdrop-image", `url(${backgroundSource})`);
+  }
+  summaryButton.appendChild(summaryBackdrop);
 
   const posterWrap = document.createElement("div");
   posterWrap.className = "movie-summary-poster";
@@ -971,12 +1285,52 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
   titleRow.appendChild(titleEl);
   titleRow.appendChild(yearEl);
 
+  let titleVariants = null;
+  if (originalTitle || catalogTitle) {
+    titleVariants = document.createElement("div");
+    titleVariants.className = "movie-title-variants";
+    if (originalTitle) {
+      const variant = document.createElement("span");
+      variant.className = "movie-title-variant";
+      variant.innerHTML = `<span>Original:</span> <strong>${originalTitle}</strong>`;
+      titleVariants.appendChild(variant);
+    }
+    if (catalogTitle) {
+      const variant = document.createElement("span");
+      variant.className = "movie-title-variant";
+      variant.innerHTML = `<span>OMDb:</span> <strong>${catalogTitle}</strong>`;
+      titleVariants.appendChild(variant);
+    }
+  }
+
+  const metaRow = document.createElement("div");
+  metaRow.className = "movie-meta-row";
+  const metaChips = [
+    createMetaChip("Year", year || null),
+    createMetaChip("Release", releaseIso || releaseFriendly || null),
+    createMetaChip("Rated", rated || null),
+    createMetaChip("Runtime", runtime || null),
+    createMetaChip("Language", languages.length ? languages.join(", ") : null)
+  ];
+  metaChips.forEach((chip) => {
+    if (chip) {
+      metaRow.appendChild(chip);
+    }
+  });
+  const idRow = createIdRow(imdbID);
+
   const ratingsRow = document.createElement("div");
   ratingsRow.className = "movie-ratings";
 
   const imdbPill = document.createElement("div");
   imdbPill.className = "rating-pill";
-  imdbPill.innerHTML = `<span class="star">★</span><strong>${imdbRating}</strong><span>IMDb</span>`;
+  const imdbSummaryValue =
+    imdbRating !== "–"
+      ? imdbRating
+      : ratingsMap.imdb
+      ? ratingsMap.imdb
+      : "–";
+  imdbPill.innerHTML = `<span class="star">★</span><strong>${imdbSummaryValue}</strong><span>IMDb</span>`;
   ratingsRow.appendChild(imdbPill);
 
   const tmdbPill = document.createElement("div");
@@ -985,30 +1339,54 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
   ratingsRow.appendChild(tmdbPill);
 
   const reasonText = formatReasons(reasons);
-  if (reasonText) {
-    const reasonRow = document.createElement("div");
+  const reasonRow = reasonText ? document.createElement("div") : null;
+  if (reasonRow) {
     reasonRow.className = "movie-reason";
     reasonRow.textContent = reasonText;
-    infoWrap.appendChild(reasonRow);
   }
 
   const presenceRow = buildMoviePresenceRow(handlers && handlers.presenceSpotlights);
-  if (presenceRow) {
-    infoWrap.appendChild(presenceRow);
-  }
-
-  infoWrap.appendChild(titleRow);
-  infoWrap.appendChild(ratingsRow);
-
+  const flagRow = createFlagRow(tmdb);
+  const synopsisBlock = buildSynopsisBlock(primarySynopsis, tmdbOverview ? "TMDb overview" : "Synopsis");
   const genreTags = document.createElement("div");
   genreTags.className = "genre-tags";
   genres.forEach((genre) => {
     const tag = document.createElement("span");
     tag.className = "genre-tag";
-    tag.textContent = genre;
+    tag.textContent = genre.label;
+    if (genre.id) {
+      tag.dataset.genreId = String(genre.id);
+      tag.title = `TMDb genre ID ${genre.id}`;
+    }
     genreTags.appendChild(tag);
   });
-  infoWrap.appendChild(genreTags);
+
+  infoWrap.appendChild(titleRow);
+  if (titleVariants) {
+    infoWrap.appendChild(titleVariants);
+  }
+  if (metaRow.childElementCount) {
+    infoWrap.appendChild(metaRow);
+  }
+  if (idRow) {
+    infoWrap.appendChild(idRow);
+  }
+  infoWrap.appendChild(ratingsRow);
+  if (flagRow) {
+    infoWrap.appendChild(flagRow);
+  }
+  if (reasonRow) {
+    infoWrap.appendChild(reasonRow);
+  }
+  if (presenceRow) {
+    infoWrap.appendChild(presenceRow);
+  }
+  if (genreTags.childElementCount) {
+    infoWrap.appendChild(genreTags);
+  }
+  if (synopsisBlock) {
+    infoWrap.appendChild(synopsisBlock);
+  }
 
   const communityMeta = document.createElement("div");
   communityMeta.className = "movie-community-meta";
@@ -1059,21 +1437,37 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
 
   const summaryMeta = document.createElement("div");
   summaryMeta.className = "movie-detail-grid";
-  appendDetail(summaryMeta, "Runtime", omdb && omdb.Runtime && omdb.Runtime !== "N/A" ? omdb.Runtime : "Unknown");
-  appendDetail(summaryMeta, "Director", omdb && omdb.Director && omdb.Director !== "N/A" ? omdb.Director : "—");
-  appendDetail(summaryMeta, "Cast", omdb && omdb.Actors && omdb.Actors !== "N/A" ? omdb.Actors.split(",").slice(0, 3).join(", ") : "—");
-  if (tmdbVotes) {
-    appendDetail(summaryMeta, "TMDB votes", tmdbVotes.toLocaleString());
-  }
+  appendDetail(summaryMeta, "Director", director || "—");
+  appendDetail(summaryMeta, "Writer", writer || "—");
+  appendDetail(summaryMeta, "Main cast", actors || "—");
+  appendDetail(summaryMeta, "Country", country || "—");
+  appendDetail(summaryMeta, "Awards", awards || "—");
+  appendDetail(summaryMeta, "Box office", boxOffice || "—");
+  appendDetail(summaryMeta, "Rated", rated || "Not rated");
+  appendDetail(summaryMeta, "Runtime", runtime || "Unknown");
+  appendDetail(
+    summaryMeta,
+    "Genres",
+    genres.length ? genres.map((genre) => genre.label).join(", ") : "—"
+  );
+  appendDetail(summaryMeta, "Release (ISO)", releaseIso || "—");
+  appendDetail(summaryMeta, "Primary language", languages.length ? languages.join(", ") : "—");
+  appendDetail(summaryMeta, "IMDb ID", imdbID || "—");
+  appendDetail(summaryMeta, "TMDb ID", tmdbId ? String(tmdbId) : "—");
 
   const plotEl = document.createElement("div");
   plotEl.className = "movie-plot";
   const plotText = document.createElement("p");
   plotText.className = "movie-plot-text";
-  plotText.textContent = plot;
+  const plotValue = omdbPlot || primarySynopsis;
+  plotText.textContent = plotValue;
+  const plotLabel = document.createElement("span");
+  plotLabel.className = "movie-plot-label";
+  plotLabel.textContent = omdbPlot ? "OMDb synopsis" : "Synopsis";
+  plotEl.appendChild(plotLabel);
   plotEl.appendChild(plotText);
 
-  if (typeof plot === "string" && plot.trim().length > 220) {
+  if (typeof plotValue === "string" && plotValue.trim().length > 220) {
     plotEl.classList.add("is-collapsible", "is-collapsed");
 
     const toggleBtn = document.createElement("button");
@@ -1107,6 +1501,50 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
     setExpanded(false);
     plotEl.appendChild(toggleBtn);
   }
+
+  const ratingBoard = buildRatingBoard([
+    {
+      label: "TMDb score",
+      value: tmdbRating !== "–" ? `${tmdbRating}/10` : null,
+      meta: tmdbVotes ? `${tmdbVotes.toLocaleString()} votes` : null
+    },
+    {
+      label: "TMDb popularity",
+      value: tmdbPopularity != null ? formatNumberValue(tmdbPopularity, { decimals: 1 }) : null
+    },
+    { label: "IMDb (Ratings API)", value: ratingsMap.imdb || null },
+    { label: "Rotten Tomatoes", value: ratingsMap.rotten || null },
+    { label: "Metacritic (Ratings API)", value: ratingsMap.metacritic || null },
+    {
+      label: "IMDb rating",
+      value:
+        imdbRating !== "–"
+          ? `${imdbRating}/10`
+          : ratingRaw
+          ? ratingRaw
+          : null,
+      meta: imdbVotesDisplay || null
+    },
+    { label: "IMDb votes", value: imdbVotesDisplay || null },
+    { label: "Metascore", value: metascore || null }
+  ]);
+
+  const factGrid = document.createElement("div");
+  factGrid.className = "movie-facts-grid";
+  appendFactChip(factGrid, "Release", releaseFriendly || releaseIso || null);
+  appendFactChip(factGrid, "Release (ISO)", releaseIso || null);
+  appendFactChip(factGrid, "Original language", languages.length ? languages[0] : null);
+  appendFactChip(factGrid, "TMDb ID", tmdbId ? String(tmdbId) : null);
+  appendFactChip(
+    factGrid,
+    "TMDb popularity",
+    tmdbPopularity != null ? formatNumberValue(tmdbPopularity, { decimals: 1 }) : null
+  );
+  appendFactChip(
+    factGrid,
+    "TMDb votes",
+    tmdbVotes ? tmdbVotes.toLocaleString() : null
+  );
 
   const actions = document.createElement("div");
   actions.className = "movie-actions";
@@ -1248,7 +1686,13 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
   }
 
   details.appendChild(summaryMeta);
+  if (factGrid.childElementCount) {
+    details.appendChild(factGrid);
+  }
   details.appendChild(plotEl);
+  if (ratingBoard) {
+    details.appendChild(ratingBoard);
+  }
   details.appendChild(actions);
   details.appendChild(trailerArea);
 
@@ -1382,7 +1826,7 @@ function appendDetail(container, label, value) {
   dt.textContent = label;
   const dd = document.createElement("span");
   dd.className = "detail-value";
-  dd.textContent = value;
+  dd.textContent = value || "—";
   item.appendChild(dt);
   item.appendChild(dd);
   container.appendChild(item);
