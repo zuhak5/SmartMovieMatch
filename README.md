@@ -40,7 +40,7 @@ The site is static, so deploying the repository to Vercel (or any provider with 
 ```
 ├── api/                  # Serverless proxy functions that keep API keys on the server
 ├── assets/
-│   ├── css/app.css       # Global styles
+│   ├── css/mobile.css    # Unified responsive styles
 │   └── js/               # ES modules for state, APIs, UI, and recommendation logic
 └── index.html            # Application shell that wires in the modules
 ```
