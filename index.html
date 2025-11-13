@@ -605,6 +605,27 @@
 
   <div id="globalToastRegion" class="global-toast-region pad-inline" role="status" aria-live="polite"></div>
 
+  <div id="notificationOverlay" class="notification-overlay" aria-hidden="true" hidden></div>
+
+  <div
+    id="movieOverlay"
+    class="movie-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-hidden="true"
+    aria-labelledby="movieOverlayHeading"
+    hidden
+  >
+    <div class="movie-overlay-panel" role="document">
+      <button id="movieOverlayClose" class="movie-overlay-close" type="button" aria-label="Close movie details">
+        <span aria-hidden="true">✕</span>
+      </button>
+      <h2 id="movieOverlayHeading" class="sr-only">Movie details</h2>
+      <div id="movieOverlayHero" class="movie-overlay-hero"></div>
+      <div id="movieOverlayBody" class="movie-overlay-body"></div>
+    </div>
+  </div>
+
   <div
     id="socialProfileOverlay"
     class="modal-overlay pad-inline"
