@@ -1,68 +1,169 @@
-<div id="highlightPreview" class="highlight-preview" aria-live="polite">
-        <div class="highlight-preview-label">Preview</div>
-        
-      <div class="highlight-preview-content" data-highlight-preview="live"><span class="highlight-preview-icon" aria-hidden="true">⚡</span><div><div class="highlight-preview-title">Live movie fetch</div><div class="highlight-preview-text">Watch cards fill with trailers, art, and metadata as I blend TMDB and OMDb in real time.</div></div></div></div>
--	  
-	  <div class="settings-quick-links" role="group" aria-label="Account settings sections">
-              <button type="button" class="settings-quick-link" data-settings-section-trigger="profile">
-                <span aria-hidden="true">👤</span>
-                Profile
-              </button>
-              <button type="button" class="settings-quick-link" data-settings-section-trigger="security">
-                <span aria-hidden="true">🔐</span>
-                Security
-              </button>
-              <button type="button" class="settings-quick-link" data-settings-section-trigger="snapshots">
-                <span aria-hidden="true">🗂️</span>
-                Snapshots
+<div class="app-highlight-showcase">
+      <ul class="app-highlight-grid" aria-label="Highlights">
+        <li>
+          <div class="highlight-card">
+            <span class="highlight-icon" aria-hidden="true">⚡</span>
+            <div class="highlight-body">
+              <span class="highlight-title">Live discovery</span>
+              <span class="highlight-text">Blend TMDB &amp; OMDb in real time.</span>
+            </div>
+          </div>
+        </li>
+        <li>
+          <div class="highlight-card">
+            <span class="highlight-icon" aria-hidden="true">🧠</span>
+            <div class="highlight-body">
+              <span class="highlight-title">Adaptive taste</span>
+              <span class="highlight-text">Favorites reshape your feed instantly.</span>
+            </div>
+          </div>
+        </li>
+        <li>
+          <div class="highlight-card">
+            <span class="highlight-icon" aria-hidden="true">🎯</span>
+            <div class="highlight-body">
+              <span class="highlight-title">Precision filters</span>
+              <span class="highlight-text">Dial in vibes, runtime, and mood.</span>
+            </div>
+          </div>
+        </li>
+        <li>
+          <div class="highlight-card">
+            <span class="highlight-icon" aria-hidden="true">🤝</span>
+            <div class="highlight-body">
+              <span class="highlight-title">Community picks</span>
+              <span class="highlight-text">See what friends are raving about.</span>
+            </div>
+          </div>
+        </li>
+      </ul>
+    </div>
+<section class="panel profile-overview-panel">
+      <div class="panel-inner">
+        <div class="panel-header profile-panel-header">
+          <div>
+            <div class="panel-title">Sync insights</div>
+            <div class="panel-subtitle">Check in on the latest cloud updates across your devices.</div>
+          </div>
+          <a class="btn-subtle btn-chip" href="index.html">
+            <span aria-hidden="true">←</span>
+            <span>Back to discovery</span>
+          </a>
+        </div>
+        <p class="profile-overview-lede">
+          Monitor how your taste profile evolves over time, then jump back into discovery when you’re ready for new picks.
+        </p>
+        <div class="profile-overview-card">
+          <section id="profileOverview" class="account-insights" aria-hidden="false">
+            <div class="account-insights-header">
+              <div>
+                <h3 class="account-insights-title">Latest syncs</h3>
+                <p class="account-insights-subtitle">Timestamps refresh after every successful sync.</p>
+              </div>
+            </div>
+            <dl class="account-insights-grid">
+              <div class="account-insight">
+                <dt>Preferences</dt>
+                <dd id="profileOverviewPreferencesValue">2 hours ago</dd>
+              </div>
+              <div class="account-insight">
+                <dt>Watched history</dt>
+                <dd id="profileOverviewWatchedValue">2 hours ago</dd>
+              </div>
+              <div class="account-insight">
+                <dt>Favorites</dt>
+                <dd id="profileOverviewFavoritesValue">2 hours ago</dd>
+              </div>
+            </dl>
+            <ul id="profileOverviewTimeline" class="account-insights-timeline" aria-live="polite"><li class="account-insights-timeline-item" data-state="empty"><span class="account-insights-timeline-icon" aria-hidden="true">🧠</span><div class="account-insights-timeline-body"><div class="account-insights-timeline-row"><span class="account-insights-timeline-title">Taste profile</span><span class="account-insights-timeline-time">2 hours ago</span></div><p class="account-insights-timeline-meta">Select genres to build your taste profile.</p></div><button type="button" class="btn-subtle account-insights-timeline-action" data-profile-settings-action="profile">Adjust profile</button></li><li class="account-insights-timeline-item" data-state="empty"><span class="account-insights-timeline-icon" aria-hidden="true">🎬</span><div class="account-insights-timeline-body"><div class="account-insights-timeline-row"><span class="account-insights-timeline-title">Watched history</span><span class="account-insights-timeline-time">2 hours ago</span></div><p class="account-insights-timeline-meta">Log watched titles to keep progress in sync.</p></div></li><li class="account-insights-timeline-item" data-state="empty"><span class="account-insights-timeline-icon" aria-hidden="true">⭐</span><div class="account-insights-timeline-body"><div class="account-insights-timeline-row"><span class="account-insights-timeline-title">Favorites library</span><span class="account-insights-timeline-time">2 hours ago</span></div><p class="account-insights-timeline-meta">Save movies you love so they’re backed up everywhere.</p></div></li></ul>
+          </section>
+          <div id="profileOverviewSignedOut" class="profile-signed-out" hidden="" aria-hidden="true" style="display: none;">
+            <h3>Sign in to unlock your overview</h3>
+            <p>Log in to see your saved favorites, watched titles, and sync activity across devices.</p>
+            <a class="btn-primary" href="login.html">Log in / Sign up</a>
+          </div>
+        </div>
+      </div>
+    </section><section class="settings-overview" aria-label="Account sync overview">
+            <div class="settings-overview-header">
+              <div>
+                <h2 class="settings-overview-title">Account sync overview</h2>
+                <p class="settings-overview-subtitle">
+                  Track when each part of your profile last synced and jump straight to the section that needs attention.
+                </p>
+              </div>
+              <button type="button" class="btn-subtle btn-chip" data-settings-sync-now="all" aria-disabled="false">
+                <span aria-hidden="true">⟳</span>
+                <span>Sync everything</span>
               </button>
             </div>
--
-<aside class="settings-rail" aria-label="Settings navigation">
-              <div class="settings-rail-inner">
-                <p class="settings-rail-label">Sections</p>
-                <nav class="settings-nav" role="tablist" aria-orientation="vertical">
-                  <button type="button" class="settings-nav-btn is-active" data-settings-target="profile" role="tab" aria-selected="true">
-                    Profile
-                  </button>
-                  <button type="button" class="settings-nav-btn" data-settings-target="security" role="tab" aria-selected="false">
-                    Security
-                  </button>
-                  <button type="button" class="settings-nav-btn" data-settings-target="snapshots" role="tab" aria-selected="false">
-                    Snapshots
-                  </button>
-                </nav>
-                <div id="settingsSaveIndicator" class="settings-save-indicator" role="status" aria-live="polite" data-variant="idle">All changes saved</div>
-              </div>
-            </aside>
--
-<section class="settings-card settings-card-wide" data-settings-section="snapshots" id="accountSnapshotsSection" aria-labelledby="accountSnapshotsHeading" aria-hidden="false">
-                <div id="snapshots" class="settings-anchor" aria-hidden="true"></div>
-                <div class="settings-card-header">
-                  <h2 id="accountSnapshotsHeading">Cloud snapshots</h2>
-                  <p>These copies refresh every time Smart Movie Match syncs.</p>
+
+            <div class="settings-sync-grid" role="list">
+              <article class="settings-sync-card" data-sync-card="preferences" role="listitem" data-state="empty">
+                <div class="settings-sync-icon" aria-hidden="true">🧠</div>
+                <div class="settings-sync-content">
+                  <h3 class="settings-sync-label">Taste profile</h3>
+                  <p id="settingsSyncPreferences" class="settings-sync-value">2 hours ago</p>
+                  <p id="settingsSyncPreferencesMeta" class="settings-sync-meta">Select genres to build your taste profile.</p>
                 </div>
-                <div class="snapshot-grid">
-                  <article class="snapshot-card">
-                    <h3>Preferences</h3>
-                    <pre id="snapshotPreferences" class="snapshot-pre" aria-live="polite">{
-  "mood": "any",
-  "name": "Admin",
-  "seed": 0.4694203410385982,
-  "timestamp": "2025-11-12T22:29:43.212Z",
-  "moodIntensity": 1,
-  "watchedSample": [],
-  "favoriteTitles": [],
-  "selectedGenres": []
-}</pre>
-                  </article>
-                  <article class="snapshot-card">
-                    <h3>Watched history</h3>
-                    <pre id="snapshotWatched" class="snapshot-pre" aria-live="polite">No watched history stored yet.</pre>
-                  </article>
-                  <article class="snapshot-card">
-                    <h3>Favorites</h3>
-                    <pre id="snapshotFavorites" class="snapshot-pre" aria-live="polite">No favorites stored yet.</pre>
-                  </article>
+                <div class="settings-sync-actions">
+                  <button type="button" class="btn-subtle settings-sync-manage" data-profile-settings-action="profile">
+                    Review details
+                  </button>
+                  <button type="button" class="btn-secondary settings-sync-now" data-settings-sync-now="preferences" aria-disabled="false">
+                    Sync now
+                  </button>
                 </div>
-              </section>
+              </article>
+
+              <article class="settings-sync-card" data-sync-card="watched" role="listitem" data-state="empty">
+                <div class="settings-sync-icon" aria-hidden="true">🎬</div>
+                <div class="settings-sync-content">
+                  <h3 class="settings-sync-label">Watched history</h3>
+                  <p id="settingsSyncWatched" class="settings-sync-value">2 hours ago</p>
+                  <p id="settingsSyncWatchedMeta" class="settings-sync-meta">Log watched titles to keep progress in sync.</p>
+                </div>
+                <div class="settings-sync-actions">
+                  <button type="button" class="btn-secondary settings-sync-now" data-settings-sync-now="watched" aria-disabled="false">
+                    Sync now
+                  </button>
+                </div>
+              </article>
+
+              <article class="settings-sync-card" data-sync-card="favorites" role="listitem" data-state="empty">
+                <div class="settings-sync-icon" aria-hidden="true">⭐</div>
+                <div class="settings-sync-content">
+                  <h3 class="settings-sync-label">Favorites</h3>
+                  <p id="settingsSyncFavorites" class="settings-sync-value">2 hours ago</p>
+                  <p id="settingsSyncFavoritesMeta" class="settings-sync-meta">Save movies you love so they’re backed up everywhere.</p>
+                </div>
+                <div class="settings-sync-actions">
+                  <button type="button" class="btn-secondary settings-sync-now" data-settings-sync-now="favorites" aria-disabled="false">
+                    Sync now
+                  </button>
+                </div>
+              </article>
+            </div>
+
+            <div id="settingsSyncStatus" class="settings-sync-status" role="status" aria-live="polite" data-variant="success">Signed in – your taste profile syncs automatically.</div>
+
+          </section>
+
+<a class="btn-subtle btn-chip" href="profile.html">
+            <span aria-hidden="true">←</span>
+            <span>Back to overview</span>
+          </a>
+<button type="button" class="auth-social-btn" data-provider="apple">
+              <span class="auth-social-icon" aria-hidden="true">🍎</span>
+              <span class="auth-social-text">
+                Apple
+                <span class="auth-social-badge">Coming soon</span>
+              </span>
+            </button>
+<button type="button" class="auth-social-btn" data-provider="github">
+              <span class="auth-social-icon" aria-hidden="true">🐙</span>
+              <span class="auth-social-text">
+                GitHub
+                <span class="auth-social-badge">Coming soon</span>
+              </span>
+            </button>
