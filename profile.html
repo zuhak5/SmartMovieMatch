@@ -348,6 +348,19 @@
                   <h4 class="social-status-title">Set your vibe</h4>
                   <p class="social-status-subtitle">Pick a quick status so friends know when to reach out.</p>
                 </div>
+                <div class="social-status-duration pad-inline">
+                  <label class="social-status-duration-label" for="socialStatusDuration">Auto-clear status</label>
+                  <select id="socialStatusDuration" class="input-base social-status-duration-select">
+                    <option value="0" selected>Keep until I change it</option>
+                    <option value="30">30 minutes</option>
+                    <option value="60">1 hour</option>
+                    <option value="120">2 hours</option>
+                    <option value="240">4 hours</option>
+                  </select>
+                  <p class="social-status-duration-hint">
+                    Time-limited statuses like “Available for watch party” will reset automatically.
+                  </p>
+                </div>
                 <div id="socialStatusPresetList" class="social-status-list pad-inline" role="group" aria-label="Status presets"></div>
                 <p
                   id="socialStatusFeedback"

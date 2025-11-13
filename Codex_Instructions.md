@@ -293,7 +293,7 @@ Implementation notes for Codex (internal):
 
 
 ## 6. Presence that actually leads to interaction
-[Codex status: TODO]  (Last updated: 2025-11-13 by Codex)
+[Codex status: DONE]  (Last updated: 2025-11-14 by Codex)
 
 
 Presence chips on movie cards & lists
@@ -321,6 +321,12 @@ Auto-expiring statuses
 For time-sensitive presets (“Available for watch party”), let users pick a duration (e.g. 2 hours).
 
 When it expires, automatically drop them back to “Just browsing” so presence stays accurate.
+
+Implementation notes for Codex (internal):
+
+- Recommendation cards and collaborative lists now include inline presence chips fed by the live presence map so friends feel inviteable at a glance.
+- The “Friends online” list adds invite/share quick actions plus an inline composer; sharing currently surfaces confirmation toasts while the direct messaging backend is still pending.
+- Status presets respect auto-expire durations (30 min to 4 hours) with local timers that reset users to “Just browsing” and sync the change back to the presence service.
 
 
 
@@ -1721,7 +1727,7 @@ Notification: “Maya replied to your review” → banner: “View discussion�
 - [x] 3. Deepen community reviews & comments  (Done: 2025-11-13 by Codex)
 - [x] 4. Collaborative lists that feel actually collaborative  (Done: 2025-11-13 by Codex)
 - [x] 5. Watch parties that feel live, not just scheduled  (Done: 2025-11-13 by Codex)
-- [ ] 6. Presence that actually leads to interaction
+- [x] 6. Presence that actually leads to interaction  (Done: 2025-11-14 by Codex)
 - [ ] 7. Social notifications that feel like a feed
 - [ ] 8. Safety, comfort, and control in the social layer
 - [ ] 9. Reduce friction to find and follow people
