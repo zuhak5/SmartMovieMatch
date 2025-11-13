@@ -124,6 +124,37 @@
     gap: 0.85rem;
   }
 
+  /* Social overview layout */
+  .social-overview-stats,
+  .social-highlights,
+  .social-extras-grid,
+  .social-lists-grid,
+  .social-collab-grid,
+  .social-watch-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .social-status-list,
+  .collab-form-grid,
+  .social-collab-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .social-highlight,
+  .social-stat,
+  .social-badges-block,
+  .social-presence-block,
+  .social-list-block,
+  .social-collab-column {
+    width: 100%;
+  }
+
+  .social-highlight-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+
   .profile-collections-panel .panel-inner,
   .social-panel .panel-inner {
     display: flex;
@@ -131,10 +162,75 @@
     width: 100%;
   }
 
+  .social-panel .panel-inner > *,
+  .social-panel .panel-header,
+  .social-content,
+  .social-signed-out,
+  .social-follow-form,
+  .social-follow-assist,
+  .social-follow-search,
+  .social-invite-card,
+  .social-import-card,
+  .social-collab-summary,
+  .social-collab-actions,
+  .collab-form,
+  .social-collab-column,
+  .social-watch-grid > *,
+  .social-lists-grid > *,
+  .social-suggestions-list {
+    width: 100%;
+  }
+
   .social-panel .panel-header,
   .social-content,
   .social-signed-out {
     width: 100%;
+  }
+
+  .social-follow-input-row,
+  .social-invite-link-row,
+  .social-import-actions,
+  .social-follow-note-actions,
+  .collab-form-footer,
+  .social-invite-qr {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .social-follow-input-row .input-base,
+  .social-follow-input-row .btn-secondary,
+  .social-invite-link-row .social-invite-link,
+  .social-invite-link-row .btn-subtle,
+  .social-import-actions > *,
+  .social-follow-note-actions .btn-subtle,
+  .collab-form-footer select,
+  .collab-form-footer .btn-secondary,
+  .social-invite-qr .btn-subtle {
+    width: 100%;
+  }
+
+  .social-invite-qr .btn-subtle {
+    align-self: stretch;
+  }
+
+  .social-follow-input-row .input-base,
+  .social-follow-input-row .btn-secondary,
+  .social-invite-link-row .btn-subtle,
+  .collab-form-footer select {
+    min-width: 0;
+  }
+
+  .social-follow-note-actions {
+    justify-content: flex-start;
+    gap: 0.6rem;
+  }
+
+  .social-import-consent {
+    align-items: flex-start;
+  }
+
+  .social-invite-qr {
+    align-items: center;
   }
 
   .panel-header {
