@@ -35,6 +35,12 @@ body {
   color-scheme: dark;
 }
 
+section,
+div {
+  padding-right: 8px;
+  padding-left: 8px;
+}
+
 body[data-theme="light"] {
   color-scheme: light;
 }
