@@ -68,6 +68,7 @@ import { getWatchedRatingPreference } from "./taste.js";
 const RECOMMENDATIONS_PAGE_SIZE = 20;
 const MAX_FOLLOW_NOTE_LENGTH = 180;
 const MAX_SUGGESTED_COLLABORATORS = 4;
+const MAX_WATCH_PARTY_SUGGESTIONS = 6;
 const COLLAB_DISCUSSION_MAX_LENGTH = 220;
 
 let inviteQrRequest = 0;
@@ -118,6 +119,7 @@ const state = {
 };
 
 const collabSuggestionSelections = new Set();
+const watchPartySuggestionSelections = new Set();
 
 const THEME_COLOR_MAP = {
   dark: "#020617",
@@ -4802,6 +4804,8 @@ function wireCollaborativeForms() {
       }
       const note = watchNoteInput ? watchNoteInput.value.trim() : "";
       const invitees = parseInviteHandles(watchInviteInput ? watchInviteInput.value : "");
+      const suggestedHandles = getSelectedWatchPartyHandles();
+      const combinedInvitees = Array.from(new Set([...invitees, ...suggestedHandles]));
       const submitButton = watchForm.querySelector("button[type=\"submit\"]");
       if (submitButton) {
         submitButton.disabled = true;
@@ -4812,10 +4816,11 @@ function wireCollaborativeForms() {
           movie: { title, tmdbId: tmdbId || null, imdbId: imdbId || null },
           scheduledFor: whenDate.toISOString(),
           note,
-          invitees
+          invitees: combinedInvitees
         });
         setCollabStatus("Watch party scheduled!", "success");
         watchForm.reset();
+        clearWatchPartySuggestionSelections();
         await refreshCollaborativeState();
       } catch (error) {
         setCollabStatus(
@@ -4860,10 +4865,11 @@ function wireCollaborativeForms() {
       return [];
     }
     const currentUser = state.session && state.session.username ? canonicalHandle(state.session.username) : null;
-    return raw
+    const handles = raw
       .split(/[\s,]+/)
       .map((value) => canonicalHandle(value))
       .filter((value) => value && value !== currentUser);
+    return Array.from(new Set(handles));
   }
 }
 
@@ -5121,6 +5127,7 @@ function renderSocialConnections() {
     return suggestion && suggestion.username && !followingSet.has(suggestion.username);
   });
   renderCollaborativeSuggestions(availableSuggestions);
+  renderWatchPartySuggestions(availableSuggestions);
   const activeEntries = following
     .map((username) => ({ username, presence: presence[username] }))
     .filter((entry) => entry.presence && entry.presence.state);
@@ -5494,6 +5501,105 @@ function getSelectedCollaborativeHandles() {
 function clearCollaborativeSuggestionSelections() {
   collabSuggestionSelections.clear();
   updateCollaborativeSuggestionSelectionStates();
+}
+
+function renderWatchPartySuggestions(suggestions) {
+  const container = $("watchPartySuggestedContainer");
+  const emptyEl = $("watchPartySuggestedEmpty");
+  if (!container || !emptyEl) {
+    return;
+  }
+  container.innerHTML = "";
+  const normalized = Array.isArray(suggestions)
+    ? suggestions
+        .map((entry) => ({
+          username: canonicalHandle(entry.username || ""),
+          displayName: entry.displayName || formatSocialDisplayName(entry.username),
+          reason: buildWatchPartySuggestionReason(entry)
+        }))
+        .filter((entry) => entry.username)
+        .slice(0, MAX_WATCH_PARTY_SUGGESTIONS)
+    : [];
+  const availableHandles = new Set(normalized.map((entry) => entry.username));
+  Array.from(watchPartySuggestionSelections).forEach((handle) => {
+    if (!availableHandles.has(handle)) {
+      watchPartySuggestionSelections.delete(handle);
+    }
+  });
+  if (!normalized.length) {
+    emptyEl.hidden = false;
+    return;
+  }
+  emptyEl.hidden = true;
+  normalized.forEach((entry) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "watch-party-suggested-chip";
+    chip.dataset.watchPartySuggestChip = "true";
+    chip.dataset.handle = entry.username;
+    chip.setAttribute("aria-pressed", "false");
+    const name = document.createElement("span");
+    name.className = "watch-party-suggested-name";
+    name.textContent = entry.displayName;
+    chip.appendChild(name);
+    const meta = document.createElement("span");
+    meta.className = "watch-party-suggested-meta";
+    meta.textContent = entry.reason;
+    chip.appendChild(meta);
+    chip.addEventListener("click", () => {
+      toggleWatchPartySuggestion(entry.username);
+    });
+    container.appendChild(chip);
+  });
+  updateWatchPartySuggestionSelectionStates();
+}
+
+function buildWatchPartySuggestionReason(entry) {
+  if (Array.isArray(entry.sharedWatchParties) && entry.sharedWatchParties.length) {
+    return `Co-hosted ${formatPlural(entry.sharedWatchParties.length, "party", "parties")} together`;
+  }
+  if (Array.isArray(entry.sharedInterests) && entry.sharedInterests.length) {
+    return `Also into ${formatFriendlyList(entry.sharedInterests, 2)}`;
+  }
+  if (Array.isArray(entry.sharedFavorites) && entry.sharedFavorites.length) {
+    return `Bonded over ${formatFriendlyList(entry.sharedFavorites, 2)}`;
+  }
+  if (typeof entry.reason === "string" && entry.reason.trim()) {
+    return entry.reason.trim();
+  }
+  return "High taste match";
+}
+
+function toggleWatchPartySuggestion(handle) {
+  const normalized = canonicalHandle(handle);
+  if (!normalized) {
+    return;
+  }
+  if (watchPartySuggestionSelections.has(normalized)) {
+    watchPartySuggestionSelections.delete(normalized);
+  } else {
+    watchPartySuggestionSelections.add(normalized);
+  }
+  updateWatchPartySuggestionSelectionStates();
+}
+
+function updateWatchPartySuggestionSelectionStates() {
+  const chips = document.querySelectorAll('[data-watch-party-suggest-chip="true"]');
+  chips.forEach((chip) => {
+    const handle = canonicalHandle(chip.dataset.handle || "");
+    const selected = handle && watchPartySuggestionSelections.has(handle);
+    chip.dataset.selected = selected ? "true" : "false";
+    chip.setAttribute("aria-pressed", selected ? "true" : "false");
+  });
+}
+
+function getSelectedWatchPartyHandles() {
+  return Array.from(watchPartySuggestionSelections);
+}
+
+function clearWatchPartySuggestionSelections() {
+  watchPartySuggestionSelections.clear();
+  updateWatchPartySuggestionSelectionStates();
 }
 
 async function inviteSuggestedCollaboratorsToList(listId, handles) {
@@ -6061,6 +6167,7 @@ function buildWatchPartyCard(entry, mode) {
   const card = document.createElement("article");
   card.className = "watch-party-card";
   card.dataset.mode = mode;
+  const invitees = Array.isArray(entry.invitees) ? entry.invitees : [];
 
   const header = document.createElement("header");
   header.className = "watch-party-card-header";
@@ -6100,40 +6207,44 @@ function buildWatchPartyCard(entry, mode) {
     card.appendChild(note);
   }
 
-  if (mode === "upcoming" && Array.isArray(entry.invitees) && entry.invitees.length) {
-    const roster = document.createElement("div");
-    roster.className = "watch-party-roster";
-    entry.invitees.forEach((invite) => {
-      if (!invite || !invite.username) {
-        return;
-      }
-      const chip = createProfileButton(invite.username, {
-        className: "watch-party-chip watch-party-chip--action",
-        label: `${formatSocialDisplayName(invite.username)} – ${formatPartyResponse(invite.response)}`,
-        stopPropagation: true
-      });
-      if (chip) {
-        chip.dataset.state = invite.response || "pending";
-        roster.appendChild(chip);
-      }
-    });
-    card.appendChild(roster);
+  const username = state.session && state.session.username ? canonicalHandle(state.session.username) : null;
+  const myInvite = invitees.find((invite) => canonicalHandle(invite.username) === username);
+  if (mode === "upcoming" && username && entry.host !== username && myInvite) {
+    const response = document.createElement("p");
+    response.className = "watch-party-response";
+    response.textContent = `You responded: ${formatPartyResponse(myInvite.response)}`;
+    card.appendChild(response);
   }
 
-  const username = state.session && state.session.username ? canonicalHandle(state.session.username) : null;
-  if (mode === "upcoming" && username && entry.host !== username) {
-    const mine = Array.isArray(entry.invitees)
-      ? entry.invitees.find((invite) => canonicalHandle(invite.username) === username)
-      : null;
-    if (mine) {
-      const response = document.createElement("p");
-      response.className = "watch-party-response";
-      response.textContent = `You responded: ${formatPartyResponse(mine.response)}`;
-      card.appendChild(response);
+  const lobby = buildWatchPartyLobby(entry);
+  if (lobby) {
+    card.appendChild(lobby);
+  }
+
+  if (mode === "upcoming") {
+    const summary = buildWatchPartySummary(entry);
+    if (summary) {
+      card.appendChild(summary);
+      card.classList.add("watch-party-card--past");
     }
   }
 
   if (mode === "invite") {
+    const vibeField = document.createElement("div");
+    vibeField.className = "watch-party-vibe-field";
+    const vibeLabel = document.createElement("span");
+    vibeLabel.className = "field-label";
+    vibeLabel.textContent = "What snack or vibe are you bringing?";
+    vibeField.appendChild(vibeLabel);
+    const vibeInput = document.createElement("input");
+    vibeInput.type = "text";
+    vibeInput.className = "input-base input-text watch-party-vibe-input";
+    vibeInput.placeholder = "Popcorn, neon drinks, cozy blankets…";
+    vibeInput.maxLength = 80;
+    vibeInput.value = myInvite && myInvite.bringing ? myInvite.bringing : "";
+    vibeField.appendChild(vibeInput);
+    card.appendChild(vibeField);
+
     const actions = document.createElement("div");
     actions.className = "watch-party-actions";
     const acceptBtn = document.createElement("button");
@@ -6142,7 +6253,7 @@ function buildWatchPartyCard(entry, mode) {
     acceptBtn.textContent = "Accept";
     acceptBtn.addEventListener("click", () => {
       playUiClick();
-      handleWatchPartyResponseAction(entry.id, "accept", acceptBtn, actions);
+      handleWatchPartyResponseAction(entry.id, "accept", acceptBtn, actions, vibeInput);
     });
     const maybeBtn = document.createElement("button");
     maybeBtn.type = "button";
@@ -6150,7 +6261,7 @@ function buildWatchPartyCard(entry, mode) {
     maybeBtn.textContent = "Maybe";
     maybeBtn.addEventListener("click", () => {
       playUiClick();
-      handleWatchPartyResponseAction(entry.id, "maybe", maybeBtn, actions);
+      handleWatchPartyResponseAction(entry.id, "maybe", maybeBtn, actions, vibeInput);
     });
     const declineBtn = document.createElement("button");
     declineBtn.type = "button";
@@ -6158,7 +6269,7 @@ function buildWatchPartyCard(entry, mode) {
     declineBtn.textContent = "Decline";
     declineBtn.addEventListener("click", () => {
       playUiClick();
-      handleWatchPartyResponseAction(entry.id, "decline", declineBtn, actions);
+      handleWatchPartyResponseAction(entry.id, "decline", declineBtn, actions, vibeInput);
     });
     actions.appendChild(acceptBtn);
     actions.appendChild(maybeBtn);
@@ -6167,6 +6278,140 @@ function buildWatchPartyCard(entry, mode) {
   }
 
   return card;
+}
+
+function buildWatchPartyLobby(entry) {
+  const invitees = Array.isArray(entry && entry.invitees) ? entry.invitees : [];
+  if (!invitees.length) {
+    return null;
+  }
+  const lobby = document.createElement("div");
+  lobby.className = "watch-party-lobby";
+  const statusWrap = document.createElement("div");
+  statusWrap.className = "watch-party-lobby-status";
+  const groups = [
+    { key: "accept", label: "Going", dataset: "going" },
+    { key: "maybe", label: "Maybe", dataset: "maybe" },
+    { key: "pending", label: "Waiting", dataset: "waiting" }
+  ];
+  groups.forEach((group) => {
+    const members = invitees.filter((invite) => normalizePartyResponse(invite.response) === group.key);
+    if (!members.length) {
+      return;
+    }
+    const section = document.createElement("div");
+    section.className = "watch-party-lobby-group";
+    section.dataset.state = group.dataset;
+    const label = document.createElement("span");
+    label.className = "watch-party-lobby-label";
+    label.textContent = `${group.label} (${members.length})`;
+    section.appendChild(label);
+    const chips = document.createElement("div");
+    chips.className = "watch-party-lobby-chips";
+    members.forEach((member) => {
+      if (!member || !member.username) {
+        return;
+      }
+      const chip = document.createElement("span");
+      chip.className = "watch-party-lobby-chip";
+      chip.dataset.state = group.dataset;
+      chip.textContent = formatSocialDisplayName(member.username);
+      if (member.bringing) {
+        chip.title = member.bringing;
+      }
+      chips.appendChild(chip);
+    });
+    section.appendChild(chips);
+    statusWrap.appendChild(section);
+  });
+  if (statusWrap.childNodes.length) {
+    lobby.appendChild(statusWrap);
+  }
+  const vibeRow = buildWatchPartyBringingRow(invitees);
+  if (vibeRow) {
+    lobby.appendChild(vibeRow);
+  }
+  return lobby.childNodes.length ? lobby : null;
+}
+
+function buildWatchPartyBringingRow(invitees) {
+  const entries = invitees
+    .map((invite) => {
+      const text = typeof invite.bringing === "string" ? invite.bringing.trim() : "";
+      if (!text) {
+        return null;
+      }
+      return { username: invite.username, text };
+    })
+    .filter(Boolean);
+  if (!entries.length) {
+    return null;
+  }
+  const row = document.createElement("div");
+  row.className = "watch-party-bringing";
+  const label = document.createElement("span");
+  label.className = "watch-party-bringing-label";
+  label.textContent = "Snacks & vibes";
+  row.appendChild(label);
+  const chips = document.createElement("div");
+  chips.className = "watch-party-bringing-chips";
+  entries.slice(0, 6).forEach((entry) => {
+    const chip = document.createElement("span");
+    chip.className = "watch-party-chip watch-party-chip--vibe";
+    chip.textContent = `${formatSocialDisplayName(entry.username)}: ${entry.text}`;
+    chips.appendChild(chip);
+  });
+  row.appendChild(chips);
+  return row;
+}
+
+function buildWatchPartySummary(entry) {
+  const scheduledAt = toTimestamp(entry && entry.scheduledFor);
+  if (!scheduledAt || Date.now() < scheduledAt) {
+    return null;
+  }
+  const invitees = Array.isArray(entry && entry.invitees) ? entry.invitees : [];
+  const going = invitees.filter((invite) => normalizePartyResponse(invite.response) === "accept");
+  const maybe = invitees.filter((invite) => normalizePartyResponse(invite.response) === "maybe");
+  const pending = invitees.filter((invite) => normalizePartyResponse(invite.response) === "pending");
+  const summary = document.createElement("div");
+  summary.className = "watch-party-summary";
+  const line = document.createElement("p");
+  line.className = "watch-party-summary-line";
+  const parts = [];
+  parts.push(
+    formatCountLabel(
+      going.length,
+      "1 friend joined",
+      `${going.length} friends joined`,
+      "No RSVPs marked as joined yet"
+    )
+  );
+  if (maybe.length) {
+    parts.push(`${maybe.length} maybe ${maybe.length === 1 ? "reply" : "replies"}`);
+  }
+  if (pending.length) {
+    parts.push(`${pending.length} awaiting reply`);
+  }
+  line.textContent = parts.filter(Boolean).join(" • ");
+  summary.appendChild(line);
+  const prompt = document.createElement("p");
+  prompt.className = "watch-party-summary-prompt";
+  prompt.textContent = "Share a quick review to capture the vibe while it’s fresh.";
+  summary.appendChild(prompt);
+  const cta = document.createElement("button");
+  cta.type = "button";
+  cta.className = "btn-link watch-party-summary-cta";
+  cta.textContent = "Leave a quick review";
+  cta.addEventListener("click", () => {
+    showToast({
+      title: "Review this party",
+      text: `Tell friends how ${entry.movie && entry.movie.title ? entry.movie.title : "the night"} went.`,
+      icon: "📝"
+    });
+  });
+  summary.appendChild(cta);
+  return summary;
 }
 
 async function handleInviteCollaboratorAction(entry, button) {
@@ -6226,7 +6471,7 @@ async function handleCollaboratorInviteDecision(listId, decision, button, action
   }
 }
 
-async function handleWatchPartyResponseAction(partyId, response, button, actionGroup) {
+async function handleWatchPartyResponseAction(partyId, response, button, actionGroup, vibeInput) {
   if (!partyId) {
     return;
   }
@@ -6235,8 +6480,9 @@ async function handleWatchPartyResponseAction(partyId, response, button, actionG
     btn.disabled = true;
   });
   setCollabStatus("Updating watch party RSVP…", "loading");
+  const bringing = vibeInput && typeof vibeInput.value === "string" ? vibeInput.value.trim() : "";
   try {
-    await respondWatchPartyRemote({ partyId, response });
+    await respondWatchPartyRemote({ partyId, response, bringing });
     setCollabStatus("Response recorded.", "success");
     await refreshCollaborativeState();
   } catch (error) {
@@ -8015,6 +8261,20 @@ function formatPartyResponse(response) {
     default:
       return "Pending";
   }
+}
+
+function normalizePartyResponse(response) {
+  const value = typeof response === "string" ? response.toLowerCase() : "";
+  if (value === "accept" || value === "accepted") {
+    return "accept";
+  }
+  if (value === "maybe") {
+    return "maybe";
+  }
+  if (value === "decline" || value === "declined") {
+    return "decline";
+  }
+  return "pending";
 }
 
 function renderNotificationCenter(payload = {}) {

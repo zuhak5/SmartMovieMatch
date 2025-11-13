@@ -257,7 +257,7 @@ Implementation notes for Codex (internal):
 
 
 ## 5. Watch parties that feel live, not just scheduled
-[Codex status: TODO]  (Last updated: 2025-11-13 by Codex)
+[Codex status: DONE]  (Last updated: 2025-11-13 by Codex)
 
 
 Pre-party lobby state
@@ -283,6 +283,12 @@ After the scheduled time passes, create a small summary card in the social area:
 “4 friends joined · average rating 8.1 · 2 new reviews.”
 
 It nudges people to leave reviews right after watching.
+
+Implementation notes for Codex (internal):
+
+- Watch party cards now include a lobby row that groups invitees by status and highlights snack/vibe chips from each RSVP.
+- The invite form surfaces smart friend suggestions plus selectable chips that autofill the invite list.
+- Once a party time passes, hosts and attendees see a summary tile with joined counts and a nudge to post a fresh review.
 
 
 
@@ -1714,7 +1720,7 @@ Notification: “Maya replied to your review” → banner: “View discussion�
 - [x] 2. Make profiles feel like real “movie personas”  (Done: 2025-11-13 by Codex)
 - [x] 3. Deepen community reviews & comments  (Done: 2025-11-13 by Codex)
 - [x] 4. Collaborative lists that feel actually collaborative  (Done: 2025-11-13 by Codex)
-- [ ] 5. Watch parties that feel live, not just scheduled
+- [x] 5. Watch parties that feel live, not just scheduled  (Done: 2025-11-13 by Codex)
 - [ ] 6. Presence that actually leads to interaction
 - [ ] 7. Social notifications that feel like a feed
 - [ ] 8. Safety, comfort, and control in the social layer

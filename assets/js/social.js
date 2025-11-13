@@ -3097,14 +3097,24 @@ function cloneCollaborativeState(collabState) {
         ? collabState.watchParties.upcoming.map((entry) => ({
             ...entry,
             movie: entry.movie ? { ...entry.movie } : { title: '', tmdbId: null, imdbId: null },
-            invitees: Array.isArray(entry.invitees) ? entry.invitees.map((invite) => ({ ...invite })) : []
+            invitees: Array.isArray(entry.invitees)
+              ? entry.invitees.map((invite) => ({
+                  ...invite,
+                  bringing: typeof invite.bringing === 'string' ? invite.bringing : ''
+                }))
+              : []
           }))
         : [],
       invites: Array.isArray(collabState.watchParties?.invites)
         ? collabState.watchParties.invites.map((entry) => ({
             ...entry,
             movie: entry.movie ? { ...entry.movie } : { title: '', tmdbId: null, imdbId: null },
-            invitees: Array.isArray(entry.invitees) ? entry.invitees.map((invite) => ({ ...invite })) : []
+            invitees: Array.isArray(entry.invitees)
+              ? entry.invitees.map((invite) => ({
+                  ...invite,
+                  bringing: typeof invite.bringing === 'string' ? invite.bringing : ''
+                }))
+              : []
           }))
         : []
     }
