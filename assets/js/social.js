@@ -617,7 +617,9 @@ export async function searchSocialUsers(query) {
     sharedWatchParties: Array.isArray(entry.sharedWatchParties) ? entry.sharedWatchParties.slice() : [],
     mutualFollowers: Array.isArray(entry.mutualFollowers) ? entry.mutualFollowers.slice() : [],
     followsYou: entry.followsYou === true,
-    reason: typeof entry.reason === 'string' ? entry.reason : ''
+    reason: typeof entry.reason === 'string' ? entry.reason : '',
+    pinnedList: entry.pinnedList || null,
+    pinnedReview: entry.pinnedReview || null
   }));
 }
 
