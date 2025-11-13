@@ -72,6 +72,19 @@ body {
   padding-inline: var(--content-padding-inline);
 }
 
+/*
+  Panels already include their own inline padding. Prevent the pad-inline
+  utility from compounding gutters inside panels so content does not drift
+  toward the right edge on narrow screens.
+*/
+.panel.pad-inline {
+  padding-inline: var(--panel-padding-inline);
+}
+
+.panel .pad-inline {
+  padding-inline: 0;
+}
+
 body[data-theme="light"] {
   color-scheme: light;
 }
