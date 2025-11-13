@@ -218,9 +218,8 @@ body[data-theme="light"]::after {
 /*
   Mobile-first refinement
   -----------------------
-  The project historically relied on a dedicated "mobile" stylesheet layered
-  on top of a desktop-first base. With the removal of `app.css`, the rules
-  below now power the handheld experience for every screen.
+  The project historically relied on separate desktop and mobile layers.
+  The unified rules below now power the handheld experience for every screen.
 */
 @media (max-width: 640px) {
   :root {
