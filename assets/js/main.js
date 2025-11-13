@@ -7265,6 +7265,21 @@ function formatPartyResponse(response) {
 }
 
 function renderNotificationCenter(payload = {}) {
+  const notifications = Array.isArray(payload.notifications)
+    ? payload.notifications
+    : Array.isArray(state.notifications)
+    ? state.notifications
+    : [];
+  state.notifications = notifications.slice();
+  const unreadCount = typeof payload.unreadCount === "number"
+    ? payload.unreadCount
+    : countUnreadNotifications();
+  const hasSession = Boolean(state.session && state.session.token);
+
+  // Keep the friends activity feed in sync with the latest notification payload
+  // even if the notification UI isn't present on the current page.
+  renderFriendsActivityFeed();
+
   const bell = $("notificationBell");
   const countEl = $("notificationCount");
   const panel = $("notificationPanel");
@@ -7274,7 +7289,6 @@ function renderNotificationCenter(payload = {}) {
     return;
   }
 
-  const hasSession = Boolean(state.session && state.session.token);
   bell.hidden = !hasSession;
   if (!hasSession) {
     state.notificationPanelOpen = false;
@@ -7286,16 +7300,6 @@ function renderNotificationCenter(payload = {}) {
     panel.hidden = true;
     return;
   }
-
-  const notifications = Array.isArray(payload.notifications)
-    ? payload.notifications
-    : Array.isArray(state.notifications)
-    ? state.notifications
-    : [];
-  state.notifications = notifications.slice();
-  const unreadCount = typeof payload.unreadCount === "number"
-    ? payload.unreadCount
-    : countUnreadNotifications();
 
   if (unreadCount > 0) {
     countEl.hidden = false;
@@ -7382,7 +7386,6 @@ function renderNotificationCenter(payload = {}) {
     panel.hidden = true;
     bell.setAttribute("aria-expanded", "false");
   }
-  renderFriendsActivityFeed();
 }
 
 function toggleNotificationPanel() {
