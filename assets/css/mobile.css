@@ -1045,7 +1045,7 @@ body[data-theme="light"] .account-link:hover {
 }
 
 .notification-panel {
-  position: absolute;
+  position: static;
   top: calc(100% + 0.6rem);
   right: 0;
   width: min(420px, 90vw);
