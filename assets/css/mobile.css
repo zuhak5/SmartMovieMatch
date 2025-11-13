@@ -77,12 +77,9 @@ body {
   utility from compounding gutters inside panels so content does not drift
   toward the right edge on narrow screens.
 */
-.panel.pad-inline {
-  padding-inline: 9px;
-}
-
+.panel.pad-inline,
 .panel .pad-inline {
-  padding-inline: 9px;
+  padding-inline: 0;
 }
 
 body[data-theme="light"] {
