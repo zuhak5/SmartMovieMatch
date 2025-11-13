@@ -504,6 +504,24 @@
                 <label class="field-label" for="collabListDescription">Description (optional)</label>
                 <textarea id="collabListDescription" class="input-base collab-textarea" rows="2" maxlength="200"></textarea>
               </div>
+              <div class="field-grid pad-inline collab-suggested-block">
+                <div>
+                  <span class="field-label">Suggested collaborators</span>
+                  <p class="collab-suggested-hint">
+                    Pick a few friends and we’ll invite them the moment your list is created.
+                  </p>
+                </div>
+                <div
+                  id="collabSuggestedContainer"
+                  class="collab-suggested-list"
+                  role="group"
+                  aria-label="Suggested collaborators"
+                >
+                  <p id="collabSuggestedEmpty" class="collab-suggested-empty">
+                    We’ll surface collaborators based on your social matches once you’re signed in.
+                  </p>
+                </div>
+              </div>
               <div class="collab-form-footer pad-inline">
                 <label class="field-label" for="collabListVisibility">Visibility</label>
                 <select id="collabListVisibility" class="input-base input-select">

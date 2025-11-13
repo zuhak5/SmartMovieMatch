@@ -145,6 +145,12 @@ module.exports = async (req, res) => {
       case 'removeCollaborativeItem':
         result = await handleRemoveCollaborativeItem(req, payload);
         break;
+      case 'voteCollaborativeItem':
+        result = await handleVoteCollaborativeItem(req, payload);
+        break;
+      case 'postCollaborativeNote':
+        result = await handlePostCollaborativeNote(req, payload);
+        break;
       case 'scheduleWatchParty':
         result = await handleScheduleWatchParty(req, payload);
         break;
@@ -958,6 +964,7 @@ async function handleCreateCollaborativeList(req, payload) {
     collaborators: [],
     invites: [],
     items: [],
+    discussion: [],
     createdAt: timestamp,
     updatedAt: timestamp
   };
@@ -1119,7 +1126,8 @@ async function handleAddCollaborativeItem(req, payload) {
     title: resolvedMovie.title,
     notes,
     addedBy: user.username,
-    addedAt: timestamp
+    addedAt: timestamp,
+    votes: { yes: [], no: [] }
   });
   list.updatedAt = timestamp;
   await writeSocialStore(store);
@@ -1159,6 +1167,98 @@ async function handleRemoveCollaborativeItem(req, payload) {
     throw new HttpError(404, 'That movie is not on this list.');
   }
   list.updatedAt = new Date().toISOString();
+  await writeSocialStore(store);
+  return {
+    body: {
+      ok: true,
+      list: formatCollaborativeListForUser(list, user.username)
+    }
+  };
+}
+
+async function handleVoteCollaborativeItem(req, payload) {
+  const { user } = await authenticate(req, payload);
+  if (!usingLocalStore()) {
+    throw new HttpError(501, 'Collaborative list voting requires local mode.');
+  }
+  const listId = typeof payload.listId === 'string' ? payload.listId.trim() : '';
+  const tmdbId = normalizeId(payload.tmdbId || payload.movieTmdbId || payload.movieId);
+  const voteRaw = typeof payload.vote === 'string' ? payload.vote.trim().toLowerCase() : '';
+  const vote = voteRaw === 'no' ? 'no' : voteRaw === 'clear' ? 'clear' : 'yes';
+  if (!listId || !tmdbId) {
+    throw new HttpError(400, 'Missing list or movie identifiers.');
+  }
+  const store = await readSocialStore();
+  const list = store.collabLists.find((entry) => entry.id === listId);
+  if (!list) {
+    throw new HttpError(404, 'Could not find that collaborative list.');
+  }
+  const actor = canonicalUsername(user.username);
+  const hasAccess = list.owner === actor ||
+    (Array.isArray(list.collaborators) && list.collaborators.some((entry) => canonicalUsername(entry.username) === actor));
+  if (!hasAccess) {
+    throw new HttpError(403, 'You do not have permission to vote on this list.');
+  }
+  list.items = Array.isArray(list.items) ? list.items : [];
+  const item = list.items.find((entry) => normalizeId(entry.tmdbId) === tmdbId);
+  if (!item) {
+    throw new HttpError(404, 'That movie is not on this list.');
+  }
+  item.votes = normalizeCollaborativeVotes(item.votes);
+  const yesSet = new Set(item.votes.yes);
+  const noSet = new Set(item.votes.no);
+  yesSet.delete(actor);
+  noSet.delete(actor);
+  if (vote === 'yes') {
+    yesSet.add(actor);
+  } else if (vote === 'no') {
+    noSet.add(actor);
+  }
+  item.votes = { yes: Array.from(yesSet), no: Array.from(noSet) };
+  list.updatedAt = new Date().toISOString();
+  await writeSocialStore(store);
+  return {
+    body: {
+      ok: true,
+      list: formatCollaborativeListForUser(list, user.username)
+    }
+  };
+}
+
+async function handlePostCollaborativeNote(req, payload) {
+  const { user } = await authenticate(req, payload);
+  if (!usingLocalStore()) {
+    throw new HttpError(501, 'Collaborative notes are only available in local demo mode.');
+  }
+  const listId = typeof payload.listId === 'string' ? payload.listId.trim() : '';
+  const bodyRaw = typeof payload.body === 'string' ? payload.body.trim() : '';
+  if (!listId) {
+    throw new HttpError(400, 'Select a collaborative list first.');
+  }
+  if (!bodyRaw) {
+    throw new HttpError(400, 'Share a short note before posting.');
+  }
+  const message = bodyRaw.slice(0, 240);
+  const store = await readSocialStore();
+  const list = store.collabLists.find((entry) => entry.id === listId);
+  if (!list) {
+    throw new HttpError(404, 'Could not find that collaborative list.');
+  }
+  const actor = canonicalUsername(user.username);
+  const canComment = list.owner === actor ||
+    (Array.isArray(list.collaborators) && list.collaborators.some((entry) => canonicalUsername(entry.username) === actor));
+  if (!canComment) {
+    throw new HttpError(403, 'You do not have permission to chat on this list.');
+  }
+  list.discussion = Array.isArray(list.discussion) ? list.discussion : [];
+  const timestamp = new Date().toISOString();
+  list.discussion.push({
+    id: randomUUID(),
+    username: actor,
+    body: message,
+    createdAt: timestamp
+  });
+  list.updatedAt = timestamp;
   await writeSocialStore(store);
   return {
     body: {
@@ -3138,7 +3238,9 @@ function formatCollaborativeListForUser(list, username) {
   const pendingInvites = Array.isArray(list.invites)
     ? list.invites.filter((invite) => invite.status === 'pending').map((invite) => canonicalUsername(invite.username)).filter(Boolean)
     : [];
-  const previewItems = Array.isArray(list.items) ? list.items.slice(0, 4) : [];
+  const previewItems = buildCollaborativePreviewItems(list);
+  const voteHighlights = buildCollaborativeVoteHighlights(list, username);
+  const discussionPreview = buildCollaborativeDiscussionPreview(list);
   return {
     id: list.id,
     name: list.name,
@@ -3151,14 +3253,129 @@ function formatCollaborativeListForUser(list, username) {
     updatedAt: list.updatedAt || list.createdAt || null,
     createdAt: list.createdAt || null,
     visibility: list.visibility || 'friends',
-    preview: previewItems.map((item) => ({
-      tmdbId: item.tmdbId || null,
-      imdbId: item.imdbId || null,
-      title: item.title || '',
-      addedBy: item.addedBy || null,
-      addedAt: item.addedAt || null
-    }))
+    preview: previewItems,
+    voteHighlights,
+    discussionPreview: discussionPreview.preview,
+    discussionCount: discussionPreview.count
   };
+}
+
+function buildCollaborativePreviewItems(list) {
+  if (!Array.isArray(list.items)) {
+    return [];
+  }
+  const sorted = list.items
+    .map((item) => {
+      const votes = normalizeCollaborativeVotes(item.votes);
+      const yesCount = votes.yes.length;
+      const noCount = votes.no.length;
+      const score = yesCount - noCount;
+      return {
+        tmdbId: item.tmdbId || null,
+        imdbId: item.imdbId || null,
+        title: item.title || '',
+        addedBy: item.addedBy || null,
+        addedAt: item.addedAt || item.createdAt || list.createdAt || null,
+        score,
+        totalVotes: yesCount + noCount
+      };
+    })
+    .filter((entry) => entry.tmdbId)
+    .sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      if (b.totalVotes !== a.totalVotes) {
+        return b.totalVotes - a.totalVotes;
+      }
+      return (b.addedAt || '').localeCompare(a.addedAt || '');
+    });
+  return sorted
+    .slice(0, 4)
+    .map((entry) => ({
+      tmdbId: entry.tmdbId,
+      imdbId: entry.imdbId,
+      title: entry.title,
+      addedBy: entry.addedBy,
+      addedAt: entry.addedAt
+    }));
+}
+
+function buildCollaborativeVoteHighlights(list, username) {
+  if (!Array.isArray(list.items)) {
+    return [];
+  }
+  const canonical = canonicalUsername(username);
+  const highlights = list.items
+    .map((item) => {
+      const votes = normalizeCollaborativeVotes(item.votes);
+      const yesCount = votes.yes.length;
+      const noCount = votes.no.length;
+      const score = yesCount - noCount;
+      const myVote = canonical
+        ? votes.yes.includes(canonical)
+          ? 'yes'
+          : votes.no.includes(canonical)
+          ? 'no'
+          : null
+        : null;
+      return {
+        tmdbId: item.tmdbId || null,
+        title: item.title || '',
+        yesCount,
+        noCount,
+        score,
+        myVote,
+        addedAt: item.addedAt || item.createdAt || list.createdAt || null
+      };
+    })
+    .filter((entry) => entry.tmdbId)
+    .sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      const totalA = a.yesCount + a.noCount;
+      const totalB = b.yesCount + b.noCount;
+      if (totalB !== totalA) {
+        return totalB - totalA;
+      }
+      return (b.addedAt || '').localeCompare(a.addedAt || '');
+    });
+  return highlights.slice(0, 3).map((entry) => ({
+    tmdbId: entry.tmdbId,
+    title: entry.title,
+    yesCount: entry.yesCount,
+    noCount: entry.noCount,
+    score: entry.score,
+    myVote: entry.myVote
+  }));
+}
+
+function buildCollaborativeDiscussionPreview(list) {
+  const discussion = Array.isArray(list.discussion) ? list.discussion.slice() : [];
+  discussion.sort((a, b) => {
+    return (a.createdAt || '').localeCompare(b.createdAt || '');
+  });
+  const preview = discussion
+    .slice(-3)
+    .map((message) => ({
+      id: message.id || randomUUID(),
+      username: canonicalUsername(message.username) || message.username || '',
+      body: typeof message.body === 'string' ? message.body : '',
+      createdAt: message.createdAt || null
+    }))
+    .filter((message) => message.username && message.body);
+  return { preview, count: discussion.length };
+}
+
+function normalizeCollaborativeVotes(votes) {
+  const yes = Array.isArray(votes?.yes)
+    ? Array.from(new Set(votes.yes.map((value) => canonicalUsername(value)).filter(Boolean)))
+    : [];
+  const no = Array.isArray(votes?.no)
+    ? Array.from(new Set(votes.no.map((value) => canonicalUsername(value)).filter(Boolean)))
+    : [];
+  return { yes, no };
 }
 
 function listCollaborativeSummary(store, username) {

@@ -34,6 +34,8 @@ import {
   respondCollaboratorInviteRemote,
   scheduleWatchPartyRemote,
   respondWatchPartyRemote,
+  voteCollaborativeItemRemote,
+  postCollaborativeNoteRemote,
   subscribeToCollaborativeState,
   getCollaborativeStateSnapshot,
   generateInviteQrRemote,
@@ -65,6 +67,8 @@ import { getWatchedRatingPreference } from "./taste.js";
 
 const RECOMMENDATIONS_PAGE_SIZE = 20;
 const MAX_FOLLOW_NOTE_LENGTH = 180;
+const MAX_SUGGESTED_COLLABORATORS = 4;
+const COLLAB_DISCUSSION_MAX_LENGTH = 220;
 
 let inviteQrRequest = 0;
 
@@ -112,6 +116,8 @@ const state = {
     lastFavoritesSync: null
   }
 };
+
+const collabSuggestionSelections = new Set();
 
 const THEME_COLOR_MAP = {
   dark: "#020617",
@@ -4693,18 +4699,45 @@ function wireCollaborativeForms() {
       }
       const description = listDescriptionInput ? listDescriptionInput.value.trim() : "";
       const visibility = visibilitySelect && visibilitySelect.value === "private" ? "private" : "friends";
+      const selectedHandles = getSelectedCollaborativeHandles();
       const submitButton = createForm.querySelector("button[type=\"submit\"]");
       if (submitButton) {
         submitButton.disabled = true;
       }
       setCollabStatus("Creating collaborative list…", "loading");
       try {
-        await createCollaborativeListRemote({ name, description, visibility });
+        const response = await createCollaborativeListRemote({ name, description, visibility });
+        const createdList = response && response.list ? response.list : null;
         setCollabStatus(`Created “${name}”.`, "success");
         createForm.reset();
         if (visibilitySelect) {
           visibilitySelect.value = "friends";
         }
+        if (selectedHandles.length && createdList && createdList.id) {
+          const { invited, failed } = await inviteSuggestedCollaboratorsToList(
+            createdList.id,
+            selectedHandles
+          );
+          if (invited.length && !failed.length) {
+            setCollabStatus(
+              `Invited ${formatCollaborativeHandleSummary(invited)} to collaborate.`,
+              "success"
+            );
+          } else if (invited.length && failed.length) {
+            setCollabStatus(
+              `Invited ${formatCollaborativeHandleSummary(invited)}, but couldn’t reach ${formatCollaborativeHandleSummary(
+                failed
+              )}.`,
+              "warning"
+            );
+          } else if (failed.length) {
+            setCollabStatus(
+              `Couldn’t invite ${formatCollaborativeHandleSummary(failed)} right now.`,
+              "error"
+            );
+          }
+        }
+        clearCollaborativeSuggestionSelections();
         await refreshCollaborativeState();
       } catch (error) {
         setCollabStatus(
@@ -5087,6 +5120,7 @@ function renderSocialConnections() {
   const availableSuggestions = suggestions.filter((suggestion) => {
     return suggestion && suggestion.username && !followingSet.has(suggestion.username);
   });
+  renderCollaborativeSuggestions(availableSuggestions);
   const activeEntries = following
     .map((username) => ({ username, presence: presence[username] }))
     .filter((entry) => entry.presence && entry.presence.state);
@@ -5378,6 +5412,118 @@ function renderSocialConnections() {
   }
 }
 
+function renderCollaborativeSuggestions(suggestions) {
+  const container = $("collabSuggestedContainer");
+  const emptyEl = $("collabSuggestedEmpty");
+  if (!container || !emptyEl) {
+    return;
+  }
+  container.innerHTML = "";
+  const normalized = Array.isArray(suggestions)
+    ? suggestions
+        .map((entry) => ({
+          username: canonicalHandle(entry.username || ""),
+          displayName: entry.displayName || formatSocialDisplayName(entry.username),
+          reason: entry.reason || entry.tagline || "High taste overlap"
+        }))
+        .filter((entry) => entry.username)
+        .slice(0, MAX_SUGGESTED_COLLABORATORS)
+    : [];
+  const availableHandles = new Set(normalized.map((entry) => entry.username));
+  Array.from(collabSuggestionSelections).forEach((handle) => {
+    if (!availableHandles.has(handle)) {
+      collabSuggestionSelections.delete(handle);
+    }
+  });
+  if (!normalized.length) {
+    emptyEl.hidden = false;
+    return;
+  }
+  emptyEl.hidden = true;
+  normalized.forEach((entry) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "collab-suggested-chip";
+    button.dataset.handle = entry.username;
+    button.dataset.collabSuggestChip = "true";
+    button.title = entry.reason;
+    const name = document.createElement("span");
+    name.className = "collab-suggested-name";
+    name.textContent = entry.displayName;
+    button.appendChild(name);
+    const reason = document.createElement("span");
+    reason.className = "collab-suggested-reason";
+    reason.textContent = entry.reason;
+    button.appendChild(reason);
+    button.addEventListener("click", () => {
+      playUiClick();
+      toggleCollaborativeSuggestion(entry.username);
+    });
+    container.appendChild(button);
+  });
+  updateCollaborativeSuggestionSelectionStates();
+}
+
+function toggleCollaborativeSuggestion(handle) {
+  const normalized = canonicalHandle(handle);
+  if (!normalized) {
+    return;
+  }
+  if (collabSuggestionSelections.has(normalized)) {
+    collabSuggestionSelections.delete(normalized);
+  } else {
+    collabSuggestionSelections.add(normalized);
+  }
+  updateCollaborativeSuggestionSelectionStates();
+}
+
+function updateCollaborativeSuggestionSelectionStates() {
+  const chips = document.querySelectorAll('[data-collab-suggest-chip="true"]');
+  chips.forEach((chip) => {
+    const handle = canonicalHandle(chip.dataset.handle || "");
+    const selected = handle && collabSuggestionSelections.has(handle);
+    chip.dataset.selected = selected ? "true" : "false";
+    chip.setAttribute("aria-pressed", selected ? "true" : "false");
+  });
+}
+
+function getSelectedCollaborativeHandles() {
+  return Array.from(collabSuggestionSelections);
+}
+
+function clearCollaborativeSuggestionSelections() {
+  collabSuggestionSelections.clear();
+  updateCollaborativeSuggestionSelectionStates();
+}
+
+async function inviteSuggestedCollaboratorsToList(listId, handles) {
+  const invited = [];
+  const failed = [];
+  for (const handle of handles) {
+    try {
+      await inviteCollaboratorRemote({ listId, username: handle });
+      invited.push(handle);
+    } catch (error) {
+      console.warn("Collaborative invite failed", handle, error);
+      failed.push(handle);
+    }
+  }
+  return { invited, failed };
+}
+
+function formatCollaborativeHandleSummary(handles) {
+  if (!Array.isArray(handles) || !handles.length) {
+    return "";
+  }
+  if (handles.length === 1) {
+    return `@${handles[0]}`;
+  }
+  if (handles.length === 2) {
+    return `@${handles[0]} and @${handles[1]}`;
+  }
+  return `@${handles[0]} and ${handles.length - 1} others`;
+}
+
 function renderCollaborativeSections(collabStateInput) {
   const collab = collabStateInput && typeof collabStateInput === "object"
     ? collabStateInput
@@ -5472,6 +5618,7 @@ function buildCollaborativeListCard(entry, mode) {
   const card = document.createElement("article");
   card.className = "collab-list-card";
   card.dataset.role = mode;
+  const canCollaborate = entry.role === "owner" || entry.role === "editor";
 
   const header = document.createElement("header");
   header.className = "collab-list-card-header";
@@ -5540,6 +5687,11 @@ function buildCollaborativeListCard(entry, mode) {
     card.appendChild(preview);
   }
 
+  const voteSection = buildCollaborativeVoteList(entry, canCollaborate);
+  if (voteSection) {
+    card.appendChild(voteSection);
+  }
+
   const collaborators = Array.isArray(entry.collaborators)
     ? entry.collaborators.filter((handle) => canonicalHandle(handle) && canonicalHandle(handle) !== canonicalHandle(entry.owner))
     : [];
@@ -5600,7 +5752,236 @@ function buildCollaborativeListCard(entry, mode) {
     card.appendChild(actions);
   }
 
+  const discussionSection = buildCollaborativeDiscussionSection(entry, canCollaborate);
+  if (discussionSection) {
+    card.appendChild(discussionSection);
+  }
+
   return card;
+}
+
+function buildCollaborativeVoteList(entry, canVote) {
+  const listId = entry && entry.id ? entry.id : null;
+  const highlights = Array.isArray(entry.voteHighlights)
+    ? entry.voteHighlights.filter((item) => item && item.tmdbId)
+    : [];
+  if (!highlights.length && !canVote) {
+    return null;
+  }
+  const section = document.createElement("div");
+  section.className = "collab-vote-list";
+  const heading = document.createElement("div");
+  heading.className = "collab-vote-heading";
+  heading.textContent = "Tonight’s frontrunners";
+  section.appendChild(heading);
+  if (!highlights.length) {
+    const empty = document.createElement("p");
+    empty.className = "collab-thread-empty";
+    empty.textContent = "No votes yet — help prioritize the lineup.";
+    section.appendChild(empty);
+    return section;
+  }
+  highlights.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "collab-vote-row";
+    const info = document.createElement("div");
+    info.className = "collab-vote-info";
+    const title = document.createElement("p");
+    title.className = "collab-vote-title";
+    title.textContent = item.title || "Untitled pick";
+    info.appendChild(title);
+    const score = document.createElement("div");
+    score.className = "collab-vote-score";
+    const summary = formatCollaborativeVoteSummary(item);
+    score.textContent = summary.label;
+    if (summary.trend) {
+      score.dataset.trend = summary.trend;
+    }
+    info.appendChild(score);
+    row.appendChild(info);
+    if (canVote && listId) {
+      const actions = document.createElement("div");
+      actions.className = "collab-vote-actions";
+      const upBtn = document.createElement("button");
+      upBtn.type = "button";
+      upBtn.className = "collab-vote-btn";
+      upBtn.textContent = `👍 ${item.yesCount || 0}`;
+      const downBtn = document.createElement("button");
+      downBtn.type = "button";
+      downBtn.className = "collab-vote-btn";
+      downBtn.textContent = `👎 ${item.noCount || 0}`;
+      const isUpSelected = item.myVote === "yes";
+      const isDownSelected = item.myVote === "no";
+      upBtn.setAttribute("aria-pressed", isUpSelected ? "true" : "false");
+      downBtn.setAttribute("aria-pressed", isDownSelected ? "true" : "false");
+      upBtn.dataset.vote = "yes";
+      downBtn.dataset.vote = "no";
+      upBtn.addEventListener("click", () => {
+        const nextVote = isUpSelected ? "clear" : "yes";
+        handleCollaborativeVoteAction(listId, item.tmdbId, nextVote, upBtn, actions);
+      });
+      downBtn.addEventListener("click", () => {
+        const nextVote = isDownSelected ? "clear" : "no";
+        handleCollaborativeVoteAction(listId, item.tmdbId, nextVote, downBtn, actions);
+      });
+      actions.appendChild(upBtn);
+      actions.appendChild(downBtn);
+      row.appendChild(actions);
+    }
+    section.appendChild(row);
+  });
+  return section;
+}
+
+function formatCollaborativeVoteSummary(item) {
+  const yes = Number.isFinite(item.yesCount) ? item.yesCount : 0;
+  const no = Number.isFinite(item.noCount) ? item.noCount : 0;
+  const score = yes - no;
+  let trend = "";
+  if (score > 0) {
+    trend = "up";
+  } else if (score < 0) {
+    trend = "down";
+  }
+  const label = yes || no ? `${yes.toLocaleString()} 👍 · ${no.toLocaleString()} 👎` : "No votes yet";
+  return { label, trend };
+}
+
+function buildCollaborativeDiscussionSection(entry, canComment) {
+  const messages = Array.isArray(entry.discussionPreview) ? entry.discussionPreview : [];
+  if (!messages.length && !canComment) {
+    return null;
+  }
+  const section = document.createElement("div");
+  section.className = "collab-thread";
+  const heading = document.createElement("div");
+  heading.className = "collab-thread-heading";
+  heading.textContent = "Planning chat";
+  if (Number.isFinite(entry.discussionCount) && entry.discussionCount > messages.length) {
+    const count = document.createElement("span");
+    count.className = "collab-thread-count";
+    count.textContent = `${entry.discussionCount.toLocaleString()} messages total`;
+    heading.appendChild(count);
+  }
+  section.appendChild(heading);
+  if (messages.length) {
+    const list = document.createElement("div");
+    list.className = "collab-thread-messages";
+    messages.forEach((message) => {
+      const row = document.createElement("div");
+      row.className = "collab-thread-message";
+      const meta = document.createElement("div");
+      meta.className = "collab-thread-meta";
+      const author = createProfileButton(message.username, {
+        className: "social-profile-link",
+        label: formatSocialDisplayName(message.username),
+        stopPropagation: true
+      });
+      if (author) {
+        meta.appendChild(author);
+      } else {
+        const fallback = document.createElement("span");
+        fallback.textContent = formatSocialDisplayName(message.username);
+        meta.appendChild(fallback);
+      }
+      const time = document.createElement("span");
+      time.textContent = formatTimeAgo(message.createdAt) || "Just now";
+      meta.appendChild(time);
+      row.appendChild(meta);
+      const body = document.createElement("p");
+      body.textContent = message.body;
+      row.appendChild(body);
+      list.appendChild(row);
+    });
+    section.appendChild(list);
+  } else {
+    const empty = document.createElement("p");
+    empty.className = "collab-thread-empty";
+    empty.textContent = "No chat yet — drop a note to kick things off.";
+    section.appendChild(empty);
+  }
+  if (canComment && entry.id) {
+    const form = document.createElement("form");
+    form.className = "collab-thread-form";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "input-base collab-thread-input";
+    input.placeholder = "Suggest a pick, snack, or vibe…";
+    input.maxLength = COLLAB_DISCUSSION_MAX_LENGTH;
+    const submitBtn = document.createElement("button");
+    submitBtn.type = "submit";
+    submitBtn.className = "btn-subtle";
+    submitBtn.textContent = "Send";
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      playUiClick();
+      handleCollaborativeNoteSubmit(entry.id, input, submitBtn, form);
+    });
+    form.appendChild(input);
+    form.appendChild(submitBtn);
+    section.appendChild(form);
+  }
+  return section;
+}
+
+async function handleCollaborativeVoteAction(listId, tmdbId, vote, button, actionGroup) {
+  if (!listId || !tmdbId) {
+    return;
+  }
+  const buttons = actionGroup
+    ? Array.from(actionGroup.querySelectorAll("button"))
+    : button
+    ? [button]
+    : [];
+  buttons.forEach((btn) => {
+    btn.disabled = true;
+  });
+  setCollabStatus("Updating list votes…", "loading");
+  try {
+    await voteCollaborativeItemRemote({ listId, tmdbId, vote });
+    setCollabStatus("Vote recorded.", "success");
+    await refreshCollaborativeState();
+  } catch (error) {
+    setCollabStatus(
+      error instanceof Error ? error.message : "Unable to update that vote right now.",
+      "error"
+    );
+  } finally {
+    buttons.forEach((btn) => {
+      btn.disabled = false;
+    });
+  }
+}
+
+async function handleCollaborativeNoteSubmit(listId, input, button, form) {
+  if (!listId || !input) {
+    return;
+  }
+  const message = input.value.trim();
+  if (!message) {
+    input.focus();
+    return;
+  }
+  const buttons = form ? Array.from(form.querySelectorAll("button")) : button ? [button] : [];
+  buttons.forEach((btn) => {
+    btn.disabled = true;
+  });
+  setCollabStatus("Sharing your note…", "loading");
+  try {
+    await postCollaborativeNoteRemote({ listId, body: message });
+    input.value = "";
+    setCollabStatus("Shared with your collaborators.", "success");
+    await refreshCollaborativeState();
+  } catch (error) {
+    setCollabStatus(
+      error instanceof Error ? error.message : "We couldn’t post that note right now.",
+      "error"
+    );
+  } finally {
+    buttons.forEach((btn) => {
+      btn.disabled = false;
+    });
+  }
 }
 
 function buildCollaborativeInviteCard(entry) {
