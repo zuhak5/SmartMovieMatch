@@ -67,7 +67,7 @@
       </span>
     </div>
     <p class="app-subtitle">
-      Update how you appear across Smart Movie Match, keep your password fresh, and review your stored snapshots.
+      Update how you appear across Smart Movie Match, keep your password fresh, and stay in sync across devices.
     </p>
   </header>
 
@@ -87,7 +87,7 @@
 
         <div id="accountSettingsSignedOut" class="settings-signed-out" hidden aria-hidden="true">
           <h2>Sign in to manage settings</h2>
-          <p>Log in to update your profile, change your password, and review the latest sync snapshots.</p>
+          <p>Log in to update your profile, change your password, and keep every device up to date.</p>
           <a class="btn-primary" href="login.html">Log in / Sign up</a>
         </div>
 
@@ -132,9 +132,6 @@
                   <p id="settingsSyncWatchedMeta" class="settings-sync-meta">Log watched titles to keep progress in sync.</p>
                 </div>
                 <div class="settings-sync-actions">
-                  <button type="button" class="btn-subtle settings-sync-manage" data-profile-settings-action="snapshots">
-                    View snapshots
-                  </button>
                   <button type="button" class="btn-secondary settings-sync-now" data-settings-sync-now="watched">
                     Sync now
                   </button>
@@ -149,9 +146,6 @@
                   <p id="settingsSyncFavoritesMeta" class="settings-sync-meta">Save movies you love so they’re backed up everywhere.</p>
                 </div>
                 <div class="settings-sync-actions">
-                  <button type="button" class="btn-subtle settings-sync-manage" data-profile-settings-action="snapshots">
-                    View snapshots
-                  </button>
                   <button type="button" class="btn-secondary settings-sync-now" data-settings-sync-now="favorites">
                     Sync now
                   </button>
@@ -161,67 +155,12 @@
 
             <div id="settingsSyncStatus" class="settings-sync-status" role="status" aria-live="polite"></div>
 
-            <div class="settings-quick-links" role="group" aria-label="Account settings sections">
-              <button type="button" class="settings-quick-link" data-settings-section-trigger="profile">
-                <span aria-hidden="true">👤</span>
-                Profile
-              </button>
-              <button type="button" class="settings-quick-link" data-settings-section-trigger="security">
-                <span aria-hidden="true">🔐</span>
-                Security
-              </button>
-              <button type="button" class="settings-quick-link" data-settings-section-trigger="snapshots">
-                <span aria-hidden="true">🗂️</span>
-                Snapshots
-              </button>
-            </div>
           </section>
 
           <div id="profile" class="settings-anchor" aria-hidden="true"></div>
           <div class="settings-layout">
-            <aside class="settings-rail" aria-label="Settings navigation">
-              <div class="settings-rail-inner">
-                <p class="settings-rail-label">Sections</p>
-                <nav class="settings-nav" role="tablist" aria-orientation="vertical">
-                  <button
-                    type="button"
-                    class="settings-nav-btn is-active"
-                    data-settings-target="profile"
-                    role="tab"
-                    aria-selected="true"
-                  >
-                    Profile
-                  </button>
-                  <button
-                    type="button"
-                    class="settings-nav-btn"
-                    data-settings-target="security"
-                    role="tab"
-                    aria-selected="false"
-                  >
-                    Security
-                  </button>
-                  <button
-                    type="button"
-                    class="settings-nav-btn"
-                    data-settings-target="snapshots"
-                    role="tab"
-                    aria-selected="false"
-                  >
-                    Snapshots
-                  </button>
-                </nav>
-                <div id="settingsSaveIndicator" class="settings-save-indicator" role="status" aria-live="polite">
-                  All changes saved
-                </div>
-              </div>
-            </aside>
             <div class="settings-views">
-              <section
-                class="settings-card is-active"
-                data-settings-section="profile"
-                aria-labelledby="accountSettingsProfileHeading"
-              >
+              <section class="settings-card" aria-labelledby="accountSettingsProfileHeading">
                 <div class="settings-card-header">
                   <h2 id="accountSettingsProfileHeading">Profile</h2>
                   <p>Change what other devices see when you sign in.</p>
@@ -267,11 +206,7 @@
                 </form>
               </section>
 
-              <section
-                class="settings-card"
-                data-settings-section="security"
-                aria-labelledby="accountSettingsSecurityHeading"
-              >
+              <section class="settings-card" aria-labelledby="accountSettingsSecurityHeading">
                 <div id="security" class="settings-anchor" aria-hidden="true"></div>
                 <div class="settings-card-header">
                   <h2 id="accountSettingsSecurityHeading">Security</h2>
@@ -386,32 +321,6 @@
                 </form>
               </section>
 
-              <section
-                class="settings-card settings-card-wide"
-                data-settings-section="snapshots"
-                id="accountSnapshotsSection"
-                aria-labelledby="accountSnapshotsHeading"
-              >
-                <div id="snapshots" class="settings-anchor" aria-hidden="true"></div>
-                <div class="settings-card-header">
-                  <h2 id="accountSnapshotsHeading">Cloud snapshots</h2>
-                  <p>These copies refresh every time Smart Movie Match syncs.</p>
-                </div>
-                <div class="snapshot-grid">
-                  <article class="snapshot-card">
-                    <h3>Preferences</h3>
-                    <pre id="snapshotPreferences" class="snapshot-pre" aria-live="polite">No data synced yet.</pre>
-                  </article>
-                  <article class="snapshot-card">
-                    <h3>Watched history</h3>
-                    <pre id="snapshotWatched" class="snapshot-pre" aria-live="polite">No data synced yet.</pre>
-                  </article>
-                  <article class="snapshot-card">
-                    <h3>Favorites</h3>
-                    <pre id="snapshotFavorites" class="snapshot-pre" aria-live="polite">No data synced yet.</pre>
-                  </article>
-                </div>
-              </section>
             </div>
           </div>
         </div>
@@ -434,10 +343,6 @@
   <a class="mobile-toolbar-action" href="#security">
     <span class="mobile-toolbar-icon" aria-hidden="true">🔒</span>
     <span class="mobile-toolbar-label">Security</span>
-  </a>
-  <a class="mobile-toolbar-action" href="#snapshots">
-    <span class="mobile-toolbar-icon" aria-hidden="true">📂</span>
-    <span class="mobile-toolbar-label">Snapshots</span>
   </a>
 </nav>
 
