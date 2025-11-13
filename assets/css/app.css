@@ -3701,7 +3701,7 @@ body[data-theme="light"] .profile-activity-chip {
 
 @media (min-width: 640px) {
   .profile-callout-snapshots {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    
   }
 }
 
