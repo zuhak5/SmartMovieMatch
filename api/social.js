@@ -679,7 +679,8 @@ async function handleSearchUsers(req, payload) {
           sharedWatchHistory: entry.sharedWatchHistory,
           sharedWatchParties: entry.sharedWatchParties,
           mutualFollowers: entry.mutualFollowers,
-          followsYou: entry.followsYou
+          followsYou: entry.followsYou,
+          preferencesSnapshot: entry.profile.preferencesSnapshot || null
         },
         {
           username: graph.username,
@@ -1556,7 +1557,8 @@ async function buildFollowSuggestions({
         mutualFollowers: mutuals,
         followsYou: true,
         tagline: 'They already follow you back.',
-        priorityReason: 'Already following you'
+        priorityReason: 'Already following you',
+        preferencesSnapshot: candidateProfile ? candidateProfile.preferencesSnapshot : null
       });
     });
 
@@ -1627,7 +1629,8 @@ async function buildFollowSuggestions({
       sharedWatchHistory: entry.sharedWatchHistory,
       sharedWatchParties: entry.sharedWatchParties,
       mutualFollowers: entry.mutuals,
-      followsYou: entry.followsYou
+      followsYou: entry.followsYou,
+      preferencesSnapshot: entry.profile.preferencesSnapshot || null
     });
   });
 
@@ -1885,6 +1888,8 @@ function normalizeSuggestionPayload(entry, { username, followingSet, followersSe
     reasonParts.push(entry.reason.trim());
   }
 
+  const pins = resolvePersonaPins(entry);
+
   return {
     username: handle,
     displayName,
@@ -1895,7 +1900,9 @@ function normalizeSuggestionPayload(entry, { username, followingSet, followersSe
     sharedWatchParties,
     mutualFollowers,
     followsYou,
-    reason: reasonParts.join(' • ')
+    reason: reasonParts.join(' • '),
+    pinnedList: pins.list,
+    pinnedReview: pins.review
   };
 }
 
@@ -1922,6 +1929,121 @@ function buildProfileTagline(profile) {
     return `Recently favorited ${recent.join(' & ')}`;
   }
   return '';
+}
+
+function resolvePersonaPins(entry) {
+  const sources = [];
+  if (entry && entry.personaPins) {
+    sources.push(entry.personaPins);
+  }
+  if (entry && entry.preferencesSnapshot && entry.preferencesSnapshot.personaPins) {
+    sources.push(entry.preferencesSnapshot.personaPins);
+  }
+  if (entry && entry.preferencesSnapshot) {
+    if (entry.preferencesSnapshot.pinnedList || entry.preferencesSnapshot.pinnedReview) {
+      sources.push({
+        list: entry.preferencesSnapshot.pinnedList,
+        review: entry.preferencesSnapshot.pinnedReview
+      });
+    }
+  }
+  if (entry && (entry.pinnedList || entry.pinnedReview)) {
+    sources.push({ list: entry.pinnedList, review: entry.pinnedReview });
+  }
+  let list = null;
+  let review = null;
+  sources.forEach((payload) => {
+    if (!payload || typeof payload !== 'object') {
+      return;
+    }
+    if (!list && (payload.list || payload.pinnedList)) {
+      list = normalizePinnedListPayload(payload.list || payload.pinnedList);
+    }
+    if (!review && (payload.review || payload.pinnedReview)) {
+      review = normalizePinnedReviewPayload(payload.review || payload.pinnedReview);
+    }
+  });
+  return { list, review };
+}
+
+function normalizePinnedListPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+  const title = extractPinText(payload.title || payload.name);
+  if (!title) {
+    return null;
+  }
+  const description = extractPinText(payload.description || payload.subtitle || payload.summary);
+  const highlights = extractPinHighlights(payload.highlights || payload.items || payload.movies);
+  const href = extractPinUrl(payload.href || payload.url || payload.link);
+  const normalized = { title };
+  if (description) {
+    normalized.description = description;
+  }
+  if (highlights.length) {
+    normalized.highlights = highlights;
+  }
+  if (href) {
+    normalized.href = href;
+  }
+  return normalized;
+}
+
+function normalizePinnedReviewPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+  const title = extractPinText(payload.title || payload.movieTitle || payload.movie);
+  if (!title) {
+    return null;
+  }
+  const excerpt = extractPinText(payload.excerpt || payload.summary || payload.body);
+  const ratingValue =
+    typeof payload.rating === 'number'
+      ? payload.rating
+      : typeof payload.rating === 'string' && payload.rating.trim() !== ''
+      ? Number(payload.rating)
+      : null;
+  const rating = Number.isFinite(ratingValue) ? Math.max(0, Math.min(10, Number(ratingValue))) : null;
+  const href = extractPinUrl(payload.href || payload.url || payload.link);
+  const normalized = { title };
+  if (excerpt) {
+    normalized.excerpt = excerpt;
+  }
+  if (rating !== null) {
+    normalized.rating = rating;
+  }
+  if (href) {
+    normalized.href = href;
+  }
+  return normalized;
+}
+
+function extractPinText(value) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed.slice(0, 320) : '';
+}
+
+function extractPinHighlights(raw) {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw
+    .map((value) => extractPinText(value))
+    .filter(Boolean)
+    .slice(0, 6);
+}
+
+function extractPinUrl(value) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed.slice(0, 500) : '';
 }
 
 async function fetchAllUserProfiles() {

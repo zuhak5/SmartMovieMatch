@@ -147,7 +147,7 @@ Implementation notes for Codex (internal):
 
 
 ## 2. Make profiles feel like real “movie personas”
-[Codex status: IN PROGRESS]  (Last updated: 2025-11-13 by Codex)
+[Codex status: DONE]  (Last updated: 2025-11-13 by Codex)
 
 
 Taste compatibility badge on friend / peer profiles
@@ -175,7 +175,7 @@ That immediately gives visitors something to explore and talk about.
 Implementation notes for Codex (internal):
 
 - Taste compatibility badge, story grid, and pinned-content placeholders now render on social profile overlays/pages, using shared overlap data to keep cards populated even without bespoke pins.
-- Next pickup point: wire real pinned list/review data once backend exposes it so the CTA buttons can deep-link to genuine content rather than generated summaries.
+- Persona pins now pull from the personaPins snapshot data that lives in auth preferences, so list/review CTAs link to the owner’s actual highlights instead of fallback summaries.
 
 
 
@@ -1700,7 +1700,7 @@ Notification: “Maya replied to your review” → banner: “View discussion�
 > This section is a quick at-a-glance summary. The **source of truth** is still the status lines under each section heading.
 
 - [x] 1. Make social features impossible to miss  (Done: 2025-11-13 by Codex)
-- [ ] 2. Make profiles feel like real “movie personas”
+- [x] 2. Make profiles feel like real “movie personas”  (Done: 2025-11-13 by Codex)
 - [ ] 3. Deepen community reviews & comments
 - [ ] 4. Collaborative lists that feel actually collaborative
 - [ ] 5. Watch parties that feel live, not just scheduled

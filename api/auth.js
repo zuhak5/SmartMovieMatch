@@ -942,6 +942,19 @@ function sanitizePreferences(preferences) {
   if (typeof preferences.likesText === "string") {
     safe.likesText = preferences.likesText.slice(0, 500);
   }
+  const personaPins = sanitizePersonaPins(
+    preferences.personaPins || {
+      list: preferences.pinnedList || null,
+      review: preferences.pinnedReview || null
+    }
+  );
+  if (personaPins) {
+    safe.personaPins = personaPins;
+  } else {
+    delete safe.personaPins;
+  }
+  delete safe.pinnedList;
+  delete safe.pinnedReview;
   return safe;
 }
 
@@ -989,6 +1002,110 @@ function sanitizeFavorites(favorites) {
     .filter(Boolean);
 
   return normalized.slice(-100);
+}
+
+function sanitizePersonaPins(pins) {
+  if (!pins || typeof pins !== "object") {
+    return null;
+  }
+  const list = sanitizePinnedListPin(pins.list || pins.pinnedList);
+  const review = sanitizePinnedReviewPin(pins.review || pins.pinnedReview);
+  const normalized = {};
+  if (list) {
+    normalized.list = list;
+  }
+  if (review) {
+    normalized.review = review;
+  }
+  return Object.keys(normalized).length ? normalized : null;
+}
+
+function sanitizePinnedListPin(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const title = sanitizePinText(value.title || value.name, 160);
+  if (!title) {
+    return null;
+  }
+  const description = sanitizePinText(value.description || value.subtitle || value.summary, 320);
+  const highlights = sanitizePinHighlights(value.highlights || value.items || value.movies);
+  const href = sanitizePinUrl(value.href || value.url || value.link);
+  const normalized = { title };
+  if (description) {
+    normalized.description = description;
+  }
+  if (highlights.length) {
+    normalized.highlights = highlights;
+  }
+  if (href) {
+    normalized.href = href;
+  }
+  return normalized;
+}
+
+function sanitizePinnedReviewPin(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const title = sanitizePinText(value.title || value.movieTitle || value.movie, 160);
+  if (!title) {
+    return null;
+  }
+  const excerpt = sanitizePinText(value.excerpt || value.summary || value.body, 400);
+  const ratingValue =
+    typeof value.rating === "number"
+      ? value.rating
+      : typeof value.rating === "string" && value.rating.trim() !== ""
+      ? Number(value.rating)
+      : null;
+  const rating = Number.isFinite(ratingValue)
+    ? Math.max(0, Math.min(10, Number(ratingValue)))
+    : null;
+  const href = sanitizePinUrl(value.href || value.url || value.link);
+  const normalized = { title };
+  if (excerpt) {
+    normalized.excerpt = excerpt;
+  }
+  if (rating !== null) {
+    normalized.rating = rating;
+  }
+  if (href) {
+    normalized.href = href;
+  }
+  return normalized;
+}
+
+function sanitizePinHighlights(list) {
+  if (!Array.isArray(list)) {
+    return [];
+  }
+  return list
+    .map((value) => sanitizePinText(value, 120))
+    .filter(Boolean)
+    .slice(0, 6);
+}
+
+function sanitizePinUrl(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+  return trimmed.slice(0, 500);
+}
+
+function sanitizePinText(value, max = 280) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+  return trimmed.slice(0, max);
 }
 
 function extractToken(req, payload) {
