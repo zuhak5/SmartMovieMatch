@@ -3780,6 +3780,10 @@ function setupSocialFeatures() {
   unsubscribeCollaborative = subscribeToCollaborativeState((collabState) => {
     state.collaborativeState = collabState;
     renderSocialConnections();
+    // Keep the friends activity tiles in sync with collaborative list updates.
+    // Otherwise, the "New lists" column stays empty until a notification event
+    // happens to trigger a manual refresh.
+    renderFriendsActivityFeed();
   });
   state.collaborativeState = getCollaborativeStateSnapshot();
   renderSocialConnections();
