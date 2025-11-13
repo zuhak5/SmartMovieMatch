@@ -6405,96 +6405,44 @@ function renderSocialProfileContent(profile) {
     socialProfileSubtitleEl.textContent = subtitleParts.join(" • ");
   }
 
-  if (normalized) {
-    const actions = document.createElement("div");
-    actions.className = "modal-actions";
-    if (isFollowing) {
-      const unfollowBtn = document.createElement("button");
-      unfollowBtn.type = "button";
-      unfollowBtn.className = "btn-subtle btn-subtle-danger";
-      unfollowBtn.textContent = "Unfollow";
-      unfollowBtn.addEventListener("click", async () => {
-        setSocialProfileStatus(`Removing @${normalized}…`, "loading");
-        await handleUnfollowUser(normalized, unfollowBtn);
-        setSocialProfileStatus("", null);
-      });
-      actions.appendChild(unfollowBtn);
-    } else {
-      const followBtn = document.createElement("button");
-      followBtn.type = "button";
-      followBtn.className = "btn-secondary";
-      followBtn.textContent = "Follow";
-      followBtn.addEventListener("click", async () => {
-        setSocialProfileStatus(`Following @${normalized}…`, "loading");
-        await handleFollowFromList(normalized, followBtn);
-        setSocialProfileStatus("", null);
-      });
-      actions.appendChild(followBtn);
-    }
-    if (actions.childElementCount) {
-      socialProfileBodyEl.appendChild(actions);
-    }
+  const contextBanner = buildPeerContextBanner({ displayName, isFollowing });
+  if (contextBanner) {
+    socialProfileBodyEl.appendChild(contextBanner);
   }
 
-  if (profile && profile.tagline) {
-    const tagline = document.createElement("p");
-    tagline.className = "social-profile-tagline";
-    tagline.textContent = profile.tagline;
-    socialProfileBodyEl.appendChild(tagline);
+  const hero = buildPeerHeroSection({ profile, normalized, displayName, isFollowing });
+  if (hero) {
+    socialProfileBodyEl.appendChild(hero);
   }
 
-  if (profile && profile.reason) {
-    const reason = document.createElement("p");
-    reason.className = "social-profile-meta";
-    reason.textContent = profile.reason;
-    socialProfileBodyEl.appendChild(reason);
+  const mutualStrip = createMutualFollowersStrip(profile);
+  if (mutualStrip) {
+    socialProfileBodyEl.appendChild(mutualStrip);
   }
 
-  const personaGrid = buildSocialPersonaGrid(profile, normalized);
+  const personaGrid = buildSocialPersonaGrid(profile, normalized, { includeCompatibility: false });
   if (personaGrid) {
-    socialProfileBodyEl.appendChild(personaGrid);
+    personaGrid.dataset.peeruserSection = "world";
+  }
+  const insight = buildPeerInsight(profile);
+  const overlapColumn = buildPeerOverlapColumn(profile);
+  const worldColumn = buildPeerWorldColumn({ personaGrid, insight });
+  const layout = document.createElement("div");
+  layout.className = "peeruser-layout-grid";
+  let layoutHasContent = false;
+  if (overlapColumn) {
+    layout.appendChild(overlapColumn);
+    layoutHasContent = true;
+  }
+  if (worldColumn) {
+    layout.appendChild(worldColumn);
+    layoutHasContent = true;
+  }
+  if (layoutHasContent) {
+    socialProfileBodyEl.appendChild(layout);
   }
 
-  if (profile && Array.isArray(profile.mutualFollowers) && profile.mutualFollowers.length) {
-    const heading = document.createElement("h3");
-    heading.className = "modal-section-title";
-    heading.textContent = `Mutual followers (${profile.mutualFollowers.length})`;
-    socialProfileBodyEl.appendChild(heading);
-
-    const chips = document.createElement("div");
-    chips.className = "social-profile-tags";
-    profile.mutualFollowers.forEach((handle) => {
-      const chip = createProfileButton(handle, {
-        className: "social-chip social-chip--action",
-        label: formatSocialDisplayName(handle)
-      });
-      if (chip) {
-        chips.appendChild(chip);
-      }
-    });
-    socialProfileBodyEl.appendChild(chips);
-  }
-
-  renderProfileTagSection("Shared favorites", profile && profile.sharedFavorites, "favorite");
-  renderProfileTagSection("Shared genres", profile && profile.sharedInterests, "interest");
-  renderProfileTagSection(
-    "Recently watched overlap",
-    profile && profile.sharedWatchHistory,
-    "watched"
-  );
-  renderProfileTagSection("Watch parties together", profile && profile.sharedWatchParties, "party");
-
-  const hasPersonaDetails = Boolean(personaGrid);
-  const hasDetails = Boolean(
-    hasPersonaDetails ||
-      (profile && profile.tagline) ||
-      (profile && profile.reason) ||
-      (profile && Array.isArray(profile.mutualFollowers) && profile.mutualFollowers.length) ||
-      (profile && Array.isArray(profile.sharedFavorites) && profile.sharedFavorites.length) ||
-      (profile && Array.isArray(profile.sharedInterests) && profile.sharedInterests.length) ||
-      (profile && Array.isArray(profile.sharedWatchHistory) && profile.sharedWatchHistory.length) ||
-      (profile && Array.isArray(profile.sharedWatchParties) && profile.sharedWatchParties.length)
-  );
+  const hasDetails = Boolean(contextBanner || hero || mutualStrip || layoutHasContent);
 
   if (!hasDetails) {
     const empty = document.createElement("p");
@@ -6504,41 +6452,461 @@ function renderSocialProfileContent(profile) {
   }
 }
 
-function renderProfileTagSection(title, values, variant) {
-  if (!socialProfileBodyEl) {
-    return;
+function buildPeerContextBanner({ displayName, isFollowing }) {
+  const params = new URLSearchParams(window.location.search);
+  const contextType = params.get("context") || params.get("notification");
+  let message = "";
+  let actionLabel = "";
+  let actionTarget = "";
+  let actionType = "";
+  const safeName = displayName || "This movie fan";
+  switch (contextType) {
+    case "follow":
+      message = `${safeName} recently followed you.`;
+      if (!isFollowing) {
+        actionLabel = "Follow back";
+        actionType = "follow";
+      }
+      break;
+    case "party":
+      message = `${safeName} invited you to a watch party.`;
+      actionLabel = "View invite";
+      actionTarget = "parties";
+      break;
+    case "reply":
+      message = `${safeName} replied to your review.`;
+      actionLabel = "Jump to highlights";
+      actionTarget = "world";
+      break;
+    default:
+      break;
   }
-  const list = Array.isArray(values) ? values.filter((value) => typeof value === "string" && value.trim()) : [];
-  if (!list.length) {
-    return;
+  if (!message) {
+    return null;
   }
-  const heading = document.createElement("h3");
-  heading.className = "modal-section-title";
-  heading.textContent = title;
-  socialProfileBodyEl.appendChild(heading);
-
-  const tagWrap = document.createElement("div");
-  tagWrap.className = "social-profile-tags";
-  list.slice(0, 8).forEach((value) => {
-    const tag = document.createElement("span");
-    tag.className = "social-suggestion-tag";
-    if (variant) {
-      tag.dataset.variant = variant;
-    }
-    tag.textContent = value;
-    tagWrap.appendChild(tag);
-  });
-  socialProfileBodyEl.appendChild(tagWrap);
+  const banner = document.createElement("div");
+  banner.className = "peeruser-context-banner";
+  const label = document.createElement("strong");
+  label.textContent = message;
+  banner.appendChild(label);
+  if (actionLabel) {
+    const actionBtn = document.createElement("button");
+    actionBtn.type = "button";
+    actionBtn.className = "btn-secondary";
+    actionBtn.textContent = actionLabel;
+    actionBtn.addEventListener("click", () => {
+      if (actionType === "follow") {
+        const target = document.querySelector('[data-peeruser-action="follow"]');
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth", block: "center" });
+          window.setTimeout(() => {
+            target.focus();
+          }, 200);
+        }
+        return;
+      }
+      if (actionTarget) {
+        focusPeeruserSection(actionTarget);
+      }
+    });
+    banner.appendChild(actionBtn);
+  }
+  return banner;
 }
 
-function buildSocialPersonaGrid(profile, normalizedHandle) {
+function buildPeerHeroSection({ profile, normalized, displayName, isFollowing }) {
+  if (!normalized && !displayName) {
+    return null;
+  }
+  const hero = document.createElement("section");
+  hero.className = "peeruser-hero";
+
+  const identity = document.createElement("div");
+  identity.className = "peeruser-hero-identity";
+  const avatar = createPeeruserAvatar(displayName, normalized);
+  identity.appendChild(avatar);
+  const textBlock = document.createElement("div");
+  textBlock.className = "peeruser-hero-text";
+  const title = document.createElement("h2");
+  title.textContent = displayName;
+  textBlock.appendChild(title);
+  if (normalized) {
+    const handle = document.createElement("div");
+    handle.className = "peeruser-hero-handle";
+    handle.textContent = `@${normalized}`;
+    textBlock.appendChild(handle);
+  }
+  const taglineText = buildPeerTagline(profile);
+  if (taglineText) {
+    const tagline = document.createElement("p");
+    tagline.className = "peeruser-hero-tagline";
+    tagline.textContent = taglineText;
+    textBlock.appendChild(tagline);
+  }
+  const statSummary = buildPeerOverlapSummary(profile);
+  if (statSummary) {
+    const stats = document.createElement("p");
+    stats.className = "peeruser-stat-row";
+    stats.textContent = statSummary;
+    textBlock.appendChild(stats);
+  }
+  identity.appendChild(textBlock);
+  hero.appendChild(identity);
+
+  const compatibilityBlock = createHeroCompatibilityBlock(profile);
+  if (compatibilityBlock) {
+    hero.appendChild(compatibilityBlock);
+  }
+
+  const actions = createPeerHeroActions({ normalized, isFollowing, displayName });
+  if (actions) {
+    hero.appendChild(actions);
+  }
+
+  return hero;
+}
+
+function createHeroCompatibilityBlock(profile) {
+  const compatibility = computeTasteCompatibility(profile);
+  if (!compatibility) {
+    return null;
+  }
+  const block = document.createElement("div");
+  block.className = "peeruser-hero-compat";
+  const badge = document.createElement("div");
+  badge.className = "peeruser-compat-badge";
+  const score = document.createElement("span");
+  score.className = "peeruser-compat-score";
+  score.textContent = `${compatibility.score}%`;
+  const tier = document.createElement("span");
+  tier.className = "peeruser-compat-tier";
+  tier.textContent = compatibility.tier;
+  badge.appendChild(score);
+  badge.appendChild(tier);
+  block.appendChild(badge);
+  const summary = document.createElement("p");
+  summary.className = "peeruser-compat-copy";
+  summary.textContent = compatibility.summary;
+  block.appendChild(summary);
+  if (compatibility.highlights.length) {
+    const chips = document.createElement("div");
+    chips.className = "peeruser-compat-chips";
+    compatibility.highlights.slice(0, 3).forEach((text) => {
+      const chip = document.createElement("span");
+      chip.className = "peeruser-compat-chip";
+      chip.textContent = text;
+      chips.appendChild(chip);
+    });
+    block.appendChild(chips);
+  }
+  return block;
+}
+
+function buildPeerOverlapSummary(profile) {
+  const favorites = normalizeStringArray(profile && profile.sharedFavorites);
+  const genres = normalizeStringArray(profile && profile.sharedInterests);
+  const watches = normalizeStringArray(profile && profile.sharedWatchHistory);
+  const parties = normalizeStringArray(profile && profile.sharedWatchParties);
+  const summaryParts = [];
+  if (favorites.length) {
+    summaryParts.push(`Shared favorites: ${favorites.length}`);
+  }
+  if (genres.length) {
+    summaryParts.push(`Shared genres: ${genres.length}`);
+  }
+  if (watches.length) {
+    summaryParts.push(`Recent overlap: ${watches.length}`);
+  }
+  if (parties.length) {
+    summaryParts.push(`Watch parties: ${parties.length}`);
+  }
+  return summaryParts.join(" • ");
+}
+
+function buildPeerTagline(profile) {
+  if (profile && profile.tagline) {
+    return profile.tagline;
+  }
+  if (profile && profile.reason) {
+    const parts = profile.reason.split("•");
+    if (parts.length) {
+      return parts[0].trim();
+    }
+    return profile.reason;
+  }
+  return "";
+}
+
+function createPeerHeroActions({ normalized, isFollowing, displayName }) {
+  const container = document.createElement("div");
+  container.className = "peeruser-hero-actions";
+  if (normalized) {
+    const followBtn = document.createElement("button");
+    followBtn.type = "button";
+    followBtn.dataset.peeruserAction = "follow";
+    followBtn.id = "peerHeroFollowBtn";
+    if (isFollowing) {
+      followBtn.className = "btn-subtle btn-subtle-danger";
+      followBtn.textContent = "Unfollow";
+      followBtn.addEventListener("click", async () => {
+        setSocialProfileStatus(`Removing @${normalized}…`, "loading");
+        await handleUnfollowUser(normalized, followBtn);
+        setSocialProfileStatus("", null);
+      });
+    } else {
+      followBtn.className = "btn-secondary";
+      followBtn.textContent = "Follow";
+      followBtn.addEventListener("click", async () => {
+        setSocialProfileStatus(`Following @${normalized}…`, "loading");
+        await handleFollowFromList(normalized, followBtn);
+        setSocialProfileStatus("", null);
+      });
+    }
+    container.appendChild(followBtn);
+  }
+  const secondary = document.createElement("div");
+  secondary.className = "peeruser-secondary-actions";
+  const partyBtn = document.createElement("button");
+  partyBtn.type = "button";
+  partyBtn.className = "btn-subtle";
+  partyBtn.textContent = "Invite to watch party";
+  partyBtn.addEventListener("click", () => {
+    handlePeerSecondaryAction("party", displayName);
+  });
+  secondary.appendChild(partyBtn);
+  const collabBtn = document.createElement("button");
+  collabBtn.type = "button";
+  collabBtn.className = "btn-subtle";
+  collabBtn.textContent = "Add to collaborative list";
+  collabBtn.addEventListener("click", () => {
+    handlePeerSecondaryAction("collab", displayName);
+  });
+  secondary.appendChild(collabBtn);
+  container.appendChild(secondary);
+  return container.childElementCount ? container : null;
+}
+
+function handlePeerSecondaryAction(type, displayName) {
+  const noun = type === "party" ? "watch party" : "collaborative list";
+  const icon = type === "party" ? "🎬" : "👥";
+  showToast({
+    title: "Coming soon",
+    text: `We’ll connect you with ${displayName || "this friend"} once ${noun} invites are live.`,
+    icon
+  });
+}
+
+function createPeeruserAvatar(displayName, normalized) {
+  const avatar = document.createElement("div");
+  avatar.className = "peeruser-avatar";
+  avatar.textContent = computePeerInitials(displayName || normalized);
+  return avatar;
+}
+
+function computePeerInitials(value) {
+  if (!value) {
+    return "SM";
+  }
+  const cleaned = value
+    .split(/[^a-zA-Z0-9]+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  if (cleaned) {
+    return cleaned;
+  }
+  return value.slice(0, 2).toUpperCase();
+}
+
+function createMutualFollowersStrip(profile) {
+  if (!profile || !Array.isArray(profile.mutualFollowers) || !profile.mutualFollowers.length) {
+    return null;
+  }
+  const strip = document.createElement("div");
+  strip.className = "peeruser-mutuals";
+  strip.dataset.peeruserSection = "mutuals";
+  const label = document.createElement("strong");
+  label.textContent = `Mutual followers: ${profile.mutualFollowers.length}`;
+  strip.appendChild(label);
+  const avatars = document.createElement("div");
+  avatars.className = "peeruser-mutual-avatars";
+  profile.mutualFollowers.slice(0, 3).forEach((handle) => {
+    const button = createProfileButton(handle, {
+      className: "peeruser-mutual-avatar",
+      ariaLabel: `View profile for ${formatSocialDisplayName(handle)}`,
+      label: computePeerInitials(handle)
+    });
+    if (button) {
+      avatars.appendChild(button);
+    }
+  });
+  if (avatars.childElementCount) {
+    strip.appendChild(avatars);
+  }
+  if (profile.mutualFollowers.length > 3) {
+    const more = document.createElement("span");
+    more.className = "peeruser-mutual-more";
+    more.textContent = `+${profile.mutualFollowers.length - 3} more`;
+    strip.appendChild(more);
+  }
+  return strip;
+}
+
+function buildPeerOverlapColumn(profile) {
+  const favorites = normalizeStringArray(profile && profile.sharedFavorites);
+  const genres = normalizeStringArray(profile && profile.sharedInterests);
+  const watches = normalizeStringArray(profile && profile.sharedWatchHistory);
+  const parties = normalizeStringArray(profile && profile.sharedWatchParties);
+  const sections = [
+    {
+      title: "Shared favorites",
+      values: favorites,
+      variant: "favorite",
+      key: "favorites",
+      emptyText: "Add more favorites to find common ground."
+    },
+    {
+      title: "Shared genres",
+      values: genres,
+      variant: "interest",
+      key: "genres",
+      emptyText: "Tap a genre to nudge recommendations."
+    },
+    {
+      title: "Recently watched overlap",
+      values: watches,
+      variant: "watched",
+      key: "watched",
+      emptyText: "Log your watches to see real-time overlap."
+    },
+    {
+      title: "Watch parties together",
+      values: parties,
+      variant: "party",
+      key: "parties",
+      emptyText: "No parties yet — invite them to one!"
+    }
+  ];
+  const cards = sections
+    .map((section) => createOverlapCard(section))
+    .filter(Boolean);
+  if (!cards.length) {
+    return null;
+  }
+  const column = document.createElement("section");
+  column.className = "peeruser-column peeruser-column--overlap";
+  column.dataset.peeruserSection = "overlap";
+  const heading = document.createElement("h3");
+  heading.className = "peeruser-section-title";
+  heading.textContent = "How you overlap";
+  column.appendChild(heading);
+  const grid = document.createElement("div");
+  grid.className = "peeruser-overlap-grid";
+  cards.forEach((card) => {
+    grid.appendChild(card);
+  });
+  column.appendChild(grid);
+  return column;
+}
+
+function createOverlapCard({ title, values, variant, emptyText, key }) {
+  const list = normalizeStringArray(values);
+  const card = document.createElement("article");
+  card.className = "peeruser-overlap-card";
+  if (key) {
+    card.dataset.peeruserSection = key;
+  }
+  const heading = document.createElement("h4");
+  heading.textContent = title;
+  const count = document.createElement("span");
+  count.className = "peeruser-overlap-count";
+  count.textContent = `${list.length}`;
+  heading.appendChild(count);
+  card.appendChild(heading);
+  if (list.length) {
+    const wrap = document.createElement("div");
+    wrap.className = "peeruser-chip-wrap";
+    list.slice(0, 8).forEach((value) => {
+      const chip = document.createElement("span");
+      chip.className = "social-suggestion-tag";
+      chip.dataset.variant = variant;
+      chip.textContent = value;
+      wrap.appendChild(chip);
+    });
+    card.appendChild(wrap);
+  } else if (emptyText) {
+    const empty = document.createElement("p");
+    empty.className = "peeruser-overlap-empty";
+    empty.textContent = emptyText;
+    card.appendChild(empty);
+  }
+  return card;
+}
+
+function buildPeerInsight(profile) {
+  const reason = typeof profile?.reason === "string" ? profile.reason.trim() : "";
+  if (!reason) {
+    return null;
+  }
+  const insight = document.createElement("article");
+  insight.className = "peeruser-insight";
+  insight.dataset.peeruserSection = "insight";
+  const heading = document.createElement("h4");
+  heading.textContent = "Why they’re in your orbit";
+  insight.appendChild(heading);
+  const copy = document.createElement("p");
+  copy.textContent = reason;
+  insight.appendChild(copy);
+  return insight;
+}
+
+function buildPeerWorldColumn({ personaGrid, insight }) {
+  const sections = [];
+  if (personaGrid) {
+    sections.push(personaGrid);
+  }
+  if (insight) {
+    sections.push(insight);
+  }
+  if (!sections.length) {
+    return null;
+  }
+  const column = document.createElement("section");
+  column.className = "peeruser-column peeruser-column--world";
+  column.dataset.peeruserSection = "world";
+  const heading = document.createElement("h3");
+  heading.className = "peeruser-section-title";
+  heading.textContent = "Their lists & highlights";
+  column.appendChild(heading);
+  sections.forEach((section) => {
+    column.appendChild(section);
+  });
+  return column;
+}
+
+function focusPeeruserSection(sectionKey) {
+  if (!sectionKey) {
+    return;
+  }
+  const target = document.querySelector(`[data-peeruser-section="${sectionKey}"]`);
+  if (!target) {
+    return;
+  }
+  target.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function buildSocialPersonaGrid(profile, normalizedHandle, options = {}) {
   const container = document.createElement("div");
   container.className = "social-persona-grid";
-  const cards = [
-    createTasteCompatibilityCard(profile),
-    createFriendshipStoryCard(profile),
-    createPinnedPersonaCard(profile, normalizedHandle)
-  ];
+  const includeCompatibility = options.includeCompatibility !== false;
+  const cards = [];
+  if (includeCompatibility) {
+    cards.push(createTasteCompatibilityCard(profile));
+  }
+  cards.push(createFriendshipStoryCard(profile));
+  cards.push(createPinnedPersonaCard(profile, normalizedHandle));
   cards.forEach((card) => {
     if (card) {
       container.appendChild(card);
