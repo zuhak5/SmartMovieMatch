@@ -12,12 +12,12 @@
   <link rel="stylesheet" href="assets/css/mobile.css" media="(max-width: 600px)" />
 </head>
 <body data-page="account-settings">
-<div class="app">
+<div class="app" style="padding-right: 5px; padding-left: 5px;">
   <header class="app-header">
-    <div class="account-bar" role="navigation" data-account-state="guest">
+    <div class="account-bar" role="navigation" data-account-state="guest" style="padding-right: 5px; padding-left: 5px;">
       <span id="accountGreeting" class="account-greeting">You’re browsing as guest.</span>
       <a id="accountLoginLink" class="account-link" href="login.html">Log in / Sign up</a>
-      <div id="accountProfile" class="account-profile" hidden>
+      <div id="accountProfile" class="account-profile" hidden style="padding-right: 5px; padding-left: 5px;">
         <button
           id="accountProfileBtn"
           class="account-pill"
@@ -60,7 +60,7 @@
         </ul>
       </div>
     </div>
-    <div class="app-title-row">
+    <div class="app-title-row" style="padding-right: 5px; padding-left: 5px;">
       <h1 class="app-title">🔐 Account settings</h1>
       <span class="pill-context">
         <span class="pill-dot"></span>
@@ -73,32 +73,32 @@
   </header>
 
   <main class="app-main settings-main">
-    <section class="panel settings-panel">
-      <div class="panel-inner">
-        <div class="panel-header settings-header">
-          <div>
-            <div class="panel-title">Profile & security</div>
-            <div class="panel-subtitle">Tailor your details and protect your account.</div>
+    <section class="panel settings-panel" style="padding-right: 5px; padding-left: 5px;">
+      <div class="panel-inner" style="padding-right: 5px; padding-left: 5px;">
+        <div class="panel-header settings-header" style="padding-right: 5px; padding-left: 5px;">
+          <div style="padding-right: 5px; padding-left: 5px;">
+            <div class="panel-title" style="padding-right: 5px; padding-left: 5px;">Profile & security</div>
+            <div class="panel-subtitle" style="padding-right: 5px; padding-left: 5px;">Tailor your details and protect your account.</div>
           </div>
         </div>
 
-        <div id="accountSettingsSignedOut" class="settings-signed-out" hidden aria-hidden="true">
+        <div id="accountSettingsSignedOut" class="settings-signed-out" hidden aria-hidden="true" style="padding-right: 5px; padding-left: 5px;">
           <h2>Sign in to manage settings</h2>
           <p>Log in to update your profile, change your password, and keep every device up to date.</p>
           <a class="btn-primary" href="login.html">Log in / Sign up</a>
         </div>
 
-        <div id="accountSettingsContent" class="settings-content" hidden aria-hidden="true">
-          <div id="profile" class="settings-anchor" aria-hidden="true"></div>
-          <div class="settings-layout">
-            <div class="settings-views">
-              <section class="settings-card" aria-labelledby="accountSettingsProfileHeading">
-                <div class="settings-card-header">
+        <div id="accountSettingsContent" class="settings-content" hidden aria-hidden="true" style="padding-right: 5px; padding-left: 5px;">
+          <div id="profile" class="settings-anchor" aria-hidden="true" style="padding-right: 5px; padding-left: 5px;"></div>
+          <div class="settings-layout" style="padding-right: 5px; padding-left: 5px;">
+            <div class="settings-views" style="padding-right: 5px; padding-left: 5px;">
+              <section class="settings-card" aria-labelledby="accountSettingsProfileHeading" style="padding-right: 5px; padding-left: 5px;">
+                <div class="settings-card-header" style="padding-right: 5px; padding-left: 5px;">
                   <h2 id="accountSettingsProfileHeading">Profile</h2>
                   <p>Change what other devices see when you sign in.</p>
                 </div>
                 <form id="accountProfileForm" class="settings-section" novalidate>
-                  <div class="field-grid">
+                  <div class="field-grid" style="padding-right: 5px; padding-left: 5px;">
                     <label class="field-label" for="accountDisplayName">Display name</label>
                     <input
                       id="accountDisplayName"
@@ -111,9 +111,9 @@
                       required
                     />
                   </div>
-                  <div class="field-grid">
+                  <div class="field-grid" style="padding-right: 5px; padding-left: 5px;">
                     <span class="field-label">Avatar</span>
-                    <div class="settings-avatar-row">
+                    <div class="settings-avatar-row" style="padding-right: 5px; padding-left: 5px;">
                       <label class="settings-avatar" for="accountAvatarInput" aria-label="Upload new avatar">
                         <span class="settings-avatar-inner" id="settingsAvatarPreview">GM</span>
                       </label>
@@ -131,23 +131,23 @@
                     </div>
                     <p class="field-hint">Preview updates instantly. Square JPG or PNG up to 5 MB recommended.</p>
                   </div>
-                  <div class="settings-actions">
+                  <div class="settings-actions" style="padding-right: 5px; padding-left: 5px;">
                     <button type="submit" class="btn-primary">Save profile</button>
-                    <div id="accountProfileStatus" class="modal-status" role="status" aria-live="polite"></div>
+                    <div id="accountProfileStatus" class="modal-status" role="status" aria-live="polite" style="padding-right: 5px; padding-left: 5px;"></div>
                   </div>
                 </form>
               </section>
 
-              <section class="settings-card" aria-labelledby="accountSettingsSecurityHeading">
-                <div id="security" class="settings-anchor" aria-hidden="true"></div>
-                <div class="settings-card-header">
+              <section class="settings-card" aria-labelledby="accountSettingsSecurityHeading" style="padding-right: 5px; padding-left: 5px;">
+                <div id="security" class="settings-anchor" aria-hidden="true" style="padding-right: 5px; padding-left: 5px;"></div>
+                <div class="settings-card-header" style="padding-right: 5px; padding-left: 5px;">
                   <h2 id="accountSettingsSecurityHeading">Security</h2>
                   <p>Reset your password and prep for multi-factor prompts.</p>
                 </div>
                 <form id="accountSecurityForm" class="settings-section" novalidate>
-                  <div class="field-grid">
+                  <div class="field-grid" style="padding-right: 5px; padding-left: 5px;">
                     <label class="field-label" for="currentPasswordInput">Current password</label>
-                    <div class="input-with-addon">
+                    <div class="input-with-addon" style="padding-right: 5px; padding-left: 5px;">
                       <input
                         id="currentPasswordInput"
                         class="input-base input-text"
@@ -171,9 +171,9 @@
                       </button>
                     </div>
                   </div>
-                  <div class="field-grid">
+                  <div class="field-grid" style="padding-right: 5px; padding-left: 5px;">
                     <label class="field-label" for="newPasswordInput">New password</label>
-                    <div class="input-with-addon">
+                    <div class="input-with-addon" style="padding-right: 5px; padding-left: 5px;">
                       <input
                         id="newPasswordInput"
                         class="input-base input-text"
@@ -199,9 +199,9 @@
                     </div>
                     <p class="field-hint">Use 8+ characters with a mix of letters, numbers, and symbols.</p>
                   </div>
-                  <div class="field-grid">
+                  <div class="field-grid" style="padding-right: 5px; padding-left: 5px;">
                     <label class="field-label" for="confirmPasswordInput">Confirm new password</label>
-                    <div class="input-with-addon">
+                    <div class="input-with-addon" style="padding-right: 5px; padding-left: 5px;">
                       <input
                         id="confirmPasswordInput"
                         class="input-base input-text"
@@ -232,7 +232,7 @@
                     <li data-password-rule="symbol">Includes a symbol</li>
                     <li data-password-rule="match">Matches confirmation</li>
                   </ul>
-                  <div class="security-prompts">
+                  <div class="security-prompts" style="padding-right: 5px; padding-left: 5px;">
                     <label class="security-option">
                       <input id="emailVerificationToggle" type="checkbox" disabled checked />
                       <span>
@@ -246,9 +246,9 @@
                       </span>
                     </label>
                   </div>
-                  <div class="settings-actions">
+                  <div class="settings-actions" style="padding-right: 5px; padding-left: 5px;">
                     <button type="submit" class="btn-primary">Update password</button>
-                    <div id="accountSecurityStatus" class="modal-status" role="status" aria-live="polite"></div>
+                    <div id="accountSecurityStatus" class="modal-status" role="status" aria-live="polite" style="padding-right: 5px; padding-left: 5px;"></div>
                   </div>
                 </form>
               </section>
@@ -261,7 +261,7 @@
   </main>
 </div>
 
-<div id="globalToastRegion" class="global-toast-region" role="status" aria-live="polite"></div>
+<div id="globalToastRegion" class="global-toast-region" role="status" aria-live="polite" style="padding-right: 5px; padding-left: 5px;"></div>
 
 <script type="module" src="assets/js/main.js"></script>
 </body>

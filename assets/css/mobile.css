@@ -12,6 +12,12 @@
     padding: 0;
   }
 
+  section,
+  div {
+    padding-right: 5px;
+    padding-left: 5px;
+  }
+
   body::before,
   body::after {
     display: none;
