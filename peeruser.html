@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Peer user profile – Smart Movie Match</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="theme-color" content="#020617" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="assets/css/app.css" />
+  <link rel="stylesheet" href="assets/css/mobile.css" media="(max-width: 600px)" />
+</head>
+<body data-page="peeruser-profile">
+<div class="app" style="padding-right: 5px; padding-left: 5px;">
+  <header class="app-header">
+    <div class="account-bar" role="navigation" data-account-state="guest" style="padding-right: 5px; padding-left: 5px;">
+      <span id="accountGreeting" class="account-greeting">You’re browsing as guest.</span>
+      <a id="accountLoginLink" class="account-link" href="login.html">Log in / Sign up</a>
+      <div id="accountProfile" class="account-profile" hidden style="padding-right: 5px; padding-left: 5px;">
+        <button
+          id="accountProfileBtn"
+          class="account-pill"
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded="false"
+          aria-controls="accountMenu"
+        >
+          <span class="account-avatar" id="accountAvatar" aria-hidden="true">
+            <span id="accountAvatarInitials" class="account-avatar-initials">GM</span>
+            <img id="accountAvatarImg" alt="" />
+          </span>
+          <span class="account-pill-text">
+            <span id="accountName" class="account-name">Guest</span>
+            <span id="accountPillSync" class="account-pill-sub">Cloud sync inactive</span>
+          </span>
+          <span class="account-pill-caret" aria-hidden="true">▾</span>
+        </button>
+        <ul id="accountMenu" class="account-menu" role="menu" aria-label="Account actions">
+          <li>
+            <button class="account-menu-item" type="button" data-action="profile" role="menuitem">
+              Profile overview
+            </button>
+          </li>
+          <li>
+            <button class="account-menu-item" type="button" data-action="settings" role="menuitem">
+              Account settings
+            </button>
+          </li>
+          <li>
+            <button
+              class="account-menu-item account-menu-item--danger"
+              type="button"
+              data-action="logout"
+              role="menuitem"
+            >
+              Sign out
+            </button>
+          </li>
+        </ul>
+      </div>
+    </div>
+    <div class="app-title-row" style="padding-right: 5px; padding-left: 5px;">
+      <h1 id="socialProfileTitle" class="app-title">Peer user profile</h1>
+      <a class="account-link" href="index.html">
+        ← Back to Smart Movie Match
+      </a>
+    </div>
+    <p id="socialProfileSubtitle" class="app-subtitle">
+      Explore a peer user’s shared favorites, watch history overlap, and party invites.
+    </p>
+  </header>
+
+  <main class="app-main profile-main">
+    <section class="panel social-profile-panel" style="padding-right: 5px; padding-left: 5px;">
+      <div class="panel-inner" style="padding-right: 5px; padding-left: 5px;">
+        <div id="socialProfileStatus" class="modal-status" role="status" aria-live="polite" style="padding-right: 5px; padding-left: 5px;"></div>
+        <div id="socialProfileBody" class="modal-section social-profile-body" style="padding-right: 5px; padding-left: 5px;"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="globalToastRegion" class="global-toast-region" role="status" aria-live="polite" style="padding-right: 5px; padding-left: 5px;"></div>
+
+<script type="module" src="assets/js/main.js"></script>
+</body>
+</html>

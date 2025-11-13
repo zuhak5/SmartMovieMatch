@@ -1524,7 +1524,7 @@ function isAccountSettingsContext() {
 
 function isSocialProfileContext() {
   const page = document.body ? document.body.getAttribute("data-page") : null;
-  return page === "social-profile";
+  return page === "social-profile" || page === "peeruser-profile";
 }
 
 function openAccountSettings(section = "profile") {
@@ -5927,7 +5927,7 @@ function openSocialProfile(username) {
   if (!normalized) {
     return;
   }
-  const profileUrl = new URL("social-profile.html", window.location.origin);
+  const profileUrl = new URL("peeruser.html", window.location.origin);
   profileUrl.searchParams.set("user", normalized);
   window.location.href = profileUrl.toString();
 }
