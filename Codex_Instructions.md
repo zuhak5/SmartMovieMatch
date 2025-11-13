@@ -180,7 +180,7 @@ Implementation notes for Codex (internal):
 
 
 ## 3. Deepen community reviews & comments
-[Codex status: TODO]  (Last updated: 2025-11-13 by Codex)
+[Codex status: DONE]  (Last updated: 2025-11-13 by Codex)
 
 
 Richer filters for community reviews
@@ -198,6 +198,11 @@ Above the review list, show a compact bar:
 👍 x24 · ❤️ x10 · 😂 x5 · 😮 x3
 
 Then let users filter to “Reviews with ❤️” or “Reviews with 😮” to quickly find emotional / surprising takes.
+
+Implementation notes for Codex (internal):
+
+- Review sections now include sentiment filters, sort tabs, and inline “From your friends” highlights before the global feed.
+- Reply forms surface rotating prompt chips to nudge threaded replies and use reaction summaries to drive emoji filtering.
 
 Threaded reply hints and prompts
 
@@ -1701,7 +1706,7 @@ Notification: “Maya replied to your review” → banner: “View discussion�
 
 - [x] 1. Make social features impossible to miss  (Done: 2025-11-13 by Codex)
 - [x] 2. Make profiles feel like real “movie personas”  (Done: 2025-11-13 by Codex)
-- [ ] 3. Deepen community reviews & comments
+- [x] 3. Deepen community reviews & comments  (Done: 2025-11-13 by Codex)
 - [ ] 4. Collaborative lists that feel actually collaborative
 - [ ] 5. Watch parties that feel live, not just scheduled
 - [ ] 6. Presence that actually leads to interaction
