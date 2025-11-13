@@ -20,6 +20,7 @@
   --layout-gutter: clamp(1.1rem, 3vw + 0.6rem, 2.2rem);
   --layout-gutter-compact: clamp(0.9rem, 3vw + 0.45rem, 1.6rem);
   --layout-vertical: clamp(1.8rem, 3vw + 1rem, 3rem);
+  --content-padding-inline: clamp(0.85rem, 1vw + 0.35rem, 1.6rem);
 
   --space-2xs: 0.35rem;
   --space-xs: 0.55rem;
@@ -35,10 +36,9 @@ body {
   color-scheme: dark;
 }
 
-section,
-div {
-  padding-right: 5px;
-  padding-left: 5px;
+
+.pad-inline {
+  padding-inline: var(--content-padding-inline);
 }
 
 body[data-theme="light"] {

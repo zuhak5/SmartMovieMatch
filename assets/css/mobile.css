@@ -5,17 +5,12 @@
     --radius-md: 12px;
     --layout-gutter: 1rem;
     --layout-vertical: 1.5rem;
+    --content-padding-inline: clamp(0.7rem, 1vw + 0.25rem, 1.1rem);
   }
 
   body {
     background: #030816;
     padding: 0;
-  }
-
-  section,
-  div {
-    padding-right: 5px;
-    padding-left: 5px;
   }
 
   body::before,

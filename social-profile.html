@@ -12,12 +12,12 @@
   <link rel="stylesheet" href="assets/css/mobile.css" media="(max-width: 600px)" />
 </head>
 <body data-page="social-profile">
-<div class="app" style="padding-right: 5px; padding-left: 5px;">
+<div class="app pad-inline">
   <header class="app-header">
-    <div class="account-bar" role="navigation" data-account-state="guest" style="padding-right: 5px; padding-left: 5px;">
+    <div class="account-bar pad-inline" role="navigation" data-account-state="guest">
       <span id="accountGreeting" class="account-greeting">You’re browsing as guest.</span>
       <a id="accountLoginLink" class="account-link" href="login.html">Log in / Sign up</a>
-      <div id="accountProfile" class="account-profile" hidden style="padding-right: 5px; padding-left: 5px;">
+      <div id="accountProfile" class="account-profile pad-inline" hidden>
         <button
           id="accountProfileBtn"
           class="account-pill"
@@ -60,7 +60,7 @@
         </ul>
       </div>
     </div>
-    <div class="app-title-row" style="padding-right: 5px; padding-left: 5px;">
+    <div class="app-title-row pad-inline">
       <h1 id="socialProfileTitle" class="app-title">Friend profile</h1>
       <a class="account-link" href="index.html">
         ← Back to Smart Movie Match
@@ -72,16 +72,16 @@
   </header>
 
   <main class="app-main profile-main">
-    <section class="panel social-profile-panel" style="padding-right: 5px; padding-left: 5px;">
-      <div class="panel-inner" style="padding-right: 5px; padding-left: 5px;">
-        <div id="socialProfileStatus" class="modal-status" role="status" aria-live="polite" style="padding-right: 5px; padding-left: 5px;"></div>
-        <div id="socialProfileBody" class="modal-section social-profile-body" style="padding-right: 5px; padding-left: 5px;"></div>
+    <section class="panel social-profile-panel pad-inline">
+      <div class="panel-inner pad-inline">
+        <div id="socialProfileStatus" class="modal-status pad-inline" role="status" aria-live="polite"></div>
+        <div id="socialProfileBody" class="modal-section social-profile-body pad-inline"></div>
       </div>
     </section>
   </main>
 </div>
 
-<div id="globalToastRegion" class="global-toast-region" role="status" aria-live="polite" style="padding-right: 5px; padding-left: 5px;"></div>
+<div id="globalToastRegion" class="global-toast-region pad-inline" role="status" aria-live="polite"></div>
 
 <script type="module" src="assets/js/main.js"></script>
 </body>
