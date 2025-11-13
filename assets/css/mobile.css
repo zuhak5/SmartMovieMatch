@@ -24,8 +24,8 @@
   --page-max-width: 1240px;
   --page-max-width-wide: 1360px;
   --text-measure: 68ch;
-  --panel-padding-block: clamp(1.35rem, 1.5vw + 1rem, 2rem);
-  --panel-padding-inline: clamp(1.15rem, 2vw + 0.8rem, 2.15rem);
+  --panel-padding-block: clamp(1.45rem, 1.5vw + 1.1rem, 2.15rem);
+  --panel-padding-inline: clamp(1.35rem, 2vw + 0.95rem, 2.4rem);
   --panel-gap: clamp(0.85rem, 1vw, 1.5rem);
   --section-gap: clamp(1.35rem, 2vw, 2.6rem);
 
@@ -49,16 +49,16 @@
 
 @media (max-width: 720px) {
   :root {
-    --panel-padding-block: clamp(1.1rem, 0.8vw + 1rem, 1.45rem);
-    --panel-padding-inline: clamp(0.9rem, 2vw + 0.45rem, 1.3rem);
+    --panel-padding-block: clamp(1.2rem, 1vw + 1rem, 1.6rem);
+    --panel-padding-inline: clamp(1.1rem, 2vw + 0.7rem, 1.65rem);
     --section-gap: clamp(1rem, 3vw, 1.5rem);
   }
 }
 
 @media (max-width: 480px) {
   :root {
-    --panel-padding-block: 1rem;
-    --panel-padding-inline: 0.9rem;
+    --panel-padding-block: 1.1rem;
+    --panel-padding-inline: 1.05rem;
     --text-measure: 60ch;
   }
 }
@@ -70,6 +70,19 @@ body {
 
 .pad-inline {
   padding-inline: var(--content-padding-inline);
+}
+
+/*
+  Panels already include their own inline padding. Prevent the pad-inline
+  utility from compounding gutters inside panels so content does not drift
+  toward the right edge on narrow screens.
+*/
+.panel.pad-inline {
+  padding-inline: var(--panel-padding-inline);
+}
+
+.panel .pad-inline {
+  padding-inline: 0;
 }
 
 body[data-theme="light"] {
