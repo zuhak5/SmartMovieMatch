@@ -79,10 +79,6 @@
             <div class="panel-title">Profile & security</div>
             <div class="panel-subtitle">Tailor your details and protect your account.</div>
           </div>
-          <a class="btn-subtle btn-chip" href="profile.html">
-            <span aria-hidden="true">←</span>
-            <span>Back to overview</span>
-          </a>
         </div>
 
         <div id="accountSettingsSignedOut" class="settings-signed-out" hidden aria-hidden="true">
@@ -92,71 +88,6 @@
         </div>
 
         <div id="accountSettingsContent" class="settings-content" hidden aria-hidden="true">
-          <section class="settings-overview" aria-label="Account sync overview">
-            <div class="settings-overview-header">
-              <div>
-                <h2 class="settings-overview-title">Account sync overview</h2>
-                <p class="settings-overview-subtitle">
-                  Track when each part of your profile last synced and jump straight to the section that needs attention.
-                </p>
-              </div>
-              <button type="button" class="btn-subtle btn-chip" data-settings-sync-now="all">
-                <span aria-hidden="true">⟳</span>
-                <span>Sync everything</span>
-              </button>
-            </div>
-
-            <div class="settings-sync-grid" role="list">
-              <article class="settings-sync-card" data-sync-card="preferences" role="listitem">
-                <div class="settings-sync-icon" aria-hidden="true">🧠</div>
-                <div class="settings-sync-content">
-                  <h3 class="settings-sync-label">Taste profile</h3>
-                  <p id="settingsSyncPreferences" class="settings-sync-value">Not synced yet</p>
-                  <p id="settingsSyncPreferencesMeta" class="settings-sync-meta">Select genres to build your taste profile.</p>
-                </div>
-                <div class="settings-sync-actions">
-                  <button type="button" class="btn-subtle settings-sync-manage" data-profile-settings-action="profile">
-                    Review details
-                  </button>
-                  <button type="button" class="btn-secondary settings-sync-now" data-settings-sync-now="preferences">
-                    Sync now
-                  </button>
-                </div>
-              </article>
-
-              <article class="settings-sync-card" data-sync-card="watched" role="listitem">
-                <div class="settings-sync-icon" aria-hidden="true">🎬</div>
-                <div class="settings-sync-content">
-                  <h3 class="settings-sync-label">Watched history</h3>
-                  <p id="settingsSyncWatched" class="settings-sync-value">Not synced yet</p>
-                  <p id="settingsSyncWatchedMeta" class="settings-sync-meta">Log watched titles to keep progress in sync.</p>
-                </div>
-                <div class="settings-sync-actions">
-                  <button type="button" class="btn-secondary settings-sync-now" data-settings-sync-now="watched">
-                    Sync now
-                  </button>
-                </div>
-              </article>
-
-              <article class="settings-sync-card" data-sync-card="favorites" role="listitem">
-                <div class="settings-sync-icon" aria-hidden="true">⭐</div>
-                <div class="settings-sync-content">
-                  <h3 class="settings-sync-label">Favorites</h3>
-                  <p id="settingsSyncFavorites" class="settings-sync-value">Not synced yet</p>
-                  <p id="settingsSyncFavoritesMeta" class="settings-sync-meta">Save movies you love so they’re backed up everywhere.</p>
-                </div>
-                <div class="settings-sync-actions">
-                  <button type="button" class="btn-secondary settings-sync-now" data-settings-sync-now="favorites">
-                    Sync now
-                  </button>
-                </div>
-              </article>
-            </div>
-
-            <div id="settingsSyncStatus" class="settings-sync-status" role="status" aria-live="polite"></div>
-
-          </section>
-
           <div id="profile" class="settings-anchor" aria-hidden="true"></div>
           <div class="settings-layout">
             <div class="settings-views">
