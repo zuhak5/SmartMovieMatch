@@ -78,11 +78,11 @@ body {
   toward the right edge on narrow screens.
 */
 .panel.pad-inline {
-  padding-inline: var(--panel-padding-inline);
+  padding-inline: 9px;
 }
 
 .panel .pad-inline {
-  padding-inline: 0;
+  padding-inline: 9px;
 }
 
 body[data-theme="light"] {
