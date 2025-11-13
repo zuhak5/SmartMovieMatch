@@ -1092,6 +1092,148 @@ body[data-theme="light"] .account-link:hover {
   gap: 0.35rem;
 }
 
+.social-persona-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.social-persona-card {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.85), rgba(30, 41, 59, 0.9));
+  border-radius: var(--radius-md);
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.social-persona-card--compat {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.14), rgba(59, 130, 246, 0.12));
+  border-color: rgba(96, 165, 250, 0.35);
+}
+
+.social-persona-eyebrow {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.social-taste-badge {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-weight: 600;
+  color: #e0f2fe;
+}
+
+.social-taste-score {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.social-taste-tier {
+  font-size: 0.95rem;
+  color: rgba(191, 219, 254, 0.85);
+}
+
+.social-persona-copy {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--text-subtle);
+}
+
+.social-persona-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.social-persona-chip {
+  background: rgba(15, 23, 42, 0.65);
+  color: rgba(226, 232, 240, 0.9);
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.social-story-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.social-story-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.social-story-stat dt {
+  font-size: 0.78rem;
+  color: rgba(148, 163, 184, 0.9);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.social-story-stat dd {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--text-main);
+}
+
+.social-pinned-block {
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  padding-top: 0.75rem;
+  margin-top: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.social-pinned-block:first-of-type {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.social-pinned-label {
+  font-size: 0.8rem;
+  color: rgba(148, 163, 184, 0.95);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.social-pinned-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.social-pinned-rating {
+  font-size: 0.85rem;
+  color: rgba(248, 250, 252, 0.9);
+  font-weight: 600;
+}
+
+.social-pinned-link {
+  font-size: 0.85rem;
+  color: var(--accent-secondary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.social-pinned-link:hover,
+.social-pinned-link:focus-visible {
+  text-decoration: underline;
+  color: rgba(191, 219, 254, 0.95);
+}
+
 .social-profile-trigger {
   border: none;
   background: none;
@@ -8154,6 +8296,170 @@ body[data-theme="light"] .onboarding-card {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 0.75rem;
+}
+
+
+.social-nudge-panel {
+  margin-top: 1.5rem;
+}
+
+.social-nudge-card {
+  position: relative;
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.28), rgba(147, 51, 234, 0.18));
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.35);
+}
+
+.social-nudge-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  color: rgba(226, 232, 240, 0.85);
+  margin-bottom: 0.25rem;
+}
+
+.social-nudge-title {
+  font-size: 1.45rem;
+  margin: 0 0 0.3rem;
+}
+
+.social-nudge-text {
+  margin: 0 0 1rem;
+  color: rgba(226, 232, 240, 0.88);
+}
+
+.social-nudge-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.1rem;
+}
+
+.social-nudge-stat {
+  padding: 0.85rem 1rem;
+  border-radius: 0.85rem;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.social-nudge-stat-label {
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(148, 163, 184, 0.85);
+}
+
+.social-nudge-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #e0e7ff;
+}
+
+.social-nudge-cta {
+  width: fit-content;
+}
+
+.friends-activity-panel {
+  margin-top: 1.5rem;
+}
+
+.friends-activity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+}
+
+.friends-activity-card {
+  border-radius: 1.25rem;
+  padding: 1.25rem;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.35);
+}
+
+.friends-activity-card-header h3 {
+  margin: 0 0 0.2rem;
+  font-size: 1.05rem;
+}
+
+.friends-activity-card-header p {
+  margin: 0 0 1rem;
+  color: rgba(148, 163, 184, 0.9);
+  font-size: 0.9rem;
+}
+
+.friends-activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.friends-activity-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.9rem;
+  background: rgba(15, 23, 42, 0.35);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.friends-activity-row[role="listitem"] {
+  list-style: none;
+}
+
+.friends-activity-text {
+  font-size: 0.92rem;
+  color: #e2e8f0;
+}
+
+.friends-activity-text .friends-activity-link {
+  color: inherit;
+  font-weight: 600;
+}
+
+.friends-activity-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: rgba(148, 163, 184, 0.85);
+}
+
+.friends-activity-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+
+.friends-activity-chip {
+  font-size: 0.72rem;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  background: rgba(99, 102, 241, 0.18);
+  color: rgba(199, 210, 254, 0.95);
+}
+
+.friends-activity-empty {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: rgba(148, 163, 184, 0.85);
+}
+
+.friends-activity-signedout {
+  padding: 1.25rem;
+  border-radius: 1rem;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px dashed rgba(148, 163, 184, 0.35);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  color: rgba(226, 232, 240, 0.9);
 }
 
 @media (max-width: 720px) {

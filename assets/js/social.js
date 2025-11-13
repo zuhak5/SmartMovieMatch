@@ -815,7 +815,7 @@ function renderSection(sectionState, cache) {
   sectionState.errorMessage.hidden = !error;
 
   const summaryStats = stats || computeReviewStats(reviews);
-  renderSummary(sectionState, summaryStats);
+  renderSummary(sectionState, summaryStats, reviews);
   updateFilterControls(sectionState, summaryStats, myReview, reviews);
 
   if (myReview) {
@@ -1482,7 +1482,7 @@ async function toggleReviewLike(sectionState, review, button) {
   }
 }
 
-function renderSummary(sectionState, stats) {
+function renderSummary(sectionState, stats, reviews = []) {
   if (!sectionState.summaryEl) {
     return;
   }
@@ -1493,7 +1493,7 @@ function renderSummary(sectionState, stats) {
       sectionState.summaryUpdated.textContent = '';
       sectionState.summaryUpdated.hidden = true;
     }
-    updateCondensedHeader(sectionState, null);
+    updateCondensedHeader(sectionState, null, reviews);
     updateFriendBadge(sectionState, null);
     return;
   }
@@ -1535,7 +1535,7 @@ function renderSummary(sectionState, stats) {
     }
   }
 
-  updateCondensedHeader(sectionState, stats);
+  updateCondensedHeader(sectionState, stats, reviews);
   updateFriendBadge(sectionState, stats.friendLastReviewAt || null);
 }
 
@@ -1572,12 +1572,13 @@ function createFilterControls() {
   return { container, label, buttonGroup, allButton, friendsButton };
 }
 
-function updateCondensedHeader(sectionState, stats) {
+function updateCondensedHeader(sectionState, stats, reviews = []) {
   const container = sectionState.condensedEl;
   const overall = sectionState.condensedOverall;
   const friends = sectionState.condensedFriends;
   const activity = sectionState.condensedActivity;
   const hasStats = Boolean(stats && stats.totalReviews);
+  const friendHighlight = buildFriendReviewHighlight(reviews);
 
   if (!hasStats) {
     if (container) {
@@ -1600,10 +1601,14 @@ function updateCondensedHeader(sectionState, stats) {
     }
     if (friends) {
       if (stats.friendReviews > 0) {
-        friends.textContent = `Friends ${formatCondensedScore(stats.friendAverageRating)}`;
+        const countLabel = stats.friendReviews === 1 ? '1 friend review' : `${stats.friendReviews} friend reviews`;
+        const avgLabel = Number.isFinite(stats.friendAverageRating)
+          ? ` • Avg ${formatCondensedScore(stats.friendAverageRating)}`
+          : '';
+        friends.textContent = `${countLabel}${avgLabel}`;
         friends.dataset.empty = 'false';
       } else {
-        friends.textContent = 'Friends —';
+        friends.textContent = 'No friend reviews yet';
         friends.dataset.empty = 'true';
       }
     }
@@ -1611,7 +1616,20 @@ function updateCondensedHeader(sectionState, stats) {
 
   if (activity) {
     const activityTimestamp = stats.friendLastReviewAt || stats.lastReviewAt;
-    if (activityTimestamp) {
+    if (friendHighlight) {
+      const friendName =
+        formatDisplayNameFromHandle(friendHighlight.username) ||
+        (friendHighlight.username ? `@${friendHighlight.username}` : 'A friend');
+      const ratingLabel = friendHighlight.ratingLabel || '';
+      const extras = friendHighlight.extraCount
+        ? ` · +${friendHighlight.extraCount} more friend${friendHighlight.extraCount === 1 ? '' : 's'}`
+        : '';
+      const timeLabel = friendHighlight.timestamp
+        ? ` · ${formatRelativeTime(friendHighlight.timestamp)}`
+        : '';
+      activity.textContent = `${friendName}${ratingLabel}${extras}${timeLabel}`;
+      activity.hidden = false;
+    } else if (activityTimestamp) {
       const prefix = stats.friendLastReviewAt ? 'Friend review' : 'Last review';
       activity.textContent = `${prefix} ${formatRelativeTime(activityTimestamp)}`;
       activity.hidden = false;
@@ -1620,6 +1638,47 @@ function updateCondensedHeader(sectionState, stats) {
       activity.hidden = true;
     }
   }
+}
+
+function buildFriendReviewHighlight(reviews) {
+  if (!Array.isArray(reviews) || !reviews.length) {
+    return null;
+  }
+  const friendReviews = reviews.filter((review) => review && review.isFriend);
+  if (!friendReviews.length) {
+    return null;
+  }
+  const decorated = friendReviews
+    .map((review) => ({ review, timestamp: getReviewTimestamp(review) }))
+    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  const latest = decorated[0];
+  const ratingValue =
+    typeof latest.review.rating === 'number'
+      ? latest.review.rating
+      : typeof latest.review.rating === 'string'
+      ? Number(latest.review.rating)
+      : null;
+  const ratingLabel = Number.isFinite(ratingValue)
+    ? ` rated ${formatRating(ratingValue)}`
+    : ' shared a take';
+  return {
+    username: latest.review.username || '',
+    ratingLabel,
+    timestamp: latest.timestamp,
+    extraCount: Math.max(friendReviews.length - 1, 0)
+  };
+}
+
+function getReviewTimestamp(review) {
+  if (!review) {
+    return null;
+  }
+  const raw = review.updatedAt || review.createdAt || null;
+  if (!raw) {
+    return null;
+  }
+  const parsed = Date.parse(raw);
+  return Number.isNaN(parsed) ? null : parsed;
 }
 
 function updateFriendBadge(sectionState, friendTimestamp) {
