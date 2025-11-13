@@ -12,12 +12,12 @@
   <link rel="stylesheet" href="assets/css/mobile.css" media="(max-width: 600px)" />
 </head>
 <body data-page="profile-overview">
-<div class="app" style="padding-right: 8px; padding-left: 8px;">
+<div class="app">
   <header class="app-header">
-    <div class="account-bar" role="navigation" data-account-state="guest" style="padding-right: 8px; padding-left: 8px;">
+    <div class="account-bar" role="navigation" data-account-state="guest">
       <span id="accountGreeting" class="account-greeting">You’re browsing as guest.</span>
       <a id="accountLoginLink" class="account-link" href="login.html">Log in / Sign up</a>
-      <div id="accountProfile" class="account-profile" hidden style="padding-right: 8px; padding-left: 8px;">
+      <div id="accountProfile" class="account-profile" hidden>
         <button
           id="accountProfileBtn"
           class="account-pill"
@@ -60,7 +60,7 @@
         </ul>
       </div>
     </div>
-    <div class="app-title-row" style="padding-right: 8px; padding-left: 8px;">
+    <div class="app-title-row">
       <h1 class="app-title">🧾 Profile overview</h1>
       <span class="pill-context">
         <span class="pill-dot"></span>
@@ -73,8 +73,8 @@
   </header>
 
   <main class="app-main profile-main">
-    <section class="panel profile-callout-panel" style="padding-right: 8px; padding-left: 8px;">
-      <div class="panel-inner" style="padding-right: 8px; padding-left: 8px;">
+    <section class="panel profile-callout-panel">
+      <div class="panel-inner">
         <article
           id="profileOverviewCallout"
           class="profile-callout"
@@ -88,43 +88,43 @@
               Track favorites, watched history, and sync health with personalized highlights and quick actions.
             </p>
           </header>
-          <div class="profile-callout-body" style="padding-right: 8px; padding-left: 8px;">
-            <div class="profile-callout-column profile-callout-column--primary" style="padding-right: 8px; padding-left: 8px;">
-              <div class="profile-callout-summary" aria-live="polite" style="padding-right: 8px; padding-left: 8px;">
-                <div class="profile-callout-summary-header" style="padding-right: 8px; padding-left: 8px;">
+          <div class="profile-callout-body">
+            <div class="profile-callout-column profile-callout-column--primary">
+              <div class="profile-callout-summary" aria-live="polite">
+                <div class="profile-callout-summary-header">
                   <span id="profileCalloutSyncBadge" class="profile-callout-sync-badge" aria-hidden="true">Guest mode</span>
                   <span class="profile-callout-summary-caption">Keep tabs on your library health at a glance.</span>
                 </div>
-                <div class="profile-callout-stats" role="list" style="padding-right: 8px; padding-left: 8px;">
-                  <div class="profile-callout-stat" role="listitem" style="padding-right: 8px; padding-left: 8px;">
+                <div class="profile-callout-stats" role="list">
+                  <div class="profile-callout-stat" role="listitem">
                     <span class="profile-callout-label">Favorites saved</span>
                     <span id="profileCalloutFavoritesValue" class="profile-callout-value">0</span>
                     <span id="profileCalloutFavoritesMeta" class="profile-callout-meta">Ready when you are</span>
                   </div>
-                  <div class="profile-callout-stat" role="listitem" style="padding-right: 8px; padding-left: 8px;">
+                  <div class="profile-callout-stat" role="listitem">
                     <span class="profile-callout-label">Watched titles</span>
                     <span id="profileCalloutWatchedValue" class="profile-callout-value">0</span>
                     <span id="profileCalloutWatchedMeta" class="profile-callout-meta">Log watched titles to tune picks.</span>
                   </div>
-                  <div class="profile-callout-stat" role="listitem" style="padding-right: 8px; padding-left: 8px;">
+                  <div class="profile-callout-stat" role="listitem">
                     <span class="profile-callout-label">Sync status</span>
                     <span id="profileCalloutSyncValue" class="profile-callout-value">Guest mode</span>
                     <span id="profileCalloutSyncMeta" class="profile-callout-meta">Sign in to start syncing automatically.</span>
                   </div>
                 </div>
-                <div class="profile-insight-grid" style="padding-right: 8px; padding-left: 8px;">
+                <div class="profile-insight-grid">
                   <article class="profile-insight-card">
                     <header class="profile-insight-card-header">
                       <span class="profile-callout-label">Genre mix</span>
                       <span id="profileGenreMeta" class="profile-callout-meta">Pick a few genres to visualize.</span>
                     </header>
-                    <div class="profile-genre-visual" style="padding-right: 8px; padding-left: 8px;">
+                    <div class="profile-genre-visual">
                       <div
                         class="profile-genre-donut"
                         id="profileGenreDonut"
                         role="img"
                         aria-label="Genre distribution overview"
-                       style="padding-right: 8px; padding-left: 8px;"></div>
+                      ></div>
                       <ul class="profile-genre-legend" id="profileGenreLegend"></ul>
                     </div>
                   </article>
@@ -133,19 +133,19 @@
                       <span class="profile-callout-label">Recent activity</span>
                       <span id="profileActivityMeta" class="profile-callout-meta">No activity logged yet.</span>
                     </header>
-                    <div class="profile-activity-timeline" id="profileActivityTimeline" role="list" style="padding-right: 8px; padding-left: 8px;"></div>
+                    <div class="profile-activity-timeline" id="profileActivityTimeline" role="list"></div>
                   </article>
                 </div>
-                <div class="profile-callout-progress-card" role="group" aria-label="Favorite milestone progress" style="padding-right: 8px; padding-left: 8px;">
+                <div class="profile-callout-progress-card" role="group" aria-label="Favorite milestone progress">
                   <div
                     id="profileCalloutProgress"
                     class="profile-callout-progress"
                     role="img"
                     aria-label="Favorite milestone meter"
                     tabindex="0"
-                   style="padding-right: 8px; padding-left: 8px;">
+                  >
                     <span class="profile-callout-progress-label">Next milestone</span>
-                    <div class="profile-callout-progress-track" style="padding-right: 8px; padding-left: 8px;">
+                    <div class="profile-callout-progress-track">
                       <span id="profileCalloutProgressFill" class="profile-callout-progress-fill"></span>
                     </div>
                   </div>
@@ -153,8 +153,8 @@
                     Add 5 favorites to unlock smarter batches.
                   </p>
                 </div>
-                <div class="profile-callout-taste" style="padding-right: 8px; padding-left: 8px;">
-                  <div class="profile-callout-taste-header" style="padding-right: 8px; padding-left: 8px;">
+                <div class="profile-callout-taste">
+                  <div class="profile-callout-taste-header">
                     <span class="profile-callout-label">Taste highlights</span>
                     <p id="profileCalloutTasteSubtitle" class="profile-callout-meta">
                       We’ll summarize your taste once you start saving titles.
@@ -166,8 +166,8 @@
                     </li>
                   </ul>
                 </div>
-                <div class="profile-callout-preferences" style="padding-right: 8px; padding-left: 8px;">
-                  <div class="profile-callout-preferences-header" style="padding-right: 8px; padding-left: 8px;">
+                <div class="profile-callout-preferences">
+                  <div class="profile-callout-preferences-header">
                     <span class="profile-callout-label">Saved genres</span>
                     <p id="profileCalloutGenreEmpty" class="profile-callout-meta">
                       Select genres from discovery to see them here.
@@ -176,8 +176,8 @@
                   <ul id="profileCalloutGenreChips" class="profile-callout-genre-list" hidden></ul>
                 </div>
               </div>
-              <div class="profile-callout-actions" style="padding-right: 8px; padding-left: 8px;">
-                <div class="profile-callout-quick-links" role="group" aria-label="Profile quick actions" style="padding-right: 8px; padding-left: 8px;">
+              <div class="profile-callout-actions">
+                <div class="profile-callout-quick-links" role="group" aria-label="Profile quick actions">
                   <button type="button" class="profile-callout-quick-link" data-profile-action="favorites">
                     <span aria-hidden="true">⭐</span>
                     Jump to favorites
@@ -200,11 +200,11 @@
             <div
               class="profile-callout-column profile-callout-column--secondary profile-callout-snapshots"
               aria-live="polite"
-             style="padding-right: 8px; padding-left: 8px;">
-              <section class="profile-callout-snapshot" style="padding-right: 8px; padding-left: 8px;">
+            >
+              <section class="profile-callout-snapshot">
                 <header class="profile-callout-snapshot-header">
                   <span class="profile-callout-snapshot-icon" aria-hidden="true">⭐</span>
-                  <div class="profile-callout-snapshot-text-group" style="padding-right: 8px; padding-left: 8px;">
+                  <div class="profile-callout-snapshot-text-group">
                     <span class="profile-callout-snapshot-title">Latest favorites</span>
                     <span id="profileCalloutFavoritesSubtitle" class="profile-callout-snapshot-subtitle">
                       Save favorites to surface them here.
@@ -225,10 +225,10 @@
                   Show all favorites
                 </button>
               </section>
-              <section class="profile-callout-snapshot" style="padding-right: 8px; padding-left: 8px;">
+              <section class="profile-callout-snapshot">
                 <header class="profile-callout-snapshot-header">
                   <span class="profile-callout-snapshot-icon" aria-hidden="true">🎟️</span>
-                  <div class="profile-callout-snapshot-text-group" style="padding-right: 8px; padding-left: 8px;">
+                  <div class="profile-callout-snapshot-text-group">
                     <span class="profile-callout-snapshot-title">Recently watched</span>
                     <span id="profileCalloutWatchedSubtitle" class="profile-callout-snapshot-subtitle">
                       Log watched titles to see recent activity.
@@ -250,7 +250,7 @@
                 </button>
               </section>
             </div>
-            <div class="profile-callout-footnotes" style="padding-right: 8px; padding-left: 8px;">
+            <div class="profile-callout-footnotes">
               <span class="profile-callout-footnote">
                 <span class="profile-callout-footnote-icon" aria-hidden="true">⚡</span>
                 Sync insights refresh automatically when you’re signed in.
@@ -265,38 +265,38 @@
         </article>
       </div>
     </section>
-    <section class="panel social-panel" id="socialConnectionsSection" style="padding-right: 8px; padding-left: 8px;">
-      <div class="panel-inner" style="padding-right: 8px; padding-left: 8px;">
-        <div class="panel-header" style="padding-right: 8px; padding-left: 8px;">
-          <div style="padding-right: 8px; padding-left: 8px;">
-            <div class="panel-title" style="padding-right: 8px; padding-left: 8px;">Social circle</div>
-            <div class="panel-subtitle" style="padding-right: 8px; padding-left: 8px;">Follow friends to spotlight their reviews in discovery.</div>
+    <section class="panel social-panel" id="socialConnectionsSection">
+      <div class="panel-inner">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Social circle</div>
+            <div class="panel-subtitle">Follow friends to spotlight their reviews in discovery.</div>
           </div>
         </div>
-        <div id="socialConnectionsSignedOut" class="social-signed-out" style="padding-right: 8px; padding-left: 8px;">
+        <div id="socialConnectionsSignedOut" class="social-signed-out">
           <h3>Sign in to follow friends</h3>
           <p>Log in to follow reviewers you trust and see their notes highlighted in recommendations.</p>
           <a class="btn-primary" href="login.html">Log in / Sign up</a>
         </div>
-        <div id="socialConnectionsContent" class="social-content" hidden aria-hidden="true" style="padding-right: 8px; padding-left: 8px;">
-          <div class="social-overview-stats" aria-live="polite" style="padding-right: 8px; padding-left: 8px;">
-            <div class="social-stat" style="padding-right: 8px; padding-left: 8px;">
+        <div id="socialConnectionsContent" class="social-content" hidden aria-hidden="true">
+          <div class="social-overview-stats" aria-live="polite">
+            <div class="social-stat">
               <span class="social-stat-label">Followers</span>
               <span id="followersCount" class="social-stat-value">0</span>
             </div>
-            <div class="social-stat" style="padding-right: 8px; padding-left: 8px;">
+            <div class="social-stat">
               <span class="social-stat-label">Following</span>
               <span id="followingCount" class="social-stat-value">0</span>
             </div>
-            <div class="social-stat" style="padding-right: 8px; padding-left: 8px;">
+            <div class="social-stat">
               <span class="social-stat-label">Mutual followers</span>
               <span id="mutualFollowersCount" class="social-stat-value">0</span>
             </div>
           </div>
 
-          <section class="social-highlights" id="socialHighlights" aria-label="Social highlights" aria-live="polite" style="padding-right: 8px; padding-left: 8px;">
+          <section class="social-highlights" id="socialHighlights" aria-label="Social highlights" aria-live="polite">
             <article class="social-highlight" id="socialHighlightActive" data-state="empty">
-              <div class="social-highlight-top" style="padding-right: 8px; padding-left: 8px;">
+              <div class="social-highlight-top">
                 <span class="social-highlight-label">
                   <span class="social-highlight-icon" aria-hidden="true">🟢</span>
                   Active now
@@ -306,7 +306,7 @@
               <p id="socialHighlightActiveNote" class="social-highlight-note">No friends online right now.</p>
             </article>
             <article class="social-highlight" id="socialHighlightInvites" data-state="empty">
-              <div class="social-highlight-top" style="padding-right: 8px; padding-left: 8px;">
+              <div class="social-highlight-top">
                 <span class="social-highlight-label">
                   <span class="social-highlight-icon" aria-hidden="true">📬</span>
                   Pending invites
@@ -316,7 +316,7 @@
               <p id="socialHighlightInvitesNote" class="social-highlight-note">You’re all caught up on invites.</p>
             </article>
             <article class="social-highlight" id="socialHighlightSuggestions" data-state="empty">
-              <div class="social-highlight-top" style="padding-right: 8px; padding-left: 8px;">
+              <div class="social-highlight-top">
                 <span class="social-highlight-label">
                   <span class="social-highlight-icon" aria-hidden="true">✨</span>
                   New suggestions
@@ -327,29 +327,29 @@
             </article>
           </section>
 
-          <div class="social-extras-grid" style="padding-right: 8px; padding-left: 8px;">
-            <section class="social-badges-block" style="padding-right: 8px; padding-left: 8px;">
+          <div class="social-extras-grid">
+            <section class="social-badges-block">
               <header class="social-section-header">
                 <h3>Recognition badges</h3>
                 <p>Celebrate how you contribute to the community.</p>
               </header>
-              <div id="socialBadgeList" class="social-badge-list" hidden style="padding-right: 8px; padding-left: 8px;"></div>
-              <div id="socialBadgeEmpty" class="empty-state empty-state--subtle" style="padding-right: 8px; padding-left: 8px;">
+              <div id="socialBadgeList" class="social-badge-list" hidden></div>
+              <div id="socialBadgeEmpty" class="empty-state empty-state--subtle">
                 Earn badges by sharing thoughtful reviews and hosting watch parties.
               </div>
             </section>
-            <section class="social-presence-block" style="padding-right: 8px; padding-left: 8px;">
+            <section class="social-presence-block">
               <header class="social-section-header">
                 <h3>Friends online</h3>
                 <p>See who’s around for a movie night.</p>
               </header>
-              <div id="socialPresenceList" class="social-presence-list" style="padding-right: 8px; padding-left: 8px;"></div>
-              <div id="socialStatusPresets" class="social-status-presets" data-state="signin" style="padding-right: 8px; padding-left: 8px;">
-                <div class="social-status-header" style="padding-right: 8px; padding-left: 8px;">
+              <div id="socialPresenceList" class="social-presence-list"></div>
+              <div id="socialStatusPresets" class="social-status-presets" data-state="signin">
+                <div class="social-status-header">
                   <h4 class="social-status-title">Set your vibe</h4>
                   <p class="social-status-subtitle">Pick a quick status so friends know when to reach out.</p>
                 </div>
-                <div id="socialStatusPresetList" class="social-status-list" role="group" aria-label="Status presets" style="padding-right: 8px; padding-left: 8px;"></div>
+                <div id="socialStatusPresetList" class="social-status-list" role="group" aria-label="Status presets"></div>
                 <p
                   id="socialStatusFeedback"
                   class="social-status-feedback"
@@ -362,9 +362,9 @@
           </div>
 
           <form id="socialFollowForm" class="social-follow-form" novalidate>
-            <div class="field-grid" style="padding-right: 8px; padding-left: 8px;">
+            <div class="field-grid">
               <label class="field-label" for="socialFollowUsername">Follow by username</label>
-              <div class="social-follow-input-row" style="padding-right: 8px; padding-left: 8px;">
+              <div class="social-follow-input-row">
                 <input
                   id="socialFollowUsername"
                   class="input-base input-text"
@@ -378,7 +378,7 @@
                 <button type="submit" id="socialFollowSubmit" class="btn-secondary">Follow</button>
               </div>
             </div>
-            <div class="social-follow-note" style="padding-right: 8px; padding-left: 8px;">
+            <div class="social-follow-note">
               <label class="sr-only" for="socialFollowNote">Personal note</label>
               <textarea
                 id="socialFollowNote"
@@ -387,7 +387,7 @@
                 maxlength="180"
                 placeholder="Add a friendly note (optional)"
               ></textarea>
-              <div class="social-follow-note-actions" style="padding-right: 8px; padding-left: 8px;">
+              <div class="social-follow-note-actions">
                 <button type="button" id="socialFollowNoteTemplate" class="btn-subtle">
                   Use friendly template
                 </button>
@@ -396,27 +396,27 @@
                 </p>
               </div>
             </div>
-          <div id="socialFollowStatus" class="community-status" role="status" aria-live="polite" style="padding-right: 8px; padding-left: 8px;"></div>
-          <div class="social-follow-assist" style="padding-right: 8px; padding-left: 8px;">
+          <div id="socialFollowStatus" class="community-status" role="status" aria-live="polite"></div>
+          <div class="social-follow-assist">
             <section
               id="socialFollowSearchPanel"
               class="social-follow-search"
               hidden
               data-state="idle"
               aria-live="polite"
-             style="padding-right: 8px; padding-left: 8px;">
+            >
               <p id="socialFollowSearchStatus" class="social-follow-search-status"></p>
               <ul id="socialFollowSearchList" class="social-follow-search-list" role="listbox"></ul>
               <p id="socialFollowSearchEmpty" class="social-follow-search-empty">
                 Start typing to find friends by name or handle.
               </p>
             </section>
-            <section class="social-invite-card" style="padding-right: 8px; padding-left: 8px;">
+            <section class="social-invite-card">
               <span class="social-invite-title">Share your profile</span>
               <p class="social-invite-text">
                 Copy your link so friends can follow you instantly.
               </p>
-              <div class="social-invite-link-row" style="padding-right: 8px; padding-left: 8px;">
+              <div class="social-invite-link-row">
                 <input
                   id="socialInviteLink"
                   class="input-base social-invite-link"
@@ -429,7 +429,7 @@
                   Copy link
                 </button>
               </div>
-              <div class="social-invite-qr" aria-live="polite" style="padding-right: 8px; padding-left: 8px;">
+              <div class="social-invite-qr" aria-live="polite">
                 <img
                   id="socialInviteQrImage"
                   class="social-invite-qr-image"
@@ -446,15 +446,15 @@
                 class="community-status social-invite-status"
                 role="status"
                 aria-live="polite"
-               style="padding-right: 8px; padding-left: 8px;"></div>
+              ></div>
               <div
                 id="socialInviteStatus"
                 class="community-status social-invite-status"
                 role="status"
                 aria-live="polite"
-               style="padding-right: 8px; padding-left: 8px;"></div>
+              ></div>
             </section>
-            <section class="social-import-card" style="padding-right: 8px; padding-left: 8px;">
+            <section class="social-import-card">
               <span class="social-import-title">Invite from contacts</span>
               <p class="social-import-text">
                 Upload a CSV with a <strong>handle</strong> column (or usernames separated by commas) and we’ll
@@ -464,7 +464,7 @@
                 <input type="checkbox" id="socialInviteImportConsent" />
                 <span>I have permission to invite these friends.</span>
               </label>
-              <div class="social-import-actions" style="padding-right: 8px; padding-left: 8px;">
+              <div class="social-import-actions">
                 <input type="file" id="socialInviteImportFile" accept=".csv,text/csv" />
                 <button type="button" id="socialInviteImportBtn" class="btn-subtle" disabled>
                   Process CSV
@@ -475,21 +475,21 @@
                 class="community-status social-import-status"
                 role="status"
                 aria-live="polite"
-               style="padding-right: 8px; padding-left: 8px;"></div>
+              ></div>
             </section>
           </div>
         </form>
 
-        <section class="social-collab" style="padding-right: 8px; padding-left: 8px;">
+        <section class="social-collab">
           <header class="social-section-header">
             <h3>Collaborative lists &amp; watch parties</h3>
             <p>Build shared collections and plan nights in with friends.</p>
           </header>
-          <div id="socialCollabStatus" class="community-status" role="status" aria-live="polite" style="padding-right: 8px; padding-left: 8px;"></div>
-          <div id="socialCollabSummary" class="social-collab-summary" style="padding-right: 8px; padding-left: 8px;"></div>
-          <div class="social-collab-actions" style="padding-right: 8px; padding-left: 8px;">
+          <div id="socialCollabStatus" class="community-status" role="status" aria-live="polite"></div>
+          <div id="socialCollabSummary" class="social-collab-summary"></div>
+          <div class="social-collab-actions">
             <form id="collabCreateForm" class="collab-form" novalidate>
-              <div class="field-grid" style="padding-right: 8px; padding-left: 8px;">
+              <div class="field-grid">
                 <label class="field-label" for="collabListName">Create a new collaborative list</label>
                 <input
                   id="collabListName"
@@ -500,11 +500,11 @@
                   required
                 />
               </div>
-              <div class="field-grid" style="padding-right: 8px; padding-left: 8px;">
+              <div class="field-grid">
                 <label class="field-label" for="collabListDescription">Description (optional)</label>
                 <textarea id="collabListDescription" class="input-base collab-textarea" rows="2" maxlength="200"></textarea>
               </div>
-              <div class="collab-form-footer" style="padding-right: 8px; padding-left: 8px;">
+              <div class="collab-form-footer">
                 <label class="field-label" for="collabListVisibility">Visibility</label>
                 <select id="collabListVisibility" class="input-base input-select">
                   <option value="friends" selected>Friends can view</option>
@@ -514,7 +514,7 @@
               </div>
             </form>
             <form id="watchPartyForm" class="collab-form" novalidate>
-              <div class="field-grid" style="padding-right: 8px; padding-left: 8px;">
+              <div class="field-grid">
                 <label class="field-label" for="watchPartyTitle">Schedule a watch party</label>
                 <input
                   id="watchPartyTitle"
@@ -524,21 +524,21 @@
                   required
                 />
               </div>
-              <div class="collab-form-grid" style="padding-right: 8px; padding-left: 8px;">
-                <div style="padding-right: 8px; padding-left: 8px;">
+              <div class="collab-form-grid">
+                <div>
                   <label class="field-label" for="watchPartyTmdbId">TMDB ID</label>
                   <input id="watchPartyTmdbId" class="input-base input-text" type="text" placeholder="e.g. 603" />
                 </div>
-                <div style="padding-right: 8px; padding-left: 8px;">
+                <div>
                   <label class="field-label" for="watchPartyImdbId">IMDb ID</label>
                   <input id="watchPartyImdbId" class="input-base input-text" type="text" placeholder="Optional" />
                 </div>
-                <div style="padding-right: 8px; padding-left: 8px;">
+                <div>
                   <label class="field-label" for="watchPartyDatetime">When</label>
                   <input id="watchPartyDatetime" class="input-base input-text" type="datetime-local" required />
                 </div>
               </div>
-              <div class="field-grid" style="padding-right: 8px; padding-left: 8px;">
+              <div class="field-grid">
                 <label class="field-label" for="watchPartyInvitees">Invite handles</label>
                 <input
                   id="watchPartyInvitees"
@@ -547,83 +547,83 @@
                   placeholder="Comma-separated usernames"
                 />
               </div>
-              <div class="field-grid" style="padding-right: 8px; padding-left: 8px;">
+              <div class="field-grid">
                 <label class="field-label" for="watchPartyNote">Personal note (optional)</label>
                 <textarea id="watchPartyNote" class="input-base collab-textarea" rows="2" maxlength="200"></textarea>
               </div>
-              <div class="collab-form-footer collab-form-footer--actions" style="padding-right: 8px; padding-left: 8px;">
+              <div class="collab-form-footer collab-form-footer--actions">
                 <button type="submit" class="btn-secondary">Schedule party</button>
                 <button type="button" id="collabRefreshBtn" class="btn-subtle">Refresh status</button>
               </div>
             </form>
           </div>
-          <div class="social-collab-grid" style="padding-right: 8px; padding-left: 8px;">
-            <section class="social-collab-column" style="padding-right: 8px; padding-left: 8px;">
+          <div class="social-collab-grid">
+            <section class="social-collab-column">
               <header class="social-section-header">
                 <h4>Your collaborative lists</h4>
                 <p>Lists you own and manage.</p>
               </header>
-              <div id="collabOwnedEmpty" class="empty-state empty-state--subtle" style="padding-right: 8px; padding-left: 8px;">
+              <div id="collabOwnedEmpty" class="empty-state empty-state--subtle">
                 Start a collaborative list to plan watch nights together.
               </div>
-              <div id="collabOwnedList" class="collab-list-container" hidden style="padding-right: 8px; padding-left: 8px;"></div>
+              <div id="collabOwnedList" class="collab-list-container" hidden></div>
             </section>
-            <section class="social-collab-column" style="padding-right: 8px; padding-left: 8px;">
+            <section class="social-collab-column">
               <header class="social-section-header">
                 <h4>Shared with you</h4>
                 <p>Lists where you’re a collaborator.</p>
               </header>
-              <div id="collabSharedEmpty" class="empty-state empty-state--subtle" style="padding-right: 8px; padding-left: 8px;">
+              <div id="collabSharedEmpty" class="empty-state empty-state--subtle">
                 Accept an invite to begin editing together.
               </div>
-              <div id="collabSharedList" class="collab-list-container" hidden style="padding-right: 8px; padding-left: 8px;"></div>
+              <div id="collabSharedList" class="collab-list-container" hidden></div>
             </section>
-            <section class="social-collab-column" style="padding-right: 8px; padding-left: 8px;">
+            <section class="social-collab-column">
               <header class="social-section-header">
                 <h4>Invites waiting</h4>
                 <p>Approve or decline collaboration invites.</p>
               </header>
-              <div id="collabInviteEmpty" class="empty-state empty-state--subtle" style="padding-right: 8px; padding-left: 8px;">No new invites yet.</div>
-              <div id="collabInviteList" class="collab-list-container" hidden style="padding-right: 8px; padding-left: 8px;"></div>
+              <div id="collabInviteEmpty" class="empty-state empty-state--subtle">No new invites yet.</div>
+              <div id="collabInviteList" class="collab-list-container" hidden></div>
             </section>
           </div>
-          <div class="social-watch-grid" style="padding-right: 8px; padding-left: 8px;">
-            <section class="social-collab-column" style="padding-right: 8px; padding-left: 8px;">
+          <div class="social-watch-grid">
+            <section class="social-collab-column">
               <header class="social-section-header">
                 <h4>Upcoming watch parties</h4>
                 <p>Stay in the loop on shared movie nights.</p>
               </header>
-              <div id="watchPartyEmpty" class="empty-state empty-state--subtle" style="padding-right: 8px; padding-left: 8px;">
+              <div id="watchPartyEmpty" class="empty-state empty-state--subtle">
                 Schedule a watch party to see it here.
               </div>
-              <div id="watchPartyList" class="watch-party-container" hidden style="padding-right: 8px; padding-left: 8px;"></div>
+              <div id="watchPartyList" class="watch-party-container" hidden></div>
             </section>
-            <section class="social-collab-column" style="padding-right: 8px; padding-left: 8px;">
+            <section class="social-collab-column">
               <header class="social-section-header">
                 <h4>Party invites</h4>
                 <p>Respond so hosts can plan.</p>
               </header>
-              <div id="watchPartyInviteEmpty" class="empty-state empty-state--subtle" style="padding-right: 8px; padding-left: 8px;">
+              <div id="watchPartyInviteEmpty" class="empty-state empty-state--subtle">
                 No pending watch-party invitations.
               </div>
-              <div id="watchPartyInviteList" class="watch-party-container" hidden style="padding-right: 8px; padding-left: 8px;"></div>
+              <div id="watchPartyInviteList" class="watch-party-container" hidden></div>
             </section>
           </div>
         </section>
 
-        <section class="social-mutuals" style="padding-right: 8px; padding-left: 8px;">
+        <section class="social-mutuals">
           <header class="social-section-header">
             <h3>Mutual followers</h3>
             <p>People you follow who follow you back.</p>
           </header>
-          <div id="socialMutualList" class="social-chip-list" hidden style="padding-right: 8px; padding-left: 8px;"></div>
-          <div id="socialMutualEmpty" class="empty-state empty-state--subtle" style="padding-right: 8px; padding-left: 8px;">
+          <div id="socialMutualList" class="social-chip-list" hidden></div>
+          <div id="socialMutualEmpty" class="empty-state empty-state--subtle">
             Follow and follow back to build your circle.
           </div>
         </section>
 
-          <div class="social-lists-grid" style="padding-right: 8px; padding-left: 8px;">
-            <section class="social-list-block" style="padding-right: 8px; padding-left: 8px;">
+          <div class="social-lists-grid">
+            <section class="social-list-block">
               <header class="social-section-header">
                 <h3>
                   Following
@@ -631,12 +631,12 @@
                 </h3>
                 <p>People you’ll see highlighted in recommendations.</p>
               </header>
-              <div id="socialFollowingEmpty" class="empty-state" style="padding-right: 8px; padding-left: 8px;">
+              <div id="socialFollowingEmpty" class="empty-state">
                 You’re not following anyone yet. Follow a friend to highlight their community notes.
               </div>
-              <div id="socialFollowingList" class="social-following-list" hidden style="padding-right: 8px; padding-left: 8px;"></div>
+              <div id="socialFollowingList" class="social-following-list" hidden></div>
             </section>
-            <section class="social-list-block" style="padding-right: 8px; padding-left: 8px;">
+            <section class="social-list-block">
               <header class="social-section-header">
                 <h3>
                   Followers
@@ -644,35 +644,35 @@
                 </h3>
                 <p>These members see your reviews in their feed.</p>
               </header>
-              <div id="socialFollowersEmpty" class="empty-state" style="padding-right: 8px; padding-left: 8px;">
+              <div id="socialFollowersEmpty" class="empty-state">
                 No followers yet. Share your profile to invite friends.
               </div>
-              <div id="socialFollowersList" class="social-following-list" hidden style="padding-right: 8px; padding-left: 8px;"></div>
+              <div id="socialFollowersList" class="social-following-list" hidden></div>
             </section>
           </div>
 
-          <section class="social-suggestions" style="padding-right: 8px; padding-left: 8px;">
+          <section class="social-suggestions">
             <header class="social-section-header">
               <h3>People you may know</h3>
               <p>Follow recommendations based on mutual followers, interests, and favorites.</p>
             </header>
-            <div id="socialSuggestionsEmpty" class="empty-state empty-state--subtle" style="padding-right: 8px; padding-left: 8px;">
+            <div id="socialSuggestionsEmpty" class="empty-state empty-state--subtle">
               We’ll suggest critics and friends as your circle grows.
             </div>
-            <div id="socialSuggestionsList" class="social-suggestions-list" hidden style="padding-right: 8px; padding-left: 8px;"></div>
+            <div id="socialSuggestionsList" class="social-suggestions-list" hidden></div>
           </section>
         </div>
       </div>
     </section>
 
-    <section class="panel collections-panel profile-collections-panel" style="padding-right: 8px; padding-left: 8px;">
-      <div class="panel-inner" style="padding-right: 8px; padding-left: 8px;">
-        <div class="panel-header collections-header" style="padding-right: 8px; padding-left: 8px;">
-          <div style="padding-right: 8px; padding-left: 8px;">
-            <div class="panel-title" style="padding-right: 8px; padding-left: 8px;">Your saved lists</div>
-            <div class="panel-subtitle" style="padding-right: 8px; padding-left: 8px;">Favorites and watched titles stay in sync wherever you sign in.</div>
+    <section class="panel collections-panel profile-collections-panel">
+      <div class="panel-inner">
+        <div class="panel-header collections-header">
+          <div>
+            <div class="panel-title">Your saved lists</div>
+            <div class="panel-subtitle">Favorites and watched titles stay in sync wherever you sign in.</div>
           </div>
-          <div class="collection-tabs" role="tablist" style="padding-right: 8px; padding-left: 8px;">
+          <div class="collection-tabs" role="tablist">
             <button
               type="button"
               class="collection-tab active"
@@ -697,20 +697,20 @@
             </button>
           </div>
         </div>
-        <div class="collection-summary" id="favoritesSummary" style="padding-right: 8px; padding-left: 8px;"></div>
-        <div class="collection-summary" id="watchedSummary" style="padding-right: 8px; padding-left: 8px;"></div>
-        <div id="favoritesView" class="collection-view active" role="tabpanel" aria-labelledby="favoritesTab" style="padding-right: 8px; padding-left: 8px;">
-          <div id="favoritesList" class="favorites-list" style="padding-right: 8px; padding-left: 8px;"></div>
-          <div id="favoritesEmpty" class="empty-state" style="padding-right: 8px; padding-left: 8px;">
+        <div class="collection-summary" id="favoritesSummary"></div>
+        <div class="collection-summary" id="watchedSummary"></div>
+        <div id="favoritesView" class="collection-view active" role="tabpanel" aria-labelledby="favoritesTab">
+          <div id="favoritesList" class="favorites-list"></div>
+          <div id="favoritesEmpty" class="empty-state">
             Save favorites from the discovery page to keep them handy here.
           </div>
         </div>
-        <div id="watchedView" class="collection-view" role="tabpanel" aria-labelledby="watchedTab" style="padding-right: 8px; padding-left: 8px;">
-          <div id="watchedList" class="watched-panel-list" style="padding-right: 8px; padding-left: 8px;"></div>
-          <div id="watchedEmpty" class="empty-state" style="padding-right: 8px; padding-left: 8px;">
+        <div id="watchedView" class="collection-view" role="tabpanel" aria-labelledby="watchedTab">
+          <div id="watchedList" class="watched-panel-list"></div>
+          <div id="watchedEmpty" class="empty-state">
             Mark recommendations as <strong>“I’ve watched this”</strong> to log them for future tuning.
           </div>
-          <div class="collection-actions" style="padding-right: 8px; padding-left: 8px;">
+          <div class="collection-actions">
             <button type="button" class="btn-subtle btn-subtle-danger" id="clearWatchedBtn">
               <span>Clear history</span>
               <span aria-hidden="true">🧹</span>
@@ -723,20 +723,20 @@
   </main>
 </div>
 
-<div id="globalToastRegion" class="global-toast-region" role="status" aria-live="polite" style="padding-right: 8px; padding-left: 8px;"></div>
+<div id="globalToastRegion" class="global-toast-region" role="status" aria-live="polite"></div>
 
 <div
   id="socialProfileOverlay"
   class="modal-overlay"
   hidden
   aria-hidden="true"
- style="padding-right: 8px; padding-left: 8px;">
+>
   <div
     class="modal social-profile-modal"
     role="dialog"
     aria-modal="true"
     aria-labelledby="socialProfileTitle"
-   style="padding-right: 8px; padding-left: 8px;">
+  >
     <button
       type="button"
       class="modal-close"
@@ -749,8 +749,8 @@
       <h2 id="socialProfileTitle" class="modal-title">Profile preview</h2>
       <p id="socialProfileSubtitle" class="modal-subtitle"></p>
     </header>
-    <div id="socialProfileStatus" class="modal-status" role="status" aria-live="polite" style="padding-right: 8px; padding-left: 8px;"></div>
-    <div id="socialProfileBody" class="modal-section social-profile-body" style="padding-right: 8px; padding-left: 8px;"></div>
+    <div id="socialProfileStatus" class="modal-status" role="status" aria-live="polite"></div>
+    <div id="socialProfileBody" class="modal-section social-profile-body"></div>
   </div>
 </div>
 
