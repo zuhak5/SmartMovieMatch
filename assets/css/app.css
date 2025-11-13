@@ -139,20 +139,11 @@ body {
 body {
   position: relative;
   min-height: 100vh;
-  background-image: var(--bg-gradient);
-  background-attachment: fixed;
   background-color: var(--bg-base);
   overflow-x: hidden;
   transition:
     background-color var(--transition-theme),
-    background-image 420ms ease,
     color var(--transition-fast);
-}
-
-@media (max-width: 768px) {
-  body {
-    background-attachment: scroll;
-  }
 }
 
 body::before,
@@ -162,34 +153,43 @@ body::after {
   inset: 0;
   pointer-events: none;
   z-index: -2;
+  transform: translateZ(0);
+  will-change: opacity;
   transition: opacity var(--transition-slow);
 }
 
 body::before {
-  background: var(--bg-noise);
+  z-index: -4;
+  background-image:
+    var(--bg-gradient),
+    radial-gradient(circle at 12% 14%, rgba(16, 185, 129, 0.18), transparent 40%),
+    radial-gradient(circle at 90% 18%, rgba(129, 140, 248, 0.18), transparent 52%),
+    radial-gradient(circle at 36% 82%, rgba(56, 189, 248, 0.12), transparent 55%),
+    radial-gradient(circle at 72% 72%, rgba(244, 114, 182, 0.08), transparent 60%);
+  background-repeat: no-repeat;
+  background-size: cover, auto, auto, auto, auto;
+  background-position: center, 12% 14%, 90% 18%, 36% 82%, 72% 72%;
+}
+
+body::after {
+  z-index: -3;
+  background-image: var(--bg-noise);
+  background-repeat: repeat;
   opacity: 0.4;
   mix-blend-mode: screen;
 }
 
-body::after {
-  background: radial-gradient(circle at 12% 14%, rgba(16, 185, 129, 0.18), transparent 40%),
-    radial-gradient(circle at 90% 18%, rgba(129, 140, 248, 0.18), transparent 52%),
-    radial-gradient(circle at 36% 82%, rgba(56, 189, 248, 0.12), transparent 55%),
-    radial-gradient(circle at 72% 72%, rgba(244, 114, 182, 0.08), transparent 60%);
-  opacity: 0.9;
-  z-index: -3;
-}
-
 body[data-theme="light"]::before {
-  opacity: 0.18;
-}
-
-body[data-theme="light"]::after {
-  background: radial-gradient(circle at 14% 12%, rgba(14, 165, 233, 0.28), transparent 48%),
+  background-image:
+    var(--bg-gradient),
+    radial-gradient(circle at 14% 12%, rgba(14, 165, 233, 0.28), transparent 48%),
     radial-gradient(circle at 86% 8%, rgba(168, 85, 247, 0.22), transparent 52%),
     radial-gradient(circle at 34% 82%, rgba(45, 212, 191, 0.2), transparent 55%),
     radial-gradient(circle at 72% 74%, rgba(251, 191, 36, 0.18), transparent 60%);
-  opacity: 0.65;
+}
+
+body[data-theme="light"]::after {
+  opacity: 0.18;
 }
 
 @media (prefers-reduced-motion: reduce) {
