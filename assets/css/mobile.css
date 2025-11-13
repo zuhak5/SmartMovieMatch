@@ -21,6 +21,8 @@
     max-width: 420px;
     padding: 1.15rem 1rem 1.5rem;
     gap: 1rem;
+    padding-left: 7.5px;
+    padding-right: 7.5px;
   }
 
   .app::before {

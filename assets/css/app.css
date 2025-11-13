@@ -297,27 +297,21 @@ h6 {
 
 @supports (padding: max(0px)) {
   .app {
-    padding-left: max(var(--layout-gutter), env(safe-area-inset-left) + 1rem);
-    padding-right: max(var(--layout-gutter), env(safe-area-inset-right) + 1rem);
+    padding-left: 7.5px;
+    padding-right: 7.5px;
   }
 
   @media (max-width: 720px) {
     .app {
-      padding-left: max(
-        var(--layout-gutter-compact),
-        env(safe-area-inset-left) + 0.85rem
-      );
-      padding-right: max(
-        var(--layout-gutter-compact),
-        env(safe-area-inset-right) + 0.85rem
-      );
+      padding-left: 7.5px;
+      padding-right: 7.5px;
     }
   }
 
   @media (max-width: 480px) {
     .app {
-      padding-left: max(0.85rem, env(safe-area-inset-left) + 0.75rem);
-      padding-right: max(0.85rem, env(safe-area-inset-right) + 0.75rem);
+      padding-left: 7.5px;
+      padding-right: 7.5px;
     }
   }
 }
@@ -732,7 +726,7 @@ body[data-theme="light"] .account-link:hover {
   gap: 0.6rem;
   max-height: 360px;
   overflow-y: auto;
-  padding-right: 0.25rem;
+  padding-right: 7.5px;
 }
 
 .notification-item {
@@ -7679,7 +7673,7 @@ body.auth-body {
 
     .auth-aside-list {
       margin: 0;
-      padding-left: 1.1rem;
+      padding-left: 7.5px;
       font-size: 0.85rem;
       color: rgba(203, 213, 225, 0.78);
       display: flex;
