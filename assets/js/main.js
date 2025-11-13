@@ -57,6 +57,7 @@ import { $ } from "./dom.js";
 import { playUiClick, playExpandSound } from "./sound.js";
 import {
   createProfileButton,
+  createInlineProfileLink,
   subscribeToProfileOpens,
   canonicalHandle
 } from "./profile-overlay.js";
@@ -6582,7 +6583,34 @@ function renderNotificationCenter(payload = {}) {
 
       const message = document.createElement("div");
       message.className = "notification-item-message";
-      message.textContent = note.message || "Activity update.";
+      const rawMessage = typeof note.message === "string" ? note.message.trim() : "";
+      const messageText = rawMessage || "Activity update.";
+      const actorHandle = typeof note.actor === "string" ? note.actor.trim() : "";
+      if (actorHandle) {
+        const actorLabel = formatSocialDisplayName(actorHandle) || `@${actorHandle}`;
+        const actorLink = createInlineProfileLink(actorHandle, {
+          label: actorLabel,
+          className: "notification-actor-link"
+        });
+        if (actorLink) {
+          message.appendChild(actorLink);
+          const normalizedMessage = messageText;
+          const startsWithActor = normalizedMessage.toLowerCase().startsWith(actorHandle.toLowerCase());
+          const remainder = startsWithActor
+            ? normalizedMessage.slice(actorHandle.length)
+            : normalizedMessage;
+          if (remainder) {
+            const needsSpace = !startsWithActor && !remainder.startsWith(" ");
+            message.appendChild(
+              document.createTextNode(needsSpace ? ` ${remainder}` : remainder)
+            );
+          }
+        } else {
+          message.textContent = messageText;
+        }
+      } else {
+        message.textContent = messageText;
+      }
 
       const meta = document.createElement("div");
       meta.className = "notification-item-meta";
