@@ -195,6 +195,18 @@
     width: 100%;
   }
 
+  .social-persona-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .social-taste-score {
+    font-size: 1.6rem;
+  }
+
+  .social-story-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .social-follow-input-row,
   .social-invite-link-row,
   .social-import-actions,
@@ -386,5 +398,34 @@
   footer,
   .app > *:last-child {
     margin-bottom: 0;
+  }
+  .social-nudge-card {
+    padding: 1.25rem;
+  }
+
+  .social-nudge-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .friends-activity-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .friends-activity-card {
+    padding: 1rem;
+  }
+
+  .friends-activity-row {
+    padding: 0.55rem 0.65rem;
+  }
+
+  .friends-activity-meta {
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .friends-activity-signedout {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

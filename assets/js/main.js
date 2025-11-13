@@ -155,6 +155,7 @@ let socialProfileRequestId = 0;
 let socialProfileReturnFocus = null;
 let socialProfileInitialized = false;
 let socialProfilePageLoaded = false;
+let socialFirstRunCtaWired = false;
 
 const GENRE_ICON_MAP = {
   "28": "💥", // Action
@@ -3691,9 +3692,67 @@ function setSyncStatus(message, variant = "muted") {
   }
 }
 
+function wireSocialFirstRunCta() {
+  if (socialFirstRunCtaWired) {
+    return;
+  }
+  const button = $("socialFirstRunCta");
+  if (!button) {
+    return;
+  }
+  socialFirstRunCtaWired = true;
+  button.addEventListener("click", () => {
+    playUiClick();
+    if (state.session && state.session.token) {
+      window.location.href = "profile.html#socialConnectionsSection";
+    } else {
+      window.location.href = "login.html";
+    }
+  });
+}
+
+function updateSocialFirstRunCard(counts = {}) {
+  const panel = $("socialFirstRunPanel");
+  const card = $("socialFirstRunCard");
+  if (!panel || !card) {
+    return;
+  }
+  const followingValue = Number.isFinite(counts.following) ? counts.following : 0;
+  const followersValue = Number.isFinite(counts.followers) ? counts.followers : 0;
+  const mutualValue = Number.isFinite(counts.mutual) ? counts.mutual : 0;
+  const totalConnections = followingValue + followersValue + mutualValue;
+  const shouldShow = totalConnections === 0;
+  panel.hidden = !shouldShow;
+  panel.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+  if (!shouldShow) {
+    return;
+  }
+  const messageEl = $("socialFirstRunMessage");
+  const followingEl = $("socialNudgeFollowing");
+  const followersEl = $("socialNudgeFollowers");
+  const mutualEl = $("socialNudgeMutual");
+  const hasSession = Boolean(state.session && state.session.token);
+  if (messageEl) {
+    messageEl.textContent = hasSession
+      ? "Follow friends to see which picks they loved (or hated)."
+      : "Sign in and follow friends to see which picks they loved (or hated).";
+  }
+  if (followingEl) {
+    followingEl.textContent = followingValue.toLocaleString();
+  }
+  if (followersEl) {
+    followersEl.textContent = followersValue.toLocaleString();
+  }
+  if (mutualEl) {
+    mutualEl.textContent = mutualValue.toLocaleString();
+  }
+  wireSocialFirstRunCta();
+}
+
 function setupSocialFeatures() {
   initSocialFeatures();
   initSocialProfileOverlay();
+  wireSocialFirstRunCta();
   if (!unsubscribeProfileOpen) {
     unsubscribeProfileOpen = subscribeToProfileOpens((username) => {
       openSocialProfile(username);
@@ -3733,6 +3792,7 @@ function setupSocialFeatures() {
   unsubscribeNotifications = subscribeToNotifications((payload) => {
     renderNotificationCenter(payload);
   });
+  renderFriendsActivityFeed();
 }
 
 function wirePresenceStatusControls() {
@@ -4770,6 +4830,229 @@ function wireCollaborativeForms() {
   }
 }
 
+function renderFriendsActivityFeed() {
+  const panel = $("friendsActivityPanel");
+  if (!panel) {
+    return;
+  }
+  const signedOut = $("friendsActivitySignedOut");
+  const content = $("friendsActivityContent");
+  const isSignedIn = Boolean(state.session && state.session.token);
+  if (!isSignedIn) {
+    if (signedOut) {
+      signedOut.hidden = false;
+    }
+    if (content) {
+      content.hidden = true;
+      content.setAttribute("aria-hidden", "true");
+    }
+    return;
+  }
+  if (signedOut) {
+    signedOut.hidden = true;
+  }
+  if (content) {
+    content.hidden = false;
+    content.setAttribute("aria-hidden", "false");
+  }
+  renderFriendWatchActivity(buildFriendWatchActivityEntries());
+  renderFriendListActivity(buildCollaborativeListActivityEntries());
+}
+
+function buildFriendWatchActivityEntries(limit = 4) {
+  if (!Array.isArray(state.notifications) || !state.notifications.length) {
+    return [];
+  }
+  const allowed = new Set(["friend_watchlist", "friend_favorite", "friend_review"]);
+  return state.notifications
+    .filter((entry) => entry && allowed.has(entry.type) && entry.actor)
+    .sort((a, b) => {
+      const aTime = Date.parse(a && a.createdAt ? a.createdAt : "") || 0;
+      const bTime = Date.parse(b && b.createdAt ? b.createdAt : "") || 0;
+      return bTime - aTime;
+    })
+    .slice(0, limit)
+    .map((entry) => ({
+      id: entry.id,
+      username: entry.actor,
+      movieTitle: entry.movieTitle || "",
+      type: entry.type || "friend_watchlist",
+      createdAt: entry.createdAt || null,
+      metaLabel:
+        entry.type === "friend_favorite"
+          ? "Favorite"
+          : entry.type === "friend_review"
+          ? "Review"
+          : "Watch log"
+    }));
+}
+
+function renderFriendWatchActivity(entries) {
+  const listEl = $("friendsWatchList");
+  const emptyEl = $("friendsWatchEmpty");
+  if (!listEl || !emptyEl) {
+    return;
+  }
+  listEl.innerHTML = "";
+  if (!entries.length) {
+    listEl.hidden = true;
+    emptyEl.hidden = false;
+    return;
+  }
+  listEl.hidden = false;
+  emptyEl.hidden = true;
+  entries.forEach((entry) => {
+    const row = document.createElement("div");
+    row.className = "friends-activity-row";
+    row.setAttribute("role", "listitem");
+    const text = document.createElement("div");
+    text.className = "friends-activity-text";
+    const link =
+      entry.username &&
+      createInlineProfileLink(entry.username, {
+        label: formatSocialDisplayName(entry.username),
+        className: "friends-activity-link"
+      });
+    if (link) {
+      text.appendChild(link);
+    } else if (entry.username) {
+      const fallback = document.createElement("span");
+      fallback.className = "friends-activity-link";
+      fallback.textContent = formatSocialDisplayName(entry.username);
+      text.appendChild(fallback);
+    } else {
+      const anon = document.createElement("span");
+      anon.textContent = "A friend";
+      text.appendChild(anon);
+    }
+    const action = document.createElement("span");
+    action.textContent = ` ${formatFriendActivityAction(entry)}`;
+    text.appendChild(action);
+    row.appendChild(text);
+    const meta = document.createElement("div");
+    meta.className = "friends-activity-meta";
+    const category = document.createElement("span");
+    category.textContent = entry.metaLabel;
+    const time = document.createElement("span");
+    time.textContent = entry.createdAt ? formatSyncTime(entry.createdAt) : "Just now";
+    meta.appendChild(category);
+    meta.appendChild(time);
+    row.appendChild(meta);
+    listEl.appendChild(row);
+  });
+}
+
+function buildCollaborativeListActivityEntries(limit = 3) {
+  const sharedLists =
+    state.collaborativeState &&
+    state.collaborativeState.lists &&
+    Array.isArray(state.collaborativeState.lists.shared)
+      ? state.collaborativeState.lists.shared.slice()
+      : [];
+  if (!sharedLists.length) {
+    return [];
+  }
+  return sharedLists
+    .sort((a, b) => {
+      const aTime = Date.parse(a && (a.updatedAt || a.createdAt) ? a.updatedAt || a.createdAt : "") || 0;
+      const bTime = Date.parse(b && (b.updatedAt || b.createdAt) ? b.updatedAt || b.createdAt : "") || 0;
+      return bTime - aTime;
+    })
+    .slice(0, limit)
+    .map((entry) => ({
+      id: entry.id,
+      owner: entry.owner || "",
+      name: entry.name || "Untitled list",
+      movieCount: Number.isFinite(entry.movieCount) ? entry.movieCount : 0,
+      updatedAt: entry.updatedAt || entry.createdAt || null,
+      preview: Array.isArray(entry.preview) ? entry.preview.slice(0, 3) : []
+    }));
+}
+
+function renderFriendListActivity(entries) {
+  const listEl = $("friendsListsList");
+  const emptyEl = $("friendsListsEmpty");
+  if (!listEl || !emptyEl) {
+    return;
+  }
+  listEl.innerHTML = "";
+  if (!entries.length) {
+    listEl.hidden = true;
+    emptyEl.hidden = false;
+    return;
+  }
+  listEl.hidden = false;
+  emptyEl.hidden = true;
+  entries.forEach((entry) => {
+    const row = document.createElement("div");
+    row.className = "friends-activity-row";
+    row.setAttribute("role", "listitem");
+    const text = document.createElement("div");
+    text.className = "friends-activity-text";
+    const ownerLink =
+      entry.owner &&
+      createInlineProfileLink(entry.owner, {
+        label: formatSocialDisplayName(entry.owner),
+        className: "friends-activity-link"
+      });
+    if (ownerLink) {
+      text.appendChild(ownerLink);
+      text.appendChild(document.createTextNode(" updated "));
+    } else if (entry.owner) {
+      const owner = document.createElement("span");
+      owner.className = "friends-activity-link";
+      owner.textContent = formatSocialDisplayName(entry.owner);
+      text.appendChild(owner);
+      text.appendChild(document.createTextNode(" updated "));
+    } else {
+      text.appendChild(document.createTextNode("A collaborator updated "));
+    }
+    const name = document.createElement("strong");
+    name.textContent = `“${entry.name}”`;
+    text.appendChild(name);
+    const countLabel = entry.movieCount === 1 ? "film" : "films";
+    text.appendChild(document.createTextNode(` (${entry.movieCount} ${countLabel})`));
+    row.appendChild(text);
+    const meta = document.createElement("div");
+    meta.className = "friends-activity-meta";
+    const summary = document.createElement("span");
+    summary.textContent = "Collaborative list";
+    const time = document.createElement("span");
+    time.textContent = entry.updatedAt ? formatSyncTime(entry.updatedAt) : "Just now";
+    meta.appendChild(summary);
+    meta.appendChild(time);
+    row.appendChild(meta);
+    if (entry.preview && entry.preview.length) {
+      const chipWrap = document.createElement("div");
+      chipWrap.className = "friends-activity-chips";
+      entry.preview.forEach((movie) => {
+        if (!movie || !movie.title) {
+          return;
+        }
+        const chip = document.createElement("span");
+        chip.className = "friends-activity-chip";
+        chip.textContent = movie.title;
+        chipWrap.appendChild(chip);
+      });
+      if (chipWrap.childNodes.length) {
+        row.appendChild(chipWrap);
+      }
+    }
+    listEl.appendChild(row);
+  });
+}
+
+function formatFriendActivityAction(entry) {
+  const movie = entry.movieTitle ? `“${entry.movieTitle}”` : "a movie";
+  if (entry.type === "friend_favorite") {
+    return `added ${movie} to favorites`;
+  }
+  if (entry.type === "friend_review") {
+    return `reviewed ${movie}`;
+  }
+  return `logged ${movie}`;
+}
+
 function renderSocialConnections() {
   const overview = state.socialOverview || getSocialOverviewSnapshot();
   const collabState = state.collaborativeState || getCollaborativeStateSnapshot();
@@ -4802,6 +5085,8 @@ function renderSocialConnections() {
     (Array.isArray(collabLists.invites) ? collabLists.invites.length : 0) +
     (Array.isArray(watchParties.invites) ? watchParties.invites.length : 0);
   const upcomingPartiesCount = Array.isArray(watchParties.upcoming) ? watchParties.upcoming.length : 0;
+
+  updateSocialFirstRunCard(counts);
 
   const leadActiveName = activeEntries.length ? formatSocialDisplayName(activeEntries[0].username) : "";
   const activeOthersCount = Math.max(activeEntries.length - 1, 0);
@@ -4983,6 +5268,7 @@ function renderSocialConnections() {
   }
 
   renderCollaborativeSections(collabState);
+  renderFriendsActivityFeed();
 
   const mutualListEl = $("socialMutualList");
   const mutualEmptyEl = $("socialMutualEmpty");
@@ -6154,6 +6440,11 @@ function renderSocialProfileContent(profile) {
     socialProfileBodyEl.appendChild(reason);
   }
 
+  const personaGrid = buildSocialPersonaGrid(profile, normalized);
+  if (personaGrid) {
+    socialProfileBodyEl.appendChild(personaGrid);
+  }
+
   if (profile && Array.isArray(profile.mutualFollowers) && profile.mutualFollowers.length) {
     const heading = document.createElement("h3");
     heading.className = "modal-section-title";
@@ -6183,8 +6474,10 @@ function renderSocialProfileContent(profile) {
   );
   renderProfileTagSection("Watch parties together", profile && profile.sharedWatchParties, "party");
 
+  const hasPersonaDetails = Boolean(personaGrid);
   const hasDetails = Boolean(
-    (profile && profile.tagline) ||
+    hasPersonaDetails ||
+      (profile && profile.tagline) ||
       (profile && profile.reason) ||
       (profile && Array.isArray(profile.mutualFollowers) && profile.mutualFollowers.length) ||
       (profile && Array.isArray(profile.sharedFavorites) && profile.sharedFavorites.length) ||
@@ -6226,6 +6519,395 @@ function renderProfileTagSection(title, values, variant) {
     tagWrap.appendChild(tag);
   });
   socialProfileBodyEl.appendChild(tagWrap);
+}
+
+function buildSocialPersonaGrid(profile, normalizedHandle) {
+  const container = document.createElement("div");
+  container.className = "social-persona-grid";
+  const cards = [
+    createTasteCompatibilityCard(profile),
+    createFriendshipStoryCard(profile),
+    createPinnedPersonaCard(profile, normalizedHandle)
+  ];
+  cards.forEach((card) => {
+    if (card) {
+      container.appendChild(card);
+    }
+  });
+  return container.childElementCount ? container : null;
+}
+
+function createTasteCompatibilityCard(profile) {
+  const compatibility = computeTasteCompatibility(profile);
+  if (!compatibility) {
+    return null;
+  }
+  const card = document.createElement("article");
+  card.className = "social-persona-card social-persona-card--compat";
+
+  const eyebrow = document.createElement("span");
+  eyebrow.className = "social-persona-eyebrow";
+  eyebrow.textContent = "Taste match";
+  card.appendChild(eyebrow);
+
+  const badge = document.createElement("div");
+  badge.className = "social-taste-badge";
+  const score = document.createElement("span");
+  score.className = "social-taste-score";
+  score.textContent = `${compatibility.score}%`;
+  const tier = document.createElement("span");
+  tier.className = "social-taste-tier";
+  tier.textContent = compatibility.tier;
+  badge.appendChild(score);
+  badge.appendChild(tier);
+  card.appendChild(badge);
+
+  const summary = document.createElement("p");
+  summary.className = "social-persona-copy";
+  summary.textContent = compatibility.summary;
+  card.appendChild(summary);
+
+  if (compatibility.highlights.length) {
+    const chips = document.createElement("div");
+    chips.className = "social-persona-chips";
+    compatibility.highlights.forEach((text) => {
+      const chip = document.createElement("span");
+      chip.className = "social-persona-chip";
+      chip.textContent = text;
+      chips.appendChild(chip);
+    });
+    card.appendChild(chips);
+  }
+
+  return card;
+}
+
+function computeTasteCompatibility(profile) {
+  const favorites = normalizeStringArray(profile && profile.sharedFavorites);
+  const genres = normalizeStringArray(profile && profile.sharedInterests);
+  const watches = normalizeStringArray(profile && profile.sharedWatchHistory);
+  const parties = normalizeStringArray(profile && profile.sharedWatchParties);
+  const totalSignals = favorites.length + genres.length + watches.length + parties.length;
+  if (!totalSignals) {
+    return null;
+  }
+  const weighted = favorites.length * 4 + genres.length * 3 + watches.length * 2 + (parties.length ? 3 : 0);
+  const normalized = Math.min(1, weighted / 18);
+  const score = Math.max(45, Math.min(100, Math.round(40 + normalized * 55)));
+  const tier = score >= 85
+    ? "High match"
+    : score >= 65
+    ? "Strong vibe"
+    : score >= 50
+    ? "Familiar tastes"
+    : "Still exploring";
+  const summaryParts = [];
+  if (genres.length) {
+    summaryParts.push(`You both love ${formatFriendlyList(genres)}`);
+  }
+  if (favorites.length) {
+    summaryParts.push(`Favorites overlap on ${formatFriendlyList(favorites)}`);
+  }
+  if (!summaryParts.length && watches.length) {
+    summaryParts.push(`Recently aligned on ${formatFriendlyList(watches)}`);
+  }
+  if (parties.length) {
+    summaryParts.push(`Joined ${formatPlural(parties.length, "watch party")}`);
+  }
+  const summary = summaryParts.slice(0, 2).join(" • ") || "Swap more favorites to sharpen this match.";
+  const highlights = [];
+  genres.slice(0, 2).forEach((genre) => highlights.push(genre));
+  if (favorites.length) {
+    highlights.push(`${favorites.length} shared favorite${favorites.length === 1 ? "" : "s"}`);
+  }
+  if (watches.length) {
+    highlights.push(`${watches.length} overlapping watch${watches.length === 1 ? "" : "es"}`);
+  }
+  if (parties.length) {
+    const label = parties.length === 1 ? "watch party" : "watch parties";
+    highlights.push(`${parties.length} ${label}`);
+  }
+  return { score, tier, summary, highlights };
+}
+
+function normalizeStringArray(values) {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+  return values
+    .map((value) => (typeof value === "string" ? value.trim() : ""))
+    .filter((value) => Boolean(value));
+}
+
+function formatFriendlyList(values, limit = 3) {
+  const list = normalizeStringArray(values).slice(0, limit);
+  if (!list.length) {
+    return "";
+  }
+  if (list.length === 1) {
+    return list[0];
+  }
+  if (list.length === 2) {
+    return `${list[0]} and ${list[1]}`;
+  }
+  return `${list.slice(0, list.length - 1).join(", ")}, and ${list[list.length - 1]}`;
+}
+
+function createFriendshipStoryCard(profile) {
+  const favorites = normalizeStringArray(profile && profile.sharedFavorites);
+  const genres = normalizeStringArray(profile && profile.sharedInterests);
+  const watches = normalizeStringArray(profile && profile.sharedWatchHistory);
+  const parties = normalizeStringArray(profile && profile.sharedWatchParties);
+  const total = favorites.length + genres.length + watches.length + parties.length;
+  if (!total) {
+    return null;
+  }
+  const card = document.createElement("article");
+  card.className = "social-persona-card social-persona-card--story";
+
+  const eyebrow = document.createElement("span");
+  eyebrow.className = "social-persona-eyebrow";
+  eyebrow.textContent = "Story of this friendship";
+  card.appendChild(eyebrow);
+
+  const statGrid = document.createElement("dl");
+  statGrid.className = "social-story-stats";
+  statGrid.appendChild(createStoryStat("Shared favorites", formatPlural(favorites.length, "film")));
+  statGrid.appendChild(createStoryStat("Shared genres", formatPlural(genres.length, "genre")));
+  statGrid.appendChild(createStoryStat("Recent overlap", formatPlural(watches.length, "watch", "watches")));
+  statGrid.appendChild(createStoryStat("Watch parties", formatPlural(parties.length, "party", "parties")));
+  card.appendChild(statGrid);
+
+  const summaryText = buildFriendshipStorySummary({ favorites, genres, watches, parties });
+  if (summaryText) {
+    const summary = document.createElement("p");
+    summary.className = "social-persona-copy";
+    summary.textContent = summaryText;
+    card.appendChild(summary);
+  }
+
+  return card;
+}
+
+function createStoryStat(label, value) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "social-story-stat";
+  const term = document.createElement("dt");
+  term.textContent = label;
+  const data = document.createElement("dd");
+  data.textContent = value;
+  wrapper.appendChild(term);
+  wrapper.appendChild(data);
+  return wrapper;
+}
+
+function formatPlural(count, singular, plural = "") {
+  const number = Number.isFinite(count) ? Math.max(0, count) : 0;
+  let word;
+  if (number === 1) {
+    word = singular;
+  } else if (plural) {
+    word = plural;
+  } else if (singular.endsWith("s")) {
+    word = singular;
+  } else {
+    word = `${singular}s`;
+  }
+  return `${number} ${word}`;
+}
+
+function buildFriendshipStorySummary({ favorites, genres, watches, parties }) {
+  const phrases = [];
+  if (favorites.length) {
+    phrases.push(`Bonded over ${formatFriendlyList(favorites)}`);
+  }
+  if (watches.length) {
+    phrases.push(`Logged ${formatPlural(watches.length, "recent overlap", "recent overlaps")}`);
+  }
+  if (genres.length && phrases.length < 2) {
+    phrases.push(`Lean into ${formatFriendlyList(genres)}`);
+  }
+  if (parties.length) {
+    phrases.push(`Joined ${formatPlural(parties.length, "watch party", "watch parties")}`);
+  }
+  return phrases.slice(0, 2).join(" • ");
+}
+
+function createPinnedPersonaCard(profile, normalizedHandle) {
+  const pinned = buildPinnedPersonaContent(profile);
+  const hasPins = Boolean(pinned.list || pinned.review);
+  const card = document.createElement("article");
+  card.className = "social-persona-card social-persona-card--pinned";
+
+  const eyebrow = document.createElement("span");
+  eyebrow.className = "social-persona-eyebrow";
+  eyebrow.textContent = "Pinned by them";
+  card.appendChild(eyebrow);
+
+  if (pinned.list) {
+    card.appendChild(createPinnedBlock("list", pinned.list, normalizedHandle));
+  }
+  if (pinned.review) {
+    card.appendChild(createPinnedBlock("review", pinned.review, normalizedHandle));
+  }
+  if (!hasPins) {
+    card.appendChild(createPinnedEmptyState());
+  }
+  return card;
+}
+
+function buildPinnedPersonaContent(profile) {
+  if (!profile) {
+    return { list: null, review: null };
+  }
+  const explicitList = normalizePinnedList(profile.pinnedList);
+  const explicitReview = normalizePinnedReview(profile.pinnedReview);
+  if (explicitList || explicitReview) {
+    return { list: explicitList, review: explicitReview };
+  }
+  const favorites = normalizeStringArray(profile.sharedFavorites);
+  const genres = normalizeStringArray(profile.sharedInterests);
+  const watches = normalizeStringArray(profile.sharedWatchHistory);
+  const listFallback = favorites.length
+    ? {
+        title: "Comfort queue",
+        description: `Built around ${formatFriendlyList(favorites)}.`,
+        highlights: favorites.slice(0, 4)
+      }
+    : genres.length
+    ? {
+        title: "Pinned mood board",
+        description: `Stacked with ${formatFriendlyList(genres)} vibes.`,
+        highlights: genres.slice(0, 4)
+      }
+    : null;
+  const reviewFallback = watches.length
+    ? {
+        title: watches[0],
+        excerpt: `They logged ${watches[0]} recently — ask for the full review.`
+      }
+    : favorites.length
+    ? {
+        title: favorites[0],
+        excerpt: `They can talk for days about ${favorites[0]}.`
+      }
+    : null;
+  return { list: listFallback, review: reviewFallback };
+}
+
+function normalizePinnedList(payload) {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+  const title = typeof payload.title === "string" ? payload.title.trim() : "";
+  if (!title) {
+    return null;
+  }
+  const description = typeof payload.description === "string" ? payload.description.trim() : "";
+  const highlights = normalizeStringArray(payload.highlights || payload.items || payload.movies);
+  const href = typeof payload.href === "string"
+    ? payload.href
+    : typeof payload.url === "string"
+    ? payload.url
+    : "";
+  return {
+    title,
+    description,
+    highlights,
+    href
+  };
+}
+
+function normalizePinnedReview(payload) {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+  const title = typeof payload.title === "string" ? payload.title.trim() : "";
+  if (!title) {
+    return null;
+  }
+  const excerpt = typeof payload.excerpt === "string" ? payload.excerpt.trim() : "";
+  const rating = typeof payload.rating === "number" ? payload.rating : null;
+  const href = typeof payload.href === "string"
+    ? payload.href
+    : typeof payload.url === "string"
+    ? payload.url
+    : "";
+  return {
+    title,
+    excerpt,
+    rating,
+    href
+  };
+}
+
+function createPinnedBlock(type, payload, normalizedHandle) {
+  const block = document.createElement("div");
+  block.className = "social-pinned-block";
+  block.dataset.variant = type;
+
+  const heading = document.createElement("div");
+  heading.className = "social-pinned-label";
+  heading.textContent = type === "list" ? "Pinned list" : "Pinned review";
+  block.appendChild(heading);
+
+  const title = document.createElement("p");
+  title.className = "social-pinned-title";
+  title.textContent = payload.title;
+  block.appendChild(title);
+
+  const detailText = payload.description || payload.excerpt || "";
+  if (detailText) {
+    const detail = document.createElement("p");
+    detail.className = "social-persona-copy";
+    detail.textContent = detailText;
+    block.appendChild(detail);
+  }
+
+  if (Array.isArray(payload.highlights) && payload.highlights.length) {
+    const highlights = document.createElement("div");
+    highlights.className = "social-persona-chips";
+    payload.highlights.slice(0, 4).forEach((text) => {
+      const chip = document.createElement("span");
+      chip.className = "social-persona-chip";
+      chip.textContent = text;
+      highlights.appendChild(chip);
+    });
+    block.appendChild(highlights);
+  }
+
+  if (typeof payload.rating === "number") {
+    const rating = document.createElement("span");
+    rating.className = "social-pinned-rating";
+    rating.textContent = `${payload.rating.toFixed(1)} / 10`;
+    block.appendChild(rating);
+  }
+
+  const link = createPinnedLink(payload.href, normalizedHandle, type);
+  if (link) {
+    block.appendChild(link);
+  }
+
+  return block;
+}
+
+function createPinnedEmptyState() {
+  const empty = document.createElement("p");
+  empty.className = "social-persona-copy";
+  empty.textContent = "No pinned lists or reviews yet — start chatting to inspire one.";
+  return empty;
+}
+
+function createPinnedLink(explicitHref, normalizedHandle, type) {
+  const href = explicitHref || (normalizedHandle ? `peeruser.html?user=${encodeURIComponent(normalizedHandle)}#${type}` : "");
+  if (!href) {
+    return null;
+  }
+  const link = document.createElement("a");
+  link.className = "social-pinned-link";
+  link.href = href;
+  link.textContent = type === "list" ? "View list" : "Read review";
+  return link;
 }
 
 function buildSocialListItem({ username, isFollowing, followsYou, mutualFollowers, onPrimaryAction }) {
@@ -6694,6 +7376,7 @@ function renderNotificationCenter(payload = {}) {
     panel.hidden = true;
     bell.setAttribute("aria-expanded", "false");
   }
+  renderFriendsActivityFeed();
 }
 
 function toggleNotificationPanel() {
@@ -6851,6 +7534,7 @@ function updateSocialSectionVisibility(session) {
   if (!hasSession) {
     setSocialStatus("", null);
   }
+  renderFriendsActivityFeed();
 }
 
 function hydrateFromSession(session) {

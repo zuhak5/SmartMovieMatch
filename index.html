@@ -414,6 +414,41 @@
         </div>
       </section>
 
+      <section
+        id="socialFirstRunPanel"
+        class="panel social-nudge-panel"
+        aria-live="polite"
+        hidden
+        style="padding-right: 5px; padding-left: 5px;"
+      >
+        <div class="panel-inner" style="padding-right: 5px; padding-left: 5px;">
+          <div id="socialFirstRunCard" class="social-nudge-card" style="padding-right: 5px; padding-left: 5px;">
+            <p class="social-nudge-eyebrow">Make it social</p>
+            <h3 class="social-nudge-title">See what your friends loved</h3>
+            <p id="socialFirstRunMessage" class="social-nudge-text">
+              Sign in and follow friends to see which picks they loved (or hated).
+            </p>
+            <div class="social-nudge-stats" role="presentation">
+              <div class="social-nudge-stat">
+                <span class="social-nudge-stat-label">Following</span>
+                <span id="socialNudgeFollowing" class="social-nudge-stat-value">0</span>
+              </div>
+              <div class="social-nudge-stat">
+                <span class="social-nudge-stat-label">Followers</span>
+                <span id="socialNudgeFollowers" class="social-nudge-stat-value">0</span>
+              </div>
+              <div class="social-nudge-stat">
+                <span class="social-nudge-stat-label">Mutual</span>
+                <span id="socialNudgeMutual" class="social-nudge-stat-value">0</span>
+              </div>
+            </div>
+            <button type="button" id="socialFirstRunCta" class="btn-primary social-nudge-cta">
+              Find people to follow
+            </button>
+          </div>
+        </div>
+      </section>
+
       <section id="recommendationsPanel" class="panel recommendations-panel" style="padding-right: 5px; padding-left: 5px;">
         <div class="panel-inner" style="padding-right: 5px; padding-left: 5px;">
           <div id="syncStatus" class="sync-status" role="status" aria-live="polite" style="padding-right: 5px; padding-left: 5px;"></div>
@@ -491,6 +526,56 @@
           <div id="recommendationsGrid" class="recommendations-grid" style="padding-right: 5px; padding-left: 5px;"></div>
           <div class="recommendations-actions" id="recommendationsActions" style="padding-right: 5px; padding-left: 5px;">
             <button type="button" class="btn-subtle btn-chip" id="showMoreRecsBtn">Show more</button>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="friendsActivityPanel"
+        class="panel friends-activity-panel"
+        aria-live="polite"
+        style="padding-right: 5px; padding-left: 5px;"
+      >
+        <div class="panel-inner" style="padding-right: 5px; padding-left: 5px;">
+          <div class="panel-header" style="padding-right: 5px; padding-left: 5px;">
+            <div style="padding-right: 5px; padding-left: 5px;">
+              <div class="panel-title">Friends activity</div>
+              <div class="panel-subtitle">See what your circle is doing in real time.</div>
+            </div>
+          </div>
+          <div id="friendsActivitySignedOut" class="friends-activity-signedout" style="padding-right: 5px; padding-left: 5px;">
+            <p>Sign in and follow a few friends to light up this feed.</p>
+            <a class="btn-secondary" href="login.html">Sign in</a>
+          </div>
+          <div
+            id="friendsActivityContent"
+            class="friends-activity-content"
+            hidden
+            aria-hidden="true"
+            style="padding-right: 5px; padding-left: 5px;"
+          >
+            <div class="friends-activity-grid">
+              <article class="friends-activity-card" aria-live="polite">
+                <header class="friends-activity-card-header">
+                  <h3>Recently logged by friends</h3>
+                  <p>Your circle’s latest watches and saves.</p>
+                </header>
+                <div id="friendsWatchList" class="friends-activity-list" role="list"></div>
+                <p id="friendsWatchEmpty" class="friends-activity-empty">
+                  Follow friends to see what they’re logging.
+                </p>
+              </article>
+              <article class="friends-activity-card" aria-live="polite">
+                <header class="friends-activity-card-header">
+                  <h3>New lists from people you follow</h3>
+                  <p>Fresh collaborative playlists and watch queues.</p>
+                </header>
+                <div id="friendsListsList" class="friends-activity-list" role="list"></div>
+                <p id="friendsListsEmpty" class="friends-activity-empty">
+                  Collaborative lists from your circle will land here.
+                </p>
+              </article>
+            </div>
           </div>
         </div>
       </section>

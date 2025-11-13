@@ -109,7 +109,7 @@ Codex should **not jump ahead** to later sections if earlier ones are still mark
 You are an expert UX/UI designer and frontend architect. Code the following.
 
 ## 1. Make social features impossible to miss
-[Codex status: TODO]  (Last updated: 2025-11-13 by Codex)
+[Codex status: DONE]  (Last updated: 2025-11-13 by Codex)
 
 
 Social “first-run” nudge on the home page
@@ -139,10 +139,15 @@ Add a small vertical strip or row on the discovery page with:
 
 Use your user_activity / recordLibraryActivity data so this feels alive even if the user never opens the full social profile page.
 
+Implementation notes for Codex (internal):
+
+- Discovery now includes a social-first nudge card plus a live friends activity panel sourced from notifications and collaborative list data.
+- Recommendation cards surface inline friend context via the condensed community header, so the social signal is visible even before expanding a movie.
+
 
 
 ## 2. Make profiles feel like real “movie personas”
-[Codex status: TODO]  (Last updated: 2025-11-13 by Codex)
+[Codex status: IN PROGRESS]  (Last updated: 2025-11-13 by Codex)
 
 
 Taste compatibility badge on friend / peer profiles
@@ -166,6 +171,11 @@ Pin favorite lists and reviews on profiles
 Let users “pin” one list and one review to the top of their profile (e.g. “All-time comfort movies”).
 
 That immediately gives visitors something to explore and talk about.
+
+Implementation notes for Codex (internal):
+
+- Taste compatibility badge, story grid, and pinned-content placeholders now render on social profile overlays/pages, using shared overlap data to keep cards populated even without bespoke pins.
+- Next pickup point: wire real pinned list/review data once backend exposes it so the CTA buttons can deep-link to genuine content rather than generated summaries.
 
 
 
@@ -1689,7 +1699,7 @@ Notification: “Maya replied to your review” → banner: “View discussion�
 
 > This section is a quick at-a-glance summary. The **source of truth** is still the status lines under each section heading.
 
-- [ ] 1. Make social features impossible to miss
+- [x] 1. Make social features impossible to miss  (Done: 2025-11-13 by Codex)
 - [ ] 2. Make profiles feel like real “movie personas”
 - [ ] 3. Deepen community reviews & comments
 - [ ] 4. Collaborative lists that feel actually collaborative
