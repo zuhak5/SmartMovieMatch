@@ -1300,7 +1300,7 @@ async function handleScheduleWatchParty(req, payload) {
     movieTitle: resolvedMovie.title,
     scheduledFor: when.toISOString(),
     note,
-    invitees: invitees.map((username) => ({ username, response: 'pending' })),
+    invitees: invitees.map((username) => ({ username, response: 'pending', bringing: '' })),
     createdAt: timestamp
   };
   store.watchParties.push(party);
@@ -1360,6 +1360,10 @@ async function handleRespondWatchParty(req, payload) {
   if (invite) {
     invite.response = decision;
     invite.respondedAt = new Date().toISOString();
+  }
+  const bringingRaw = typeof payload.bringing === 'string' ? payload.bringing.trim() : '';
+  if (invite) {
+    invite.bringing = bringingRaw ? bringingRaw.slice(0, 80) : '';
   }
   await writeSocialStore(store);
   if (party.host !== user.username) {
@@ -3442,7 +3446,8 @@ function formatWatchPartyForUser(party, username) {
     invitees: Array.isArray(party.invitees)
       ? party.invitees.map((entry) => ({
           username: canonicalUsername(entry.username),
-          response: entry.response || 'pending'
+          response: entry.response || 'pending',
+          bringing: typeof entry.bringing === 'string' ? entry.bringing : ''
         }))
       : []
   };

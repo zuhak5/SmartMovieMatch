@@ -3049,6 +3049,64 @@ body[data-theme="light"] .pill-context {
   color: var(--text-subtle);
 }
 
+.watch-party-suggested-block {
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.watch-party-suggested-hint {
+  margin: 0.15rem 0 0;
+  font-size: 0.83rem;
+  color: var(--text-subtle);
+}
+
+.watch-party-suggested-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.watch-party-suggested-chip {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  border-radius: var(--radius-md);
+  padding: 0.45rem 0.65rem;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(2, 6, 23, 0.6);
+  font-size: 0.82rem;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.watch-party-suggested-chip:hover,
+.watch-party-suggested-chip:focus-visible {
+  border-color: rgba(96, 165, 250, 0.7);
+  transform: translateY(-1px);
+}
+
+.watch-party-suggested-chip[data-selected="true"] {
+  border-color: rgba(129, 140, 248, 0.8);
+  background: rgba(99, 102, 241, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.4);
+}
+
+.watch-party-suggested-name {
+  font-weight: 600;
+}
+
+.watch-party-suggested-meta {
+  font-size: 0.74rem;
+  color: var(--text-subtle);
+}
+
+.watch-party-suggested-empty {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-subtle);
+}
+
 .collab-form-footer {
   display: flex;
   flex-wrap: wrap;
@@ -3096,6 +3154,11 @@ body[data-theme="light"] .pill-context {
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: var(--radius-md);
   padding: 0.85rem 0.95rem;
+}
+
+.watch-party-card--past {
+  border-color: rgba(148, 163, 184, 0.35);
+  background: rgba(2, 6, 23, 0.85);
 }
 
 .collab-list-card[data-role="owner"] {
@@ -3356,6 +3419,125 @@ body[data-theme="light"] .pill-context {
   margin: 0;
   font-size: 0.82rem;
   color: rgba(203, 213, 225, 0.8);
+}
+
+.watch-party-lobby {
+  display: grid;
+  gap: 0.6rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.watch-party-lobby-status {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.watch-party-lobby-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.watch-party-lobby-label {
+  font-size: 0.8rem;
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.watch-party-lobby-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.watch-party-lobby-chip {
+  border-radius: var(--radius-pill, 999px);
+  padding: 0.25rem 0.6rem;
+  font-size: 0.78rem;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: var(--text-main);
+  background: rgba(15, 23, 42, 0.7);
+}
+
+.watch-party-lobby-chip[data-state="going"] {
+  border-color: rgba(134, 239, 172, 0.5);
+  color: rgba(134, 239, 172, 0.95);
+}
+
+.watch-party-lobby-chip[data-state="maybe"] {
+  border-color: rgba(250, 204, 21, 0.45);
+  color: rgba(250, 204, 21, 0.95);
+}
+
+.watch-party-lobby-chip[data-state="waiting"] {
+  border-color: rgba(148, 163, 184, 0.4);
+  color: rgba(148, 163, 184, 0.85);
+}
+
+.watch-party-bringing {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.watch-party-bringing-label {
+  font-size: 0.78rem;
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.watch-party-bringing-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.watch-party-chip--vibe {
+  background: rgba(15, 118, 110, 0.15);
+  border-color: rgba(45, 212, 191, 0.35);
+  color: rgba(45, 212, 191, 0.95);
+}
+
+.watch-party-vibe-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.watch-party-vibe-field .field-label {
+  font-size: 0.82rem;
+}
+
+.watch-party-vibe-input {
+  width: 100%;
+}
+
+.watch-party-summary {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--radius-md);
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px dashed rgba(148, 163, 184, 0.3);
+}
+
+.watch-party-summary-line {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.watch-party-summary-prompt {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-subtle);
+}
+
+.watch-party-summary-cta {
+  justify-content: flex-start;
+  padding: 0;
 }
 .social-follow-input-row {
   display: flex;
