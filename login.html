@@ -13,8 +13,8 @@
   </head>
   <body class="auth-body">
     <main class="auth-page">
-      <section class="auth-card" aria-labelledby="authTitle">
-        <div class="auth-card-header">
+      <section class="auth-card" aria-labelledby="authTitle" style="padding-right: 8px; padding-left: 8px;">
+        <div class="auth-card-header" style="padding-right: 8px; padding-left: 8px;">
           <a class="auth-logo" href="index.html">🎬 Smart Movie Match</a>
           <h1 id="authTitle" class="auth-card-title">Welcome back</h1>
           <p id="authSubtitle" class="auth-card-subtitle">
@@ -22,7 +22,7 @@
             across devices.
           </p>
         </div>
-        <div class="auth-mode-tabs" role="tablist" aria-label="Authentication mode">
+        <div class="auth-mode-tabs" role="tablist" aria-label="Authentication mode" style="padding-right: 8px; padding-left: 8px;">
           <button
             type="button"
             class="auth-mode-tab is-active"
@@ -43,7 +43,7 @@
           </button>
         </div>
         <form id="authForm" class="auth-form" novalidate>
-          <div class="field-group" id="displayNameGroup" hidden>
+          <div class="field-group" id="displayNameGroup" hidden style="padding-right: 8px; padding-left: 8px;">
 
             <label class="field-label" for="displayNameInput">Name</label>
             <input
@@ -58,10 +58,10 @@
             />
             <p class="field-hint">We’ll personalize headings with this.</p>
           </div>
-<div class="field-group field-group--avatar" id="avatarGroup" hidden>
+<div class="field-group field-group--avatar" id="avatarGroup" hidden style="padding-right: 8px; padding-left: 8px;">
   <span class="field-label">Profile picture</span>
 
-  <div class="avatar-row">
+  <div class="avatar-row" style="padding-right: 8px; padding-left: 8px;">
     <label
       class="avatar-circle"
       for="avatarInput"
@@ -70,7 +70,7 @@
       <span class="avatar-placeholder" aria-hidden="true">+</span>
     </label>
 
-    <div class="avatar-text">
+    <div class="avatar-text" style="padding-right: 8px; padding-left: 8px;">
       <p class="field-hint">Optional. JPG/PNG up to ~5 MB.</p>
     </div>
   </div>
@@ -84,7 +84,7 @@
   />
 </div>
 
-          <div class="field-group">
+          <div class="field-group" style="padding-right: 8px; padding-left: 8px;">
             <label class="field-label" for="usernameInput">Username</label>
             <input
               id="usernameInput"
@@ -98,9 +98,9 @@
               minlength="3"
             />
           </div>
-          <div class="field-group">
+          <div class="field-group" style="padding-right: 8px; padding-left: 8px;">
             <label class="field-label" for="passwordInput">Password</label>
-            <div class="input-with-addon">
+            <div class="input-with-addon" style="padding-right: 8px; padding-left: 8px;">
               <input
                 id="passwordInput"
                 class="input-base input-text"
@@ -125,7 +125,7 @@
               </button>
             </div>
             <p class="field-hint">Use a mix of letters, numbers, and symbols for a stronger password.</p>
-            <div id="passwordStrength" class="password-strength" role="status" aria-live="polite"></div>
+            <div id="passwordStrength" class="password-strength" role="status" aria-live="polite" style="padding-right: 8px; padding-left: 8px;"></div>
             <ul id="authPasswordChecklist" class="password-checklist" data-checklist-context="auth">
               <li data-password-rule="length">At least 8 characters</li>
               <li data-password-rule="upper">Mix of upper &amp; lower case</li>
@@ -133,7 +133,7 @@
               <li data-password-rule="symbol">Include a symbol</li>
             </ul>
           </div>
-          <div class="auth-actions">
+          <div class="auth-actions" style="padding-right: 8px; padding-left: 8px;">
             <button id="authSubmit" type="submit" class="btn-primary">Continue</button>
             <button id="authModeToggle" type="button" class="btn-secondary">
               Need an account? Sign up
@@ -142,10 +142,10 @@
           <button id="forgotPasswordBtn" type="button" class="btn-link btn-link-inline auth-forgot-password">
             Forgot password?
           </button>
-          <div class="auth-divider" role="separator">
+          <div class="auth-divider" role="separator" style="padding-right: 8px; padding-left: 8px;">
             <span>Or continue with</span>
           </div>
-          <div class="auth-socials" aria-label="Social sign-in coming soon">
+          <div class="auth-socials" aria-label="Social sign-in coming soon" style="padding-right: 8px; padding-left: 8px;">
             <button type="button" class="auth-social-btn" data-provider="google">
               <span class="auth-social-icon" aria-hidden="true">🔒</span>
               <span class="auth-social-text">
@@ -155,17 +155,17 @@
             </button>
           </div>
         </form>
-        <div id="authStatus" class="auth-status" role="status" aria-live="polite"></div>
+        <div id="authStatus" class="auth-status" role="status" aria-live="polite" style="padding-right: 8px; padding-left: 8px;"></div>
       </section>
       <aside id="authAside" class="auth-aside">
-        <div class="auth-aside-inner">
+        <div class="auth-aside-inner" style="padding-right: 8px; padding-left: 8px;">
           <h2 class="auth-aside-title">Why create an account?</h2>
           <ul class="auth-aside-list">
             <li>Store your favorite genres and mood preferences securely online.</li>
             <li>Sync watched history to refine recommendations everywhere.</li>
             <li>Get smarter picks based on community sentiment and your taste.</li>
           </ul>
-          <div class="auth-aside-highlights">
+          <div class="auth-aside-highlights" style="padding-right: 8px; padding-left: 8px;">
             <article class="auth-story-card">
               <h3>Weekly discovery digest</h3>
               <p>Receive a curated recap of new releases that match your saved vibes.</p>
