@@ -154,6 +154,7 @@ let socialProfileActiveUsername = null;
 let socialProfileRequestId = 0;
 let socialProfileReturnFocus = null;
 let socialProfileInitialized = false;
+let socialProfilePageLoaded = false;
 
 const GENRE_ICON_MAP = {
   "28": "💥", // Action
@@ -961,6 +962,9 @@ function init() {
         : "Signed out. Preferences won’t sync until you sign in again.",
       session ? "success" : "muted"
     );
+    if (isSocialProfileContext() && wasSignedIn !== isSignedIn) {
+      maybeReloadSocialProfilePage({ force: true });
+    }
     if (isAccountSettingsContext()) {
       populateAccountSettings();
       if (window.location.hash === "#security" && session && session.token) {
@@ -1009,6 +1013,8 @@ function init() {
       }
     });
   }
+
+  maybeReloadSocialProfilePage();
 }
 
 function wireEvents() {
@@ -1514,6 +1520,11 @@ function highlightCollectionSection(target) {
 function isAccountSettingsContext() {
   const page = document.body ? document.body.getAttribute("data-page") : null;
   return page === "account-settings";
+}
+
+function isSocialProfileContext() {
+  const page = document.body ? document.body.getAttribute("data-page") : null;
+  return page === "social-profile";
 }
 
 function openAccountSettings(section = "profile") {
@@ -5916,65 +5927,9 @@ function openSocialProfile(username) {
   if (!normalized) {
     return;
   }
-  initSocialProfileOverlay();
-  if (!socialProfileOverlay) {
-    window.location.href = "profile.html";
-    return;
-  }
-  if (!state.session || !state.session.token) {
-    window.location.href = "login.html";
-    return;
-  }
-  socialProfileActiveUsername = normalized;
-  socialProfileReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  socialProfileOverlay.hidden = false;
-  socialProfileOverlay.setAttribute("open", "");
-  socialProfileOverlay.setAttribute("aria-hidden", "false");
-  socialProfileOverlay.scrollTop = 0;
-  if (socialProfileBodyEl) {
-    socialProfileBodyEl.innerHTML = "";
-  }
-  if (socialProfileTitleEl) {
-    socialProfileTitleEl.textContent = formatSocialDisplayName(normalized);
-  }
-  if (socialProfileSubtitleEl) {
-    socialProfileSubtitleEl.textContent = `@${normalized}`;
-  }
-  setSocialProfileStatus("Loading profile…", "loading");
-  window.requestAnimationFrame(() => {
-    if (socialProfileCloseBtn) {
-      try {
-        socialProfileCloseBtn.focus();
-      } catch (error) {
-        // ignore focus errors
-      }
-    }
-  });
-  const requestId = ++socialProfileRequestId;
-  searchSocialUsers(normalized)
-    .then((results) => {
-      if (requestId !== socialProfileRequestId || socialProfileActiveUsername !== normalized) {
-        return;
-      }
-      const match = Array.isArray(results)
-        ? results.find((entry) => canonicalHandle(entry.username) === normalized)
-        : null;
-      if (!match) {
-        setSocialProfileStatus("We couldn’t find that profile right now.", "error");
-        return;
-      }
-      renderSocialProfileContent(match);
-      setSocialProfileStatus("", null);
-    })
-    .catch((error) => {
-      if (requestId !== socialProfileRequestId) {
-        return;
-      }
-      const message = error && error.message
-        ? String(error.message)
-        : "We couldn’t load that profile right now.";
-      setSocialProfileStatus(message, "error");
-    });
+  const profileUrl = new URL("social-profile.html", window.location.origin);
+  profileUrl.searchParams.set("user", normalized);
+  window.location.href = profileUrl.toString();
 }
 
 function closeSocialProfileOverlay() {
@@ -5986,6 +5941,7 @@ function closeSocialProfileOverlay() {
   socialProfileOverlay.hidden = true;
   socialProfileActiveUsername = null;
   socialProfileRequestId += 1;
+  socialProfilePageLoaded = false;
   if (socialProfileBodyEl) {
     socialProfileBodyEl.innerHTML = "";
   }
@@ -6019,11 +5975,116 @@ function setSocialProfileStatus(message, variant) {
   }
 }
 
+function fetchSocialProfileDetails(username) {
+  const normalized = canonicalHandle(username);
+  if (!normalized) {
+    return Promise.resolve(null);
+  }
+  return searchSocialUsers(normalized).then((results) => {
+    if (!Array.isArray(results)) {
+      return null;
+    }
+    return results.find((entry) => canonicalHandle(entry.username) === normalized) || null;
+  });
+}
+
+function loadSocialProfileForPage(username) {
+  const normalized = canonicalHandle(username);
+  if (!normalized) {
+    if (socialProfileBodyEl) {
+      socialProfileBodyEl.innerHTML = "";
+    }
+    socialProfileActiveUsername = null;
+    socialProfilePageLoaded = false;
+    setSocialProfileStatus("Select a username to view a shared profile.", "muted");
+    return;
+  }
+  socialProfileActiveUsername = normalized;
+  socialProfilePageLoaded = false;
+  if (socialProfileBodyEl) {
+    socialProfileBodyEl.innerHTML = "";
+  }
+  if (socialProfileTitleEl) {
+    socialProfileTitleEl.textContent = formatSocialDisplayName(normalized);
+  }
+  if (socialProfileSubtitleEl) {
+    socialProfileSubtitleEl.textContent = `@${normalized}`;
+  }
+  setSocialProfileStatus(`Loading @${normalized}…`, "loading");
+  const requestId = ++socialProfileRequestId;
+  fetchSocialProfileDetails(normalized)
+    .then((profile) => {
+      if (requestId !== socialProfileRequestId || socialProfileActiveUsername !== normalized) {
+        return;
+      }
+      if (!profile) {
+        setSocialProfileStatus("We couldn’t find that profile right now.", "error");
+        return;
+      }
+      renderSocialProfileContent(profile);
+      setSocialProfileStatus("", null);
+    })
+    .catch((error) => {
+      if (requestId !== socialProfileRequestId) {
+        return;
+      }
+      const message = error && error.message
+        ? String(error.message)
+        : "We couldn’t load that profile right now.";
+      setSocialProfileStatus(message, "error");
+    });
+}
+
+function getSocialProfileQueryHandle() {
+  const params = new URLSearchParams(window.location.search);
+  const keys = ["user", "username", "handle"];
+  for (const key of keys) {
+    const value = params.get(key);
+    if (value && value.trim()) {
+      return value.trim();
+    }
+  }
+  return "";
+}
+
+function maybeReloadSocialProfilePage(options = {}) {
+  if (!isSocialProfileContext()) {
+    return;
+  }
+  const rawHandle = getSocialProfileQueryHandle();
+  if (!rawHandle) {
+    if (socialProfileBodyEl) {
+      socialProfileBodyEl.innerHTML = "";
+    }
+    socialProfileActiveUsername = null;
+    socialProfilePageLoaded = false;
+    setSocialProfileStatus("Select a username from your activity feed to view their profile.", "muted");
+    return;
+  }
+  const normalized = canonicalHandle(rawHandle);
+  if (socialProfileSubtitleEl && normalized) {
+    socialProfileSubtitleEl.textContent = `@${normalized}`;
+  }
+  if (!state.session || !state.session.token) {
+    if (socialProfileBodyEl) {
+      socialProfileBodyEl.innerHTML = "";
+    }
+    socialProfilePageLoaded = false;
+    setSocialProfileStatus("Sign in to view friend profiles.", "error");
+    return;
+  }
+  if (!options.force && socialProfilePageLoaded && normalized && normalized === socialProfileActiveUsername) {
+    return;
+  }
+  loadSocialProfileForPage(normalized || rawHandle);
+}
+
 function renderSocialProfileContent(profile) {
   if (!socialProfileBodyEl) {
     return;
   }
   socialProfileBodyEl.innerHTML = "";
+  socialProfilePageLoaded = true;
   const normalized = canonicalHandle(profile && profile.username ? profile.username : socialProfileActiveUsername);
   const displayName = profile && profile.displayName
     ? profile.displayName
