@@ -4841,19 +4841,25 @@ function renderFriendsActivityFeed() {
   if (!isSignedIn) {
     if (signedOut) {
       signedOut.hidden = false;
+      signedOut.style.display = "";
+      signedOut.setAttribute("aria-hidden", "false");
     }
     if (content) {
       content.hidden = true;
       content.setAttribute("aria-hidden", "true");
+      content.style.display = "none";
     }
     return;
   }
   if (signedOut) {
     signedOut.hidden = true;
+    signedOut.style.display = "none";
+    signedOut.setAttribute("aria-hidden", "true");
   }
   if (content) {
     content.hidden = false;
     content.setAttribute("aria-hidden", "false");
+    content.style.display = "";
   }
   renderFriendWatchActivity(buildFriendWatchActivityEntries());
   renderFriendListActivity(buildCollaborativeListActivityEntries());
