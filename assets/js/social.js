@@ -7,6 +7,19 @@ const MAX_LONG_REVIEW_LENGTH = 2400;
 
 const NOTIFICATION_POLL_INTERVAL = 45000;
 const REVIEW_REACTIONS = ['👍', '❤️', '😂', '😮'];
+const THREAD_PROMPTS = [
+  'What would you pair this with?',
+  'Agree or disagree with their take?',
+  'Where did you watch it?',
+  'Did it hold up on a rewatch?',
+  'Which scene surprised you most?'
+];
+const REVIEW_SORT_OPTIONS = [
+  { key: 'top-friends', label: 'Top from friends' },
+  { key: 'most-liked', label: 'Most liked' },
+  { key: 'newest', label: 'Newest' }
+];
+const DEFAULT_REVIEW_SORT = 'newest';
 
 export const PRESENCE_STATUS_PRESETS = [
   {
@@ -403,6 +416,12 @@ export function buildCommunitySection(movieContext) {
   const filterControls = createFilterControls();
   section.appendChild(filterControls.container);
 
+  const reactionSummary = createReactionSummaryControls();
+  section.appendChild(reactionSummary.container);
+
+  const friendsHighlight = createFriendsHighlight();
+  section.appendChild(friendsHighlight.container);
+
   const listWrapper = document.createElement('div');
   listWrapper.className = 'community-reviews';
   const list = document.createElement('div');
@@ -440,7 +459,11 @@ export function buildCommunitySection(movieContext) {
     submitBtn,
     statusEl,
     filter: 'all',
+    sort: DEFAULT_REVIEW_SORT,
+    reactionFilter: null,
     filterControls,
+    friendsHighlight,
+    reactionSummary,
     summaryEl: summary.container,
     summaryOverallValue: summary.overallValue,
     summaryOverallMeta: summary.overallMeta,
@@ -475,6 +498,23 @@ export function buildCommunitySection(movieContext) {
   if (filterControls.friendsButton) {
     filterControls.friendsButton.addEventListener('click', () => {
       setSectionFilter(sectionState, 'friends');
+    });
+  }
+  if (filterControls.sortButtons) {
+    Object.entries(filterControls.sortButtons).forEach(([key, button]) => {
+      button.addEventListener('click', () => {
+        setSectionSort(sectionState, key);
+      });
+    });
+  }
+  if (reactionSummary.buttons) {
+    Object.entries(reactionSummary.buttons).forEach(([emoji, button]) => {
+      button.addEventListener('click', () => {
+        if (button.disabled) {
+          return;
+        }
+        toggleReactionFilter(sectionState, emoji);
+      });
     });
   }
 
@@ -834,14 +874,21 @@ function renderSection(sectionState, cache) {
 
   sectionState.list.innerHTML = '';
   const filteredReviews = filterReviewsForDisplay(reviews, sectionState.filter);
+  updateReactionSummary(sectionState, filteredReviews);
+  updateFriendsHighlight(sectionState, reviews);
+  const reactionFilteredReviews = filterReviewsByReaction(filteredReviews, sectionState.reactionFilter);
+  const sortedReviews = sortReviewsForDisplay(reactionFilteredReviews, sectionState.sort);
 
-  if (!filteredReviews.length) {
+  if (!sortedReviews.length) {
     const hasAnyReviews = reviews.length > 0;
+    const hasFilteredReviews = filteredReviews.length > 0;
     if (!hasAnyReviews) {
       sectionState.empty.textContent = sectionState.emptyDefaultMessage;
-    } else if (sectionState.filter === 'friends') {
+    } else if (!hasFilteredReviews || sectionState.filter === 'friends') {
       sectionState.empty.textContent =
         'No friend reviews yet. Switch back to everyone to see all community notes.';
+    } else if (sectionState.reactionFilter) {
+      sectionState.empty.textContent = `No reviews with ${sectionState.reactionFilter} yet. Try another reaction or clear the filter.`;
     } else {
       sectionState.empty.textContent = sectionState.emptyDefaultMessage;
     }
@@ -850,7 +897,7 @@ function renderSection(sectionState, cache) {
   }
   sectionState.empty.hidden = true;
 
-  filteredReviews.forEach((review) => {
+  sortedReviews.forEach((review) => {
     sectionState.list.appendChild(renderReviewItem(review, sectionState));
   });
 }
@@ -901,6 +948,14 @@ function updateFilterButtonState(sectionState) {
     friendsButton.classList.toggle('is-active', isActive);
     friendsButton.setAttribute('aria-pressed', isActive ? 'true' : 'false');
   }
+  if (controls.sortButtons) {
+    const sortKey = normalizeReviewSort(sectionState.sort);
+    Object.entries(controls.sortButtons).forEach(([key, button]) => {
+      const isActive = key === sortKey;
+      button.classList.toggle('is-active', isActive);
+      button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+  }
 }
 
 function filterReviewsForDisplay(reviews, filter) {
@@ -911,6 +966,19 @@ function filterReviewsForDisplay(reviews, filter) {
     return reviews.filter((review) => review && (review.isFriend || review.isSelf));
   }
   return reviews.slice();
+}
+
+function filterReviewsByReaction(reviews, reaction) {
+  if (!Array.isArray(reviews) || !reaction) {
+    return reviews ? reviews.slice() : [];
+  }
+  return reviews.filter((review) => {
+    if (!review || !review.reactions || !review.reactions.totals) {
+      return false;
+    }
+    const count = review.reactions.totals[reaction];
+    return Number.isFinite(count) && count > 0;
+  });
 }
 
 function setSectionFilter(sectionState, nextFilter) {
@@ -930,6 +998,34 @@ function setSectionFilter(sectionState, nextFilter) {
   }
   sectionState.filter = normalized;
   updateFilterButtonState(sectionState);
+  const cache = state.reviewCache.get(sectionState.key) || {};
+  renderSection(sectionState, cache);
+}
+
+function setSectionSort(sectionState, nextSort) {
+  if (!sectionState || !sectionState.filterControls) {
+    return;
+  }
+  const normalized = normalizeReviewSort(nextSort);
+  if (sectionState.sort === normalized) {
+    return;
+  }
+  sectionState.sort = normalized;
+  updateFilterButtonState(sectionState);
+  const cache = state.reviewCache.get(sectionState.key) || {};
+  renderSection(sectionState, cache);
+}
+
+function toggleReactionFilter(sectionState, emoji) {
+  if (!sectionState) {
+    return;
+  }
+  const normalized = REVIEW_REACTIONS.includes(emoji) ? emoji : null;
+  const next = sectionState.reactionFilter === normalized ? null : normalized;
+  if (sectionState.reactionFilter === next) {
+    return;
+  }
+  sectionState.reactionFilter = next;
   const cache = state.reviewCache.get(sectionState.key) || {};
   renderSection(sectionState, cache);
 }
@@ -1300,6 +1396,10 @@ function createReplyForm(review, parentId, sectionState) {
   textarea.required = true;
   textarea.placeholder = parentId ? 'Reply to this comment…' : 'Leave a reply…';
   form.appendChild(textarea);
+  const promptsRow = createReplyPromptRow(parentId);
+  if (promptsRow) {
+    form.appendChild(promptsRow);
+  }
   const footer = document.createElement('div');
   footer.className = 'community-reply-footer';
   const submit = document.createElement('button');
@@ -1355,6 +1455,50 @@ async function submitReviewReply(sectionState, review, textarea, statusEl, paren
       error instanceof Error ? error.message : 'Unable to post that reply right now.';
     statusEl.dataset.variant = 'error';
   }
+}
+
+function createReplyPromptRow(parentId) {
+  const pool = Array.isArray(THREAD_PROMPTS) ? THREAD_PROMPTS.slice() : [];
+  if (!pool.length) {
+    return null;
+  }
+  const promptCount = parentId ? 1 : 2;
+  const selection = pickReplyPrompts(promptCount, pool);
+  if (!selection.length) {
+    return null;
+  }
+  const wrapper = document.createElement('div');
+  wrapper.className = 'community-reply-prompts';
+  const label = document.createElement('span');
+  label.className = 'community-reply-prompts-label';
+  label.textContent = parentId ? 'Keep the thread going:' : 'Need a prompt?';
+  wrapper.appendChild(label);
+  const list = document.createElement('div');
+  list.className = 'community-reply-prompts-list';
+  selection.forEach((text) => {
+    const chip = document.createElement('span');
+    chip.className = 'community-reply-prompt';
+    chip.textContent = text;
+    list.appendChild(chip);
+  });
+  wrapper.appendChild(list);
+  return wrapper;
+}
+
+function pickReplyPrompts(count, pool) {
+  if (!Array.isArray(pool) || !pool.length) {
+    return [];
+  }
+  const available = pool.slice();
+  const chosen = [];
+  while (available.length && chosen.length < count) {
+    const index = Math.floor(Math.random() * available.length);
+    const [prompt] = available.splice(index, 1);
+    if (prompt) {
+      chosen.push(prompt);
+    }
+  }
+  return chosen;
 }
 
 async function toggleReviewReaction(sectionState, review, emoji, button) {
@@ -1546,14 +1690,18 @@ function createFilterControls() {
   container.className = 'community-filter-bar';
   container.hidden = true;
 
+  const filterGroup = document.createElement('div');
+  filterGroup.className = 'community-filter-group';
+  container.appendChild(filterGroup);
+
   const label = document.createElement('span');
   label.className = 'community-filter-label';
   label.textContent = 'Show';
-  container.appendChild(label);
+  filterGroup.appendChild(label);
 
   const buttonGroup = document.createElement('div');
   buttonGroup.className = 'community-filter-buttons';
-  container.appendChild(buttonGroup);
+  filterGroup.appendChild(buttonGroup);
 
   const allButton = document.createElement('button');
   allButton.type = 'button';
@@ -1571,7 +1719,93 @@ function createFilterControls() {
   friendsButton.setAttribute('aria-disabled', 'true');
   buttonGroup.appendChild(friendsButton);
 
-  return { container, label, buttonGroup, allButton, friendsButton };
+  const sortGroup = document.createElement('div');
+  sortGroup.className = 'community-filter-group community-sort-group';
+  container.appendChild(sortGroup);
+
+  const sortLabel = document.createElement('span');
+  sortLabel.className = 'community-filter-label';
+  sortLabel.textContent = 'Sort';
+  sortGroup.appendChild(sortLabel);
+
+  const sortButtonsWrap = document.createElement('div');
+  sortButtonsWrap.className = 'community-filter-buttons';
+  sortGroup.appendChild(sortButtonsWrap);
+
+  const sortButtons = {};
+  REVIEW_SORT_OPTIONS.forEach((option) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'community-filter-btn';
+    button.textContent = option.label;
+    button.dataset.sort = option.key;
+    const isDefault = option.key === DEFAULT_REVIEW_SORT;
+    button.setAttribute('aria-pressed', isDefault ? 'true' : 'false');
+    if (isDefault) {
+      button.classList.add('is-active');
+    }
+    sortButtonsWrap.appendChild(button);
+    sortButtons[option.key] = button;
+  });
+
+  return {
+    container,
+    label,
+    buttonGroup,
+    allButton,
+    friendsButton,
+    sortLabel,
+    sortButtonsWrap,
+    sortButtons
+  };
+}
+
+function createReactionSummaryControls() {
+  const container = document.createElement('div');
+  container.className = 'community-reaction-summary';
+  container.hidden = true;
+
+  const label = document.createElement('span');
+  label.className = 'community-reaction-summary-label';
+  label.textContent = 'Sentiment snapshot';
+  container.appendChild(label);
+
+  const buttonsWrap = document.createElement('div');
+  buttonsWrap.className = 'community-reaction-summary-buttons';
+  container.appendChild(buttonsWrap);
+
+  const buttons = {};
+  REVIEW_REACTIONS.forEach((emoji) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'community-reaction-filter-btn';
+    button.textContent = `${emoji} ×0`;
+    button.disabled = true;
+    button.setAttribute('aria-disabled', 'true');
+    button.setAttribute('aria-pressed', 'false');
+    button.dataset.emoji = emoji;
+    buttonsWrap.appendChild(button);
+    buttons[emoji] = button;
+  });
+
+  return { container, label, buttonsWrap, buttons };
+}
+
+function createFriendsHighlight() {
+  const container = document.createElement('div');
+  container.className = 'community-friends-highlight';
+  container.hidden = true;
+
+  const label = document.createElement('span');
+  label.className = 'community-friends-highlight-label';
+  label.textContent = 'From your friends';
+  container.appendChild(label);
+
+  const list = document.createElement('div');
+  list.className = 'community-friends-highlight-list';
+  container.appendChild(list);
+
+  return { container, label, list };
 }
 
 function updateCondensedHeader(sectionState, stats, reviews = []) {
@@ -1681,6 +1915,221 @@ function getReviewTimestamp(review) {
   }
   const parsed = Date.parse(raw);
   return Number.isNaN(parsed) ? null : parsed;
+}
+
+function getReviewRatingValue(review) {
+  if (!review) {
+    return null;
+  }
+  if (typeof review.rating === 'number') {
+    return review.rating;
+  }
+  if (typeof review.rating === 'string') {
+    const parsed = Number(review.rating);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+}
+
+function normalizeReviewSort(value) {
+  const requested = typeof value === 'string' ? value : DEFAULT_REVIEW_SORT;
+  const found = REVIEW_SORT_OPTIONS.find((option) => option.key === requested);
+  return found ? found.key : DEFAULT_REVIEW_SORT;
+}
+
+function sortReviewsForDisplay(reviews, sortKey) {
+  if (!Array.isArray(reviews)) {
+    return [];
+  }
+  const normalized = normalizeReviewSort(sortKey);
+  const list = reviews.slice();
+  if (normalized === 'most-liked') {
+    return list.sort((a, b) => {
+      const likesA = normalizeLikeMeta(a && a.likes).count;
+      const likesB = normalizeLikeMeta(b && b.likes).count;
+      if (likesA === likesB) {
+        return (getReviewTimestamp(b) || 0) - (getReviewTimestamp(a) || 0);
+      }
+      return likesB - likesA;
+    });
+  }
+  if (normalized === 'top-friends') {
+    const friendReviews = [];
+    const otherReviews = [];
+    list.forEach((review) => {
+      if (review && (review.isFriend || review.isSelf)) {
+        friendReviews.push(review);
+      } else {
+        otherReviews.push(review);
+      }
+    });
+    const compareByRating = (a, b) => {
+      const ratingA = getReviewRatingValue(a);
+      const ratingB = getReviewRatingValue(b);
+      if (ratingA === ratingB) {
+        return (getReviewTimestamp(b) || 0) - (getReviewTimestamp(a) || 0);
+      }
+      if (ratingA == null) {
+        return 1;
+      }
+      if (ratingB == null) {
+        return -1;
+      }
+      return ratingB - ratingA;
+    };
+    friendReviews.sort(compareByRating);
+    otherReviews.sort(compareByRating);
+    return friendReviews.concat(otherReviews);
+  }
+  return list.sort((a, b) => (getReviewTimestamp(b) || 0) - (getReviewTimestamp(a) || 0));
+}
+
+function computeReactionTotals(reviews) {
+  const totals = {};
+  REVIEW_REACTIONS.forEach((emoji) => {
+    totals[emoji] = 0;
+  });
+  if (!Array.isArray(reviews)) {
+    return totals;
+  }
+  reviews.forEach((review) => {
+    if (!review || !review.reactions || !review.reactions.totals) {
+      return;
+    }
+    REVIEW_REACTIONS.forEach((emoji) => {
+      const value = review.reactions.totals[emoji];
+      if (Number.isFinite(value)) {
+        totals[emoji] += value;
+      }
+    });
+  });
+  return totals;
+}
+
+function updateReactionSummary(sectionState, reviews) {
+  if (!sectionState || !sectionState.reactionSummary) {
+    return;
+  }
+  const summary = sectionState.reactionSummary;
+  const totals = computeReactionTotals(reviews);
+  const hasAny = REVIEW_REACTIONS.some((emoji) => totals[emoji] > 0);
+  if (!hasAny) {
+    summary.container.hidden = true;
+    if (sectionState.reactionFilter) {
+      sectionState.reactionFilter = null;
+    }
+    Object.values(summary.buttons || {}).forEach((button) => {
+      button.textContent = `${button.dataset.emoji} ×0`;
+      button.disabled = true;
+      button.setAttribute('aria-disabled', 'true');
+      button.setAttribute('aria-pressed', 'false');
+      button.classList.remove('is-active');
+    });
+    return;
+  }
+  summary.container.hidden = false;
+  const activeFilter = sectionState.reactionFilter;
+  if (activeFilter && totals[activeFilter] === 0) {
+    sectionState.reactionFilter = null;
+  }
+  REVIEW_REACTIONS.forEach((emoji) => {
+    const button = summary.buttons ? summary.buttons[emoji] : null;
+    if (!button) {
+      return;
+    }
+    const count = totals[emoji] || 0;
+    button.textContent = `${emoji} ×${count}`;
+    if (count === 0) {
+      button.disabled = true;
+      button.setAttribute('aria-disabled', 'true');
+      button.classList.remove('is-active');
+      button.setAttribute('aria-pressed', 'false');
+    } else {
+      button.disabled = false;
+      button.removeAttribute('aria-disabled');
+      const isActive = sectionState.reactionFilter === emoji;
+      button.classList.toggle('is-active', isActive);
+      button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    }
+  });
+}
+
+function updateFriendsHighlight(sectionState, reviews = []) {
+  if (!sectionState || !sectionState.friendsHighlight) {
+    return;
+  }
+  const highlight = sectionState.friendsHighlight;
+  if (sectionState.filter === 'friends') {
+    highlight.container.hidden = true;
+    highlight.list.innerHTML = '';
+    return;
+  }
+  const friendReviews = Array.isArray(reviews)
+    ? reviews.filter((review) => review && (review.isFriend || review.isSelf))
+    : [];
+  if (!friendReviews.length) {
+    highlight.container.hidden = true;
+    highlight.list.innerHTML = '';
+    return;
+  }
+  const decorated = friendReviews
+    .slice()
+    .sort((a, b) => (getReviewTimestamp(b) || 0) - (getReviewTimestamp(a) || 0))
+    .slice(0, 3);
+  highlight.list.innerHTML = '';
+  decorated.forEach((review) => {
+    const item = document.createElement('div');
+    item.className = 'community-friends-highlight-item';
+    let author = createInlineProfileLink(review.username, {
+      label: formatDisplayNameFromHandle(review.username) || review.username || 'Friend',
+      className: 'community-friends-highlight-author'
+    });
+    if (!author) {
+      author = document.createElement('span');
+      author.className = 'community-friends-highlight-author';
+      author.textContent = formatDisplayNameFromHandle(review.username) || review.username || 'Friend';
+    }
+    item.appendChild(author);
+    const ratingLabel = formatFriendHighlightRating(review);
+    if (ratingLabel) {
+      const rating = document.createElement('span');
+      rating.className = 'community-friends-highlight-rating';
+      rating.textContent = ratingLabel;
+      item.appendChild(rating);
+    }
+    const snippet = buildFriendHighlightSnippet(review);
+    if (snippet) {
+      const quote = document.createElement('span');
+      quote.className = 'community-friends-highlight-quote';
+      quote.textContent = snippet;
+      item.appendChild(quote);
+    }
+    highlight.list.appendChild(item);
+  });
+  highlight.container.hidden = false;
+}
+
+function formatFriendHighlightRating(review) {
+  const value = getReviewRatingValue(review);
+  if (!Number.isFinite(value)) {
+    return '';
+  }
+  return `${(Math.round(value * 10) / 10).toFixed(1)}/10`;
+}
+
+function buildFriendHighlightSnippet(review) {
+  const text = review && typeof review.capsule === 'string' && review.capsule.trim()
+    ? review.capsule.trim()
+    : review && typeof review.body === 'string'
+    ? review.body.trim()
+    : '';
+  if (!text) {
+    return '';
+  }
+  if (text.length <= 60) {
+    return `“${text}”`;
+  }
+  return `“${text.slice(0, 57).trim()}…”`;
 }
 
 function updateFriendBadge(sectionState, friendTimestamp) {
