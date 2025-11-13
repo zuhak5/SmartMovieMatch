@@ -225,7 +225,7 @@ Then list the global community below.
 
 
 ## 4. Collaborative lists that feel actually collaborative
-[Codex status: TODO]  (Last updated: 2025-11-13 by Codex)
+[Codex status: DONE]  (Last updated: 2025-11-13 by Codex)
 
 
 Suggestions when creating a collaborative list
@@ -247,6 +247,12 @@ Per-list micro-discussion
 Attach a tiny comment thread to each collaborative list (even just the last 3 messages visible inline).
 
 This gives people a place to negotiate why a movie is or isn’t on the list.
+
+Implementation notes for Codex (internal):
+
+- Collaborative list creation now surfaces suggested collaborators pulled from social matches and automatically invites selected handles after the list is created.
+- Collaborative cards show live vote buttons tied to new API endpoints so “yes/no” sentiment reorders preview chips and highlights top picks.
+- Each card includes a lightweight chat thread with the latest three messages plus an inline composer for owners/collaborators.
 
 
 
@@ -1707,7 +1713,7 @@ Notification: “Maya replied to your review” → banner: “View discussion�
 - [x] 1. Make social features impossible to miss  (Done: 2025-11-13 by Codex)
 - [x] 2. Make profiles feel like real “movie personas”  (Done: 2025-11-13 by Codex)
 - [x] 3. Deepen community reviews & comments  (Done: 2025-11-13 by Codex)
-- [ ] 4. Collaborative lists that feel actually collaborative
+- [x] 4. Collaborative lists that feel actually collaborative  (Done: 2025-11-13 by Codex)
 - [ ] 5. Watch parties that feel live, not just scheduled
 - [ ] 6. Presence that actually leads to interaction
 - [ ] 7. Social notifications that feel like a feed

@@ -270,6 +270,14 @@ export async function respondWatchPartyRemote({ partyId, response, note }) {
   return callSocial('respondWatchParty', { partyId, response, note });
 }
 
+export async function voteCollaborativeItemRemote({ listId, tmdbId, vote }) {
+  return callSocial('voteCollaborativeItem', { listId, tmdbId, vote });
+}
+
+export async function postCollaborativeNoteRemote({ listId, body }) {
+  return callSocial('postCollaborativeNote', { listId, body });
+}
+
 export async function generateInviteQrRemote(link) {
   const trimmed = typeof link === 'string' ? link.trim() : '';
   if (!trimmed) {
@@ -2902,7 +2910,50 @@ function normalizeCollaborativeListSummary(entry) {
           addedBy: item.addedBy || null,
           addedAt: item.addedAt || null
         }))
-      : []
+      : [],
+    voteHighlights: Array.isArray(entry.voteHighlights)
+      ? entry.voteHighlights.map(normalizeCollaborativeVoteHighlight).filter(Boolean)
+      : [],
+    discussionPreview: Array.isArray(entry.discussionPreview)
+      ? entry.discussionPreview.map(normalizeCollaborativeDiscussionMessage).filter(Boolean)
+      : [],
+    discussionCount: Number.isFinite(entry.discussionCount) ? Number(entry.discussionCount) : 0
+  };
+}
+
+function normalizeCollaborativeVoteHighlight(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+  const tmdbId = normalizeId(entry.tmdbId || entry.movieTmdbId || entry.id);
+  if (!tmdbId) {
+    return null;
+  }
+  return {
+    tmdbId,
+    title: entry.title || 'Untitled pick',
+    yesCount: Number.isFinite(entry.yesCount) ? Number(entry.yesCount) : 0,
+    noCount: Number.isFinite(entry.noCount) ? Number(entry.noCount) : 0,
+    score: Number.isFinite(entry.score) ? Number(entry.score) : 0,
+    myVote: entry.myVote === 'no' ? 'no' : entry.myVote === 'yes' ? 'yes' : null
+  };
+}
+
+function normalizeCollaborativeDiscussionMessage(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+  const id = entry.id || entry.messageId || null;
+  const username = entry.username || entry.author || null;
+  const body = typeof entry.body === 'string' ? entry.body : '';
+  if (!id || !username || !body.trim()) {
+    return null;
+  }
+  return {
+    id,
+    username,
+    body: body.trim(),
+    createdAt: entry.createdAt || entry.timestamp || null
   };
 }
 
