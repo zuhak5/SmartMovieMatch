@@ -331,7 +331,7 @@ Implementation notes for Codex (internal):
 
 
 ## 7. Social notifications that feel like a feed
-[Codex status: TODO]  (Last updated: 2025-11-13 by Codex)
+[Codex status: DONE]  (Last updated: 2025-11-13 by Codex)
 
 
 Social-first notification grouping
@@ -359,6 +359,11 @@ Soft “unread social activity” indicator on nav
 Add tiny dot or count near the Profile/Social link when there’s new social activity, not just system notifications.
 
 This keeps the social area feeling active without being spammy.
+
+Implementation notes for Codex (internal):
+
+- Notification center now groups entries into “New from your friends” and “Account & sync”, adds contextual CTA buttons, and updates the social nav indicator across every page.
+- Discovery cards respond to notification deep links by auto-expanding the relevant movie and pulsing the community section; profile links honor context anchors for follow, collab, and watch-party invites.
 
 
 
@@ -1728,7 +1733,7 @@ Notification: “Maya replied to your review” → banner: “View discussion�
 - [x] 4. Collaborative lists that feel actually collaborative  (Done: 2025-11-13 by Codex)
 - [x] 5. Watch parties that feel live, not just scheduled  (Done: 2025-11-13 by Codex)
 - [x] 6. Presence that actually leads to interaction  (Done: 2025-11-14 by Codex)
-- [ ] 7. Social notifications that feel like a feed
+- [x] 7. Social notifications that feel like a feed  (Done: 2025-11-13 by Codex)
 - [ ] 8. Safety, comfort, and control in the social layer
 - [ ] 9. Reduce friction to find and follow people
 

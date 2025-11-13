@@ -928,6 +928,15 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
 
   const card = document.createElement("article");
   card.className = "movie-card collapsed";
+  if (tmdbId) {
+    card.dataset.tmdbId = String(tmdbId);
+  }
+  if (imdbID) {
+    card.dataset.imdbId = String(imdbID);
+  }
+  if (title) {
+    card.dataset.title = title.toLowerCase();
+  }
 
   const summaryButton = document.createElement("button");
   summaryButton.type = "button";
@@ -1265,14 +1274,26 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
     }
   }
 
-  const toggleExpansion = () => {
-    const expanded = card.classList.toggle("expanded");
-    card.classList.toggle("collapsed", !expanded);
-    summaryButton.setAttribute("aria-expanded", expanded ? "true" : "false");
-    playExpandSound(expanded);
-    if (expanded && tmdbId) {
+  const setExpansionState = (expanded, options = {}) => {
+    const next = Boolean(expanded);
+    const isExpanded = card.classList.contains("expanded");
+    if (next === isExpanded) {
+      return;
+    }
+    card.classList.toggle("expanded", next);
+    card.classList.toggle("collapsed", !next);
+    summaryButton.setAttribute("aria-expanded", next ? "true" : "false");
+    if (!options.silent) {
+      playExpandSound(next);
+    }
+    if (next && tmdbId) {
       acknowledgeFriendActivity(String(tmdbId));
     }
+  };
+
+  const toggleExpansion = () => {
+    const next = !card.classList.contains("expanded");
+    setExpansionState(next);
   };
 
   summaryButton.addEventListener("click", () => {
@@ -1280,10 +1301,77 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
     toggleExpansion();
   });
 
+  card.addEventListener("movie-card:set-state", (event) => {
+    const detail = event && event.detail ? event.detail : {};
+    const expand = typeof detail.expand === "boolean" ? detail.expand : true;
+    setExpansionState(expand, detail);
+  });
+
   card.appendChild(summaryButton);
   card.appendChild(details);
 
   return card;
+}
+
+export function highlightRecommendationCard(target, options = {}) {
+  if (!target) {
+    return false;
+  }
+  const tmdbId = target.tmdbId ? String(target.tmdbId) : "";
+  const imdbId = target.imdbId ? String(target.imdbId) : "";
+  const normalizedTitle = typeof target.title === "string" ? target.title.trim().toLowerCase() : "";
+  const cards = document.querySelectorAll(".movie-card");
+  let match = null;
+  cards.forEach((card) => {
+    if (match) {
+      return;
+    }
+    const cardTmdb = card.dataset.tmdbId || "";
+    const cardImdb = card.dataset.imdbId || "";
+    const cardTitle = card.dataset.title || "";
+    if (
+      (tmdbId && cardTmdb === tmdbId) ||
+      (imdbId && cardImdb === imdbId) ||
+      (normalizedTitle && cardTitle === normalizedTitle)
+    ) {
+      match = card;
+    }
+  });
+  if (!match) {
+    return false;
+  }
+  const duration = typeof options.highlightDuration === "number" ? options.highlightDuration : 1800;
+  match.classList.add("movie-card--notification-focus");
+  window.setTimeout(() => {
+    match.classList.remove("movie-card--notification-focus");
+  }, duration);
+  if (options.scroll !== false) {
+    const block = options.scrollBlock || "center";
+    match.scrollIntoView({ behavior: "smooth", block });
+  }
+  if (options.expand && match.classList.contains("collapsed")) {
+    match.dispatchEvent(
+      new CustomEvent("movie-card:set-state", {
+        detail: { expand: true, silent: true }
+      })
+    );
+  }
+  if (options.focusCommunity) {
+    window.requestAnimationFrame(() => {
+      const community = match.querySelector(".community-notes");
+      if (community) {
+        community.classList.add("community-notes--pulse");
+        community.scrollIntoView({ behavior: "smooth", block: "start" });
+        window.setTimeout(() => {
+          community.classList.remove("community-notes--pulse");
+        }, duration);
+      }
+    });
+  }
+  if (typeof options.onFocused === "function") {
+    options.onFocused(match);
+  }
+  return true;
 }
 
 function appendDetail(container, label, value) {
