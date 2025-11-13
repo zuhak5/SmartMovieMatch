@@ -54,7 +54,9 @@ import {
   setRecStatus,
   setRecError,
   showToast,
-  highlightRecommendationCard
+  highlightRecommendationCard,
+  closeMovieOverlay,
+  isMovieOverlayOpen
 } from "./ui.js";
 import { $ } from "./dom.js";
 import { playUiClick, playExpandSound } from "./sound.js";
@@ -1156,6 +1158,7 @@ function wireEvents() {
   const avatarRemoveBtn = $("accountAvatarRemove");
   const notificationBell = $("notificationBell");
   const notificationPanel = $("notificationPanel");
+  const notificationOverlay = $("notificationOverlay");
   const notificationMarkRead = $("notificationMarkRead");
   const themeToggle = $("themeToggle");
   const collectionFilterGenre = $("collectionFilterGenre");
@@ -1191,6 +1194,12 @@ function wireEvents() {
       event.stopPropagation();
       playUiClick();
       toggleNotificationPanel();
+    });
+  }
+
+  if (notificationOverlay) {
+    notificationOverlay.addEventListener("click", () => {
+      closeNotificationPanel();
     });
   }
 
@@ -1363,6 +1372,10 @@ function wireEvents() {
     if (event.key === "Escape") {
       if (isSocialProfileOpen()) {
         closeSocialProfileOverlay();
+        return;
+      }
+      if (isMovieOverlayOpen()) {
+        closeMovieOverlay();
         return;
       }
       if (state.accountMenuOpen) {
@@ -8932,6 +8945,7 @@ function renderNotificationCenter(payload = {}) {
   const bell = $("notificationBell");
   const countEl = $("notificationCount");
   const panel = $("notificationPanel");
+  const overlay = $("notificationOverlay");
   const listEl = $("notificationList");
   const emptyEl = $("notificationEmpty");
   if (!bell || !countEl || !panel || !listEl || !emptyEl) {
@@ -8947,6 +8961,12 @@ function renderNotificationCenter(payload = {}) {
     listEl.hidden = true;
     emptyEl.hidden = false;
     panel.hidden = true;
+    panel.classList.remove("is-visible");
+    if (overlay) {
+      overlay.classList.remove("is-visible");
+      overlay.hidden = true;
+      overlay.setAttribute("aria-hidden", "true");
+    }
     return;
   }
 
@@ -8994,10 +9014,22 @@ function renderNotificationCenter(payload = {}) {
 
   if (state.notificationPanelOpen) {
     panel.hidden = false;
+    panel.classList.add("is-visible");
     bell.setAttribute("aria-expanded", "true");
+    if (overlay) {
+      overlay.hidden = false;
+      overlay.classList.add("is-visible");
+      overlay.setAttribute("aria-hidden", "false");
+    }
   } else {
     panel.hidden = true;
+    panel.classList.remove("is-visible");
     bell.setAttribute("aria-expanded", "false");
+    if (overlay) {
+      overlay.classList.remove("is-visible");
+      overlay.setAttribute("aria-hidden", "true");
+      overlay.hidden = true;
+    }
   }
 }
 

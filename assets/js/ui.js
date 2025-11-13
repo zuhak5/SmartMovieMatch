@@ -10,10 +10,15 @@ const COLLECTION_DEFAULT_STATE = {
   viewExpanded: { favorites: false, watched: false }
 };
 const TOAST_DURATION = 4200;
+const MOVIE_OVERLAY_TRANSITION_MS = 220;
 const LANGUAGE_DISPLAY =
   typeof Intl !== "undefined" && typeof Intl.DisplayNames === "function"
     ? new Intl.DisplayNames(["en"], { type: "language" })
     : null;
+
+let movieOverlayState = { card: null, placeholder: null, details: null, summary: null };
+let movieOverlayElements = null;
+let movieOverlayListenersAttached = false;
 
 function getOmdbField(omdb, key) {
   if (!omdb || omdb.Response === "False") {
@@ -179,6 +184,137 @@ function buildGenreList(tmdb, omdb) {
   }
   const omdbGenres = splitOmdbList(omdb, "Genre");
   return omdbGenres.map((label) => ({ id: null, label }));
+}
+
+function getMovieOverlayElements() {
+  if (movieOverlayElements) {
+    return movieOverlayElements;
+  }
+  const overlay = $("movieOverlay");
+  const hero = $("movieOverlayHero");
+  const body = $("movieOverlayBody");
+  const close = $("movieOverlayClose");
+  const title = $("movieOverlayHeading");
+  if (!overlay || !hero || !body || !close) {
+    return null;
+  }
+  if (!movieOverlayListenersAttached) {
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) {
+        playUiClick();
+        closeMovieOverlay();
+      }
+    });
+    close.addEventListener("click", () => {
+      playUiClick();
+      closeMovieOverlay();
+    });
+    movieOverlayListenersAttached = true;
+  }
+  movieOverlayElements = { overlay, hero, body, close, title };
+  return movieOverlayElements;
+}
+
+function createMovieOverlayHero(summaryButton) {
+  const hero = document.createElement("div");
+  hero.className = "movie-summary movie-overlay-summary";
+  hero.innerHTML = summaryButton.innerHTML;
+  hero.setAttribute("aria-hidden", "true");
+  hero.setAttribute("tabindex", "-1");
+  const stateIcons = hero.querySelector(".movie-state-icons");
+  if (stateIcons) {
+    stateIcons.setAttribute("aria-hidden", "true");
+  }
+  return hero;
+}
+
+export function closeMovieOverlay(options = {}) {
+  if (!movieOverlayState.card) {
+    const elements = getMovieOverlayElements();
+    if (elements && !elements.overlay.hidden) {
+      elements.overlay.classList.remove("is-visible");
+      elements.overlay.setAttribute("aria-hidden", "true");
+      elements.overlay.hidden = true;
+      elements.hero.innerHTML = "";
+      elements.body.innerHTML = "";
+      document.body.classList.remove("movie-overlay-open");
+    }
+    return;
+  }
+  const { card, placeholder, details, summary } = movieOverlayState;
+  const elements = getMovieOverlayElements();
+  if (placeholder && placeholder.parentNode) {
+    placeholder.parentNode.replaceChild(details, placeholder);
+  } else if (card) {
+    card.appendChild(details);
+  }
+  if (card) {
+    card.classList.remove("movie-card--overlay-active");
+  }
+  if (summary) {
+    summary.setAttribute("aria-expanded", "false");
+  }
+  movieOverlayState = { card: null, placeholder: null, details: null, summary: null };
+  if (elements) {
+    elements.overlay.classList.remove("is-visible");
+    elements.overlay.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("movie-overlay-open");
+    window.setTimeout(() => {
+      if (!movieOverlayState.card) {
+        elements.overlay.hidden = true;
+        elements.hero.innerHTML = "";
+        elements.body.innerHTML = "";
+      }
+    }, MOVIE_OVERLAY_TRANSITION_MS);
+  }
+  if (!options.silent && summary && typeof summary.focus === "function") {
+    summary.focus();
+  }
+}
+
+export function isMovieOverlayOpen() {
+  return Boolean(movieOverlayState.card);
+}
+
+function showMovieOverlay(card) {
+  const elements = getMovieOverlayElements();
+  if (!card || !elements) {
+    return;
+  }
+  if (movieOverlayState.card === card) {
+    closeMovieOverlay();
+    return;
+  }
+  const summary = card.querySelector(".movie-summary");
+  const details = card.querySelector(".movie-details");
+  if (!summary || !details || !details.parentNode) {
+    return;
+  }
+  closeMovieOverlay({ silent: true });
+  const placeholder = document.createElement("div");
+  placeholder.className = "movie-details-placeholder";
+  details.parentNode.insertBefore(placeholder, details);
+  elements.hero.innerHTML = "";
+  const heroContent = createMovieOverlayHero(summary);
+  elements.hero.appendChild(heroContent);
+  elements.body.innerHTML = "";
+  elements.body.appendChild(details);
+  const titleText = heroContent.querySelector(".movie-title")?.textContent?.trim();
+  if (elements.title) {
+    elements.title.textContent = titleText ? `Details for ${titleText}` : "Movie details";
+  }
+  movieOverlayState = { card, placeholder, details, summary };
+  summary.setAttribute("aria-expanded", "true");
+  card.classList.add("movie-card--overlay-active");
+  elements.overlay.hidden = false;
+  elements.overlay.setAttribute("aria-hidden", "false");
+  elements.overlay.classList.add("is-visible");
+  document.body.classList.add("movie-overlay-open");
+  window.requestAnimationFrame(() => {
+    if (elements.close) {
+      elements.close.focus();
+    }
+  });
 }
 
 function createMetaChip(label, value) {
@@ -1146,6 +1282,7 @@ export function renderRecommendations(items, watchedMovies, options = {}) {
   if (!grid) {
     return;
   }
+  closeMovieOverlay({ silent: true });
   grid.innerHTML = "";
 
   const favorites = Array.isArray(options.favorites) ? options.favorites : [];
@@ -1735,14 +1872,10 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
     }
   };
 
-  const toggleExpansion = () => {
-    const next = !card.classList.contains("expanded");
-    setExpansionState(next);
-  };
-
-  summaryButton.addEventListener("click", () => {
+  summaryButton.addEventListener("click", (event) => {
+    event.preventDefault();
     playUiClick();
-    toggleExpansion();
+    showMovieOverlay(card);
   });
 
   card.addEventListener("movie-card:set-state", (event) => {
