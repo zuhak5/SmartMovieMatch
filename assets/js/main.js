@@ -75,6 +75,8 @@ const MAX_WATCH_PARTY_SUGGESTIONS = 6;
 const COLLAB_DISCUSSION_MAX_LENGTH = 220;
 
 let inviteQrRequest = 0;
+let notificationOverlayMediaQuery = null;
+let notificationOverlayMediaQueryListenerAttached = false;
 
 const SOCIAL_NOTIFICATION_TYPES = new Set([
   "follow",
@@ -1175,6 +1177,8 @@ function wireEvents() {
   const confirmPasswordInput = $("confirmPasswordInput");
   const settingsPasswordChecklist = $("settingsPasswordChecklist");
 
+  initNotificationOverlayMediaQuery();
+
   if (accountProfileBtn && accountMenu) {
     accountProfileBtn.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -1577,6 +1581,38 @@ function wireEvents() {
     playUiClick();
     openAccountSettings(section);
   });
+}
+
+function shouldUseNotificationOverlay() {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return false;
+  }
+  if (!notificationOverlayMediaQuery) {
+    notificationOverlayMediaQuery = window.matchMedia("(max-width: 720px)");
+  }
+  return notificationOverlayMediaQuery.matches;
+}
+
+function initNotificationOverlayMediaQuery() {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return;
+  }
+  if (!notificationOverlayMediaQuery) {
+    notificationOverlayMediaQuery = window.matchMedia("(max-width: 720px)");
+  }
+  if (notificationOverlayMediaQueryListenerAttached || !notificationOverlayMediaQuery) {
+    return;
+  }
+  const listener = () => {
+    const overlay = $("notificationOverlay");
+    syncNotificationOverlay(overlay, state.notificationPanelOpen);
+  };
+  if (typeof notificationOverlayMediaQuery.addEventListener === "function") {
+    notificationOverlayMediaQuery.addEventListener("change", listener);
+  } else if (typeof notificationOverlayMediaQuery.addListener === "function") {
+    notificationOverlayMediaQuery.addListener(listener);
+  }
+  notificationOverlayMediaQueryListenerAttached = true;
 }
 
 function toggleAccountMenu() {
@@ -9061,11 +9097,15 @@ function normalizePartyResponse(response) {
 
 function syncNotificationOverlay(overlay, isOpen) {
   const body = typeof document !== "undefined" ? document.body : null;
+  const overlayEnabled = shouldUseNotificationOverlay();
   if (body) {
-    body.classList.toggle("notification-overlay-open", Boolean(isOpen));
+    body.classList.toggle(
+      "notification-overlay-open",
+      Boolean(isOpen && overlayEnabled)
+    );
   }
   if (overlay) {
-    if (isOpen) {
+    if (isOpen && overlayEnabled) {
       overlay.hidden = false;
       overlay.classList.add("is-visible");
       overlay.setAttribute("aria-hidden", "false");
