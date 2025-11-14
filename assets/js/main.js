@@ -8924,6 +8924,20 @@ function normalizePartyResponse(response) {
   return "pending";
 }
 
+function syncNotificationOverlay(overlay, isOpen) {
+  if (overlay) {
+    if (isOpen) {
+      overlay.hidden = false;
+      overlay.classList.add("is-visible");
+      overlay.setAttribute("aria-hidden", "false");
+    } else {
+      overlay.classList.remove("is-visible");
+      overlay.setAttribute("aria-hidden", "true");
+      overlay.hidden = true;
+    }
+  }
+}
+
 function renderNotificationCenter(payload = {}) {
   const notifications = Array.isArray(payload.notifications)
     ? payload.notifications
@@ -8949,6 +8963,7 @@ function renderNotificationCenter(payload = {}) {
   const listEl = $("notificationList");
   const emptyEl = $("notificationEmpty");
   if (!bell || !countEl || !panel || !listEl || !emptyEl) {
+    syncNotificationOverlay(overlay, false);
     return;
   }
 
@@ -8962,11 +8977,7 @@ function renderNotificationCenter(payload = {}) {
     emptyEl.hidden = false;
     panel.hidden = true;
     panel.classList.remove("is-visible");
-    if (overlay) {
-      overlay.classList.remove("is-visible");
-      overlay.hidden = true;
-      overlay.setAttribute("aria-hidden", "true");
-    }
+    syncNotificationOverlay(overlay, false);
     return;
   }
 
@@ -9016,20 +9027,12 @@ function renderNotificationCenter(payload = {}) {
     panel.hidden = false;
     panel.classList.add("is-visible");
     bell.setAttribute("aria-expanded", "true");
-    if (overlay) {
-      overlay.hidden = false;
-      overlay.classList.add("is-visible");
-      overlay.setAttribute("aria-hidden", "false");
-    }
+    syncNotificationOverlay(overlay, true);
   } else {
     panel.hidden = true;
     panel.classList.remove("is-visible");
     bell.setAttribute("aria-expanded", "false");
-    if (overlay) {
-      overlay.classList.remove("is-visible");
-      overlay.setAttribute("aria-hidden", "true");
-      overlay.hidden = true;
-    }
+    syncNotificationOverlay(overlay, false);
   }
 }
 

@@ -277,18 +277,21 @@ export function isMovieOverlayOpen() {
 }
 
 function showMovieOverlay(card) {
+  if (!card) {
+    return false;
+  }
   const elements = getMovieOverlayElements();
-  if (!card || !elements) {
-    return;
+  if (!elements) {
+    return false;
   }
   if (movieOverlayState.card === card) {
     closeMovieOverlay();
-    return;
+    return true;
   }
   const summary = card.querySelector(".movie-summary");
   const details = card.querySelector(".movie-details");
   if (!summary || !details || !details.parentNode) {
-    return;
+    return false;
   }
   closeMovieOverlay({ silent: true });
   const placeholder = document.createElement("div");
@@ -315,6 +318,7 @@ function showMovieOverlay(card) {
       elements.close.focus();
     }
   });
+  return true;
 }
 
 function createMetaChip(label, value) {
@@ -1916,7 +1920,11 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
   summaryButton.addEventListener("click", (event) => {
     event.preventDefault();
     playUiClick();
-    showMovieOverlay(card);
+    const handledByOverlay = showMovieOverlay(card);
+    if (!handledByOverlay) {
+      const shouldExpand = !card.classList.contains("expanded");
+      setExpansionState(shouldExpand);
+    }
   });
 
   card.addEventListener("movie-card:set-state", (event) => {
