@@ -105,6 +105,79 @@
       to your mood and what you’ve already watched.
     </p>
 
+    <section id="globalSearchPanel" class="panel global-search-panel pad-inline" aria-label="Global search">
+      <div class="panel-inner pad-inline">
+        <div class="panel-header pad-inline">
+          <div class="pad-inline">
+            <p class="global-search-eyebrow">Search Smart Movie Match</p>
+            <h2 class="panel-title">Find movies, friends, or genres</h2>
+            <p class="panel-subtitle">Type anything you’re curious about and jump to the right spot.</p>
+          </div>
+        </div>
+        <form id="globalSearchForm" class="global-search-form" role="search" novalidate>
+          <label class="sr-only" for="globalSearchInput">Search movies, friends, or genres</label>
+          <div class="global-search-input-row">
+            <span class="global-search-icon" aria-hidden="true">🔎</span>
+            <input
+              id="globalSearchInput"
+              class="input-base input-text global-search-input"
+              type="search"
+              name="globalSearch"
+              autocomplete="off"
+              placeholder="Search for “Dune”, @friend, or “sci-fi”"
+              minlength="2"
+              spellcheck="false"
+            />
+            <button type="button" id="globalSearchClear" class="btn-subtle global-search-clear" hidden>
+              Clear
+            </button>
+          </div>
+        </form>
+        <p id="globalSearchStatus" class="global-search-status" role="status" aria-live="polite">
+          Search for a movie title, friend handle, or genre.
+        </p>
+        <div id="globalSearchResults" class="global-search-results" hidden>
+          <section
+            id="globalSearchMoviesSection"
+            class="global-search-section"
+            aria-label="Movie results"
+            hidden
+          >
+            <header class="global-search-section-header">
+              <h3>Movies</h3>
+              <span id="globalSearchMoviesCount" class="global-search-count" aria-live="polite"></span>
+            </header>
+            <ul id="globalSearchMoviesList" class="global-search-list" role="list"></ul>
+            <p id="globalSearchMoviesEmpty" class="global-search-empty" hidden></p>
+          </section>
+          <section
+            id="globalSearchPeopleSection"
+            class="global-search-section"
+            aria-label="Friend results"
+            hidden
+          >
+            <header class="global-search-section-header">
+              <h3>Friends</h3>
+              <span id="globalSearchPeopleCount" class="global-search-count" aria-live="polite"></span>
+            </header>
+            <ul id="globalSearchPeopleList" class="global-search-list" role="list"></ul>
+            <p id="globalSearchPeopleEmpty" class="global-search-empty" hidden></p>
+          </section>
+          <section
+            id="globalSearchGenresSection"
+            class="global-search-section"
+            aria-label="Genre results"
+            hidden
+          >
+            <header class="global-search-section-header">
+              <h3>Genres</h3>
+            </header>
+            <ul id="globalSearchGenresList" class="global-search-chip-list" role="list"></ul>
+          </section>
+        </div>
+      </div>
+    </section>
+
   </header>
 
   <main class="app-main">

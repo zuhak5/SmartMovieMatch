@@ -396,6 +396,229 @@ body[data-theme="light"]::after {
     gap: 1rem;
   }
 
+  .global-search-panel {
+    margin-top: var(--space-md);
+  }
+
+  .global-search-form {
+    margin-top: var(--space-sm);
+  }
+
+  .global-search-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.4rem 0.85rem;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    background: rgba(15, 23, 42, 0.7);
+  }
+
+  .global-search-icon {
+    font-size: 1.1rem;
+    color: var(--text-subtle);
+  }
+
+  .global-search-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font-size: 1rem;
+  }
+
+  .global-search-input:focus {
+    outline: none;
+  }
+
+  .global-search-clear {
+    font-size: 0.85rem;
+    padding-inline: 0.75rem;
+  }
+
+  .global-search-status {
+    margin: 0.6rem 0 0;
+    font-size: 0.85rem;
+    color: var(--text-subtle);
+    min-height: 1.1em;
+  }
+
+  .global-search-status[data-variant="loading"] {
+    color: var(--accent-secondary);
+  }
+
+  .global-search-status[data-variant="success"] {
+    color: var(--success);
+  }
+
+  .global-search-status[data-variant="error"] {
+    color: var(--error);
+  }
+
+  .global-search-results {
+    margin-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .global-search-results[hidden] {
+    display: none;
+  }
+
+  .global-search-section {
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 18px;
+    padding: 1rem;
+    background: rgba(2, 6, 23, 0.45);
+  }
+
+  .global-search-section[hidden] {
+    display: none;
+  }
+
+  .global-search-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .global-search-count {
+    font-size: 0.85rem;
+    color: var(--text-subtle);
+  }
+
+  .global-search-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .global-search-list[hidden] {
+    display: none;
+  }
+
+  .global-search-item {
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 16px;
+    padding: 0.85rem;
+    background: rgba(15, 23, 42, 0.55);
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .global-search-item-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+  }
+
+  .global-search-item-title span {
+    font-size: 0.85rem;
+    color: var(--text-subtle);
+    font-weight: 500;
+  }
+
+  .global-search-item-meta,
+  .global-search-item-description {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-subtle);
+  }
+
+  .global-search-item-description {
+    color: rgba(226, 232, 240, 0.9);
+  }
+
+  .global-search-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.3rem;
+  }
+
+  .global-search-action {
+    flex: none;
+  }
+
+  .global-search-empty {
+    margin: 0.25rem 0 0;
+    font-size: 0.85rem;
+    color: var(--text-subtle);
+  }
+
+  .global-search-empty[hidden] {
+    display: none;
+  }
+
+  .global-search-chip-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .global-search-chip-list li {
+    margin: 0;
+  }
+
+  .global-search-chip {
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    border-radius: 999px;
+    padding: 0.3rem 0.85rem;
+    background: transparent;
+    color: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background var(--transition-fast), border-color var(--transition-fast);
+  }
+
+  .global-search-chip:hover,
+  .global-search-chip:focus-visible {
+    background: rgba(148, 163, 184, 0.2);
+    border-color: rgba(148, 163, 184, 0.7);
+  }
+
+  .global-search-eyebrow {
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin: 0 0 0.2rem;
+    color: var(--text-subtle);
+  }
+
+  .global-search-person-handle {
+    font-size: 0.85rem;
+    color: var(--text-subtle);
+  }
+
+  .global-search-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0.25rem 0 0;
+  }
+
+  .global-search-tag {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    color: var(--text-subtle);
+    background: rgba(15, 23, 42, 0.4);
+  }
+
   .panel,
   .auth-card {
     border-radius: 18px;
