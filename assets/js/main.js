@@ -1,4 +1,5 @@
 import { TMDB_GENRES } from "./config.js";
+import { fetchFromTmdb } from "./api.js";
 import {
   loadSession,
   subscribeToSession,
@@ -80,6 +81,13 @@ const MAX_FOLLOW_NOTE_LENGTH = 180;
 const MAX_SUGGESTED_COLLABORATORS = 4;
 const MAX_WATCH_PARTY_SUGGESTIONS = 6;
 const COLLAB_DISCUSSION_MAX_LENGTH = 220;
+const GLOBAL_SEARCH_MIN_LENGTH = 2;
+const SOCIAL_SEARCH_MIN_LENGTH = 3;
+const GLOBAL_SEARCH_DEBOUNCE_MS = 220;
+const GLOBAL_SEARCH_MAX_MOVIES = 5;
+const GLOBAL_SEARCH_MAX_PEOPLE = 5;
+const GLOBAL_SEARCH_MAX_GENRES = 8;
+const GLOBAL_SEARCH_DEFAULT_STATUS = "Search for a movie title, friend handle, or genre.";
 const DEFAULT_NOTIFICATION_PREFERENCES = {
   securityEmails: true,
   followEmails: false,
@@ -153,6 +161,9 @@ const state = {
     lastPreferencesSync: null,
     lastWatchedSync: null,
     lastFavoritesSync: null
+  },
+  globalSearch: {
+    controller: null
   }
 };
 
@@ -1066,6 +1077,7 @@ function init() {
   wireEvents();
   renderNotificationCenter();
   maybeApplyPageContextFromQuery();
+  maybeApplyDiscoverySearchIntent();
 
   if (!state.onboardingSeen) {
     window.setTimeout(() => {
@@ -1136,11 +1148,14 @@ function maybeFocusNotificationTarget() {
 }
 
 function clearNotificationQueryParams() {
+  removeQueryParams(["movie", "tmdb", "imdb", "title", "context", "notification", "source"]);
+}
+
+function removeQueryParams(keys = []) {
   if (!window.history || typeof window.history.replaceState !== "function") {
-    return;
+    return false;
   }
   const url = new URL(window.location.href);
-  const keys = ["movie", "tmdb", "imdb", "title", "context", "notification", "source"];
   let mutated = false;
   keys.forEach((key) => {
     if (url.searchParams.has(key)) {
@@ -1149,11 +1164,12 @@ function clearNotificationQueryParams() {
     }
   });
   if (!mutated) {
-    return;
+    return false;
   }
   const nextSearch = url.searchParams.toString();
   const next = `${url.pathname}${nextSearch ? `?${nextSearch}` : ""}${url.hash || ""}`;
   window.history.replaceState({}, document.title, next);
+  return true;
 }
 
 function maybeApplyPageContextFromQuery() {
@@ -1191,6 +1207,27 @@ function maybeApplyPageContextFromQuery() {
     });
   }
   clearNotificationQueryParams();
+}
+
+function maybeApplyDiscoverySearchIntent() {
+  if (!isDiscoveryPage()) {
+    return;
+  }
+  const params = new URLSearchParams(window.location.search);
+  const consumed = [];
+  const searchQuery = params.get("search");
+  const genreParam = params.get("genre");
+  if (searchQuery && state.globalSearch.controller?.search) {
+    state.globalSearch.controller.search(searchQuery);
+    consumed.push("search", "searchType");
+  }
+  if (genreParam && applyGenreSelection(String(genreParam), { silent: true })) {
+    consumed.push("genre");
+  }
+  if (consumed.length) {
+    consumed.push("context");
+    removeQueryParams(consumed);
+  }
 }
 
 function wireEvents() {
@@ -1630,6 +1667,705 @@ function wireEvents() {
     playUiClick();
     openAccountSettings(section);
   });
+
+  setupGlobalSearch();
+}
+
+function setupGlobalSearch() {
+  const panel = $("globalSearchPanel");
+  const input = $("globalSearchInput");
+  const statusEl = $("globalSearchStatus");
+  const resultsEl = $("globalSearchResults");
+  const form = $("globalSearchForm");
+  const clearBtn = $("globalSearchClear");
+  const moviesSection = $("globalSearchMoviesSection");
+  const moviesList = $("globalSearchMoviesList");
+  const moviesCount = $("globalSearchMoviesCount");
+  const moviesEmpty = $("globalSearchMoviesEmpty");
+  const peopleSection = $("globalSearchPeopleSection");
+  const peopleList = $("globalSearchPeopleList");
+  const peopleCount = $("globalSearchPeopleCount");
+  const peopleEmpty = $("globalSearchPeopleEmpty");
+  const genresSection = $("globalSearchGenresSection");
+  const genresList = $("globalSearchGenresList");
+
+  state.globalSearch.controller = null;
+
+  if (!panel || !input || !statusEl || !resultsEl) {
+    return;
+  }
+
+  let searchTimer = null;
+  let activeRequestId = 0;
+  let movieAbortController = null;
+
+  const setStatus = (message, variant = "muted") => {
+    if (!statusEl) {
+      return;
+    }
+    const copy = message || "";
+    statusEl.textContent = copy;
+    statusEl.hidden = !copy;
+    if (!copy) {
+      statusEl.removeAttribute("data-variant");
+    } else {
+      statusEl.dataset.variant = variant;
+    }
+  };
+
+  const resetSection = () => {
+    if (moviesList) {
+      moviesList.innerHTML = "";
+      moviesList.hidden = false;
+    }
+    if (peopleList) {
+      peopleList.innerHTML = "";
+      peopleList.hidden = false;
+    }
+    if (genresList) {
+      genresList.innerHTML = "";
+    }
+    if (moviesSection) {
+      moviesSection.hidden = true;
+    }
+    if (peopleSection) {
+      peopleSection.hidden = true;
+    }
+    if (genresSection) {
+      genresSection.hidden = true;
+    }
+    if (moviesCount) {
+      moviesCount.textContent = "";
+    }
+    if (peopleCount) {
+      peopleCount.textContent = "";
+    }
+    if (moviesEmpty) {
+      moviesEmpty.hidden = true;
+      moviesEmpty.textContent = "";
+    }
+    if (peopleEmpty) {
+      peopleEmpty.hidden = true;
+      peopleEmpty.textContent = "";
+    }
+    resultsEl.hidden = true;
+  };
+
+  const resetResults = ({ status, variant } = {}) => {
+    if (movieAbortController) {
+      movieAbortController.abort();
+      movieAbortController = null;
+    }
+    if (searchTimer) {
+      window.clearTimeout(searchTimer);
+      searchTimer = null;
+    }
+    activeRequestId += 1;
+    resetSection();
+    setStatus(status || GLOBAL_SEARCH_DEFAULT_STATUS, variant || "muted");
+  };
+
+  const updateClearVisibility = () => {
+    if (!clearBtn) {
+      return;
+    }
+    clearBtn.hidden = !(input.value && input.value.trim().length);
+  };
+
+  const fetchPeopleResults = (query) => {
+    if (!state.session || !state.session.token) {
+      return Promise.resolve({ results: [], message: "Sign in to search for friends." });
+    }
+    if (query.length < SOCIAL_SEARCH_MIN_LENGTH) {
+      const remaining = SOCIAL_SEARCH_MIN_LENGTH - query.length;
+      const suffix = remaining === 1 ? "" : "s";
+      return Promise.resolve({
+        results: [],
+        message: `Add ${remaining} more character${suffix} to search friends.`
+      });
+    }
+    return searchSocialUsers(query)
+      .then((results) => ({
+        results,
+        message: results.length ? "" : "No friend matches yet."
+      }))
+      .catch((error) => ({
+        results: [],
+        message:
+          error && error.message
+            ? String(error.message)
+            : "We couldn’t search friends right now."
+      }));
+  };
+
+  const runSearch = (rawQuery, immediate = false) => {
+    const query = typeof rawQuery === "string" ? rawQuery : input.value;
+    const trimmed = query.trim();
+    updateClearVisibility();
+    if (!trimmed) {
+      resetResults();
+      return;
+    }
+    if (trimmed.length < GLOBAL_SEARCH_MIN_LENGTH) {
+      resetResults({
+        status: `Enter at least ${GLOBAL_SEARCH_MIN_LENGTH} characters to search.`,
+        variant: "muted"
+      });
+      return;
+    }
+
+    const execute = () => {
+      const requestId = ++activeRequestId;
+      if (movieAbortController) {
+        movieAbortController.abort();
+      }
+      movieAbortController = new AbortController();
+      resetSection();
+      setStatus(`Searching for “${trimmed}”…`, "loading");
+
+      const moviesPromise = fetchFromTmdb(
+        "search/movie",
+        { query: trimmed, include_adult: "false" },
+        { signal: movieAbortController.signal }
+      )
+        .then((data) => {
+          const results = Array.isArray(data?.results) ? data.results : [];
+          const limited = results.slice(0, GLOBAL_SEARCH_MAX_MOVIES);
+          return {
+            entries: limited,
+            total: typeof data?.total_results === "number" ? data.total_results : limited.length,
+            message: limited.length ? "" : "No movie matches yet."
+          };
+        })
+        .catch((error) => {
+          if (isAbortError(error)) {
+            return { entries: [], total: 0, message: "" };
+          }
+          console.warn("Global search movie error", error);
+          return {
+            entries: [],
+            total: 0,
+            message: "Movie search isn’t available right now."
+          };
+        });
+
+      const peoplePromise = fetchPeopleResults(trimmed).then((payload) => ({
+        results: Array.isArray(payload.results)
+          ? payload.results.slice(0, GLOBAL_SEARCH_MAX_PEOPLE)
+          : [],
+        message: payload.message || ""
+      }));
+
+      const genreMatches = findMatchingGenres(trimmed).slice(0, GLOBAL_SEARCH_MAX_GENRES);
+
+      Promise.all([moviesPromise, peoplePromise])
+        .then(([moviePayload, peoplePayload]) => {
+          if (requestId !== activeRequestId) {
+            return;
+          }
+          const moviesVisible = renderGlobalSearchMovies(
+            { section: moviesSection, list: moviesList, count: moviesCount, empty: moviesEmpty },
+            moviePayload,
+            trimmed
+          );
+          const peopleVisible = renderGlobalSearchPeople(
+            { section: peopleSection, list: peopleList, count: peopleCount, empty: peopleEmpty },
+            peoplePayload
+          );
+          const genresVisible = renderGlobalSearchGenres(
+            { section: genresSection, list: genresList },
+            genreMatches,
+            trimmed
+          );
+          const hasAny = moviesVisible || peopleVisible || genresVisible;
+          if (!hasAny) {
+            setStatus(`No matches for “${trimmed}”.`, "error");
+            resultsEl.hidden = true;
+            return;
+          }
+          setStatus(`Results for “${trimmed}”`, "success");
+          resultsEl.hidden = false;
+        })
+        .catch((error) => {
+          if (requestId !== activeRequestId) {
+            return;
+          }
+          const message = error && error.message
+            ? String(error.message)
+            : "We couldn’t search right now. Try again.";
+          setStatus(message, "error");
+          resultsEl.hidden = true;
+        });
+    };
+
+    if (immediate) {
+      execute();
+      return;
+    }
+
+    if (searchTimer) {
+      window.clearTimeout(searchTimer);
+    }
+    searchTimer = window.setTimeout(execute, GLOBAL_SEARCH_DEBOUNCE_MS);
+  };
+
+  resetResults();
+  updateClearVisibility();
+
+  input.addEventListener("input", () => {
+    runSearch(input.value);
+  });
+
+  if (form) {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      runSearch(input.value, true);
+    });
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      input.value = "";
+      updateClearVisibility();
+      resetResults();
+      input.focus();
+    });
+  }
+
+  state.globalSearch.controller = {
+    search(query) {
+      const next = typeof query === "string" ? query : "";
+      input.value = next;
+      updateClearVisibility();
+      runSearch(next || input.value, true);
+    },
+    setQuery(query) {
+      input.value = typeof query === "string" ? query : "";
+      updateClearVisibility();
+    },
+    focus() {
+      input.focus();
+    }
+  };
+}
+
+function renderGlobalSearchMovies(elements, payload, query) {
+  const { section, list, count, empty } = elements;
+  if (!section || !list) {
+    return false;
+  }
+  const entries = Array.isArray(payload?.entries) ? payload.entries : [];
+  const message = payload?.message ? String(payload.message) : "";
+  const hasEntries = entries.length > 0;
+  list.innerHTML = "";
+  list.hidden = !hasEntries;
+  if (count) {
+    count.textContent = hasEntries
+      ? formatSearchCount(entries.length, payload?.total || entries.length)
+      : "";
+  }
+  if (!hasEntries && !message) {
+    section.hidden = true;
+    if (empty) {
+      empty.hidden = true;
+      empty.textContent = "";
+    }
+    return false;
+  }
+  section.hidden = false;
+  if (hasEntries) {
+    entries.forEach((movie) => {
+      list.appendChild(createGlobalSearchMovieItem(movie, query));
+    });
+    if (empty) {
+      empty.hidden = true;
+      empty.textContent = "";
+    }
+    return true;
+  }
+  if (empty) {
+    empty.hidden = !message;
+    empty.textContent = message;
+  }
+  return Boolean(message);
+}
+
+function renderGlobalSearchPeople(elements, payload) {
+  const { section, list, count, empty } = elements;
+  if (!section || !list) {
+    return false;
+  }
+  const entries = Array.isArray(payload?.results) ? payload.results : [];
+  const message = payload?.message ? String(payload.message) : "";
+  const hasEntries = entries.length > 0;
+  list.innerHTML = "";
+  list.hidden = !hasEntries;
+  if (count) {
+    count.textContent = hasEntries ? `${entries.length}` : "";
+  }
+  if (!hasEntries && !message) {
+    section.hidden = true;
+    if (empty) {
+      empty.hidden = true;
+      empty.textContent = "";
+    }
+    return false;
+  }
+  section.hidden = false;
+  entries.forEach((person) => {
+    list.appendChild(createGlobalSearchPersonItem(person));
+  });
+  if (empty) {
+    empty.hidden = !message;
+    empty.textContent = message;
+  }
+  return Boolean(hasEntries || message);
+}
+
+function renderGlobalSearchGenres(elements, genres, query) {
+  const { section, list } = elements;
+  if (!section || !list) {
+    return false;
+  }
+  const entries = Array.isArray(genres) ? genres : [];
+  list.innerHTML = "";
+  if (!entries.length) {
+    section.hidden = true;
+    return false;
+  }
+  section.hidden = false;
+  entries.forEach((genre) => {
+    const li = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "global-search-chip";
+    button.textContent = genre.name;
+    button.addEventListener("click", () => handleGlobalSearchGenreAction(genre, query));
+    li.appendChild(button);
+    list.appendChild(li);
+  });
+  return true;
+}
+
+function createGlobalSearchMovieItem(movie, query) {
+  const item = document.createElement("li");
+  item.className = "global-search-item";
+  const title = document.createElement("p");
+  title.className = "global-search-item-title";
+  const label = movie?.title || movie?.original_title || movie?.name || "Untitled";
+  title.textContent = label;
+  const releaseYear = (movie?.release_date || movie?.first_air_date || "").slice(0, 4);
+  if (releaseYear) {
+    const year = document.createElement("span");
+    year.textContent = releaseYear;
+    title.appendChild(year);
+  }
+  item.appendChild(title);
+
+  const metaParts = [];
+  if (typeof movie?.vote_average === "number" && movie.vote_average > 0) {
+    metaParts.push(`${movie.vote_average.toFixed(1)} ★`);
+  }
+  if (movie?.original_language) {
+    metaParts.push(movie.original_language.toUpperCase());
+  }
+  if (Array.isArray(movie?.genre_ids) && movie.genre_ids.length) {
+    const genreLabels = movie.genre_ids
+      .map((id) => TMDB_GENRES[id] || null)
+      .filter(Boolean)
+      .slice(0, 2);
+    if (genreLabels.length) {
+      metaParts.push(genreLabels.join(" / "));
+    }
+  }
+  if (metaParts.length) {
+    const meta = document.createElement("p");
+    meta.className = "global-search-item-meta";
+    meta.textContent = metaParts.join(" • ");
+    item.appendChild(meta);
+  }
+
+  const overview = (movie?.overview || "").trim();
+  if (overview) {
+    const summary = document.createElement("p");
+    summary.className = "global-search-item-description";
+    summary.textContent = overview.length > 220 ? `${overview.slice(0, 217)}…` : overview;
+    item.appendChild(summary);
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "global-search-actions";
+  const primaryBtn = document.createElement("button");
+  primaryBtn.type = "button";
+  primaryBtn.className = "btn-secondary global-search-action";
+  primaryBtn.textContent = isDiscoveryPage() ? "Use these genres" : "Open in discovery";
+  primaryBtn.addEventListener("click", () => handleGlobalSearchMovieAction(movie, query));
+  actions.appendChild(primaryBtn);
+
+  const link = document.createElement("a");
+  link.className = "btn-subtle global-search-action";
+  link.target = "_blank";
+  link.rel = "noreferrer noopener";
+  link.textContent = "View on TMDB";
+  if (movie?.id) {
+    link.href = `https://www.themoviedb.org/movie/${movie.id}`;
+  } else {
+    const fallback = label || query || "movie";
+    link.href = `https://www.themoviedb.org/search?query=${encodeURIComponent(fallback)}`;
+  }
+  actions.appendChild(link);
+
+  item.appendChild(actions);
+  return item;
+}
+
+function createGlobalSearchPersonItem(person) {
+  const item = document.createElement("li");
+  item.className = "global-search-item";
+  const title = document.createElement("p");
+  title.className = "global-search-item-title";
+  title.textContent = person?.displayName || person?.username || "Smart Movie Match member";
+  if (person?.username) {
+    const handle = document.createElement("span");
+    handle.className = "global-search-person-handle";
+    handle.textContent = `@${person.username}`;
+    title.appendChild(handle);
+  }
+  item.appendChild(title);
+
+  const detail = document.createElement("p");
+  detail.className = "global-search-item-meta";
+  detail.textContent =
+    person?.reason?.trim() || person?.tagline?.trim() || "Active on Smart Movie Match";
+  item.appendChild(detail);
+
+  const tagValues = buildGlobalSearchPersonTags(person);
+  if (tagValues.length) {
+    const tags = document.createElement("div");
+    tags.className = "global-search-tags";
+    tagValues.forEach((text) => {
+      const tag = document.createElement("span");
+      tag.className = "global-search-tag";
+      tag.textContent = text;
+      tags.appendChild(tag);
+    });
+    item.appendChild(tags);
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "global-search-actions";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "btn-secondary global-search-action";
+  button.textContent = "Open profile";
+  button.addEventListener("click", () => handleGlobalSearchFriendAction(person?.username));
+  actions.appendChild(button);
+  item.appendChild(actions);
+  return item;
+}
+
+function buildGlobalSearchPersonTags(person = {}) {
+  const tags = [];
+  if (Array.isArray(person.sharedFavorites) && person.sharedFavorites.length) {
+    tags.push(`${person.sharedFavorites.length} shared favorites`);
+  }
+  if (Array.isArray(person.sharedInterests) && person.sharedInterests.length) {
+    tags.push(person.sharedInterests.slice(0, 2).join(" • "));
+  }
+  if (Array.isArray(person.mutualFollowers) && person.mutualFollowers.length) {
+    tags.push(`${person.mutualFollowers.length} mutuals`);
+  }
+  if (Array.isArray(person.sharedWatchParties) && person.sharedWatchParties.length) {
+    tags.push(`${person.sharedWatchParties.length} watch parties`);
+  }
+  return tags.slice(0, 3);
+}
+
+function handleGlobalSearchMovieAction(movie, query) {
+  if (!movie) {
+    return;
+  }
+  playUiClick();
+  if (isDiscoveryPage()) {
+    applyGenresFromMovie(movie);
+    return;
+  }
+  const title = movie.title || movie.original_title || movie.name || "";
+  redirectToDiscoverySearch({
+    query: query || title,
+    type: "movie",
+    tmdbId: movie.id ? String(movie.id) : "",
+    title,
+    context: "search"
+  });
+}
+
+function handleGlobalSearchGenreAction(genre, query) {
+  if (!genre || !genre.id) {
+    return;
+  }
+  playUiClick();
+  if (isDiscoveryPage()) {
+    applyGenreSelection(String(genre.id));
+    return;
+  }
+  redirectToDiscoverySearch({ query: query || genre.name, type: "genre", genreId: genre.id });
+}
+
+function handleGlobalSearchFriendAction(username) {
+  if (!username) {
+    return;
+  }
+  playUiClick();
+  openSocialProfile(username);
+}
+
+function redirectToDiscoverySearch(intent = {}) {
+  const url = new URL("index.html", window.location.origin);
+  const query = intent.query ? String(intent.query) : "";
+  if (query) {
+    url.searchParams.set("search", query);
+  }
+  if (intent.type) {
+    url.searchParams.set("searchType", String(intent.type));
+  }
+  if (intent.tmdbId) {
+    url.searchParams.set("movie", String(intent.tmdbId));
+  }
+  if (intent.title) {
+    url.searchParams.set("title", String(intent.title));
+  }
+  if (intent.genreId) {
+    url.searchParams.set("genre", String(intent.genreId));
+  }
+  const context = intent.context ? String(intent.context) : "search";
+  url.searchParams.set("context", context);
+  window.location.href = url.toString();
+}
+
+function applyGenresFromMovie(movie) {
+  if (!isDiscoveryPage()) {
+    return false;
+  }
+  if (!movie || !Array.isArray(movie.genre_ids) || !movie.genre_ids.length) {
+    showToast({
+      title: "No genre info",
+      text: "TMDB didn’t provide genres for that title.",
+      icon: "ℹ️"
+    });
+    return false;
+  }
+  const applied = [];
+  Array.from(new Set(movie.genre_ids.map((id) => String(id)))).forEach((genreId) => {
+    const didApply = applyGenreSelection(genreId, { refresh: false, scroll: false, silent: true });
+    if (didApply) {
+      applied.push(genreId);
+    }
+  });
+  if (!applied.length) {
+    showToast({
+      title: "Already tuned",
+      text: "Those genres are already part of your vibe.",
+      icon: "ℹ️"
+    });
+    return false;
+  }
+  getRecommendations(true);
+  scrollToPreferencesPanel();
+  const labels = applied.map((id) => TMDB_GENRES[id] || `Genre ${id}`);
+  showToast({
+    title: "Vibe updated",
+    text: `Leaning into ${labels.join(", ")}.`,
+    icon: "✨"
+  });
+  return true;
+}
+
+function applyGenreSelection(genreId, options = {}) {
+  if (!isDiscoveryPage() || !genreId) {
+    return false;
+  }
+  const changed = toggleGenreCheckbox(genreId);
+  if (!changed) {
+    if (!options.silent) {
+      showToast({
+        title: "Already active",
+        text: `${TMDB_GENRES[genreId] || "That genre"} is already in your vibe.`,
+        icon: "ℹ️"
+      });
+    }
+    return false;
+  }
+  if (options.refresh !== false) {
+    getRecommendations(true);
+  }
+  if (options.scroll !== false) {
+    scrollToPreferencesPanel();
+  }
+  if (!options.silent) {
+    showToast({
+      title: "Genre added",
+      text: `Dialing up ${TMDB_GENRES[genreId] || "that genre"}.`,
+      icon: "🎯"
+    });
+  }
+  return true;
+}
+
+function toggleGenreCheckbox(genreId) {
+  const checkbox = document.querySelector(`input[name="genre"][value="${genreId}"]`);
+  if (!checkbox || checkbox.checked) {
+    return false;
+  }
+  checkbox.checked = true;
+  checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+  return true;
+}
+
+function scrollToPreferencesPanel() {
+  const panel = $("preferencesPanel");
+  if (!panel) {
+    return;
+  }
+  window.requestAnimationFrame(() => {
+    try {
+      panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (error) {
+      panel.scrollIntoView();
+    }
+  });
+}
+
+function findMatchingGenres(query) {
+  const normalized = normalizeSearchTerm(query);
+  if (!normalized) {
+    return [];
+  }
+  return Object.entries(TMDB_GENRES)
+    .map(([id, label]) => {
+      const cleaned = normalizeSearchTerm(label);
+      const index = cleaned.indexOf(normalized);
+      if (index === -1) {
+        return null;
+      }
+      return { id, name: label, score: index, length: cleaned.length };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.score - b.score || a.length - b.length || a.name.localeCompare(b.name));
+}
+
+function normalizeSearchTerm(value) {
+  return typeof value === "string" ? value.toLowerCase().replace(/[^a-z0-9]/gi, "") : "";
+}
+
+function formatSearchCount(displayed, total) {
+  if (!displayed) {
+    return "";
+  }
+  if (!total || total <= displayed) {
+    return `${displayed}`;
+  }
+  return `Top ${displayed} of ${total}`;
 }
 
 function shouldUseNotificationOverlay() {
@@ -1788,6 +2524,11 @@ function highlightCollectionSection(target) {
       highlightEl.classList.remove("profile-section-pulse");
     }, 1200);
   }
+}
+
+function isDiscoveryPage() {
+  const page = document.body ? document.body.getAttribute("data-page") : null;
+  return page === "discovery";
 }
 
 function isAccountSettingsContext() {
