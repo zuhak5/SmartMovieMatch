@@ -11,6 +11,11 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const AUTH_SERVICE_CONFIGURED = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 const LOCAL_STORE_PATH = path.join(__dirname, "..", "data", "auth-users.json");
 const USING_LOCAL_STORE = !AUTH_SERVICE_CONFIGURED;
+const DEFAULT_NOTIFICATION_PREFERENCES = {
+  securityEmails: true,
+  followEmails: false,
+  partyEmails: true
+};
 
 function safeFilename(name) {
   return String(name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -953,6 +958,12 @@ function sanitizePreferences(preferences) {
   } else {
     delete safe.personaPins;
   }
+  const notificationPreferences = sanitizeNotificationPreferences(preferences.notificationPreferences);
+  if (notificationPreferences) {
+    safe.notificationPreferences = notificationPreferences;
+  } else {
+    delete safe.notificationPreferences;
+  }
   delete safe.pinnedList;
   delete safe.pinnedReview;
   return safe;
@@ -1018,6 +1029,29 @@ function sanitizePersonaPins(pins) {
     normalized.review = review;
   }
   return Object.keys(normalized).length ? normalized : null;
+}
+
+function sanitizeNotificationPreferences(prefs) {
+  const source = prefs && typeof prefs === "object" ? prefs : {};
+  const normalized = {
+    securityEmails:
+      typeof source.securityEmails === "boolean"
+        ? source.securityEmails
+        : DEFAULT_NOTIFICATION_PREFERENCES.securityEmails,
+    followEmails:
+      typeof source.followEmails === "boolean"
+        ? source.followEmails
+        : DEFAULT_NOTIFICATION_PREFERENCES.followEmails,
+    partyEmails:
+      typeof source.partyEmails === "boolean"
+        ? source.partyEmails
+        : DEFAULT_NOTIFICATION_PREFERENCES.partyEmails
+  };
+  const matchesDefaults =
+    normalized.securityEmails === DEFAULT_NOTIFICATION_PREFERENCES.securityEmails &&
+    normalized.followEmails === DEFAULT_NOTIFICATION_PREFERENCES.followEmails &&
+    normalized.partyEmails === DEFAULT_NOTIFICATION_PREFERENCES.partyEmails;
+  return matchesDefaults ? null : normalized;
 }
 
 function sanitizePinnedListPin(value) {

@@ -661,7 +661,7 @@ Ensure #authStatus appears directly below the submit button, not at the very bot
 
 
 ## 5. account-settings.html – Account & Security
-[Codex status: DONE]  (Last updated: 2025-11-14 by Codex)
+[Codex status: DONE]  (Last updated: 2025-02-15 by Codex)
 
 
 Goal: Make it effortless to manage identity + safety, while hinting at how that affects the social side.
@@ -721,6 +721,10 @@ Add a small sticky “Settings” sidebar or top tabs that link to those anchors
 
 On mobile, make this a horizontal pill strip at the top of #accountSettingsContent so users can jump directly without scrolling.
 
+
+Implementation notes for Codex (internal):
+
+- Notifications sidebar + card now offer email toggles for security events, new follows, and watch party invites, persisted via auth preference snapshots so the bell stays the default feed while email stays optional.
 
 
 ## 1. index – Home / Discovery
@@ -1121,7 +1125,7 @@ Notification: “Maya replied to your review” → banner: “View discussion�
 - [x] 2. profile.html – Profile Overview  (Done: 2025-11-14 by Codex)
 - [x] 3. peeruser.html – Peer / Friend Profile  (Done: 2025-11-14 by Codex)
 - [x] 4. login.html – Auth Page  (Done: 2025-11-14 by Codex)
-- [x] 5. account-settings.html – Account & Security  (Done: 2025-11-14 by Codex)
+- [x] 5. account-settings.html – Account & Security  (Done: 2025-02-15 by Codex)
 
 **Codex instructions for this tracker:**
 

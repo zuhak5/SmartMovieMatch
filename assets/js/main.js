@@ -80,6 +80,11 @@ const MAX_FOLLOW_NOTE_LENGTH = 180;
 const MAX_SUGGESTED_COLLABORATORS = 4;
 const MAX_WATCH_PARTY_SUGGESTIONS = 6;
 const COLLAB_DISCUSSION_MAX_LENGTH = 220;
+const DEFAULT_NOTIFICATION_PREFERENCES = {
+  securityEmails: true,
+  followEmails: false,
+  partyEmails: true
+};
 
 let inviteQrRequest = 0;
 let notificationOverlayMediaQuery = null;
@@ -1166,6 +1171,7 @@ function wireEvents() {
   const accountProfile = $("accountProfile");
   const profileForm = $("accountProfileForm");
   const securityForm = $("accountSecurityForm");
+  const notificationsForm = $("accountNotificationsForm");
   const avatarInput = $("accountAvatarInput");
   const avatarUploadBtn = $("accountAvatarUpload");
   const avatarRemoveBtn = $("accountAvatarRemove");
@@ -1431,6 +1437,10 @@ function wireEvents() {
 
   if (securityForm) {
     securityForm.addEventListener("submit", handleSecuritySubmit);
+  }
+
+  if (notificationsForm) {
+    notificationsForm.addEventListener("submit", handleNotificationPreferencesSubmit);
   }
 
   if (avatarInput) {
@@ -1817,6 +1827,10 @@ function populateAccountSettings() {
   const preview = $("settingsAvatarPreview");
   const profileStatus = $("accountProfileStatus");
   const securityStatus = $("accountSecurityStatus");
+  const notificationsStatus = $("accountNotificationsStatus");
+  const notifySecurityInput = $("notifySecurityEmail");
+  const notifyFollowInput = $("notifyFollowEmail");
+  const notifyPartyInput = $("notifyPartyEmail");
   const avatarInput = $("accountAvatarInput");
   const handleValue = $("accountHandleValue");
   const taglinePreview = $("accountTaglinePreview");
@@ -1841,6 +1855,11 @@ function populateAccountSettings() {
   if (securityStatus) {
     securityStatus.textContent = "";
     securityStatus.removeAttribute("data-variant");
+  }
+
+  if (notificationsStatus) {
+    notificationsStatus.textContent = "";
+    notificationsStatus.removeAttribute("data-variant");
   }
 
   if (handleValue) {
@@ -1873,6 +1892,17 @@ function populateAccountSettings() {
     syncCopy.textContent = "Used for favorites, reviews, and friend suggestions across Smart Movie Match.";
   }
 
+  const notificationPrefs = getNotificationPreferenceSnapshot();
+  if (notifySecurityInput) {
+    notifySecurityInput.checked = notificationPrefs.securityEmails;
+  }
+  if (notifyFollowInput) {
+    notifyFollowInput.checked = notificationPrefs.followEmails;
+  }
+  if (notifyPartyInput) {
+    notifyPartyInput.checked = notificationPrefs.partyEmails;
+  }
+
   const initials = getActiveDisplayName().slice(0, 2).toUpperCase() || "SM";
   if (settingsAvatar && preview) {
     if (state.session && state.session.avatarUrl) {
@@ -1892,6 +1922,27 @@ function populateAccountSettings() {
     }
   }
 
+}
+
+function getNotificationPreferenceSnapshot() {
+  const snapshot = state.session && state.session.preferencesSnapshot;
+  const raw = snapshot && typeof snapshot.notificationPreferences === "object"
+    ? snapshot.notificationPreferences
+    : {};
+  return {
+    securityEmails:
+      typeof raw.securityEmails === "boolean"
+        ? raw.securityEmails
+        : DEFAULT_NOTIFICATION_PREFERENCES.securityEmails,
+    followEmails:
+      typeof raw.followEmails === "boolean"
+        ? raw.followEmails
+        : DEFAULT_NOTIFICATION_PREFERENCES.followEmails,
+    partyEmails:
+      typeof raw.partyEmails === "boolean"
+        ? raw.partyEmails
+        : DEFAULT_NOTIFICATION_PREFERENCES.partyEmails
+  };
 }
 
 function setupSettingsNavHighlighting() {
@@ -2095,6 +2146,56 @@ async function handleSecuritySubmit(event) {
     updatePasswordChecklist(checklist, "", "");
   } catch (error) {
     statusEl.textContent = error.message || "Couldn’t update your password.";
+    statusEl.dataset.variant = "error";
+  }
+}
+
+async function handleNotificationPreferencesSubmit(event) {
+  event.preventDefault();
+  if (!state.session || !state.session.token) {
+    window.location.href = "login.html";
+    return;
+  }
+  const statusEl = $("accountNotificationsStatus");
+  const securityInput = $("notifySecurityEmail");
+  const followInput = $("notifyFollowEmail");
+  const partyInput = $("notifyPartyEmail");
+  if (!statusEl || !securityInput || !followInput || !partyInput) {
+    return;
+  }
+
+  const nextPrefs = {
+    securityEmails: Boolean(securityInput.checked),
+    followEmails: Boolean(followInput.checked),
+    partyEmails: Boolean(partyInput.checked)
+  };
+  const currentPrefs = getNotificationPreferenceSnapshot();
+  const noChanges =
+    nextPrefs.securityEmails === currentPrefs.securityEmails &&
+    nextPrefs.followEmails === currentPrefs.followEmails &&
+    nextPrefs.partyEmails === currentPrefs.partyEmails;
+  if (noChanges) {
+    statusEl.textContent = "Already saved.";
+    statusEl.removeAttribute("data-variant");
+    return;
+  }
+
+  statusEl.textContent = "Saving notification preferences…";
+  statusEl.dataset.variant = "loading";
+
+  try {
+    const snapshot = {
+      ...(state.session && state.session.preferencesSnapshot ? state.session.preferencesSnapshot : {}),
+      notificationPreferences: nextPrefs
+    };
+    await persistPreferencesRemote(state.session, snapshot);
+    statusEl.textContent = "Notification preferences saved.";
+    statusEl.dataset.variant = "success";
+  } catch (error) {
+    statusEl.textContent =
+      error instanceof Error && error.message
+        ? error.message
+        : "Couldn’t update notification preferences.";
     statusEl.dataset.variant = "error";
   }
 }
