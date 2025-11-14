@@ -8596,7 +8596,7 @@ function renderSocialProfileContent(profile) {
     personaGrid.dataset.peeruserSection = "world";
   }
   const insight = buildPeerInsight(profile);
-  const overlapColumn = buildPeerOverlapColumn(profile);
+  const overlapColumn = buildPeerOverlapColumn(profile, { isFollowing });
   const worldColumn = buildPeerWorldColumn({ personaGrid, insight });
   const layout = document.createElement("div");
   layout.className = "peeruser-layout-grid";
@@ -8833,7 +8833,7 @@ function createPeerHeroActions({ normalized, isFollowing, displayName, isMuted, 
         setSocialProfileStatus("", null);
       });
     } else {
-      followBtn.className = "btn-secondary";
+      followBtn.className = "btn-primary";
       followBtn.textContent = "Follow";
       followBtn.addEventListener("click", async () => {
         setSocialProfileStatus(`Following @${normalized}…`, "loading");
@@ -8842,6 +8842,12 @@ function createPeerHeroActions({ normalized, isFollowing, displayName, isMuted, 
       });
     }
     container.appendChild(followBtn);
+    if (isFollowing) {
+      const followContext = document.createElement("p");
+      followContext.className = "peeruser-follow-context";
+      followContext.textContent = "You’ll see their reviews and lists in your social feed.";
+      container.appendChild(followContext);
+    }
   }
   const secondary = document.createElement("div");
   secondary.className = "peeruser-secondary-actions";
@@ -9110,7 +9116,9 @@ function buildMutualFollowersPanel(handles, panelId) {
   return { panel, closeButton: closeBtn };
 }
 
-function buildPeerOverlapColumn(profile) {
+function buildPeerOverlapColumn(profile, options = {}) {
+  const isFollowing = options.isFollowing === true;
+  const compatibility = !isFollowing ? computeTasteCompatibility(profile) : null;
   const favorites = normalizeStringArray(profile && profile.sharedFavorites);
   const genres = normalizeStringArray(profile && profile.sharedInterests);
   const watches = normalizeStringArray(profile && profile.sharedWatchHistory);
@@ -9158,6 +9166,14 @@ function buildPeerOverlapColumn(profile) {
   heading.className = "peeruser-section-title";
   heading.textContent = "How you overlap";
   column.appendChild(heading);
+  if (!isFollowing) {
+    const nudge = document.createElement("p");
+    nudge.className = "peeruser-overlap-nudge";
+    nudge.textContent = compatibility && typeof compatibility.score === "number"
+      ? `Taste match ${compatibility.score}% – following them will improve your social feed.`
+      : "High taste match – following them will improve your social feed.";
+    column.appendChild(nudge);
+  }
   const grid = document.createElement("div");
   grid.className = "peeruser-overlap-grid";
   cards.forEach((card) => {
