@@ -504,7 +504,7 @@ Add a tiny “Clear all” filter pill on the right so people aren’t hunting t
 
 
 ## 2. profile.html – Profile Overview
-[Codex status: TODO]  (Last updated: 2025-11-13 by Codex)
+[Codex status: DONE]  (Last updated: 2025-11-14 by Codex)
 
 
 Goal: This page should answer: “Who am I on Smart Movie Match?” (taste + social footprint) in a quick scroll.
@@ -569,6 +569,11 @@ On mobile, collapse some areas with <details>:
 e.g. “Recognition badges” and “Collaborative lists” can be expandable, leaving “Find friends” and “Share profile” more visible.
 
 
+
+Implementation notes for Codex (internal):
+
+- Profile hero now renders avatar, handle, tagline, and follower stats, with the taste summary mirrored in the callout pulse text.
+- Social connections panel is reorganized into highlights, presence, collapsible collaboration blocks, a dedicated “Find friends” area, and a separate share panel. Recognition badges and collaboration shells collapse on mobile via `initResponsiveCollapsibles()`.
 
 ## 3. peeruser.html – Peer / Friend Profile
 [Codex status: TODO]  (Last updated: 2025-11-13 by Codex)
@@ -1113,7 +1118,7 @@ Notification: “Maya replied to your review” → banner: “View discussion�
 - [x] 9. Reduce friction to find and follow people  (Done: 2025-11-14 by Codex)
 
 - [x] 1. index.html – Discovery / Home  (Done: 2025-11-14 by Codex)
-- [ ] 2. profile.html – Profile Overview
+- [x] 2. profile.html – Profile Overview  (Done: 2025-11-14 by Codex)
 - [ ] 3. peeruser.html – Peer / Friend Profile
 - [ ] 4. login.html – Auth Page
 - [ ] 5. account-settings.html – Account & Security
