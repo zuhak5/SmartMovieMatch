@@ -143,6 +143,7 @@ Implementation notes for Codex (internal):
 
 - Discovery now includes a social-first nudge card plus a live friends activity panel sourced from notifications and collaborative list data.
 - Recommendation cards surface inline friend context via the condensed community header, so the social signal is visible even before expanding a movie.
+- The discovery stack now also surfaces a compact “From your friends” strip synced with notifications so fresh social updates are glanceable without opening the bell.
 
 
 
@@ -500,6 +501,11 @@ In the #recommendationsPanel header, turn #recMetaPrimary + the genre/mood info 
 “Cozy Sci-Fi • Genres: Sci-Fi, Adventure • IMDb 7+ • Streamable now”
 
 Add a tiny “Clear all” filter pill on the right so people aren’t hunting through the left panel to reset.
+
+
+Implementation notes for Codex (internal):
+
+- The recommendations column now embeds a compact “From your friends” feed sourced from live notifications, plus an “Open notifications” CTA that jumps straight to the bell panel.
 
 
 

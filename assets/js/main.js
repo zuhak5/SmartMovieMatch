@@ -5935,6 +5935,7 @@ function renderFriendsActivityFeed() {
       content.style.display = "none";
     }
     renderDiscoveryFollowSuggestions();
+    renderFriendsInlineHighlights();
     return;
   }
   if (signedOut) {
@@ -5950,6 +5951,7 @@ function renderFriendsActivityFeed() {
   renderFriendWatchActivity(buildFriendWatchActivityEntries());
   renderFriendListActivity(buildCollaborativeListActivityEntries());
   renderDiscoveryFollowSuggestions();
+  renderFriendsInlineHighlights();
 }
 
 function buildFriendWatchActivityEntries(limit = 4) {
@@ -6149,6 +6151,136 @@ function renderFriendListActivity(entries) {
     }
     listEl.appendChild(row);
   });
+}
+
+function renderFriendsInlineHighlights() {
+  const panel = $("friendsInlinePanel");
+  const listEl = $("friendsInlineList");
+  const emptyEl = $("friendsInlineEmpty");
+  const seeAllBtn = $("friendsInlineSeeAll");
+  if (!panel || !listEl || !emptyEl) {
+    return;
+  }
+  const isSignedIn = Boolean(state.session && state.session.token);
+  if (!isSignedIn) {
+    listEl.innerHTML = "";
+    panel.hidden = true;
+    panel.setAttribute("aria-hidden", "true");
+    return;
+  }
+  const highlights = buildInlineFriendHighlightEntries();
+  listEl.innerHTML = "";
+  if (!highlights.length) {
+    listEl.hidden = true;
+    emptyEl.hidden = false;
+  } else {
+    listEl.hidden = false;
+    emptyEl.hidden = true;
+    highlights.forEach((entry) => {
+      const item = document.createElement("div");
+      item.className = "friends-inline-item";
+      item.setAttribute("role", "listitem");
+      const icon = document.createElement("span");
+      icon.className = "friends-inline-icon";
+      icon.textContent = entry.icon || "🔔";
+      icon.setAttribute("aria-hidden", "true");
+      item.appendChild(icon);
+      const body = document.createElement("div");
+      body.className = "friends-inline-body";
+      const text = document.createElement("p");
+      text.className = "friends-inline-text";
+      text.textContent = entry.text;
+      body.appendChild(text);
+      if (entry.timestamp) {
+        const meta = document.createElement("span");
+        meta.className = "friends-inline-meta";
+        meta.textContent = entry.timestamp;
+        body.appendChild(meta);
+      }
+      item.appendChild(body);
+      const actionBtn = createInlineNotificationAction(entry.action);
+      if (actionBtn) {
+        item.appendChild(actionBtn);
+      }
+      listEl.appendChild(item);
+    });
+  }
+  panel.hidden = false;
+  panel.setAttribute("aria-hidden", "false");
+  if (seeAllBtn && !seeAllBtn.dataset.bound) {
+    seeAllBtn.addEventListener("click", () => {
+      playUiClick();
+      openNotificationPanel();
+      const bell = $("notificationBell");
+      if (bell) {
+        bell.focus();
+      }
+    });
+    seeAllBtn.dataset.bound = "true";
+  }
+}
+
+function buildInlineFriendHighlightEntries(limit = 3) {
+  if (!Array.isArray(state.notifications) || !state.notifications.length) {
+    return [];
+  }
+  return state.notifications
+    .filter((note) => note && getNotificationCategory(note) === "social")
+    .sort((a, b) => {
+      const aTime = Date.parse(a && a.createdAt ? a.createdAt : "") || 0;
+      const bTime = Date.parse(b && b.createdAt ? b.createdAt : "") || 0;
+      return bTime - aTime;
+    })
+    .slice(0, limit)
+    .map((note) => ({
+      id: note.id || `${note.type || "note"}-${note.createdAt || Date.now()}`,
+      icon: getNotificationIcon(note.type),
+      text: formatInlineNotificationMessage(note),
+      timestamp: formatNotificationTimestamp(note.createdAt),
+      action: getNotificationActionConfig(note)
+    }));
+}
+
+function formatInlineNotificationMessage(note) {
+  if (!note) {
+    return "Friend activity update.";
+  }
+  const rawMessage = typeof note.message === "string" ? note.message.trim() : "";
+  const actorHandle = typeof note.actor === "string" ? note.actor.trim() : "";
+  if (!rawMessage) {
+    if (actorHandle) {
+      const label = formatSocialDisplayName(actorHandle);
+      return label ? `${label} has new activity.` : "Friend activity update.";
+    }
+    return "Friend activity update.";
+  }
+  if (actorHandle) {
+    const display = formatSocialDisplayName(actorHandle);
+    if (display) {
+      const lowerMessage = rawMessage.toLowerCase();
+      const lowerHandle = actorHandle.toLowerCase();
+      const index = lowerMessage.indexOf(lowerHandle);
+      if (index >= 0) {
+        return `${rawMessage.slice(0, index)}${display}${rawMessage.slice(index + actorHandle.length)}`;
+      }
+    }
+  }
+  return rawMessage;
+}
+
+function createInlineNotificationAction(config) {
+  if (!config || typeof config.handler !== "function") {
+    return null;
+  }
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "friends-inline-link btn-link btn-link-inline";
+  button.textContent = config.label || "View";
+  button.addEventListener("click", () => {
+    playUiClick();
+    config.handler();
+  });
+  return button;
 }
 
 function formatFriendActivityAction(entry) {
@@ -10382,29 +10514,36 @@ function buildNotificationItem(note) {
 }
 
 function buildNotificationAction(note) {
+  const config = getNotificationActionConfig(note);
+  if (!config) {
+    return null;
+  }
+  return createNotificationActionButton(config.label, config.handler);
+}
+
+function getNotificationActionConfig(note) {
   const type = typeof note?.type === "string" ? note.type.toLowerCase() : "";
   switch (type) {
     case "follow":
-      return createNotificationActionButton("Open social hub", () => openProfileDeepLink("social"));
+      return { label: "Open social hub", handler: () => openProfileDeepLink("social") };
     case "collab_invite":
-      return createNotificationActionButton("Review invite", () => openProfileDeepLink("collab"));
+      return { label: "Review invite", handler: () => openProfileDeepLink("collab") };
     case "collab_accept":
-      return createNotificationActionButton("See the list", () => openProfileDeepLink("collab"));
+      return { label: "See the list", handler: () => openProfileDeepLink("collab") };
     case "watch_party":
-      return createNotificationActionButton("View watch party", () => openProfileDeepLink("party"));
+      return { label: "View watch party", handler: () => openProfileDeepLink("party") };
     case "watch_party_update":
     case "watch_party_reminder":
-      return createNotificationActionButton("Open RSVP", () => openProfileDeepLink("party"));
+      return { label: "Open RSVP", handler: () => openProfileDeepLink("party") };
     default:
       break;
   }
   if (note && (note.movieTmdbId || note.movieImdbId || note.movieTitle)) {
-    const label = type && (type.includes("review") || type === "mention")
-      ? "View discussion"
-      : "Open movie";
-    return createNotificationActionButton(label, () => {
-      openMovieContextFromNotification(note, { context: "community" });
-    });
+    const label = type && (type.includes("review") || type === "mention") ? "View discussion" : "Open movie";
+    return {
+      label,
+      handler: () => openMovieContextFromNotification(note, { context: "community" })
+    };
   }
   return null;
 }
