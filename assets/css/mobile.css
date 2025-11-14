@@ -1053,6 +1053,7 @@ body[data-theme="light"] .account-link:hover {
   transition: opacity 220ms ease;
   opacity: 0;
   pointer-events: none;
+  overscroll-behavior: contain;
 }
 
 .notification-overlay.is-visible {
@@ -1086,11 +1087,29 @@ body[data-theme="light"] .account-link:hover {
 
 @media (max-width: 720px) {
   .notification-panel {
-    right: auto;
+    top: auto;
+    bottom: 0;
     left: 50%;
-    transform-origin: top center;
-    width: min(100%, 420px);
+    right: auto;
+    width: 100%;
+    max-height: 90vh;
+    transform-origin: bottom center;
+    border-radius: 24px 24px 0 0;
     --notification-panel-translate-x: -50%;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0));
+    padding-top: clamp(0.9rem, 3vw, 1.2rem);
+    box-shadow: 0 -12px 40px rgba(2, 6, 23, 0.6);
+  }
+}
+
+@supports (height: 100dvh) {
+  .notification-panel {
+    max-height: min(78dvh, 540px);
+  }
+  @media (max-width: 720px) {
+    .notification-panel {
+      max-height: 92dvh;
+    }
   }
 }
 
@@ -1108,6 +1127,12 @@ body[data-theme="light"] .account-link:hover {
   z-index: -1;
 }
 
+@media (max-width: 720px) {
+  .notification-panel::before {
+    display: none;
+  }
+}
+
 .notification-panel.is-visible {
   opacity: 1;
   transform: translate(var(--notification-panel-translate-x), 0) scale(1);
@@ -1119,6 +1144,48 @@ body[data-theme="light"] .account-link:hover {
   align-items: center;
   gap: 0.65rem;
   margin-bottom: 0.75rem;
+}
+
+.notification-panel-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.notification-close {
+  border: none;
+  background: rgba(15, 23, 42, 0.85);
+  color: rgba(226, 232, 240, 0.9);
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.notification-close:hover,
+.notification-close:focus-visible {
+  background: rgba(59, 130, 246, 0.95);
+  color: rgba(2, 6, 23, 0.95);
+}
+
+@media (max-width: 720px) {
+  .notification-panel-header {
+    align-items: flex-start;
+  }
+  .notification-panel-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .notification-close {
+    display: inline-flex;
+  }
 }
 
 .notification-panel-title {
@@ -1139,6 +1206,11 @@ body[data-theme="light"] .account-link:hover {
   max-height: calc(100% - 2.8rem);
   overflow-y: auto;
   padding-right: 7.5px;
+}
+
+body.notification-overlay-open {
+  overflow: hidden;
+  touch-action: none;
 }
 
 .notification-item {
@@ -1529,6 +1601,14 @@ body[data-theme="light"] .account-link:hover {
   opacity: 0;
   pointer-events: none;
   transition: opacity 220ms ease;
+  min-height: 100vh;
+  overscroll-behavior: contain;
+}
+
+@supports (height: 100dvh) {
+  .movie-overlay {
+    min-height: 100dvh;
+  }
 }
 
 .movie-overlay.is-visible {
@@ -1539,7 +1619,7 @@ body[data-theme="light"] .account-link:hover {
 .movie-overlay-panel {
   width: min(960px, 100%);
   max-height: calc(100vh - 2rem);
-  overflow-y: auto;
+  overflow: hidden;
   background:
     linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(34, 211, 238, 0.08)),
     rgba(5, 10, 24, 0.96);
@@ -1548,23 +1628,48 @@ body[data-theme="light"] .account-link:hover {
   box-shadow: 0 40px 80px rgba(2, 6, 23, 0.8);
   padding: clamp(1rem, 2.8vw, 2.25rem);
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.9rem, 2vw, 1.4rem);
+  overscroll-behavior: contain;
+}
+
+@supports (height: 100dvh) {
+  .movie-overlay-panel {
+    max-height: calc(100dvh - 2rem);
+  }
 }
 
 @media (max-width: 720px) {
   .movie-overlay {
-    padding: 0.75rem;
+    padding: 0;
+    align-items: stretch;
   }
   .movie-overlay-panel {
-    max-height: 100vh;
-    border-radius: 0;
     width: 100%;
+    border-radius: 0;
+    max-height: none;
+    min-height: 100vh;
+    padding: calc(1rem + env(safe-area-inset-top, 0)) clamp(1rem, 4vw, 1.5rem) calc(1.25rem + env(safe-area-inset-bottom, 0));
+  }
+  .movie-overlay-body {
+    padding-right: 0;
+  }
+}
+
+@supports (height: 100dvh) {
+  @media (max-width: 720px) {
+    .movie-overlay-panel {
+      min-height: 100dvh;
+      max-height: 100dvh;
+    }
   }
 }
 
 .movie-overlay-close {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
+  top: clamp(0.75rem, 2vw, 1.25rem);
+  right: clamp(0.75rem, 2vw, 1.25rem);
   border: none;
   width: 2.5rem;
   height: 2.5rem;
@@ -1579,6 +1684,13 @@ body[data-theme="light"] .account-link:hover {
   box-shadow: 0 10px 30px rgba(2, 6, 23, 0.45);
 }
 
+@media (max-width: 720px) {
+  .movie-overlay-close {
+    top: calc(env(safe-area-inset-top, 0) + 0.6rem);
+    right: calc(env(safe-area-inset-right, 0) + 0.6rem);
+  }
+}
+
 .movie-overlay-close:hover,
 .movie-overlay-close:focus-visible {
   background: rgba(59, 130, 246, 0.95);
@@ -1586,7 +1698,8 @@ body[data-theme="light"] .account-link:hover {
 }
 
 .movie-overlay-hero {
-  margin-bottom: clamp(1rem, 2vw, 1.6rem);
+  margin-bottom: 0;
+  flex-shrink: 0;
 }
 
 .movie-overlay-summary {
@@ -1610,6 +1723,16 @@ body[data-theme="light"] .account-link:hover {
   flex-direction: column;
   gap: 1rem;
   padding-right: 0.25rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable both-edges;
+}
+
+@media (max-width: 720px) {
+  .movie-overlay-body {
+    scrollbar-gutter: auto;
+  }
 }
 
 .movie-overlay-body .movie-details {
@@ -1618,6 +1741,7 @@ body[data-theme="light"] .account-link:hover {
 
 body.movie-overlay-open {
   overflow: hidden;
+  touch-action: none;
 }
 
 .modal {
