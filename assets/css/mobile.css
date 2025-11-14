@@ -2053,7 +2053,77 @@ body.movie-overlay-open {
 
 .peeruser-mutual-more {
   font-size: 0.85rem;
+  color: var(--accent-secondary);
+  border: none;
+  background: transparent;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+}
+
+.peeruser-mutual-more.is-active {
+  color: var(--accent-strong);
+}
+
+.peeruser-mutual-more:focus-visible {
+  outline: 2px solid var(--accent-secondary);
+  outline-offset: 2px;
+}
+
+.peeruser-mutual-panel {
+  flex-basis: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(2, 6, 23, 0.94);
+  padding: 0.9rem;
+  box-shadow: 0 20px 40px rgba(2, 6, 23, 0.45);
+}
+
+.peeruser-mutual-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.35rem;
+}
+
+.peeruser-mutual-panel-title {
+  margin: 0;
+  font-weight: 600;
+  color: rgba(248, 250, 252, 0.95);
+}
+
+.peeruser-mutual-panel-description {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
   color: var(--text-subtle);
+}
+
+.peeruser-mutual-panel-close {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-subtle);
+  font-size: 0.8rem;
+  padding: 0.2rem 0.85rem;
+  cursor: pointer;
+}
+
+.peeruser-mutual-panel-close:hover,
+.peeruser-mutual-panel-close:focus-visible {
+  border-color: var(--accent-strong);
+  color: var(--accent-strong);
+}
+
+.peeruser-mutual-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
 }
 
 .peeruser-insight {

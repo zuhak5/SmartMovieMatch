@@ -615,6 +615,11 @@ Right under the hero, add a subtle strip: “Mutual followers: N” with up to 3
 That’s a very strong social signal and deserves top placement.
 
 
+Implementation notes for Codex (internal):
+
+- Mutual follower strips now expose a “+ more” toggle that opens a mini list built with `buildSocialListItem`, complete with follow/unfollow + safety controls and click-outside dismissal.
+
+
 
 ## 4. login.html – Auth Page
 [Codex status: DONE]  (Last updated: 2025-11-14 by Codex)
