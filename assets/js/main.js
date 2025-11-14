@@ -8925,15 +8925,26 @@ function createMutualFollowersStrip(profile) {
   if (!profile || !Array.isArray(profile.mutualFollowers) || !profile.mutualFollowers.length) {
     return null;
   }
+  const currentUser = canonicalHandle(state.session && state.session.username ? state.session.username : "");
+  const handles = Array.from(
+    new Set(
+      profile.mutualFollowers
+        .map((handle) => canonicalHandle(handle))
+        .filter((handle) => handle && handle !== currentUser)
+    )
+  );
+  if (!handles.length) {
+    return null;
+  }
   const strip = document.createElement("div");
   strip.className = "peeruser-mutuals";
   strip.dataset.peeruserSection = "mutuals";
   const label = document.createElement("strong");
-  label.textContent = `Mutual followers: ${profile.mutualFollowers.length}`;
+  label.textContent = `Mutual followers: ${handles.length}`;
   strip.appendChild(label);
   const avatars = document.createElement("div");
   avatars.className = "peeruser-mutual-avatars";
-  profile.mutualFollowers.slice(0, 3).forEach((handle) => {
+  handles.slice(0, 3).forEach((handle) => {
     const button = createProfileButton(handle, {
       className: "peeruser-mutual-avatar",
       ariaLabel: `View profile for ${formatSocialDisplayName(handle)}`,
@@ -8946,13 +8957,157 @@ function createMutualFollowersStrip(profile) {
   if (avatars.childElementCount) {
     strip.appendChild(avatars);
   }
-  if (profile.mutualFollowers.length > 3) {
-    const more = document.createElement("span");
+  if (handles.length > 3) {
+    const normalizedOwner = canonicalHandle(profile && profile.username ? profile.username : socialProfileActiveUsername);
+    const panelIdBase = normalizedOwner ? normalizedOwner : `mutual-${Math.random().toString(36).slice(2, 8)}`;
+    const panelId = `peeruserMutualPanel-${panelIdBase}`;
+    const more = document.createElement("button");
+    more.type = "button";
     more.className = "peeruser-mutual-more";
-    more.textContent = `+${profile.mutualFollowers.length - 3} more`;
+    more.textContent = `+${handles.length - 3} more`;
+    more.setAttribute("aria-controls", panelId);
+    more.setAttribute("aria-expanded", "false");
+    more.setAttribute("aria-label", "Show all mutual followers");
     strip.appendChild(more);
+    const panelInfo = buildMutualFollowersPanel(handles, panelId);
+    if (panelInfo) {
+      strip.appendChild(panelInfo.panel);
+      let outsideHandler = null;
+      const closePanel = () => {
+        panelInfo.panel.hidden = true;
+        more.setAttribute("aria-expanded", "false");
+        more.classList.remove("is-active");
+        if (outsideHandler) {
+          document.removeEventListener("click", outsideHandler);
+          outsideHandler = null;
+        }
+      };
+      const openPanel = () => {
+        panelInfo.panel.hidden = false;
+        more.setAttribute("aria-expanded", "true");
+        more.classList.add("is-active");
+        panelInfo.panel.focus();
+        if (!outsideHandler) {
+          outsideHandler = (event) => {
+            if (!strip.contains(event.target)) {
+              closePanel();
+            }
+          };
+          document.addEventListener("click", outsideHandler);
+        }
+      };
+      const togglePanel = () => {
+        playUiClick();
+        if (panelInfo.panel.hidden) {
+          openPanel();
+        } else {
+          closePanel();
+        }
+      };
+      more.addEventListener("click", togglePanel);
+      if (panelInfo.closeButton) {
+        panelInfo.closeButton.addEventListener("click", () => {
+          closePanel();
+          more.focus();
+        });
+      }
+      panelInfo.panel.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          closePanel();
+          more.focus();
+        }
+      });
+      strip.addEventListener("DOMNodeRemoved", () => {
+        if (outsideHandler) {
+          document.removeEventListener("click", outsideHandler);
+          outsideHandler = null;
+        }
+      });
+    }
   }
   return strip;
+}
+
+function buildMutualFollowersPanel(handles, panelId) {
+  if (!Array.isArray(handles) || !handles.length) {
+    return null;
+  }
+  const panel = document.createElement("div");
+  panel.className = "peeruser-mutual-panel";
+  panel.id = panelId;
+  panel.hidden = true;
+  panel.tabIndex = -1;
+  panel.setAttribute("role", "dialog");
+  panel.setAttribute("aria-label", "All mutual followers");
+
+  const header = document.createElement("div");
+  header.className = "peeruser-mutual-panel-header";
+  const title = document.createElement("p");
+  title.className = "peeruser-mutual-panel-title";
+  title.textContent = "All mutual followers";
+  header.appendChild(title);
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "peeruser-mutual-panel-close";
+  closeBtn.textContent = "Close";
+  header.appendChild(closeBtn);
+  panel.appendChild(header);
+
+  const description = document.createElement("p");
+  description.className = "peeruser-mutual-panel-description";
+  description.textContent = "See everyone who follows you both.";
+  panel.appendChild(description);
+
+  const list = document.createElement("div");
+  list.className = "peeruser-mutual-list";
+  const followingSet = new Set(
+    (Array.isArray(state.followingUsers) ? state.followingUsers : [])
+      .map((handle) => canonicalHandle(handle))
+      .filter(Boolean)
+  );
+  const mutedSet = getMutedHandleSet();
+  const blockedSet = getBlockedHandleSet();
+  handles.forEach((handle) => {
+    if (!handle) {
+      return;
+    }
+    const isFollowing = followingSet.has(handle);
+    const item = buildSocialListItem({
+      username: handle,
+      isFollowing,
+      followsYou: true,
+      mutualFollowers: handles.filter((value) => value !== handle),
+      onPrimaryAction: (button) => {
+        if (!state.session || !state.session.token) {
+          window.location.href = "login.html";
+          return;
+        }
+        if (isFollowing) {
+          handleUnfollowUser(handle, button);
+        } else {
+          handleFollowFromList(handle, button);
+        }
+      },
+      onMuteToggle: (button) => {
+        playUiClick();
+        handleMuteToggle(handle, button, { statusTarget: "profile", clearOnSuccess: true });
+      },
+      onBlockToggle:
+        state.session && state.session.token
+          ? (button) => {
+              playUiClick();
+              handleBlockToggle(handle, button, { statusTarget: "profile", clearOnSuccess: true });
+            }
+          : null,
+      isMuted: mutedSet.has(handle),
+      isBlocked: blockedSet.has(handle)
+    });
+    if (item) {
+      list.appendChild(item);
+    }
+  });
+  panel.appendChild(list);
+  return { panel, closeButton: closeBtn };
 }
 
 function buildPeerOverlapColumn(profile) {
