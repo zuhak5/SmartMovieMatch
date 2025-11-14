@@ -1557,33 +1557,6 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
     genreTags.appendChild(tag);
   });
 
-  infoWrap.appendChild(titleRow);
-  if (titleVariants) {
-    infoWrap.appendChild(titleVariants);
-  }
-  if (metaRow.childElementCount) {
-    infoWrap.appendChild(metaRow);
-  }
-  if (idRow) {
-    infoWrap.appendChild(idRow);
-  }
-  infoWrap.appendChild(ratingsRow);
-  if (flagRow) {
-    infoWrap.appendChild(flagRow);
-  }
-  if (reasonRow) {
-    infoWrap.appendChild(reasonRow);
-  }
-  if (presenceRow) {
-    infoWrap.appendChild(presenceRow);
-  }
-  if (genreTags.childElementCount) {
-    infoWrap.appendChild(genreTags);
-  }
-  if (synopsisBlock) {
-    infoWrap.appendChild(synopsisBlock);
-  }
-
   const communityContext = document.createElement("div");
   communityContext.className = "movie-community-context";
   communityContext.hidden = true;
@@ -1603,12 +1576,10 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
   communityMeta.appendChild(communityFriends);
 
   communityContext.appendChild(communityMeta);
-  infoWrap.appendChild(communityContext);
 
   const communityActivity = document.createElement("div");
   communityActivity.className = "movie-community-activity";
   communityActivity.hidden = true;
-  infoWrap.appendChild(communityActivity);
 
   const communityQuickEntry = document.createElement("button");
   communityQuickEntry.type = "button";
@@ -1626,7 +1597,36 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
     );
     focusCommunitySection(card, { pulse: true, focusInput: true });
   });
+
+  infoWrap.appendChild(titleRow);
+  if (titleVariants) {
+    infoWrap.appendChild(titleVariants);
+  }
+  if (metaRow.childElementCount) {
+    infoWrap.appendChild(metaRow);
+  }
+  infoWrap.appendChild(communityContext);
+  infoWrap.appendChild(communityActivity);
   infoWrap.appendChild(communityQuickEntry);
+  if (idRow) {
+    infoWrap.appendChild(idRow);
+  }
+  infoWrap.appendChild(ratingsRow);
+  if (flagRow) {
+    infoWrap.appendChild(flagRow);
+  }
+  if (reasonRow) {
+    infoWrap.appendChild(reasonRow);
+  }
+  if (presenceRow) {
+    infoWrap.appendChild(presenceRow);
+  }
+  if (genreTags.childElementCount) {
+    infoWrap.appendChild(genreTags);
+  }
+  if (synopsisBlock) {
+    infoWrap.appendChild(synopsisBlock);
+  }
 
   const stateIcons = document.createElement("div");
   stateIcons.className = "movie-state-icons";

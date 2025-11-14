@@ -3184,48 +3184,57 @@ function getSelectedGenreLabels() {
 }
 
 function buildActiveFilterLabels() {
-  const labels = [];
-  if (state.activePreset && state.activePreset.title) {
-    labels.push(state.activePreset.title);
-  }
   const genreLabels = getSelectedGenreLabels();
+  const presetLabel = state.activePreset && state.activePreset.title ? state.activePreset.title.trim() : "";
+  const detailLabels = [];
+
   if (genreLabels.length) {
     const preview = genreLabels.slice(0, 3);
     let genreText = `Genres: ${preview.join(", ")}`;
     if (genreLabels.length > preview.length) {
       genreText += ` +${genreLabels.length - preview.length}`;
     }
-    labels.push(genreText);
+    detailLabels.push(genreText);
+  } else {
+    detailLabels.push("Genres: Popular mix");
   }
+
   if (state.recommendationFilters.topRated) {
-    labels.push("IMDb 7+");
+    detailLabels.push("IMDb 7+");
   }
   if (state.recommendationFilters.streaming) {
-    labels.push("Streamable now");
+    detailLabels.push("Streamable now");
   }
   if (state.recommendationFilters.fresh) {
-    labels.push("Released <2y");
+    detailLabels.push("Released <2y");
   }
-  return labels;
+
+  const hasCustomizations = Boolean(
+    presetLabel || genreLabels.length || state.recommendationFilters.topRated || state.recommendationFilters.streaming || state.recommendationFilters.fresh
+  );
+
+  return {
+    vibeLabel: presetLabel || "Personal mix",
+    detailLabels,
+    hasCustomizations
+  };
 }
 
 function updateRecommendationFilterSummary() {
+  const vibeEl = $("recMetaPrimary");
   const summaryEl = $("recFilterSummary");
   const resetBtn = $("recFilterReset");
-  const labels = buildActiveFilterLabels();
+  const { vibeLabel, detailLabels, hasCustomizations } = buildActiveFilterLabels();
+  if (vibeEl) {
+    vibeEl.textContent = vibeLabel;
+  }
   if (summaryEl) {
-    if (labels.length) {
-      summaryEl.textContent = labels.join(" • ");
-      summaryEl.hidden = false;
-    } else {
-      summaryEl.textContent = "";
-      summaryEl.hidden = true;
-    }
+    summaryEl.textContent = detailLabels.join(" • ");
+    summaryEl.hidden = false;
   }
   if (resetBtn) {
-    const shouldShow = labels.length > 0;
-    resetBtn.hidden = !shouldShow;
-    resetBtn.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+    resetBtn.hidden = !hasCustomizations;
+    resetBtn.setAttribute("aria-hidden", hasCustomizations ? "false" : "true");
   }
 }
 
@@ -3335,7 +3344,7 @@ async function getRecommendations(isShuffleOnly) {
       titleEl.textContent = "Recommendations";
     }
 
-    const metaEl = $("recMetaPrimary");
+    const metaEl = $("recResultsMeta");
     const genreLabel = selectedGenres.length
       ? "inside your selected genres"
       : "across popular genres";
@@ -3602,13 +3611,14 @@ function updateShowMoreButton() {
 }
 
 function updateRecommendationsMeta() {
-  const metaEl = $("recMetaPrimary");
+  const metaEl = $("recResultsMeta");
   if (!metaEl) {
     return;
   }
 
   const context = state.recommendationContext;
-  if (!context || !context.baseMeta) {
+  if (!context) {
+    metaEl.textContent = "Waiting for your vibe…";
     return;
   }
 
@@ -3616,24 +3626,26 @@ function updateRecommendationsMeta() {
   const filteredTotal = state.filteredRecommendations.length;
   const visible = filteredTotal ? Math.min(filteredTotal, state.visibleRecommendations || filteredTotal) : 0;
 
+  const baseMeta = context.baseMeta || "Curating across popular genres.";
+
   if (!total) {
-    metaEl.textContent = `${context.baseMeta} No matches yet – try adjusting your vibe.`;
+    metaEl.textContent = `${baseMeta} No matches yet – try adjusting your vibe.`;
     return;
   }
 
   if (!filteredTotal) {
-    metaEl.textContent = `${context.baseMeta} Filters are hiding everything – loosen them or fetch again.`;
+    metaEl.textContent = `${baseMeta} Filters are hiding everything – loosen them or fetch again.`;
     return;
   }
 
   if (filteredTotal >= total) {
     if (visible >= filteredTotal) {
-      metaEl.textContent = `${context.baseMeta} Showing all ${filteredTotal} movies.`;
+      metaEl.textContent = `${baseMeta} Showing all ${filteredTotal} movies.`;
     } else {
-      metaEl.textContent = `${context.baseMeta} Showing ${visible} of ${filteredTotal} movies.`;
+      metaEl.textContent = `${baseMeta} Showing ${visible} of ${filteredTotal} movies.`;
     }
   } else {
-    metaEl.textContent = `${context.baseMeta} Showing ${visible} of ${filteredTotal} filtered movies (${total} found).`;
+    metaEl.textContent = `${baseMeta} Showing ${visible} of ${filteredTotal} filtered movies (${total} found).`;
   }
 }
 
