@@ -1,11 +1,28 @@
 const { fetchJson, TIMEOUT_ERROR_NAME } = require('../lib/http-client');
 
-const ALLOWED_PATHS = new Set([
-  'discover/movie',
-  'search/movie',
-  'trending/movie/week',
-  'genre/movie/list'
-]);
+const ALLOWED_PATH_PATTERNS = [
+  /^discover\/movie$/,
+  /^search\/movie$/,
+  /^trending\/movie\/week$/,
+  /^genre\/movie\/list$/,
+  /^movie\/\d+\/(recommendations|similar)$/
+];
+
+function isAllowedPath(path) {
+  return ALLOWED_PATH_PATTERNS.some((pattern) => pattern.test(path));
+}
+
+const V3_PATH_PATTERNS = [
+  /^genre\//,
+  /^discover\//,
+  /^search\//,
+  /^trending\//,
+  /^movie\/\d+\/(recommendations|similar)$/
+];
+
+function isV3Path(path) {
+  return V3_PATH_PATTERNS.some((pattern) => pattern.test(path));
+}
 
 const TMDB_TIMEOUT_MS = 10000;
 
@@ -14,26 +31,29 @@ module.exports = async (req, res) => {
     const { query = {} } = req;
     const { path = 'discover/movie', ...rest } = query;
 
-    if (!ALLOWED_PATHS.has(path)) {
+    if (!isAllowedPath(path)) {
       res.status(400).json({ error: 'Unsupported TMDB path' });
       return;
     }
 
-    const isV3Path = path.startsWith('genre/');
+    let useV3 = isV3Path(path);
     const v4AccessToken = process.env.TMDB_API_READ_ACCESS_TOKEN;
     const v3ApiKey = process.env.TMDB_API_KEY;
 
-    if (isV3Path && !v3ApiKey) {
+    if (useV3 && !v3ApiKey) {
       res.status(503).json({ error: 'TMDB v3 API key not configured' });
       return;
     }
 
-    if (!isV3Path && !v4AccessToken) {
-      res.status(503).json({ error: 'TMDB API Read Access Token not configured' });
-      return;
+    if (!useV3 && !v4AccessToken) {
+      if (!v3ApiKey) {
+        res.status(503).json({ error: 'TMDB API credentials not configured' });
+        return;
+      }
+      useV3 = true;
     }
 
-    const apiBase = isV3Path
+    const apiBase = useV3
       ? 'https://api.themoviedb.org/3/'
       : 'https://api.themoviedb.org/4/';
     const baseUrl = `${apiBase}${path}`;
@@ -71,7 +91,7 @@ module.exports = async (req, res) => {
     let body;
     let method = 'GET';
 
-    if (isV3Path) {
+    if (useV3) {
       appendParam('api_key', v3ApiKey);
       if (paramEntries.length) {
         const search = new URLSearchParams(paramEntries);
