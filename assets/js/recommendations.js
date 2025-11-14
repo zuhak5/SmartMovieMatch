@@ -10,6 +10,46 @@ const ytCache = new Map();
 
 const ABORT_ERROR_NAME = "AbortError";
 
+function toNormalizedString(value) {
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length ? trimmed : null;
+  }
+  return null;
+}
+
+function normalizeGenreSelections(genres) {
+  if (!Array.isArray(genres)) {
+    return [];
+  }
+  const normalized = genres
+    .map((genre) => toNormalizedString(genre))
+    .filter(Boolean);
+  return [...new Set(normalized)];
+}
+
+function normalizeFavoriteTitles(titles, limit = 6) {
+  if (!Array.isArray(titles)) {
+    return [];
+  }
+  const normalized = titles
+    .map((title) => (typeof title === "string" ? title.trim() : ""))
+    .filter(Boolean);
+  return typeof limit === "number" && Number.isFinite(limit)
+    ? normalized.slice(0, Math.max(0, limit))
+    : normalized;
+}
+
+function clampMoodIntensity(value) {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return 1;
+  }
+  return Math.min(2, Math.max(0, value));
+}
+
 function createFallbackOmdbFromTmdb(movie) {
   if (!movie) {
     return null;
@@ -68,23 +108,22 @@ function throwIfAborted(signal) {
   }
 }
 
-export async function discoverCandidateMovies(
-  { selectedGenres, mood, moodIntensity, favoriteTitles, seed },
-  { signal } = {}
-) {
+export async function discoverCandidateMovies(options = {}, { signal } = {}) {
+  const selectedGenres = normalizeGenreSelections(options.selectedGenres);
+  const selectedGenresSet = new Set(selectedGenres);
+  const mood = typeof options.mood === "string" ? options.mood : "any";
+  const intensity = clampMoodIntensity(options.moodIntensity);
+  const favorites = normalizeFavoriteTitles(options.favoriteTitles, 6);
+  const seed =
+    typeof options.seed === "number" && Number.isFinite(options.seed)
+      ? options.seed
+      : Math.random();
+
   const candidateMap = new Map();
 
   const fetchOptions = { signal };
 
-  const intensity =
-    typeof moodIntensity === "number" ? Math.min(2, Math.max(0, moodIntensity)) : 1;
   const intensityMultiplier = intensity === 2 ? 1.35 : intensity === 0 ? 0.75 : 1;
-  const favorites = Array.isArray(favoriteTitles)
-    ? favoriteTitles
-        .map((title) => (typeof title === "string" ? title.trim() : ""))
-        .filter((title) => title.length > 0)
-        .slice(0, 6)
-    : [];
 
   function addCandidatesFromResults(results, opts = {}) {
     if (!Array.isArray(results)) {
@@ -117,9 +156,9 @@ export async function discoverCandidateMovies(
         typeof movie.vote_count === "number" ? movie.vote_count : 0;
       let score = rating * 0.9 + popularity * 0.03;
 
-      if (selectedGenres.length) {
+      if (selectedGenresSet.size) {
         const overlap = movie.genre_ids.filter((id) =>
-          selectedGenres.includes(String(id))
+          selectedGenresSet.has(String(id))
         );
         score += overlap.length * 4.2;
       }
@@ -149,19 +188,21 @@ export async function discoverCandidateMovies(
     });
   }
 
-  const genreList = [...selectedGenres];
+  const genreList = [...selectedGenresSet];
   const moodGenresLight = ["35", "10751", "16", "10749"];
   const moodGenresDark = ["27", "53", "80", "18"];
 
   if (mood === "light") {
     moodGenresLight.forEach((genre) => {
-      if (!genreList.includes(genre)) {
+      if (!selectedGenresSet.has(genre)) {
+        selectedGenresSet.add(genre);
         genreList.push(genre);
       }
     });
   } else if (mood === "dark") {
     moodGenresDark.forEach((genre) => {
-      if (!genreList.includes(genre)) {
+      if (!selectedGenresSet.has(genre)) {
+        selectedGenresSet.add(genre);
         genreList.push(genre);
       }
     });
@@ -327,10 +368,17 @@ export async function discoverCandidateMovies(
   return Array.from(candidateMap.values());
 }
 
-export function scoreAndSelectCandidates(candidates, opts, watchedMovies) {
-  const selectedGenres = opts.selectedGenres || [];
-  const mood = opts.mood || "any";
-  const favoriteTitles = Array.isArray(opts.favoriteTitles) ? opts.favoriteTitles : [];
+export function scoreAndSelectCandidates(
+  candidates,
+  opts = {},
+  watchedMovies = []
+) {
+  const selectedGenres = normalizeGenreSelections(opts.selectedGenres);
+  const mood = typeof opts.mood === "string" ? opts.mood : "any";
+  const favoriteTitles = normalizeFavoriteTitles(
+    opts.favoriteTitles,
+    Number.POSITIVE_INFINITY
+  );
   const favoriteSet = new Set(
     favoriteTitles
       .map((title) => (typeof title === "string" ? title.toLowerCase() : ""))
