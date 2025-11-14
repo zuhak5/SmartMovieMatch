@@ -1087,6 +1087,8 @@ body[data-theme="light"] .account-link:hover {
 
 @media (max-width: 720px) {
   .notification-panel {
+    top: auto;
+    bottom: 0;
     left: 50%;
     right: auto;
     width: 100%;
