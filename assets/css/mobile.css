@@ -1940,6 +1940,12 @@ body.movie-overlay-open {
   width: 100%;
 }
 
+.peeruser-follow-context {
+  margin: -0.35rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-subtle);
+}
+
 .peeruser-secondary-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1971,6 +1977,12 @@ body.movie-overlay-open {
 .peeruser-section-title {
   margin: 0;
   font-size: 1.05rem;
+}
+
+.peeruser-overlap-nudge {
+  margin: 0.2rem 0 0.6rem;
+  font-size: 0.88rem;
+  color: var(--text-subtle);
 }
 
 .peeruser-overlap-grid {

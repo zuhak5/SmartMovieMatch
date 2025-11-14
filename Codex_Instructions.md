@@ -618,6 +618,7 @@ That’s a very strong social signal and deserves top placement.
 Implementation notes for Codex (internal):
 
 - Mutual follower strips now expose a “+ more” toggle that opens a mini list built with `buildSocialListItem`, complete with follow/unfollow + safety controls and click-outside dismissal.
+- Follow CTAs now surface social-feed copy when already following, and overlap grids nudge non-followers with the “High taste match” prompt pulled from compatibility data.
 
 
 
