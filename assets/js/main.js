@@ -1565,6 +1565,21 @@ function wireEvents() {
     });
   });
 
+  document.querySelectorAll('[data-scroll]').forEach((button) => {
+    button.addEventListener("click", (event) => {
+      const selector = button.getAttribute("data-scroll");
+      if (!selector) {
+        return;
+      }
+      event.preventDefault();
+      playUiClick();
+      const target = document.querySelector(selector);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  });
+
   const recNudgeBtn = $("recNudgeBtn");
   if (recNudgeBtn) {
     recNudgeBtn.addEventListener("click", () => {
@@ -1580,6 +1595,16 @@ function wireEvents() {
       playUiClick();
       revealMoreRecommendations();
     });
+  }
+
+  const runtimeSlider = $("runtimeInput");
+  const runtimeOutput = $("runtimeValue");
+  if (runtimeSlider && runtimeOutput) {
+    const updateRuntimeValue = () => {
+      runtimeOutput.textContent = `${runtimeSlider.value} min`;
+    };
+    runtimeSlider.addEventListener("input", updateRuntimeValue);
+    updateRuntimeValue();
   }
 
   const clearWatchedBtn = $("clearWatchedBtn");
@@ -1669,6 +1694,7 @@ function wireEvents() {
   });
 
   setupGlobalSearch();
+  setupSearchShortcuts();
 }
 
 function setupGlobalSearch() {
@@ -1947,6 +1973,27 @@ function setupGlobalSearch() {
       input.focus();
     }
   };
+}
+
+function setupSearchShortcuts() {
+  const input = $("globalSearchInput");
+  const shortcuts = document.querySelectorAll("[data-search-shortcut]");
+  if (!input || !shortcuts.length) {
+    return;
+  }
+
+  shortcuts.forEach((button) => {
+    button.addEventListener("click", () => {
+      const query = button.getAttribute("data-search-shortcut") || button.textContent.trim();
+      if (!query) {
+        return;
+      }
+      playUiClick();
+      input.value = query;
+      input.focus();
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  });
 }
 
 function renderGlobalSearchMovies(elements, payload, query) {
