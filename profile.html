@@ -86,6 +86,38 @@
           data-sync-state="guest"
           aria-live="polite"
         >
+          <div class="profile-hero pad-inline">
+            <div class="profile-hero-identity pad-inline">
+              <span class="profile-hero-avatar" id="profileHeroAvatar" aria-hidden="true">
+                <span id="profileHeroAvatarInitials" class="profile-hero-avatar-initials">GM</span>
+                <img id="profileHeroAvatarImg" alt="" />
+              </span>
+              <div class="profile-hero-text pad-inline">
+                <span class="profile-hero-eyebrow">Your movie persona</span>
+                <h2 id="profileHeroName" class="profile-hero-name">Guest member</h2>
+                <p id="profileHeroHandle" class="profile-hero-handle" data-state="guest">@guest</p>
+                <p id="profileHeroTagline" class="profile-hero-tagline">
+                  Tell Smart Movie Match what you love and we’ll turn this into your signature vibe.
+                </p>
+              </div>
+            </div>
+            <div class="profile-hero-social pad-inline" aria-label="Followers overview">
+              <div class="social-overview-stats profile-hero-stats pad-inline">
+                <div class="social-stat pad-inline">
+                  <span class="social-stat-label">Followers</span>
+                  <span id="profileHeroFollowers" class="social-stat-value">0</span>
+                </div>
+                <div class="social-stat pad-inline">
+                  <span class="social-stat-label">Following</span>
+                  <span id="profileHeroFollowing" class="social-stat-value">0</span>
+                </div>
+                <div class="social-stat pad-inline">
+                  <span class="social-stat-label">Mutual followers</span>
+                  <span id="profileHeroMutual" class="social-stat-value">0</span>
+                </div>
+              </div>
+            </div>
+          </div>
           <header class="panel-header profile-callout-header">
             <span class="panel-eyebrow">Taste snapshot</span>
             <h2 class="panel-title">Your Smart Movie Match pulse</h2>
@@ -100,6 +132,9 @@
                   <span id="profileCalloutSyncBadge" class="profile-callout-sync-badge" aria-hidden="true">Guest mode</span>
                   <span class="profile-callout-summary-caption">Keep tabs on your library health at a glance.</span>
                 </div>
+                <p id="profilePulseSummary" class="profile-pulse-summary">
+                  We’ll summarize your current mood and mix once you’ve saved a few titles.
+                </p>
                 <div class="profile-callout-stats pad-inline" role="list">
                   <div class="profile-callout-stat pad-inline" role="listitem">
                     <span class="profile-callout-label">Favorites saved</span>
@@ -158,47 +193,35 @@
                     Add 5 favorites to unlock smarter batches.
                   </p>
                 </div>
-                <div class="profile-callout-taste pad-inline">
-                  <div class="profile-callout-taste-header pad-inline">
-                    <span class="profile-callout-label">Taste highlights</span>
-                    <p id="profileCalloutTasteSubtitle" class="profile-callout-meta">
-                      We’ll summarize your taste once you start saving titles.
-                    </p>
-                  </div>
-                  <ul id="profileCalloutTasteList" class="profile-callout-taste-list">
-                    <li class="profile-callout-taste-empty">
-                      Add favorites or log watched titles to unlock taste highlights.
-                    </li>
-                  </ul>
-                </div>
-                <div class="profile-callout-preferences pad-inline">
-                  <div class="profile-callout-preferences-header pad-inline">
-                    <span class="profile-callout-label">Saved genres</span>
-                    <p id="profileCalloutGenreEmpty" class="profile-callout-meta">
-                      Select genres from discovery to see them here.
-                    </p>
-                  </div>
-                  <ul id="profileCalloutGenreChips" class="profile-callout-genre-list" hidden></ul>
-                </div>
               </div>
               <div class="profile-callout-actions pad-inline">
                 <div class="profile-callout-quick-links pad-inline" role="group" aria-label="Profile quick actions">
-                  <button type="button" class="profile-callout-quick-link" data-profile-action="favorites">
-                    <span aria-hidden="true">⭐</span>
-                    Jump to favorites
-                  </button>
-                  <button type="button" class="profile-callout-quick-link" data-profile-action="watched">
-                    <span aria-hidden="true">🎬</span>
-                    Jump to watched history
-                  </button>
-                  <button type="button" class="profile-callout-quick-link" data-profile-settings-action="profile">
-                    <span aria-hidden="true">⚙️</span>
-                    Manage account settings
-                  </button>
-                  <a class="profile-callout-quick-link" href="index.html">
-                    <span aria-hidden="true">🔎</span>
-                    Back to discovery
-                  </a>
+                  <div class="profile-callout-quick-group">
+                    <p class="profile-callout-quick-label">Your library</p>
+                    <div class="profile-callout-quick-grid pad-inline">
+                      <button type="button" class="profile-callout-quick-link" data-profile-action="favorites">
+                        <span aria-hidden="true">⭐</span>
+                        Jump to favorites
+                      </button>
+                      <button type="button" class="profile-callout-quick-link" data-profile-action="watched">
+                        <span aria-hidden="true">🎬</span>
+                        Jump to watched history
+                      </button>
+                    </div>
+                  </div>
+                  <div class="profile-callout-quick-group">
+                    <p class="profile-callout-quick-label">Your account</p>
+                    <div class="profile-callout-quick-grid pad-inline">
+                      <button type="button" class="profile-callout-quick-link" data-profile-settings-action="profile">
+                        <span aria-hidden="true">⚙️</span>
+                        Manage account settings
+                      </button>
+                      <a class="profile-callout-quick-link" href="index.html">
+                        <span aria-hidden="true">🔎</span>
+                        Back to discovery
+                      </a>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -270,455 +293,485 @@
         </article>
       </div>
     </section>
+    <section class="panel profile-taste-panel pad-inline">
+      <div class="panel-inner pad-inline">
+        <header class="panel-header pad-inline">
+          <div class="pad-inline">
+            <div class="panel-title pad-inline">Taste details</div>
+            <div class="panel-subtitle pad-inline">Drill into highlights and saved genres when you want the full story.</div>
+          </div>
+        </header>
+        <div class="profile-taste-details pad-inline">
+          <div class="profile-callout-taste pad-inline">
+            <div class="profile-callout-taste-header pad-inline">
+              <span class="profile-callout-label">Taste highlights</span>
+              <p id="profileCalloutTasteSubtitle" class="profile-callout-meta">
+                We’ll summarize your taste once you start saving titles.
+              </p>
+            </div>
+            <ul id="profileCalloutTasteList" class="profile-callout-taste-list">
+              <li class="profile-callout-taste-empty">
+                Add favorites or log watched titles to unlock taste highlights.
+              </li>
+            </ul>
+          </div>
+          <div class="profile-callout-preferences pad-inline">
+            <div class="profile-callout-preferences-header pad-inline">
+              <span class="profile-callout-label">Saved genres</span>
+              <p id="profileCalloutGenreEmpty" class="profile-callout-meta">
+                Select genres from discovery to see them here.
+              </p>
+            </div>
+            <ul id="profileCalloutGenreChips" class="profile-callout-genre-list" hidden></ul>
+          </div>
+        </div>
+      </div>
+    </section>
     <section class="panel social-panel pad-inline" id="socialConnectionsSection">
       <div class="panel-inner pad-inline">
         <div class="panel-header pad-inline">
           <div class="pad-inline">
-            <div class="panel-title pad-inline">Social circle</div>
-            <div class="panel-subtitle pad-inline">Follow friends to spotlight their reviews in discovery.</div>
+            <div class="panel-title pad-inline">Connections &amp; collabs</div>
+            <div class="panel-subtitle pad-inline">Grow your circle, plan shared lists, and see who’s online for a movie night.</div>
           </div>
         </div>
         <div id="socialConnectionsSignedOut" class="social-signed-out pad-inline">
           <h3>Sign in to follow friends</h3>
-          <p>Log in to follow reviewers you trust and see their notes highlighted in recommendations.</p>
+          <p>Log in to follow reviewers you trust, see their notes in discovery, and unlock collaborative lists.</p>
           <a class="btn-primary" href="login.html">Log in / Sign up</a>
         </div>
         <div id="socialConnectionsContent" class="social-content pad-inline" hidden aria-hidden="true">
-          <div class="social-overview-stats pad-inline" aria-live="polite">
-            <div class="social-stat pad-inline">
-              <span class="social-stat-label">Followers</span>
-              <span id="followersCount" class="social-stat-value">0</span>
-            </div>
-            <div class="social-stat pad-inline">
-              <span class="social-stat-label">Following</span>
-              <span id="followingCount" class="social-stat-value">0</span>
-            </div>
-            <div class="social-stat pad-inline">
-              <span class="social-stat-label">Mutual followers</span>
-              <span id="mutualFollowersCount" class="social-stat-value">0</span>
-            </div>
-          </div>
-
-          <section class="social-highlights pad-inline" id="socialHighlights" aria-label="Social highlights" aria-live="polite">
-            <article class="social-highlight" id="socialHighlightActive" data-state="empty">
-              <div class="social-highlight-top pad-inline">
-                <span class="social-highlight-label">
-                  <span class="social-highlight-icon" aria-hidden="true">🟢</span>
-                  Active now
-                </span>
-                <span id="socialHighlightActiveCount" class="social-highlight-count">0</span>
-              </div>
-              <p id="socialHighlightActiveNote" class="social-highlight-note">No friends online right now.</p>
-            </article>
-            <article class="social-highlight" id="socialHighlightInvites" data-state="empty">
-              <div class="social-highlight-top pad-inline">
-                <span class="social-highlight-label">
-                  <span class="social-highlight-icon" aria-hidden="true">📬</span>
-                  Pending invites
-                </span>
-                <span id="socialHighlightInvitesCount" class="social-highlight-count">0</span>
-              </div>
-              <p id="socialHighlightInvitesNote" class="social-highlight-note">You’re all caught up on invites.</p>
-            </article>
-            <article class="social-highlight" id="socialHighlightSuggestions" data-state="empty">
-              <div class="social-highlight-top pad-inline">
-                <span class="social-highlight-label">
-                  <span class="social-highlight-icon" aria-hidden="true">✨</span>
-                  New suggestions
-                </span>
-                <span id="socialHighlightSuggestionsCount" class="social-highlight-count">0</span>
-              </div>
-              <p id="socialHighlightSuggestionsNote" class="social-highlight-note">Follow more friends to get fresh matches.</p>
-            </article>
-          </section>
-
-          <div class="social-extras-grid pad-inline">
-            <section class="social-badges-block pad-inline">
-              <header class="social-section-header">
-                <h3>Recognition badges</h3>
-                <p>Celebrate how you contribute to the community.</p>
-              </header>
-              <div id="socialBadgeList" class="social-badge-list pad-inline" hidden></div>
-              <div id="socialBadgeEmpty" class="empty-state empty-state--subtle pad-inline">
-                Earn badges by sharing thoughtful reviews and hosting watch parties.
-              </div>
-            </section>
-            <section class="social-presence-block pad-inline">
-              <header class="social-section-header">
-                <h3>Friends online</h3>
-                <p>See who’s around for a movie night.</p>
-              </header>
-              <div id="socialPresenceList" class="social-presence-list pad-inline"></div>
-              <div id="socialStatusPresets" class="social-status-presets pad-inline" data-state="signin">
-                <div class="social-status-header pad-inline">
-                  <h4 class="social-status-title">Set your vibe</h4>
-                  <p class="social-status-subtitle">Pick a quick status so friends know when to reach out.</p>
+          <div class="social-activity-grid pad-inline">
+            <section class="social-highlights pad-inline" id="socialHighlights" aria-label="Social highlights" aria-live="polite">
+              <article class="social-highlight" id="socialHighlightActive" data-state="empty">
+                <div class="social-highlight-top pad-inline">
+                  <span class="social-highlight-label">
+                    <span class="social-highlight-icon" aria-hidden="true">🟢</span>
+                    Active now
+                  </span>
+                  <span id="socialHighlightActiveCount" class="social-highlight-count">0</span>
                 </div>
-                <div class="social-status-duration pad-inline">
-                  <label class="social-status-duration-label" for="socialStatusDuration">Auto-clear status</label>
-                  <select id="socialStatusDuration" class="input-base social-status-duration-select">
-                    <option value="0" selected>Keep until I change it</option>
-                    <option value="30">30 minutes</option>
-                    <option value="60">1 hour</option>
-                    <option value="120">2 hours</option>
-                    <option value="240">4 hours</option>
-                  </select>
-                  <p class="social-status-duration-hint">
-                    Time-limited statuses like “Available for watch party” will reset automatically.
-                  </p>
+                <p id="socialHighlightActiveNote" class="social-highlight-note">No friends online right now.</p>
+              </article>
+              <article class="social-highlight" id="socialHighlightInvites" data-state="empty">
+                <div class="social-highlight-top pad-inline">
+                  <span class="social-highlight-label">
+                    <span class="social-highlight-icon" aria-hidden="true">📬</span>
+                    Pending invites
+                  </span>
+                  <span id="socialHighlightInvitesCount" class="social-highlight-count">0</span>
                 </div>
-                <div id="socialStatusPresetList" class="social-status-list pad-inline" role="group" aria-label="Status presets"></div>
-                <p
-                  id="socialStatusFeedback"
-                  class="social-status-feedback"
-                  role="status"
-                  aria-live="polite"
-                  hidden
-                ></p>
-              </div>
+                <p id="socialHighlightInvitesNote" class="social-highlight-note">You’re all caught up on invites.</p>
+              </article>
+              <article class="social-highlight" id="socialHighlightSuggestions" data-state="empty">
+                <div class="social-highlight-top pad-inline">
+                  <span class="social-highlight-label">
+                    <span class="social-highlight-icon" aria-hidden="true">✨</span>
+                    New suggestions
+                  </span>
+                  <span id="socialHighlightSuggestionsCount" class="social-highlight-count">0</span>
+                </div>
+                <p id="socialHighlightSuggestionsNote" class="social-highlight-note">Follow more friends to get fresh matches.</p>
+              </article>
             </section>
-          </div>
-
-          <form id="socialFollowForm" class="social-follow-form" novalidate>
-            <div class="field-grid pad-inline">
-              <label class="field-label" for="socialFollowUsername">Follow by username</label>
-              <div class="social-follow-input-row pad-inline">
-                <input
-                  id="socialFollowUsername"
-                  class="input-base input-text"
-                  type="text"
-                  name="username"
-                  autocomplete="off"
-                  minlength="3"
-                  placeholder="friend_username"
-                  required
-                />
-                <button type="submit" id="socialFollowSubmit" class="btn-secondary">Follow</button>
+            <details class="social-collapsible" data-mobile-collapsible open>
+              <summary class="social-collapsible-summary">
+                <span class="social-collapsible-title">Recognition badges</span>
+                <span class="social-collapsible-subtitle">Celebrate how you contribute to the community.</span>
+              </summary>
+              <div class="social-collapsible-body pad-inline">
+                <div id="socialBadgeList" class="social-badge-list pad-inline" hidden></div>
+                <div id="socialBadgeEmpty" class="empty-state empty-state--subtle pad-inline">
+                  Earn badges by sharing thoughtful reviews and hosting watch parties.
+                </div>
               </div>
-            </div>
-            <div class="social-follow-note pad-inline">
-              <label class="sr-only" for="socialFollowNote">Personal note</label>
-              <textarea
-                id="socialFollowNote"
-                class="input-base social-follow-note-input"
-                rows="2"
-                maxlength="180"
-                placeholder="Add a friendly note (optional)"
-              ></textarea>
-              <div class="social-follow-note-actions pad-inline">
-                <button type="button" id="socialFollowNoteTemplate" class="btn-subtle">
-                  Use friendly template
-                </button>
-                <p id="socialFollowNoteHint" class="social-follow-note-hint">
-                  We’ll include this note in follow requests (optional).
+            </details>
+          </div>
+          <section class="social-presence-block pad-inline">
+            <header class="social-section-header">
+              <h3>Friends online</h3>
+              <p>See who’s around for a movie night.</p>
+            </header>
+            <div id="socialPresenceList" class="social-presence-list pad-inline"></div>
+            <div id="socialStatusPresets" class="social-status-presets pad-inline" data-state="signin">
+              <div class="social-status-header pad-inline">
+                <h4 class="social-status-title">Set your vibe</h4>
+                <p class="social-status-subtitle">Pick a quick status so friends know when to reach out.</p>
+              </div>
+              <div class="social-status-duration pad-inline">
+                <label class="social-status-duration-label" for="socialStatusDuration">Auto-clear status</label>
+                <select id="socialStatusDuration" class="input-base social-status-duration-select">
+                  <option value="0" selected>Keep until I change it</option>
+                  <option value="30">30 minutes</option>
+                  <option value="60">1 hour</option>
+                  <option value="120">2 hours</option>
+                  <option value="240">4 hours</option>
+                </select>
+                <p class="social-status-duration-hint">
+                  Time-limited statuses like “Available for watch party” will reset automatically.
                 </p>
               </div>
+              <div id="socialStatusPresetList" class="social-status-list pad-inline" role="group" aria-label="Status presets"></div>
+              <p
+                id="socialStatusFeedback"
+                class="social-status-feedback"
+                role="status"
+                aria-live="polite"
+                hidden
+              ></p>
             </div>
-          <div id="socialFollowStatus" class="community-status pad-inline" role="status" aria-live="polite"></div>
-          <div class="social-follow-assist pad-inline">
-            <section
-              id="socialFollowSearchPanel"
-              class="social-follow-search pad-inline"
-              hidden
-              data-state="idle"
-              aria-live="polite"
-            >
-              <p id="socialFollowSearchStatus" class="social-follow-search-status"></p>
-              <ul id="socialFollowSearchList" class="social-follow-search-list" role="listbox"></ul>
-              <p id="socialFollowSearchEmpty" class="social-follow-search-empty">
-                Start typing to find friends by name or handle.
-              </p>
-            </section>
-            <section class="social-invite-card pad-inline">
-              <span class="social-invite-title">Share your profile</span>
-              <p class="social-invite-text">
-                Copy your link so friends can follow you instantly.
-              </p>
-              <div class="social-invite-link-row pad-inline">
-                <input
-                  id="socialInviteLink"
-                  class="input-base social-invite-link"
-                  type="text"
-                  readonly
-                  value=""
-                  aria-label="Profile invite link"
-                />
-                <button type="button" id="socialInviteCopyBtn" class="btn-subtle" disabled>
-                  Copy link
-                </button>
-              </div>
-              <div class="social-invite-qr pad-inline" aria-live="polite">
-                <img
-                  id="socialInviteQrImage"
-                  class="social-invite-qr-image"
-                  src=""
-                  alt="QR code that links to your profile"
-                  hidden
-                />
-                <button type="button" id="socialInviteQrDownload" class="btn-subtle" disabled>
-                  Download QR
-                </button>
-              </div>
-              <div
-                id="socialInviteQrStatus"
-                class="community-status social-invite-status pad-inline"
-                role="status"
-                aria-live="polite"
-              ></div>
-              <div
-                id="socialInviteStatus"
-                class="community-status social-invite-status pad-inline"
-                role="status"
-                aria-live="polite"
-              ></div>
-            </section>
-            <section class="social-import-card pad-inline">
-              <span class="social-import-title">Invite from contacts</span>
-              <p class="social-import-text">
-                Upload a CSV with a <strong>handle</strong> column (or usernames separated by commas) and we’ll
-                send follow requests with your note.
-              </p>
-              <label class="social-import-consent">
-                <input type="checkbox" id="socialInviteImportConsent" />
-                <span>I have permission to invite these friends.</span>
-              </label>
-              <div class="social-import-actions pad-inline">
-                <input type="file" id="socialInviteImportFile" accept=".csv,text/csv" />
-                <button type="button" id="socialInviteImportBtn" class="btn-subtle" disabled>
-                  Process CSV
-                </button>
-              </div>
-              <div
-                id="socialInviteImportStatus"
-                class="community-status social-import-status pad-inline"
-                role="status"
-                aria-live="polite"
-              ></div>
-            </section>
-          </div>
-        </form>
-
-        <section class="social-collab pad-inline">
-          <header class="social-section-header">
-            <h3>Collaborative lists &amp; watch parties</h3>
-            <p>Build shared collections and plan nights in with friends.</p>
-          </header>
-          <div id="socialCollabStatus" class="community-status pad-inline" role="status" aria-live="polite"></div>
-          <div id="socialCollabSummary" class="social-collab-summary pad-inline"></div>
-          <div class="social-collab-actions pad-inline">
-            <form id="collabCreateForm" class="collab-form" novalidate>
-              <div class="field-grid pad-inline">
-                <label class="field-label" for="collabListName">Create a new collaborative list</label>
-                <input
-                  id="collabListName"
-                  class="input-base input-text"
-                  type="text"
-                  placeholder="Weekend double-feature"
-                  minlength="3"
-                  required
-                />
-              </div>
-              <div class="field-grid pad-inline">
-                <label class="field-label" for="collabListDescription">Description (optional)</label>
-                <textarea id="collabListDescription" class="input-base collab-textarea" rows="2" maxlength="200"></textarea>
-              </div>
-              <div class="field-grid pad-inline collab-suggested-block">
-                <div>
-                  <span class="field-label">Suggested collaborators</span>
-                  <p class="collab-suggested-hint">
-                    Pick a few friends and we’ll invite them the moment your list is created.
-                  </p>
+          </section>
+          <details class="social-collapsible social-collab-shell pad-inline" data-mobile-collapsible open>
+            <summary class="social-collapsible-summary">
+              <span class="social-collapsible-title">Collaborative lists &amp; watch parties</span>
+              <span class="social-collapsible-subtitle">Build shared collections and plan nights in with friends.</span>
+            </summary>
+            <div class="social-collapsible-body pad-inline">
+              <section class="social-collab pad-inline">
+                <div id="socialCollabStatus" class="community-status pad-inline" role="status" aria-live="polite"></div>
+                <div id="socialCollabSummary" class="social-collab-summary pad-inline"></div>
+                <div class="social-collab-actions pad-inline">
+                  <form id="collabCreateForm" class="collab-form" novalidate>
+                    <div class="field-grid pad-inline">
+                      <label class="field-label" for="collabListName">Create a new collaborative list</label>
+                      <input
+                        id="collabListName"
+                        class="input-base input-text"
+                        type="text"
+                        placeholder="Weekend double-feature"
+                        minlength="3"
+                        required
+                      />
+                    </div>
+                    <div class="field-grid pad-inline">
+                      <label class="field-label" for="collabListDescription">Description (optional)</label>
+                      <textarea id="collabListDescription" class="input-base collab-textarea" rows="2" maxlength="200"></textarea>
+                    </div>
+                    <div class="field-grid pad-inline collab-suggested-block">
+                      <div>
+                        <span class="field-label">Suggested collaborators</span>
+                        <p class="collab-suggested-hint">
+                          Pick a few friends and we’ll invite them the moment your list is created.
+                        </p>
+                      </div>
+                      <div
+                        id="collabSuggestedContainer"
+                        class="collab-suggested-list"
+                        role="group"
+                        aria-label="Suggested collaborators"
+                      >
+                        <p id="collabSuggestedEmpty" class="collab-suggested-empty">
+                          We’ll surface collaborators based on your social matches once you’re signed in.
+                        </p>
+                      </div>
+                    </div>
+                    <div class="collab-form-footer pad-inline">
+                      <label class="field-label" for="collabListVisibility">Visibility</label>
+                      <select id="collabListVisibility" class="input-base input-select">
+                        <option value="friends" selected>Friends can view</option>
+                        <option value="private">Private</option>
+                      </select>
+                      <button type="submit" class="btn-secondary">Create list</button>
+                    </div>
+                  </form>
+                  <form id="watchPartyForm" class="collab-form" novalidate>
+                    <div class="field-grid pad-inline">
+                      <label class="field-label" for="watchPartyTitle">Schedule a watch party</label>
+                      <input
+                        id="watchPartyTitle"
+                        class="input-base input-text"
+                        type="text"
+                        placeholder="Movie title"
+                        required
+                      />
+                    </div>
+                    <div class="collab-form-grid pad-inline">
+                      <div class="pad-inline">
+                        <label class="field-label" for="watchPartyTmdbId">TMDB ID</label>
+                        <input id="watchPartyTmdbId" class="input-base input-text" type="text" placeholder="e.g. 603" />
+                      </div>
+                      <div class="pad-inline">
+                        <label class="field-label" for="watchPartyImdbId">IMDb ID</label>
+                        <input id="watchPartyImdbId" class="input-base input-text" type="text" placeholder="Optional" />
+                      </div>
+                      <div class="pad-inline">
+                        <label class="field-label" for="watchPartyDatetime">When</label>
+                        <input id="watchPartyDatetime" class="input-base input-text" type="datetime-local" required />
+                      </div>
+                    </div>
+                    <div class="field-grid pad-inline">
+                      <label class="field-label" for="watchPartyInvitees">Invite handles</label>
+                      <input
+                        id="watchPartyInvitees"
+                        class="input-base input-text"
+                        type="text"
+                        placeholder="Comma-separated usernames"
+                      />
+                    </div>
+                    <div class="field-grid pad-inline watch-party-suggested-block">
+                      <div>
+                        <span class="field-label">Smart invite suggestions</span>
+                        <p class="watch-party-suggested-hint">
+                          Frequent collaborators and friends who share tonight's vibe.
+                        </p>
+                      </div>
+                      <div
+                        id="watchPartySuggestedContainer"
+                        class="watch-party-suggested-list"
+                        role="group"
+                        aria-label="Suggested watch party invitees"
+                      >
+                        <p id="watchPartySuggestedEmpty" class="watch-party-suggested-empty">
+                          Sign in to see who we recommend inviting.
+                        </p>
+                      </div>
+                    </div>
+                    <div class="field-grid pad-inline">
+                      <label class="field-label" for="watchPartyNote">Personal note (optional)</label>
+                      <textarea id="watchPartyNote" class="input-base collab-textarea" rows="2" maxlength="200"></textarea>
+                    </div>
+                    <div class="collab-form-footer collab-form-footer--actions pad-inline">
+                      <button type="submit" class="btn-secondary">Schedule party</button>
+                      <button type="button" id="collabRefreshBtn" class="btn-subtle">Refresh status</button>
+                    </div>
+                  </form>
                 </div>
-                <div
-                  id="collabSuggestedContainer"
-                  class="collab-suggested-list"
-                  role="group"
-                  aria-label="Suggested collaborators"
-                >
-                  <p id="collabSuggestedEmpty" class="collab-suggested-empty">
-                    We’ll surface collaborators based on your social matches once you’re signed in.
-                  </p>
+                <div class="social-collab-grid pad-inline">
+                  <section class="social-collab-column pad-inline">
+                    <header class="social-section-header">
+                      <h4>Your collaborative lists</h4>
+                      <p>Lists you own and manage.</p>
+                    </header>
+                    <div id="collabOwnedEmpty" class="empty-state empty-state--subtle pad-inline">
+                      Start a collaborative list to plan watch nights together.
+                    </div>
+                    <div id="collabOwnedList" class="collab-list-container pad-inline" hidden></div>
+                  </section>
+                  <section class="social-collab-column pad-inline">
+                    <header class="social-section-header">
+                      <h4>Shared with you</h4>
+                      <p>Lists where you’re a collaborator.</p>
+                    </header>
+                    <div id="collabSharedEmpty" class="empty-state empty-state--subtle pad-inline">
+                      Accept an invite to begin editing together.
+                    </div>
+                    <div id="collabSharedList" class="collab-list-container pad-inline" hidden></div>
+                  </section>
+                  <section class="social-collab-column pad-inline">
+                    <header class="social-section-header">
+                      <h4>Invites waiting</h4>
+                      <p>Approve or decline collaboration invites.</p>
+                    </header>
+                    <div id="collabInviteEmpty" class="empty-state empty-state--subtle pad-inline">No new invites yet.</div>
+                    <div id="collabInviteList" class="collab-list-container pad-inline" hidden></div>
+                  </section>
                 </div>
-              </div>
-              <div class="collab-form-footer pad-inline">
-                <label class="field-label" for="collabListVisibility">Visibility</label>
-                <select id="collabListVisibility" class="input-base input-select">
-                  <option value="friends" selected>Friends can view</option>
-                  <option value="private">Private</option>
-                </select>
-                <button type="submit" class="btn-secondary">Create list</button>
-              </div>
-            </form>
-            <form id="watchPartyForm" class="collab-form" novalidate>
-              <div class="field-grid pad-inline">
-                <label class="field-label" for="watchPartyTitle">Schedule a watch party</label>
-                <input
-                  id="watchPartyTitle"
-                  class="input-base input-text"
-                  type="text"
-                  placeholder="Movie title"
-                  required
-                />
-              </div>
-              <div class="collab-form-grid pad-inline">
-                <div class="pad-inline">
-                  <label class="field-label" for="watchPartyTmdbId">TMDB ID</label>
-                  <input id="watchPartyTmdbId" class="input-base input-text" type="text" placeholder="e.g. 603" />
+                <div class="social-watch-grid pad-inline">
+                  <section class="social-collab-column pad-inline">
+                    <header class="social-section-header">
+                      <h4>Upcoming watch parties</h4>
+                      <p>Stay in the loop on shared movie nights.</p>
+                    </header>
+                    <div id="watchPartyEmpty" class="empty-state empty-state--subtle pad-inline">
+                      Schedule a watch party to see it here.
+                    </div>
+                    <div id="watchPartyList" class="watch-party-container pad-inline" hidden></div>
+                  </section>
+                  <section class="social-collab-column pad-inline">
+                    <header class="social-section-header">
+                      <h4>Party invites</h4>
+                      <p>Respond so hosts can plan.</p>
+                    </header>
+                    <div id="watchPartyInviteEmpty" class="empty-state empty-state--subtle pad-inline">
+                      No pending watch-party invitations.
+                    </div>
+                    <div id="watchPartyInviteList" class="watch-party-container pad-inline" hidden></div>
+                  </section>
                 </div>
-                <div class="pad-inline">
-                  <label class="field-label" for="watchPartyImdbId">IMDb ID</label>
-                  <input id="watchPartyImdbId" class="input-base input-text" type="text" placeholder="Optional" />
-                </div>
-                <div class="pad-inline">
-                  <label class="field-label" for="watchPartyDatetime">When</label>
-                  <input id="watchPartyDatetime" class="input-base input-text" type="datetime-local" required />
-                </div>
-              </div>
-              <div class="field-grid pad-inline">
-                <label class="field-label" for="watchPartyInvitees">Invite handles</label>
-                <input
-                  id="watchPartyInvitees"
-                  class="input-base input-text"
-                  type="text"
-                  placeholder="Comma-separated usernames"
-                />
-              </div>
-              <div class="field-grid pad-inline watch-party-suggested-block">
-                <div>
-                  <span class="field-label">Smart invite suggestions</span>
-                  <p class="watch-party-suggested-hint">
-                    Frequent collaborators and friends who share tonight's vibe.
-                  </p>
-                </div>
-                <div
-                  id="watchPartySuggestedContainer"
-                  class="watch-party-suggested-list"
-                  role="group"
-                  aria-label="Suggested watch party invitees"
-                >
-                  <p id="watchPartySuggestedEmpty" class="watch-party-suggested-empty">
-                    Sign in to see who we recommend inviting.
-                  </p>
-                </div>
-              </div>
-              <div class="field-grid pad-inline">
-                <label class="field-label" for="watchPartyNote">Personal note (optional)</label>
-                <textarea id="watchPartyNote" class="input-base collab-textarea" rows="2" maxlength="200"></textarea>
-              </div>
-              <div class="collab-form-footer collab-form-footer--actions pad-inline">
-                <button type="submit" class="btn-secondary">Schedule party</button>
-                <button type="button" id="collabRefreshBtn" class="btn-subtle">Refresh status</button>
-              </div>
-            </form>
-          </div>
-          <div class="social-collab-grid pad-inline">
-            <section class="social-collab-column pad-inline">
-              <header class="social-section-header">
-                <h4>Your collaborative lists</h4>
-                <p>Lists you own and manage.</p>
-              </header>
-              <div id="collabOwnedEmpty" class="empty-state empty-state--subtle pad-inline">
-                Start a collaborative list to plan watch nights together.
-              </div>
-              <div id="collabOwnedList" class="collab-list-container pad-inline" hidden></div>
-            </section>
-            <section class="social-collab-column pad-inline">
-              <header class="social-section-header">
-                <h4>Shared with you</h4>
-                <p>Lists where you’re a collaborator.</p>
-              </header>
-              <div id="collabSharedEmpty" class="empty-state empty-state--subtle pad-inline">
-                Accept an invite to begin editing together.
-              </div>
-              <div id="collabSharedList" class="collab-list-container pad-inline" hidden></div>
-            </section>
-            <section class="social-collab-column pad-inline">
-              <header class="social-section-header">
-                <h4>Invites waiting</h4>
-                <p>Approve or decline collaboration invites.</p>
-              </header>
-              <div id="collabInviteEmpty" class="empty-state empty-state--subtle pad-inline">No new invites yet.</div>
-              <div id="collabInviteList" class="collab-list-container pad-inline" hidden></div>
-            </section>
-          </div>
-          <div class="social-watch-grid pad-inline">
-            <section class="social-collab-column pad-inline">
-              <header class="social-section-header">
-                <h4>Upcoming watch parties</h4>
-                <p>Stay in the loop on shared movie nights.</p>
-              </header>
-              <div id="watchPartyEmpty" class="empty-state empty-state--subtle pad-inline">
-                Schedule a watch party to see it here.
-              </div>
-              <div id="watchPartyList" class="watch-party-container pad-inline" hidden></div>
-            </section>
-            <section class="social-collab-column pad-inline">
-              <header class="social-section-header">
-                <h4>Party invites</h4>
-                <p>Respond so hosts can plan.</p>
-              </header>
-              <div id="watchPartyInviteEmpty" class="empty-state empty-state--subtle pad-inline">
-                No pending watch-party invitations.
-              </div>
-              <div id="watchPartyInviteList" class="watch-party-container pad-inline" hidden></div>
-            </section>
-          </div>
-        </section>
-
-        <section class="social-mutuals pad-inline">
-          <header class="social-section-header">
-            <h3>Mutual followers</h3>
-            <p>People you follow who follow you back.</p>
-          </header>
-          <div id="socialMutualList" class="social-chip-list pad-inline" hidden></div>
-          <div id="socialMutualEmpty" class="empty-state empty-state--subtle pad-inline">
-            Follow and follow back to build your circle.
-          </div>
-        </section>
-
-          <div class="social-lists-grid pad-inline">
-            <section class="social-list-block pad-inline">
-              <header class="social-section-header">
-                <h3>
-                  Following
-                  <span id="socialFollowingHeadingCount" class="social-count-pill">0</span>
-                </h3>
-                <p>People you’ll see highlighted in recommendations.</p>
-              </header>
-              <div id="socialFollowingEmpty" class="empty-state pad-inline">
-                You’re not following anyone yet. Follow a friend to highlight their community notes.
-              </div>
-              <div id="socialFollowingList" class="social-following-list pad-inline" hidden></div>
-            </section>
-            <section class="social-list-block pad-inline">
-              <header class="social-section-header">
-                <h3>
-                  Followers
-                  <span id="socialFollowersHeadingCount" class="social-count-pill">0</span>
-                </h3>
-                <p>These members see your reviews in their feed.</p>
-              </header>
-              <div id="socialFollowersEmpty" class="empty-state pad-inline">
-                No followers yet. Share your profile to invite friends.
-              </div>
-              <div id="socialFollowersList" class="social-following-list pad-inline" hidden></div>
-            </section>
-          </div>
-
-          <section class="social-suggestions pad-inline">
+              </section>
+            </div>
+          </details>
+          <section class="social-find-friends pad-inline">
             <header class="social-section-header">
-              <h3>People you may know</h3>
-              <p>Follow recommendations based on mutual followers, interests, and favorites.</p>
+              <h3>Find friends</h3>
+              <p>Search by handle, then explore your circle.</p>
             </header>
-            <div id="socialSuggestionsEmpty" class="empty-state empty-state--subtle pad-inline">
-              We’ll suggest critics and friends as your circle grows.
+            <form id="socialFollowForm" class="social-follow-form" novalidate>
+              <div class="field-grid pad-inline">
+                <label class="field-label" for="socialFollowUsername">Follow by username</label>
+                <div class="social-follow-input-row pad-inline">
+                  <input
+                    id="socialFollowUsername"
+                    class="input-base input-text"
+                    type="text"
+                    name="username"
+                    autocomplete="off"
+                    minlength="3"
+                    placeholder="friend_username"
+                    required
+                  />
+                  <button type="submit" id="socialFollowSubmit" class="btn-secondary">Follow</button>
+                </div>
+              </div>
+              <div class="field-grid pad-inline">
+                <label class="field-label" for="socialFollowNote">Personal note</label>
+                <textarea
+                  id="socialFollowNote"
+                  class="input-base social-follow-note-input"
+                  rows="2"
+                  maxlength="180"
+                  placeholder="Add a friendly note (optional)"
+                ></textarea>
+                <div class="social-follow-note-actions pad-inline">
+                  <button type="button" id="socialFollowNoteTemplate" class="btn-subtle">
+                    Use friendly template
+                  </button>
+                  <p id="socialFollowNoteHint" class="social-follow-note-hint">
+                    We’ll include this note in follow requests (optional).
+                  </p>
+                </div>
+              </div>
+              <div id="socialFollowStatus" class="community-status pad-inline" role="status" aria-live="polite"></div>
+              <section
+                id="socialFollowSearchPanel"
+                class="social-follow-search pad-inline"
+                hidden
+                data-state="idle"
+                aria-live="polite"
+              >
+                <p id="socialFollowSearchStatus" class="social-follow-search-status"></p>
+                <ul id="socialFollowSearchList" class="social-follow-search-list" role="listbox"></ul>
+                <p id="socialFollowSearchEmpty" class="social-follow-search-empty">
+                  Start typing to find friends by name or handle.
+                </p>
+              </section>
+            </form>
+            <section class="social-mutuals pad-inline">
+              <header class="social-section-header">
+                <h3>Mutual followers</h3>
+                <p>People you follow who follow you back.</p>
+              </header>
+              <div id="socialMutualList" class="social-chip-list pad-inline" hidden></div>
+              <div id="socialMutualEmpty" class="empty-state empty-state--subtle pad-inline">
+                Follow and follow back to build your circle.
+              </div>
+            </section>
+            <div class="social-lists-grid pad-inline">
+              <section class="social-list-block pad-inline">
+                <header class="social-section-header">
+                  <h3>
+                    Following
+                    <span id="socialFollowingHeadingCount" class="social-count-pill">0</span>
+                  </h3>
+                  <p>People you’ll see highlighted in recommendations.</p>
+                </header>
+                <div id="socialFollowingEmpty" class="empty-state pad-inline">
+                  You’re not following anyone yet. Follow a friend to highlight their community notes.
+                </div>
+                <div id="socialFollowingList" class="social-following-list pad-inline" hidden></div>
+              </section>
+              <section class="social-list-block pad-inline">
+                <header class="social-section-header">
+                  <h3>
+                    Followers
+                    <span id="socialFollowersHeadingCount" class="social-count-pill">0</span>
+                  </h3>
+                  <p>These members see your reviews in their feed.</p>
+                </header>
+                <div id="socialFollowersEmpty" class="empty-state pad-inline">
+                  No followers yet. Share your profile to invite friends.
+                </div>
+                <div id="socialFollowersList" class="social-following-list pad-inline" hidden></div>
+              </section>
             </div>
-            <div id="socialSuggestionsList" class="social-suggestions-list pad-inline" hidden></div>
+            <section class="social-suggestions pad-inline">
+              <header class="social-section-header">
+                <h3>People you may know</h3>
+                <p>Follow recommendations based on mutual followers, interests, and favorites.</p>
+              </header>
+              <div id="socialSuggestionsEmpty" class="empty-state empty-state--subtle pad-inline">
+                We’ll suggest critics and friends as your circle grows.
+              </div>
+              <div id="socialSuggestionsList" class="social-suggestions-list pad-inline" hidden></div>
+            </section>
+          </section>
+          <section class="social-share-panel pad-inline">
+            <header class="social-section-header">
+              <h3>Share your profile</h3>
+              <p>Send a link or QR so friends can follow instantly.</p>
+            </header>
+            <div class="social-share-grid social-follow-assist pad-inline">
+              <article class="social-invite-card pad-inline">
+                <span class="social-invite-title">Share your profile</span>
+                <p class="social-invite-text">
+                  Copy your link so friends can follow you instantly.
+                </p>
+                <div class="social-invite-link-row pad-inline">
+                  <input
+                    id="socialInviteLink"
+                    class="input-base social-invite-link"
+                    type="text"
+                    readonly
+                    value=""
+                    aria-label="Profile invite link"
+                  />
+                  <button type="button" id="socialInviteCopyBtn" class="btn-subtle" disabled>
+                    Copy link
+                  </button>
+                </div>
+                <div class="social-invite-qr pad-inline" aria-live="polite">
+                  <img
+                    id="socialInviteQrImage"
+                    class="social-invite-qr-image"
+                    src=""
+                    alt="QR code that links to your profile"
+                    hidden
+                  />
+                  <button type="button" id="socialInviteQrDownload" class="btn-subtle" disabled>
+                    Download QR
+                  </button>
+                </div>
+                <div
+                  id="socialInviteQrStatus"
+                  class="community-status social-invite-status pad-inline"
+                  role="status"
+                  aria-live="polite"
+                ></div>
+                <div
+                  id="socialInviteStatus"
+                  class="community-status social-invite-status pad-inline"
+                  role="status"
+                  aria-live="polite"
+                ></div>
+              </article>
+              <article class="social-import-card pad-inline">
+                <span class="social-import-title">Invite from contacts</span>
+                <p class="social-import-text">
+                  Upload a CSV with a <strong>handle</strong> column (or usernames separated by commas) and we’ll
+                  send follow requests with your note.
+                </p>
+                <label class="social-import-consent">
+                  <input type="checkbox" id="socialInviteImportConsent" />
+                  <span>I have permission to invite these friends.</span>
+                </label>
+                <div class="social-import-actions pad-inline">
+                  <input type="file" id="socialInviteImportFile" accept=".csv,text/csv" />
+                  <button type="button" id="socialInviteImportBtn" class="btn-subtle" disabled>
+                    Process CSV
+                  </button>
+                </div>
+                <div
+                  id="socialInviteImportStatus"
+                  class="community-status social-import-status pad-inline"
+                  role="status"
+                  aria-live="polite"
+                ></div>
+              </article>
+            </div>
           </section>
         </div>
       </div>
     </section>
-
     <section class="panel collections-panel profile-collections-panel pad-inline">
       <div class="panel-inner pad-inline">
         <div class="panel-header collections-header pad-inline">

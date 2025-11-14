@@ -968,6 +968,7 @@ function init() {
       : "Sign in to sync your preferences and watch history across devices.",
     state.session ? "success" : "muted"
   );
+  initResponsiveCollapsibles();
 
   subscribeToSession((session) => {
     const previousSession = state.session;
@@ -4158,6 +4159,41 @@ function updateAccountUi(session) {
   updateProfileHeroIdentity(session);
 }
 
+function initResponsiveCollapsibles() {
+  if (typeof window.matchMedia !== "function") {
+    return;
+  }
+  const collapsibles = Array.from(
+    document.querySelectorAll(".social-collapsible[data-mobile-collapsible]")
+  ).filter((el) => el instanceof HTMLDetailsElement);
+  if (!collapsibles.length) {
+    return;
+  }
+  const media = window.matchMedia("(max-width: 720px)");
+  const syncState = (isMobile) => {
+    collapsibles.forEach((details) => {
+      if (isMobile) {
+        if (details.dataset.mobileState !== "mobile") {
+          details.removeAttribute("open");
+          details.dataset.mobileState = "mobile";
+        }
+      } else {
+        if (!details.hasAttribute("open")) {
+          details.setAttribute("open", "");
+        }
+        details.dataset.mobileState = "desktop";
+      }
+    });
+  };
+  const handler = (event) => syncState(event.matches);
+  syncState(media.matches);
+  if (typeof media.addEventListener === "function") {
+    media.addEventListener("change", handler);
+  } else if (typeof media.addListener === "function") {
+    media.addListener(handler);
+  }
+}
+
 function updateProfileHeroIdentity(session) {
   const heroName = $("profileHeroName");
   if (!heroName) {
@@ -4168,6 +4204,7 @@ function updateProfileHeroIdentity(session) {
   const heroAvatar = document.getElementById("profileHeroAvatar");
   const heroAvatarImg = $("profileHeroAvatarImg");
   const heroAvatarInitials = $("profileHeroAvatarInitials");
+  const pulseSummary = $("profilePulseSummary");
   const isSignedIn = Boolean(session && session.token);
   const displayName = isSignedIn
     ? (typeof session.displayName === "string" && session.displayName.trim()
@@ -4181,8 +4218,12 @@ function updateProfileHeroIdentity(session) {
     heroHandle.textContent = isSignedIn && session && session.username ? `@${session.username}` : "@guest";
     heroHandle.dataset.state = isSignedIn ? "visible" : "guest";
   }
+  const heroSummary = buildProfileHeroTagline(session);
   if (heroTagline) {
-    heroTagline.textContent = buildProfileHeroTagline(session);
+    heroTagline.textContent = heroSummary;
+  }
+  if (pulseSummary) {
+    pulseSummary.textContent = heroSummary;
   }
   if (heroAvatarInitials) {
     const initials = displayName
