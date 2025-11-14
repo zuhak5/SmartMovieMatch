@@ -24,7 +24,7 @@ module.exports = async (req, res) => {
       return;
     }
 
-    const baseUrl = `https://api.themoviedb.org/3/${path}`;
+    const baseUrl = `https://api.themoviedb.org/4/${path}`;
     const params = new URLSearchParams();
     params.set('api_key', apiKey);
 
