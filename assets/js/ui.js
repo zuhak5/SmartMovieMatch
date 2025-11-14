@@ -276,17 +276,8 @@ export function isMovieOverlayOpen() {
   return Boolean(movieOverlayState.card);
 }
 
-function prefersInlineMovieDetails() {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-    return false;
-  }
-  const prefersCoarse = window.matchMedia("(pointer: coarse)").matches;
-  const prefersSmallViewport = window.matchMedia("(max-width: 900px)").matches;
-  return prefersCoarse || prefersSmallViewport;
-}
-
 function showMovieOverlay(card) {
-  if (!card || prefersInlineMovieDetails()) {
+  if (!card) {
     return false;
   }
   const elements = getMovieOverlayElements();
