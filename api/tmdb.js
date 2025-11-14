@@ -3,15 +3,16 @@ const { fetchJson, TIMEOUT_ERROR_NAME } = require('../lib/http-client');
 const ALLOWED_PATHS = new Set([
   'discover/movie',
   'search/movie',
-  'trending/movie/week'
+  'trending/movie/week',
+  'genre/movie/list'
 ]);
 
 const TMDB_TIMEOUT_MS = 10000;
 
 module.exports = async (req, res) => {
   try {
-    const apiKey = process.env.TMDB_API_READ_ACCESS_TOKEN;
-    if (!apiKey) {
+    const apiToken = process.env.TMDB_API_READ_ACCESS_TOKEN;
+    if (!apiToken) {
       res.status(503).json({ error: 'TMDB API key not configured' });
       return;
     }
@@ -24,9 +25,11 @@ module.exports = async (req, res) => {
       return;
     }
 
-    const baseUrl = `https://api.themoviedb.org/4/${path}`;
+    const apiBase = path.startsWith('genre/')
+      ? 'https://api.themoviedb.org/3/'
+      : 'https://api.themoviedb.org/4/';
+    const baseUrl = `${apiBase}${path}`;
     const params = new URLSearchParams();
-    params.set('api_key', apiKey);
 
     const language = rest.language || 'en-US';
     if (language) {
@@ -55,7 +58,10 @@ module.exports = async (req, res) => {
     const url = `${baseUrl}?${params.toString()}`;
     const result = await fetchJson(url, {
       timeoutMs: TMDB_TIMEOUT_MS,
-      headers: { Accept: 'application/json' }
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${apiToken}`
+      }
     });
 
     if (!result.ok) {
