@@ -1515,6 +1515,53 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
   });
   const idRow = createIdRow(imdbID);
 
+  const communityContext = document.createElement("div");
+  communityContext.className = "movie-community-context";
+  communityContext.dataset.state = "idle";
+  communityContext.hidden = false;
+  communityContext.setAttribute("aria-live", "polite");
+
+  const communityAvatars = document.createElement("div");
+  communityAvatars.className = "movie-community-avatars";
+  communityContext.appendChild(communityAvatars);
+
+  const communityMeta = document.createElement("div");
+  communityMeta.className = "movie-community-meta";
+  const communityOverall = document.createElement("span");
+  communityOverall.className = "movie-community-chip";
+  communityOverall.textContent = "Community intel warming up";
+  communityMeta.appendChild(communityOverall);
+
+  const communityFriends = document.createElement("span");
+  communityFriends.className = "movie-community-chip is-friends";
+  communityFriends.dataset.empty = "true";
+  communityFriends.textContent = "No friend reviews yet";
+  communityMeta.appendChild(communityFriends);
+
+  communityContext.appendChild(communityMeta);
+
+  const communityActivity = document.createElement("div");
+  communityActivity.className = "movie-community-activity";
+  communityActivity.hidden = false;
+  communityActivity.textContent = "Leave a quick note to start the thread.";
+
+  const communityQuickEntry = document.createElement("button");
+  communityQuickEntry.type = "button";
+  communityQuickEntry.className = "movie-community-quick";
+  communityQuickEntry.textContent = "Leave a quick note";
+  communityQuickEntry.setAttribute("aria-label", "Open community notes to leave a quick review");
+  communityQuickEntry.hidden = !(handlers && handlers.community);
+  communityQuickEntry.addEventListener("click", (event) => {
+    event.stopPropagation();
+    playUiClick();
+    card.dispatchEvent(
+      new CustomEvent("movie-card:set-state", {
+        detail: { expand: true }
+      })
+    );
+    focusCommunitySection(card, { pulse: true, focusInput: true });
+  });
+
   const ratingsRow = document.createElement("div");
   ratingsRow.className = "movie-ratings";
 
@@ -1558,6 +1605,9 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
   });
 
   infoWrap.appendChild(titleRow);
+  infoWrap.appendChild(communityContext);
+  infoWrap.appendChild(communityActivity);
+  infoWrap.appendChild(communityQuickEntry);
   if (titleVariants) {
     infoWrap.appendChild(titleVariants);
   }
@@ -1583,56 +1633,6 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
   if (synopsisBlock) {
     infoWrap.appendChild(synopsisBlock);
   }
-
-  const communityContext = document.createElement("div");
-  communityContext.className = "movie-community-context";
-  communityContext.dataset.state = "idle";
-  communityContext.hidden = false;
-  communityContext.setAttribute("aria-live", "polite");
-
-  const communityAvatars = document.createElement("div");
-  communityAvatars.className = "movie-community-avatars";
-  communityContext.appendChild(communityAvatars);
-
-  const communityMeta = document.createElement("div");
-  communityMeta.className = "movie-community-meta";
-  const communityOverall = document.createElement("span");
-  communityOverall.className = "movie-community-chip";
-  communityOverall.textContent = "Community intel warming up";
-  communityMeta.appendChild(communityOverall);
-
-  const communityFriends = document.createElement("span");
-  communityFriends.className = "movie-community-chip is-friends";
-  communityFriends.dataset.empty = "true";
-  communityFriends.textContent = "No friend reviews yet";
-  communityMeta.appendChild(communityFriends);
-
-  communityContext.appendChild(communityMeta);
-  infoWrap.appendChild(communityContext);
-
-  const communityActivity = document.createElement("div");
-  communityActivity.className = "movie-community-activity";
-  communityActivity.hidden = false;
-  communityActivity.textContent = "Leave a quick note to start the thread.";
-  infoWrap.appendChild(communityActivity);
-
-  const communityQuickEntry = document.createElement("button");
-  communityQuickEntry.type = "button";
-  communityQuickEntry.className = "movie-community-quick";
-  communityQuickEntry.textContent = "Leave a quick note";
-  communityQuickEntry.setAttribute("aria-label", "Open community notes to leave a quick review");
-  communityQuickEntry.hidden = !(handlers && handlers.community);
-  communityQuickEntry.addEventListener("click", (event) => {
-    event.stopPropagation();
-    playUiClick();
-    card.dispatchEvent(
-      new CustomEvent("movie-card:set-state", {
-        detail: { expand: true }
-      })
-    );
-    focusCommunitySection(card, { pulse: true, focusInput: true });
-  });
-  infoWrap.appendChild(communityQuickEntry);
 
   const stateIcons = document.createElement("div");
   stateIcons.className = "movie-state-icons";

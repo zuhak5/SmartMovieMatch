@@ -118,7 +118,7 @@
           </div>
         </div>
         <p class="hint-text hint-text--compact">
-          Pick a few favorites or genres — I’ll adapt the feed instantly.
+          A couple of vibes or genres is enough to refresh the feed.
         </p>
 
         <form id="prefsForm" class="prefs-form">
@@ -129,7 +129,7 @@
                   <p class="vibe-preset-eyebrow">Need inspiration?</p>
                   <h3 class="vibe-preset-title">Jump in with a preset</h3>
                   <p class="vibe-preset-subtitle">
-                    Tap a card to auto-select genres. You can still tweak the list afterward.
+                    Tap a card to auto-fill genres, then fine-tune below.
                   </p>
                 </div>
               </div>
@@ -322,24 +322,31 @@
         <div class="panel-inner pad-inline">
           <div id="syncStatus" class="sync-status pad-inline" role="status" aria-live="polite"></div>
           <div class="recommendations-header pad-inline">
-            <div class="pad-inline">
-              <div class="recommendations-title pad-inline" id="recTitle">Recommendations</div>
-            <div class="recommendations-meta pad-inline">
-              <div class="recommendations-active-row pad-inline">
-                <span
-                  id="recMetaPrimary"
-                  class="recommendations-pill recommendations-pill--meta"
-                  aria-live="polite"
-                >
-                  Discovery mix
+            <div class="recommendations-headline pad-inline">
+              <div class="recommendations-title-row pad-inline">
+                <div class="recommendations-title pad-inline" id="recTitle">Recommendations</div>
+                <span class="pill-mini">
+                  <span class="swatch"></span>
+                  IMDb rating • genres • plot • trailer
                 </span>
-                <span id="recFilterSummary" class="recommendations-pill recommendations-pill--filters">
-                  Genres: All • Quick filters off
-                </span>
+              </div>
+              <div class="recommendations-filter-row pad-inline">
+                <div class="recommendations-pill-row pad-inline" role="list">
+                  <span
+                    id="recMetaPrimary"
+                    class="recommendations-pill recommendations-pill--meta"
+                    aria-live="polite"
+                  >
+                    Discovery mix
+                  </span>
+                  <span id="recFilterSummary" class="recommendations-pill recommendations-pill--filters">
+                    Genres: All • Quick filters off
+                  </span>
+                </div>
                 <button
                   type="button"
                   id="recFilterReset"
-                  class="recommendations-pill recommendations-pill--action"
+                  class="recommendations-pill recommendations-pill--action recommendations-pill--clear"
                   hidden
                   aria-hidden="true"
                 >
@@ -349,18 +356,13 @@
               <div id="recMetaStatus" class="recommendations-meta-status" aria-live="polite">
                 Tune your preferences, then I’ll blend TMDB discovery with fresh OMDb details.
               </div>
-              <span class="pill-mini">
-                <span class="swatch"></span>
-                IMDb rating • genres • plot • trailer
-              </span>
+            </div>
+            <div class="recommendations-actions pad-inline">
+              <button type="button" class="btn-subtle btn-chip btn-chip-muted" id="recNudgeBtn">
+                Shuffle suggestions
+              </button>
             </div>
           </div>
-          <div class="pad-inline">
-            <button type="button" class="btn-subtle btn-chip btn-chip-muted" id="recNudgeBtn">
-              Shuffle suggestions
-            </button>
-          </div>
-        </div>
 
         <div
           id="socialMiniPreview"
