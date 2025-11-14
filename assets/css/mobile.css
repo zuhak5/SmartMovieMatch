@@ -79,7 +79,7 @@ body {
 */
 .panel.pad-inline,
 .panel .pad-inline {
-  padding-inline: 5px;
+  padding-inline: 0;
 }
 
 body[data-theme="light"] {
