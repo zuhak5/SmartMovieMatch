@@ -1364,8 +1364,9 @@ function renderCommentNode(comment, review, sectionState, depth) {
   body.textContent = comment.body || '';
   wrapper.appendChild(body);
 
+  let replyBtn = null;
   if (state.session && state.session.token) {
-    const replyBtn = document.createElement('button');
+    replyBtn = document.createElement('button');
     replyBtn.type = 'button';
     replyBtn.className = 'btn-subtle community-reply-btn';
     replyBtn.textContent = 'Reply';
@@ -1384,8 +1385,9 @@ function renderCommentNode(comment, review, sectionState, depth) {
     wrapper.appendChild(replyBtn);
   }
 
+  let childList = null;
   if (Array.isArray(comment.replies) && comment.replies.length) {
-    const childList = document.createElement('div');
+    childList = document.createElement('div');
     childList.className = 'community-comment-children';
     comment.replies.forEach((reply) => {
       const node = renderCommentNode(reply, review, sectionState, depth + 1);
@@ -1395,6 +1397,42 @@ function renderCommentNode(comment, review, sectionState, depth) {
     });
     wrapper.appendChild(childList);
   }
+
+  const comfort = resolveUserComfortState(comment.username, {
+    isSelf: isSelfComment,
+    serverBlocked: Boolean(comment.blockedByViewer),
+    serverBlocksViewer: Boolean(comment.blocksViewer)
+  });
+  if (comfort.hidden) {
+    wrapper.classList.add('community-comment--hidden');
+    body.hidden = true;
+    if (replyBtn) {
+      replyBtn.hidden = true;
+    }
+    if (childList) {
+      childList.hidden = true;
+    }
+    const canReveal = comfort.reason !== 'blockedBy';
+    const notice = createHiddenContentNotice({
+      username: comment.username,
+      reason: comfort.reason,
+      onReveal: canReveal
+        ? () => {
+            body.hidden = false;
+            if (replyBtn) {
+              replyBtn.hidden = false;
+            }
+            if (childList) {
+              childList.hidden = false;
+            }
+            wrapper.classList.remove('community-comment--hidden');
+            notice.remove();
+          }
+        : null
+    });
+    wrapper.appendChild(notice);
+  }
+
   return wrapper;
 }
 

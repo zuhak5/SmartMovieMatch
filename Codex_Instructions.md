@@ -368,7 +368,7 @@ Implementation notes for Codex (internal):
 
 
 ## 8. Safety, comfort, and control in the social layer
-[Codex status: TODO]  (Last updated: 2025-11-13 by Codex)
+[Codex status: DONE]  (Last updated: 2025-02-14 by Codex)
 
 
 Expose blocking / muting in the UI
@@ -390,6 +390,11 @@ Per-movie “friend visibility” control
 Let users optionally mark certain reviews or diary entries as “private” or “friends only”.
 
 That encourages sharing honest takes without worrying everything is public.
+
+Implementation notes for Codex (internal):
+
+- Comment threads now respect the same hidden-content rules as reviews, and the reveal notice wires to unblock/unmute helpers.
+- Follow lists and peer profiles surface dedicated safety controls (block/mute) plus new chips so members always see current status.
 
 
 
