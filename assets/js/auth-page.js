@@ -116,7 +116,15 @@ function initAuthPage() {
           : variant === "loading"
             ? "status-loading"
             : "status-info";
-    status.innerHTML = `<span class="${className}">${message}</span>`;
+    const labelText =
+      variant === "error"
+        ? "Error"
+        : variant === "success"
+          ? "Success"
+          : variant === "loading"
+            ? "Working"
+            : "Info";
+    status.innerHTML = `<span class="${className}" data-status-label="${labelText}">${message}</span>`;
   }
 
   function clearAvatarPreview() {

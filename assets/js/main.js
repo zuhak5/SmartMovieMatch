@@ -1818,6 +1818,9 @@ function populateAccountSettings() {
   const profileStatus = $("accountProfileStatus");
   const securityStatus = $("accountSecurityStatus");
   const avatarInput = $("accountAvatarInput");
+  const handleValue = $("accountHandleValue");
+  const taglinePreview = $("accountTaglinePreview");
+  const syncCopy = $("accountProfileSyncCopy");
 
   state.accountRemoveAvatar = false;
   if (avatarInput) {
@@ -1838,6 +1841,36 @@ function populateAccountSettings() {
   if (securityStatus) {
     securityStatus.textContent = "";
     securityStatus.removeAttribute("data-variant");
+  }
+
+  if (handleValue) {
+    const normalizedHandle = state.session && state.session.username
+      ? canonicalHandle(state.session.username)
+      : "";
+    handleValue.textContent = normalizedHandle ? `@${normalizedHandle}` : "@guest";
+  }
+
+  if (taglinePreview) {
+    const selectedGenreIds = Array.isArray(state.session?.preferencesSnapshot?.selectedGenres)
+      ? state.session.preferencesSnapshot.selectedGenres
+      : [];
+    const genreLabels = selectedGenreIds
+      .map((id) => {
+        const key = typeof id === "number" ? String(id) : typeof id === "string" ? id : "";
+        if (key && TMDB_GENRES[key]) {
+          return TMDB_GENRES[key];
+        }
+        return key;
+      })
+      .filter(Boolean);
+    const vibeLabel = getActiveVibeLabel(genreLabels);
+    taglinePreview.textContent = genreLabels.length
+      ? `${vibeLabel} • synced from your vibe settings.`
+      : "Synced from your vibe preferences. Update them on your profile.";
+  }
+
+  if (syncCopy) {
+    syncCopy.textContent = "Used for favorites, reviews, and friend suggestions across Smart Movie Match.";
   }
 
   const initials = getActiveDisplayName().slice(0, 2).toUpperCase() || "SM";
