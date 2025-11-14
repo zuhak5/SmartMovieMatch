@@ -10,7 +10,7 @@ const TMDB_TIMEOUT_MS = 10000;
 
 module.exports = async (req, res) => {
   try {
-    const apiKey = process.env.TMDB_API_KEY;
+    const apiKey = process.env.TMDB_API_READ_ACCESS_TOKEN;
     if (!apiKey) {
       res.status(503).json({ error: 'TMDB API key not configured' });
       return;
