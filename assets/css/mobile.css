@@ -6690,9 +6690,44 @@ body[data-theme="light"] .preferences-preview-preset {
     .recommendations-header {
       display: flex;
       justify-content: space-between;
-      align-items: baseline;
-      gap: 0.5rem;
+      align-items: flex-start;
+      gap: 0.75rem;
+      flex-wrap: wrap;
       margin-bottom: 0.75rem;
+    }
+
+    .recommendations-headline {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      flex: 1;
+    }
+
+    .recommendations-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .recommendations-filter-row {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      flex-wrap: wrap;
+    }
+
+    .recommendations-pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      flex: 1;
+    }
+
+    .recommendations-actions {
+      display: flex;
+      align-items: flex-start;
     }
 
     .recommendations-title {
@@ -6710,15 +6745,6 @@ body[data-theme="light"] .preferences-preview-preset {
       flex-direction: column;
       align-items: flex-start;
       gap: 0.45rem;
-    }
-
-    .recommendations-meta-pill-row,
-    .recommendations-active-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.35rem;
-      align-items: center;
-      width: 100%;
     }
 
     .recommendations-pill {
@@ -6754,14 +6780,14 @@ body[data-theme="light"] .preferences-preview-preset {
       transition: color var(--transition-fast), border-color var(--transition-fast);
     }
 
-    .recommendations-active-row .recommendations-pill--action {
-      margin-left: auto;
-    }
-
     .recommendations-pill--action:hover,
     .recommendations-pill--action:focus-visible {
       border-color: rgba(248, 113, 113, 0.6);
       color: #fecaca;
+    }
+
+    .recommendations-pill--clear {
+      white-space: nowrap;
     }
 
     .recommendations-meta-status {
@@ -6771,12 +6797,18 @@ body[data-theme="light"] .preferences-preview-preset {
     }
 
     @media (max-width: 640px) {
-      .recommendations-active-row {
-        gap: 0.45rem;
+      .recommendations-filter-row {
+        flex-direction: column;
+        align-items: stretch;
       }
 
-      .recommendations-active-row .recommendations-pill--action {
-        margin-left: 0;
+      .recommendations-pill-row {
+        width: 100%;
+      }
+
+      .recommendations-actions {
+        width: 100%;
+        justify-content: flex-start;
       }
     }
 
@@ -8039,7 +8071,8 @@ body[data-theme="light"] .control-chip input {
       display: flex;
       align-items: center;
       gap: 0.6rem;
-      margin-top: 0.4rem;
+      margin-top: 0.2rem;
+      margin-bottom: 0.1rem;
       min-height: 1.8rem;
     }
 
@@ -8114,13 +8147,13 @@ body[data-theme="light"] .control-chip input {
     }
 
     .movie-community-activity {
-      margin-top: 0.32rem;
+      margin-top: 0.15rem;
       font-size: 0.7rem;
       color: rgba(148, 163, 184, 0.85);
     }
 
     .movie-community-quick {
-      margin-top: 0.35rem;
+      margin-top: 0.25rem;
       font-size: 0.72rem;
       color: rgba(248, 250, 252, 0.92);
       background: transparent;
