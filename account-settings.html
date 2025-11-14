@@ -75,6 +75,7 @@
     <p class="app-subtitle">
       Update how you appear across Smart Movie Match, keep your password fresh, and stay in sync across devices.
     </p>
+    <a class="settings-switch-link" href="login.html">Switch account</a>
   </header>
 
   <main class="app-main settings-main">
@@ -82,10 +83,14 @@
       <div class="panel-inner pad-inline">
         <div class="panel-header settings-header pad-inline">
           <div class="pad-inline">
-            <div class="panel-title pad-inline">Profile & security</div>
+            <div class="panel-title pad-inline">Profile &amp; security</div>
             <div class="panel-subtitle pad-inline">Tailor your details and protect your account.</div>
           </div>
         </div>
+        <nav class="settings-nav pad-inline" aria-label="Settings sections">
+          <a class="settings-nav-link is-active" href="#profile" aria-current="true">Profile</a>
+          <a class="settings-nav-link" href="#security">Security</a>
+        </nav>
 
         <div id="accountSettingsSignedOut" class="settings-signed-out pad-inline" hidden aria-hidden="true">
           <h2>Sign in to manage settings</h2>
@@ -97,44 +102,60 @@
           <div id="profile" class="settings-anchor pad-inline" aria-hidden="true"></div>
           <div class="settings-layout pad-inline">
             <div class="settings-views pad-inline">
-              <section class="settings-card pad-inline" aria-labelledby="accountSettingsProfileHeading">
+              <section
+                class="settings-card pad-inline"
+                aria-labelledby="accountSettingsProfileHeading"
+                data-settings-section="profile"
+              >
                 <div class="settings-card-header pad-inline">
                   <h2 id="accountSettingsProfileHeading">Profile</h2>
                   <p>Change what other devices see when you sign in.</p>
                 </div>
                 <form id="accountProfileForm" class="settings-section" novalidate>
-                  <div class="field-grid pad-inline">
-                    <label class="field-label" for="accountDisplayName">Display name</label>
-                    <input
-                      id="accountDisplayName"
-                      class="input-base input-text"
-                      type="text"
-                      name="displayName"
-                      minlength="2"
-                      maxlength="120"
-                      autocomplete="name"
-                      required
-                    />
-                  </div>
-                  <div class="field-grid pad-inline">
-                    <span class="field-label">Avatar</span>
-                    <div class="settings-avatar-row pad-inline">
-                      <label class="settings-avatar" for="accountAvatarInput" aria-label="Upload new avatar">
-                        <span class="settings-avatar-inner" id="settingsAvatarPreview">GM</span>
-                      </label>
+                  <div class="settings-fieldset pad-inline">
+                    <p class="settings-fieldset-title">Identity</p>
+                    <div class="field-grid pad-inline">
+                      <label class="field-label" for="accountDisplayName">Display name</label>
                       <input
-                        id="accountAvatarInput"
-                        class="input-base input-file"
-                        type="file"
-                        name="avatar"
-                        accept="image/*"
+                        id="accountDisplayName"
+                        class="input-base input-text"
+                        type="text"
+                        name="displayName"
+                        minlength="2"
+                        maxlength="120"
+                        autocomplete="name"
+                        required
                       />
-                      <button type="button" id="accountAvatarUpload" class="btn-secondary settings-avatar-upload">
-                        Upload new
-                      </button>
-                      <button type="button" id="accountAvatarRemove" class="btn-subtle" disabled>Remove</button>
+                      <p class="field-hint">Shown to friends, collaborators, and in recommendations.</p>
                     </div>
-                    <p class="field-hint">Preview updates instantly. Square JPG or PNG up to 5 MB recommended.</p>
+                    <div class="field-grid pad-inline">
+                      <span class="field-label">Avatar</span>
+                      <div class="settings-avatar-row pad-inline">
+                        <label class="settings-avatar" for="accountAvatarInput" aria-label="Upload new avatar">
+                          <span class="settings-avatar-inner" id="settingsAvatarPreview">GM</span>
+                        </label>
+                        <input
+                          id="accountAvatarInput"
+                          class="input-base input-file"
+                          type="file"
+                          name="avatar"
+                          accept="image/*"
+                        />
+                        <button type="button" id="accountAvatarUpload" class="btn-secondary settings-avatar-upload">
+                          Upload new
+                        </button>
+                        <button type="button" id="accountAvatarRemove" class="btn-subtle" disabled>Remove</button>
+                      </div>
+                      <p class="field-hint">Used across friend profiles, watch parties, and notifications.</p>
+                    </div>
+                    <div class="settings-helper-card pad-inline" role="note">
+                      <p class="settings-helper-title">Social discoverability</p>
+                      <p class="settings-helper-copy">
+                        Your @handle mirrors your username and your hero tagline still comes from the “Your vibe”
+                        preferences you set on your profile. We’ll surface dedicated handle and tagline controls in this
+                        panel soon so everything lives in one place.
+                      </p>
+                    </div>
                   </div>
                   <div class="settings-actions pad-inline">
                     <button type="submit" class="btn-primary">Save profile</button>
@@ -143,91 +164,105 @@
                 </form>
               </section>
 
-              <section class="settings-card pad-inline" aria-labelledby="accountSettingsSecurityHeading">
-                <div id="security" class="settings-anchor pad-inline" aria-hidden="true"></div>
+              <div id="security" class="settings-anchor pad-inline" aria-hidden="true"></div>
+              <section
+                class="settings-card pad-inline"
+                aria-labelledby="accountSettingsSecurityHeading"
+                data-settings-section="security"
+              >
                 <div class="settings-card-header pad-inline">
                   <h2 id="accountSettingsSecurityHeading">Security</h2>
                   <p>Reset your password and prep for multi-factor prompts.</p>
                 </div>
                 <form id="accountSecurityForm" class="settings-section" novalidate>
-                  <div class="field-grid pad-inline">
-                    <label class="field-label" for="currentPasswordInput">Current password</label>
-                    <div class="input-with-addon pad-inline">
-                      <input
-                        id="currentPasswordInput"
-                        class="input-base input-text"
-                        type="password"
-                        name="currentPassword"
-                        autocomplete="current-password"
-                        required
-                      />
-                      <button
-                        type="button"
-                        class="input-visibility-toggle"
-                        data-password-toggle="currentPasswordInput"
-                        data-label-show="Show"
-                        data-label-hide="Hide"
-                        data-aria-show="Show current password"
-                        data-aria-hide="Hide current password"
-                        aria-pressed="false"
-                      >
-                        <span class="input-visibility-icon" aria-hidden="true">👁</span>
-                        <span class="input-visibility-label" data-toggle-label>Show</span>
-                      </button>
+                  <div class="security-steps pad-inline">
+                    <div class="security-step pad-inline">
+                      <p class="security-step-title">Step 1 · Confirm current password</p>
+                      <div class="field-grid pad-inline">
+                        <label class="field-label" for="currentPasswordInput">Current password</label>
+                        <div class="input-with-addon pad-inline">
+                          <input
+                            id="currentPasswordInput"
+                            class="input-base input-text"
+                            type="password"
+                            name="currentPassword"
+                            autocomplete="current-password"
+                            required
+                          />
+                          <button
+                            type="button"
+                            class="input-visibility-toggle"
+                            data-password-toggle="currentPasswordInput"
+                            data-label-show="Show"
+                            data-label-hide="Hide"
+                            data-aria-show="Show current password"
+                            data-aria-hide="Hide current password"
+                            aria-pressed="false"
+                          >
+                            <span class="input-visibility-icon" aria-hidden="true">👁</span>
+                            <span class="input-visibility-label" data-toggle-label>Show</span>
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div class="field-grid pad-inline">
-                    <label class="field-label" for="newPasswordInput">New password</label>
-                    <div class="input-with-addon pad-inline">
-                      <input
-                        id="newPasswordInput"
-                        class="input-base input-text"
-                        type="password"
-                        name="newPassword"
-                        autocomplete="new-password"
-                        minlength="8"
-                        required
-                      />
-                      <button
-                        type="button"
-                        class="input-visibility-toggle"
-                        data-password-toggle="newPasswordInput"
-                        data-label-show="Show"
-                        data-label-hide="Hide"
-                        data-aria-show="Show new password"
-                        data-aria-hide="Hide new password"
-                        aria-pressed="false"
-                      >
-                        <span class="input-visibility-icon" aria-hidden="true">👁</span>
-                        <span class="input-visibility-label" data-toggle-label>Show</span>
-                      </button>
-                    </div>
-                    <p class="field-hint">Use 8+ characters with a mix of letters, numbers, and symbols.</p>
-                  </div>
-                  <div class="field-grid pad-inline">
-                    <label class="field-label" for="confirmPasswordInput">Confirm new password</label>
-                    <div class="input-with-addon pad-inline">
-                      <input
-                        id="confirmPasswordInput"
-                        class="input-base input-text"
-                        type="password"
-                        name="confirmPassword"
-                        autocomplete="new-password"
-                        required
-                      />
-                      <button
-                        type="button"
-                        class="input-visibility-toggle"
-                        data-password-toggle="confirmPasswordInput"
-                        data-label-show="Show"
-                        data-label-hide="Hide"
-                        data-aria-show="Show confirmation"
-                        data-aria-hide="Hide confirmation"
-                        aria-pressed="false"
-                      >
-                        <span class="input-visibility-icon" aria-hidden="true">👁</span>
-                        <span class="input-visibility-label" data-toggle-label>Show</span>
-                      </button>
+                    <div class="security-step security-step--double pad-inline">
+                      <p class="security-step-title">Step 2 · Choose a new password</p>
+                      <div class="security-step-grid pad-inline">
+                        <div class="field-grid pad-inline">
+                          <label class="field-label" for="newPasswordInput">New password</label>
+                          <div class="input-with-addon pad-inline">
+                            <input
+                              id="newPasswordInput"
+                              class="input-base input-text"
+                              type="password"
+                              name="newPassword"
+                              autocomplete="new-password"
+                              minlength="8"
+                              required
+                            />
+                            <button
+                              type="button"
+                              class="input-visibility-toggle"
+                              data-password-toggle="newPasswordInput"
+                              data-label-show="Show"
+                              data-label-hide="Hide"
+                              data-aria-show="Show new password"
+                              data-aria-hide="Hide new password"
+                              aria-pressed="false"
+                            >
+                              <span class="input-visibility-icon" aria-hidden="true">👁</span>
+                              <span class="input-visibility-label" data-toggle-label>Show</span>
+                            </button>
+                          </div>
+                          <p class="field-hint">Use 8+ characters with a mix of letters, numbers, and symbols.</p>
+                        </div>
+                        <div class="field-grid pad-inline">
+                          <label class="field-label" for="confirmPasswordInput">Confirm new password</label>
+                          <div class="input-with-addon pad-inline">
+                            <input
+                              id="confirmPasswordInput"
+                              class="input-base input-text"
+                              type="password"
+                              name="confirmPassword"
+                              autocomplete="new-password"
+                              required
+                            />
+                            <button
+                              type="button"
+                              class="input-visibility-toggle"
+                              data-password-toggle="confirmPasswordInput"
+                              data-label-show="Show"
+                              data-label-hide="Hide"
+                              data-aria-show="Show confirmation"
+                              data-aria-hide="Hide confirmation"
+                              aria-pressed="false"
+                            >
+                              <span class="input-visibility-icon" aria-hidden="true">👁</span>
+                              <span class="input-visibility-label" data-toggle-label>Show</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <ul id="settingsPasswordChecklist" class="password-checklist password-checklist--compact">
@@ -242,6 +277,7 @@
                       <input id="emailVerificationToggle" type="checkbox" disabled checked />
                       <span>
                         Email verification is required for password recovery. We’ll send alerts to your inbox.
+                        <em>Used for sign-in alerts and important security notifications only.</em>
                       </span>
                     </label>
                     <label class="security-option">

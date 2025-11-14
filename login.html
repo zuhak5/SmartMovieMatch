@@ -17,9 +17,14 @@
           <a class="auth-logo" href="index.html">🎬 Smart Movie Match</a>
           <h1 id="authTitle" class="auth-card-title">Welcome back</h1>
           <p id="authSubtitle" class="auth-card-subtitle">
-            Sign in or create an account to sync your taste profile and watched history
-            across devices.
+            Sign in or create an account to sync your taste profile, keep watched history in one place,
+            and connect with friends for shared recommendations.
           </p>
+          <ul class="auth-benefits-inline">
+            <li>Sync your taste profile</li>
+            <li>See friends’ trends</li>
+            <li>Join collaborative watchlists</li>
+          </ul>
         </div>
         <div class="auth-mode-tabs pad-inline" role="tablist" aria-label="Authentication mode">
           <button
@@ -28,8 +33,10 @@
             data-auth-mode="login"
             role="tab"
             aria-selected="true"
+            aria-describedby="authTabHintLogin"
           >
-            Sign in
+            <span class="auth-mode-label">Sign in</span>
+            <span id="authTabHintLogin" class="auth-mode-hint">For existing members</span>
           </button>
           <button
             type="button"
@@ -37,8 +44,10 @@
             data-auth-mode="signup"
             role="tab"
             aria-selected="false"
+            aria-describedby="authTabHintSignup"
           >
-            Create account
+            <span class="auth-mode-label">Create account</span>
+            <span id="authTabHintSignup" class="auth-mode-hint">Takes less than a minute</span>
           </button>
         </div>
         <form id="authForm" class="auth-form" novalidate>

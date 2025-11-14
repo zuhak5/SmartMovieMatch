@@ -961,6 +961,7 @@ function init() {
   if (isAccountSettingsContext() && state.session && state.session.token) {
     populateAccountSettings();
   }
+  setupSettingsNavHighlighting();
   setSyncStatus(
     state.session
       ? "Signed in – your taste profile syncs automatically."
@@ -1857,6 +1858,94 @@ function populateAccountSettings() {
     }
   }
 
+}
+
+function setupSettingsNavHighlighting() {
+  if (!isAccountSettingsContext()) {
+    return;
+  }
+  const navLinks = Array.from(document.querySelectorAll('.settings-nav-link[href^="#"]'));
+  if (!navLinks.length) {
+    return;
+  }
+  const sections = navLinks
+    .map((link) => {
+      const hash = link.getAttribute('href');
+      if (!hash || !hash.startsWith('#')) {
+        return null;
+      }
+      const id = hash.slice(1);
+      const target = document.querySelector(`[data-settings-section="${id}"]`) || document.getElementById(id);
+      if (!target) {
+        return null;
+      }
+      return { id, section: target, link };
+    })
+    .filter(Boolean);
+  if (!sections.length) {
+    return;
+  }
+  let activeId = null;
+  const setActiveLink = (nextId) => {
+    if (!nextId || nextId === activeId) {
+      return;
+    }
+    activeId = nextId;
+    navLinks.forEach((link) => {
+      const hash = link.getAttribute('href') || '';
+      const id = hash.startsWith('#') ? hash.slice(1) : null;
+      const isActive = id === nextId;
+      link.classList.toggle('is-active', isActive);
+      if (isActive) {
+        link.setAttribute('aria-current', 'true');
+      } else {
+        link.removeAttribute('aria-current');
+      }
+    });
+  };
+  const updateFromScroll = () => {
+    const viewportAnchor = window.innerHeight * 0.35;
+    let candidateId = sections[0].id;
+    let smallestDistance = Infinity;
+    sections.forEach(({ id, section }) => {
+      const rect = section.getBoundingClientRect();
+      const distance = Math.abs(rect.top - viewportAnchor);
+      if (distance < smallestDistance) {
+        smallestDistance = distance;
+        candidateId = id;
+      }
+    });
+    setActiveLink(candidateId);
+  };
+  if (typeof window.IntersectionObserver === 'function') {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+        if (!visible.length) {
+          return;
+        }
+        const nextId = visible[0].target.dataset.settingsSection || visible[0].target.id;
+        if (nextId) {
+          setActiveLink(nextId);
+        }
+      },
+      { rootMargin: '-40% 0px -45% 0px', threshold: [0.15, 0.4, 0.65] }
+    );
+    sections.forEach(({ section }) => observer.observe(section));
+  } else {
+    window.addEventListener('scroll', updateFromScroll, { passive: true });
+  }
+  navLinks.forEach((link) => {
+    link.addEventListener('click', () => {
+      const hash = link.getAttribute('href');
+      if (hash && hash.startsWith('#')) {
+        setActiveLink(hash.slice(1));
+      }
+    });
+  });
+  updateFromScroll();
 }
 
 async function handleProfileSubmit(event) {
@@ -3227,17 +3316,15 @@ function buildFilterSummaryParts(selectedGenres = getSelectedGenreLabels()) {
 }
 
 function updateRecommendationFilterSummary() {
-  const summaryEl = $("recFilterSummary");
+  const summaryEl = $("recMetaSummary");
   const resetBtn = $("recFilterReset");
-  const vibeEl = $("recMetaPrimary");
   const selectedGenres = getSelectedGenreLabels();
   const summaryParts = buildFilterSummaryParts(selectedGenres);
+  const vibeLabel = getActiveVibeLabel(selectedGenres);
   if (summaryEl) {
-    summaryEl.textContent = summaryParts.join(" • ");
+    const textParts = [vibeLabel, ...summaryParts];
+    summaryEl.textContent = textParts.join(" • ");
     summaryEl.hidden = false;
-  }
-  if (vibeEl) {
-    vibeEl.textContent = getActiveVibeLabel(selectedGenres);
   }
   if (resetBtn) {
     const hasPreset = Boolean(state.activePreset);
@@ -4063,6 +4150,178 @@ function updateAccountUi(session) {
     settingsSignedOut.setAttribute("aria-hidden", isSignedIn ? "true" : "false");
   }
 
+  updateProfileHeroIdentity(session);
+}
+
+function updateProfileHeroIdentity(session) {
+  const heroName = $("profileHeroName");
+  if (!heroName) {
+    return;
+  }
+  const heroHandle = $("profileHeroHandle");
+  const heroTagline = $("profileHeroTagline");
+  const heroAvatar = document.getElementById("profileHeroAvatar");
+  const heroAvatarImg = $("profileHeroAvatarImg");
+  const heroAvatarInitials = $("profileHeroAvatarInitials");
+  const isSignedIn = Boolean(session && session.token);
+  const displayName = isSignedIn
+    ? (typeof session.displayName === "string" && session.displayName.trim()
+        ? session.displayName.trim()
+        : typeof session.username === "string"
+        ? session.username
+        : "Member")
+    : "Guest member";
+  heroName.textContent = displayName;
+  if (heroHandle) {
+    heroHandle.textContent = isSignedIn && session && session.username ? `@${session.username}` : "@guest";
+    heroHandle.dataset.state = isSignedIn ? "visible" : "guest";
+  }
+  if (heroTagline) {
+    heroTagline.textContent = buildProfileHeroTagline(session);
+  }
+  if (heroAvatarInitials) {
+    const initials = displayName
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "SM";
+    heroAvatarInitials.textContent = initials;
+  }
+  if (heroAvatar && heroAvatarImg) {
+    if (session && session.avatarUrl) {
+      heroAvatarImg.src = session.avatarUrl;
+      heroAvatarImg.alt = `${displayName} avatar`;
+      heroAvatar.classList.add("has-image");
+    } else {
+      heroAvatarImg.removeAttribute("src");
+      heroAvatarImg.alt = "";
+      heroAvatar.classList.remove("has-image");
+    }
+  }
+}
+
+function buildProfileHeroTagline(session) {
+  const snapshot = session && session.preferencesSnapshot ? session.preferencesSnapshot : null;
+  const likesText = snapshot && typeof snapshot.likesText === "string" ? snapshot.likesText.trim() : "";
+  if (likesText) {
+    return likesText;
+  }
+  const overlapSummary = buildProfileOverlapSummary();
+  const favoritesSummary = buildProfileFavoritesSummary(snapshot);
+  const genreSummary = buildProfileGenreSummary(snapshot);
+  if (overlapSummary && favoritesSummary) {
+    return `${overlapSummary} • ${favoritesSummary}`;
+  }
+  if (overlapSummary) {
+    return overlapSummary;
+  }
+  if (favoritesSummary) {
+    return favoritesSummary;
+  }
+  if (genreSummary) {
+    return genreSummary;
+  }
+  return "Tell Smart Movie Match what you’re into and this space will feel uniquely yours.";
+}
+
+function buildProfileFavoritesSummary(snapshot) {
+  const snapshotFavorites = Array.isArray(snapshot && snapshot.favoriteTitles)
+    ? snapshot.favoriteTitles
+        .map((title) => (typeof title === "string" ? title.trim() : ""))
+        .filter(Boolean)
+    : [];
+  if (snapshotFavorites.length) {
+    const preview = snapshotFavorites.slice(0, 3);
+    return `Favorites lately: ${formatFriendlyList(preview, preview.length)}.`;
+  }
+  const fallbackFavorites = Array.isArray(state.favorites)
+    ? state.favorites
+        .slice(-3)
+        .reverse()
+        .map((entry) => (entry && typeof entry.title === "string" ? entry.title.trim() : ""))
+        .filter(Boolean)
+    : [];
+  if (fallbackFavorites.length) {
+    return `Favorites lately: ${formatFriendlyList(fallbackFavorites, fallbackFavorites.length)}.`;
+  }
+  return "";
+}
+
+function buildProfileGenreSummary(snapshot) {
+  const selectedGenres = Array.isArray(snapshot && snapshot.selectedGenres)
+    ? snapshot.selectedGenres.map((genre) => (typeof genre === "string" ? genre.trim() : "")).filter(Boolean)
+    : [];
+  if (selectedGenres.length) {
+    const preview = selectedGenres.slice(0, 2);
+    return `Into ${preview.join(", ")} right now.`;
+  }
+  return "";
+}
+
+function buildProfileOverlapSummary() {
+  const overview = state.socialOverview || getSocialOverviewSnapshot();
+  if (!overview) {
+    return "";
+  }
+  const suggestions = Array.isArray(overview.suggestions) ? overview.suggestions : [];
+  const overlapSuggestion = suggestions.find((suggestion) => {
+    if (!suggestion) {
+      return false;
+    }
+    return (
+      (Array.isArray(suggestion.sharedFavorites) && suggestion.sharedFavorites.length > 0) ||
+      (Array.isArray(suggestion.sharedInterests) && suggestion.sharedInterests.length > 0) ||
+      (Array.isArray(suggestion.sharedWatchHistory) && suggestion.sharedWatchHistory.length > 0)
+    );
+  });
+  const formatHandle = (suggestion) => {
+    if (!suggestion || typeof suggestion.username !== "string") {
+      return "";
+    }
+    const trimmed = suggestion.username.trim();
+    return trimmed ? ` with @${trimmed}` : "";
+  };
+  if (overlapSuggestion) {
+    const handleText = formatHandle(overlapSuggestion);
+    if (Array.isArray(overlapSuggestion.sharedFavorites) && overlapSuggestion.sharedFavorites.length) {
+      return `High favorite overlap${handleText} on ${formatFriendlyList(overlapSuggestion.sharedFavorites, 2)}.`;
+    }
+    if (Array.isArray(overlapSuggestion.sharedInterests) && overlapSuggestion.sharedInterests.length) {
+      return `Friends keep tagging you for ${formatFriendlyList(overlapSuggestion.sharedInterests, 2)} vibes.`;
+    }
+    if (Array.isArray(overlapSuggestion.sharedWatchHistory) && overlapSuggestion.sharedWatchHistory.length) {
+      const friendText = handleText || " with friends";
+      return `Logging the same watches${friendText}: ${formatFriendlyList(overlapSuggestion.sharedWatchHistory, 2)}.`;
+    }
+  }
+  const counts = overview && overview.counts ? overview.counts : {};
+  const mutualCount = Number.isFinite(counts.mutual)
+    ? counts.mutual
+    : Array.isArray(overview.mutualFollowers)
+    ? overview.mutualFollowers.length
+    : 0;
+  if (mutualCount > 0) {
+    return `Swapping picks with ${formatPlural(mutualCount, "mutual")}.`;
+  }
+  const followersCount = Number.isFinite(counts.followers)
+    ? counts.followers
+    : Array.isArray(overview.followers)
+    ? overview.followers.length
+    : 0;
+  if (followersCount > 0) {
+    return `Sharing updates with ${formatPlural(followersCount, "follower")}.`;
+  }
+  const followingCount = Number.isFinite(counts.following)
+    ? counts.following
+    : Array.isArray(overview.following)
+    ? overview.following.length
+    : 0;
+  if (followingCount > 0) {
+    return `Following ${formatPlural(followingCount, "movie fan")}.`;
+  }
+  return "";
 }
 
 function setSyncStatus(message, variant = "muted") {
@@ -5891,6 +6150,9 @@ function renderSocialConnections() {
     "mutualFollowersCount",
     Number.isFinite(counts.mutual) ? counts.mutual : mutualFollowers.length
   );
+  updateSocialCount("profileHeroFollowers", Number.isFinite(counts.followers) ? counts.followers : followers.length);
+  updateSocialCount("profileHeroFollowing", Number.isFinite(counts.following) ? counts.following : following.length);
+  updateSocialCount("profileHeroMutual", Number.isFinite(counts.mutual) ? counts.mutual : mutualFollowers.length);
   updateSocialCount(
     "socialFollowingHeadingCount",
     Number.isFinite(counts.following) ? counts.following : following.length
@@ -8124,13 +8386,29 @@ function renderSocialProfileContent(profile) {
   }
 
   const hero = buildPeerHeroSection({ profile, normalized, displayName, isFollowing });
+  const heroHost = document.getElementById("peeruserHeroHost");
   if (hero) {
-    socialProfileBodyEl.appendChild(hero);
+    if (heroHost) {
+      heroHost.innerHTML = "";
+      heroHost.appendChild(hero);
+    } else {
+      socialProfileBodyEl.appendChild(hero);
+    }
+  } else if (heroHost) {
+    heroHost.innerHTML = "";
   }
 
   const mutualStrip = createMutualFollowersStrip(profile);
+  const mutualHost = document.getElementById("peeruserMutualHost");
   if (mutualStrip) {
-    socialProfileBodyEl.appendChild(mutualStrip);
+    if (mutualHost) {
+      mutualHost.innerHTML = "";
+      mutualHost.appendChild(mutualStrip);
+    } else {
+      socialProfileBodyEl.appendChild(mutualStrip);
+    }
+  } else if (mutualHost) {
+    mutualHost.innerHTML = '<p class="peeruser-mutual-empty">No mutual followers yet.</p>';
   }
 
   const personaGrid = buildSocialPersonaGrid(profile, normalized, { includeCompatibility: false });
