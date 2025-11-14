@@ -3167,47 +3167,77 @@ function getSelectedGenreLabels() {
     .filter(Boolean);
 }
 
-function buildActiveFilterLabels() {
-  const labels = [];
+function getActiveVibeLabel(preselectedGenres) {
   if (state.activePreset && state.activePreset.title) {
-    labels.push(state.activePreset.title);
+    return state.activePreset.title;
   }
-  const genreLabels = getSelectedGenreLabels();
-  if (genreLabels.length) {
-    const preview = genreLabels.slice(0, 3);
+  const genres = Array.isArray(preselectedGenres) ? preselectedGenres : getSelectedGenreLabels();
+  if (genres.length === 1) {
+    return `${genres[0]} focus`;
+  }
+  if (genres.length === 2) {
+    return `${genres[0]} + ${genres[1]} mix`;
+  }
+  if (genres.length > 2) {
+    return `${genres[0]}, ${genres[1]} +${genres.length - 2}`;
+  }
+  return "Discovery mix";
+}
+
+function buildFilterSummaryParts(selectedGenres = getSelectedGenreLabels()) {
+  const parts = [];
+  if (selectedGenres.length) {
+    const preview = selectedGenres.slice(0, 3);
     let genreText = `Genres: ${preview.join(", ")}`;
-    if (genreLabels.length > preview.length) {
-      genreText += ` +${genreLabels.length - preview.length}`;
+    if (selectedGenres.length > preview.length) {
+      genreText += ` +${selectedGenres.length - preview.length}`;
     }
-    labels.push(genreText);
+    parts.push(genreText);
+  } else {
+    parts.push("Genres: All");
   }
+
   if (state.recommendationFilters.topRated) {
-    labels.push("IMDb 7+");
+    parts.push("IMDb 7+");
   }
   if (state.recommendationFilters.streaming) {
-    labels.push("Streamable now");
+    parts.push("Streamable now");
   }
   if (state.recommendationFilters.fresh) {
-    labels.push("Released <2y");
+    parts.push("Released <2y");
   }
-  return labels;
+  if (
+    !state.recommendationFilters.topRated &&
+    !state.recommendationFilters.streaming &&
+    !state.recommendationFilters.fresh
+  ) {
+    parts.push("Quick filters off");
+  }
+
+  return parts;
 }
 
 function updateRecommendationFilterSummary() {
   const summaryEl = $("recFilterSummary");
   const resetBtn = $("recFilterReset");
-  const labels = buildActiveFilterLabels();
+  const vibeEl = $("recMetaPrimary");
+  const selectedGenres = getSelectedGenreLabels();
+  const summaryParts = buildFilterSummaryParts(selectedGenres);
   if (summaryEl) {
-    if (labels.length) {
-      summaryEl.textContent = labels.join(" • ");
-      summaryEl.hidden = false;
-    } else {
-      summaryEl.textContent = "";
-      summaryEl.hidden = true;
-    }
+    summaryEl.textContent = summaryParts.join(" • ");
+    summaryEl.hidden = false;
+  }
+  if (vibeEl) {
+    vibeEl.textContent = getActiveVibeLabel(selectedGenres);
   }
   if (resetBtn) {
-    const shouldShow = labels.length > 0;
+    const hasPreset = Boolean(state.activePreset);
+    const hasGenres = selectedGenres.length > 0;
+    const hasQuickFilters =
+      state.recommendationFilters.topRated ||
+      state.recommendationFilters.streaming ||
+      state.recommendationFilters.fresh;
+    const shouldShow = hasPreset || hasGenres || hasQuickFilters;
     resetBtn.hidden = !shouldShow;
     resetBtn.setAttribute("aria-hidden", shouldShow ? "false" : "true");
   }
@@ -3319,7 +3349,7 @@ async function getRecommendations(isShuffleOnly) {
       titleEl.textContent = "Recommendations";
     }
 
-    const metaEl = $("recMetaPrimary");
+    const metaEl = $("recMetaStatus");
     const genreLabel = selectedGenres.length
       ? "inside your selected genres"
       : "across popular genres";
@@ -3586,7 +3616,7 @@ function updateShowMoreButton() {
 }
 
 function updateRecommendationsMeta() {
-  const metaEl = $("recMetaPrimary");
+  const metaEl = $("recMetaStatus");
   if (!metaEl) {
     return;
   }
@@ -4053,6 +4083,7 @@ function updateSocialFirstRunCard(counts = {}) {
   const panel = $("socialFirstRunPanel");
   const card = $("socialFirstRunCard");
   if (!panel || !card) {
+    updateSocialMiniPreview(counts);
     return;
   }
   const followingValue = Number.isFinite(counts.following) ? counts.following : 0;
@@ -4062,6 +4093,7 @@ function updateSocialFirstRunCard(counts = {}) {
   const shouldShow = totalConnections === 0;
   panel.hidden = !shouldShow;
   panel.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+  updateSocialMiniPreview(counts);
   if (!shouldShow) {
     return;
   }
@@ -4085,6 +4117,34 @@ function updateSocialFirstRunCard(counts = {}) {
     mutualEl.textContent = mutualValue.toLocaleString();
   }
   wireSocialFirstRunCta();
+}
+
+function updateSocialMiniPreview(counts = {}) {
+  const container = $("socialMiniPreview");
+  if (!container) {
+    return;
+  }
+  const followingEl = $("socialMiniFollowing");
+  const followersEl = $("socialMiniFollowers");
+  const mutualEl = $("socialMiniMutual");
+  const followingValue = Number.isFinite(counts.following) ? counts.following : 0;
+  const followersValue = Number.isFinite(counts.followers) ? counts.followers : 0;
+  const mutualValue = Number.isFinite(counts.mutual) ? counts.mutual : 0;
+  const hasConnections = followingValue + followersValue + mutualValue > 0;
+  container.hidden = !hasConnections;
+  container.setAttribute("aria-hidden", hasConnections ? "false" : "true");
+  if (!hasConnections) {
+    return;
+  }
+  if (followingEl) {
+    followingEl.textContent = followingValue.toLocaleString();
+  }
+  if (followersEl) {
+    followersEl.textContent = followersValue.toLocaleString();
+  }
+  if (mutualEl) {
+    mutualEl.textContent = mutualValue.toLocaleString();
+  }
 }
 
 function setupSocialFeatures() {

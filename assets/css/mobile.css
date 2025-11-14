@@ -6663,7 +6663,8 @@ body[data-theme="light"] .preferences-preview-preset {
       gap: 0.45rem;
     }
 
-    .recommendations-meta-pill-row {
+    .recommendations-meta-pill-row,
+    .recommendations-active-row {
       display: flex;
       flex-wrap: wrap;
       gap: 0.35rem;
@@ -6704,10 +6705,73 @@ body[data-theme="light"] .preferences-preview-preset {
       transition: color var(--transition-fast), border-color var(--transition-fast);
     }
 
+    .recommendations-active-row .recommendations-pill--action {
+      margin-left: auto;
+    }
+
     .recommendations-pill--action:hover,
     .recommendations-pill--action:focus-visible {
       border-color: rgba(248, 113, 113, 0.6);
       color: #fecaca;
+    }
+
+    .recommendations-meta-status {
+      font-size: 0.78rem;
+      color: rgba(148, 163, 184, 0.9);
+      line-height: 1.4;
+    }
+
+    @media (max-width: 640px) {
+      .recommendations-active-row {
+        gap: 0.45rem;
+      }
+
+      .recommendations-active-row .recommendations-pill--action {
+        margin-left: 0;
+      }
+    }
+
+    .social-mini-preview {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+      align-items: center;
+      padding-top: 0;
+      padding-bottom: 0.35rem;
+      border-bottom: 1px dashed rgba(148, 163, 184, 0.35);
+      margin-bottom: 1rem;
+    }
+
+    .social-mini-chip {
+      display: inline-flex;
+      flex-direction: column;
+      gap: 0.1rem;
+      padding: 0.35rem 0.65rem;
+      border-radius: var(--radius-full);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      background: rgba(15, 23, 42, 0.75);
+      min-width: 4.5rem;
+    }
+
+    .social-mini-label {
+      font-size: 0.68rem;
+      color: rgba(148, 163, 184, 0.9);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .social-mini-value {
+      font-size: 0.98rem;
+      font-weight: 600;
+      color: rgba(248, 250, 252, 0.95);
+    }
+
+    .social-mini-hint {
+      font-size: 0.72rem;
+      color: rgba(148, 163, 184, 0.9);
+      margin-left: auto;
+      flex: 1;
+      min-width: 220px;
     }
 
 .recommendations-controls {
@@ -7927,6 +7991,17 @@ body[data-theme="light"] .control-chip input {
       align-items: center;
       gap: 0.6rem;
       margin-top: 0.4rem;
+      min-height: 1.8rem;
+    }
+
+    .movie-community-context[data-state='idle'] .movie-community-chip {
+      border-style: dashed;
+      color: rgba(148, 163, 184, 0.85);
+      background: rgba(15, 23, 42, 0.6);
+    }
+
+    .movie-community-context[data-state='idle'] .movie-community-avatars {
+      opacity: 0.3;
     }
 
     .movie-community-avatars {

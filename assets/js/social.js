@@ -1830,23 +1830,29 @@ function updateCondensedHeader(sectionState, stats, reviews = []) {
 
   if (!hasStats) {
     if (container) {
-      container.hidden = true;
+      container.hidden = false;
+      container.dataset.state = 'idle';
+    }
+    if (overall) {
+      overall.textContent = 'Community intel warming up';
     }
     if (avatars) {
       avatars.innerHTML = '';
     }
     if (activity) {
-      activity.hidden = true;
-      activity.textContent = '';
+      activity.hidden = false;
+      activity.textContent = 'Leave a quick note to start the thread.';
     }
     if (friends) {
       friends.dataset.empty = 'true';
+      friends.textContent = 'No friend reviews yet';
     }
     return;
   }
 
   if (container) {
     container.hidden = false;
+    container.dataset.state = 'active';
     if (overall) {
       overall.textContent = `Community ${formatCondensedScore(stats.averageRating)}`;
     }
