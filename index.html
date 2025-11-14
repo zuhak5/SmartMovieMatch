@@ -127,23 +127,23 @@
             <div class="panel-subtitle pad-inline">Genres, mood &amp; what you’ve liked</div>
           </div>
         </div>
-        <p class="hint-text">
-          The more you share (what you’ve seen and the genres you love), the smarter the
-          suggestions become. Movies you mark as “watched” also tune the recommender.
+        <p class="hint-text hint-text--compact">
+          Share a few favorites or genres and the live feed adapts instantly.
         </p>
 
-        <form id="prefsForm">
-          <section class="vibe-preset-panel pad-inline" aria-label="Starter vibe presets">
-            <div class="vibe-preset-header pad-inline">
-              <div class="pad-inline">
-                <p class="vibe-preset-eyebrow">Need inspiration?</p>
-                <h3 class="vibe-preset-title">Jump in with a preset</h3>
-                <p class="vibe-preset-subtitle">
-                  Tap a card to auto-select genres. You can still tweak the list afterward.
-                </p>
+        <form id="prefsForm" class="prefs-form">
+          <section class="prefs-section prefs-section--presets">
+            <div class="vibe-preset-panel pad-inline" aria-label="Starter vibe presets">
+              <div class="vibe-preset-header pad-inline">
+                <div class="pad-inline">
+                  <p class="vibe-preset-eyebrow">Need inspiration?</p>
+                  <h3 class="vibe-preset-title">Jump in with a preset</h3>
+                  <p class="vibe-preset-subtitle">
+                    Tap a card to auto-select genres. You can still tweak the list afterward.
+                  </p>
+                </div>
               </div>
-            </div>
-            <div class="vibe-preset-grid pad-inline" role="group">
+              <div class="vibe-preset-grid pad-inline" role="group">
               <button
                 type="button"
                 class="vibe-preset-card"
@@ -209,17 +209,17 @@
                 </span>
               </button>
             </div>
+            </div>
           </section>
 
           <!-- Genres -->
-          <div class="field-group pad-inline">
-            <div class="field-label-row pad-inline">
-              <label>Genres you enjoy</label>
-              <div class="field-label-secondary pad-inline">
-                Pick a few – you can mix anything.
-              </div>
+          <section class="prefs-section prefs-section--genres" aria-label="Fine-tune genres">
+            <div class="prefs-section-header pad-inline">
+              <p class="prefs-section-eyebrow">Fine-tune genres</p>
+              <h3 class="prefs-section-title">Dial in exactly what you’re craving</h3>
+              <p class="prefs-section-subtitle">Mix and match anything — I’ll balance the picks.</p>
             </div>
-            <div class="genre-grid pad-inline">
+            <div class="genre-grid pad-inline" role="group" aria-label="Genre preferences">
               <!-- TMDB genre IDs -->
               <label class="genre-pill">
                 <input type="checkbox" name="genre" value="28" />
@@ -306,7 +306,12 @@
                 </span>
               </label>
             </div>
-          </div>
+          </section>
+
+          <details class="prefs-section prefs-section--advanced">
+            <summary>Advanced filters</summary>
+            <p>Runtime ranges, streaming sources, and crew filters will live here as they roll out.</p>
+          </details>
 
 
           <div class="preferences-preview pad-inline" id="preferencesPreview" aria-live="polite"></div>
@@ -321,8 +326,107 @@
       </div>
     </section>
 
-    <!-- Right column: collections + recommendations -->
+    <!-- Right column: recommendations + collections -->
     <div class="right-column pad-inline">
+      <section id="recommendationsPanel" class="panel recommendations-panel pad-inline">
+        <div class="panel-inner pad-inline">
+          <div id="syncStatus" class="sync-status pad-inline" role="status" aria-live="polite"></div>
+          <div class="recommendations-header pad-inline">
+            <div class="pad-inline">
+              <div class="recommendations-title pad-inline" id="recTitle">Recommendations</div>
+              <div class="recommendations-meta pad-inline">
+                <div class="recommendations-meta-pill-row">
+                  <span id="recMetaPrimary" class="recommendations-pill recommendations-pill--meta">
+                    Tune your preferences, then I’ll blend TMDB discovery with fresh OMDb details.
+                  </span>
+                  <span
+                    id="recFilterSummary"
+                    class="recommendations-pill recommendations-pill--filters"
+                    hidden
+                  ></span>
+                  <button
+                    type="button"
+                    id="recFilterReset"
+                    class="recommendations-pill recommendations-pill--action"
+                    hidden
+                    aria-hidden="true"
+                  >
+                    Clear all
+                  </button>
+                </div>
+                <span class="pill-mini">
+                  <span class="swatch"></span>
+                  IMDb rating • genres • plot • trailer
+                </span>
+              </div>
+            </div>
+            <div class="pad-inline">
+              <button type="button" class="btn-subtle btn-chip btn-chip-muted" id="recNudgeBtn">
+                Shuffle suggestions
+              </button>
+            </div>
+          </div>
+
+          <div class="recommendations-controls pad-inline" role="region" aria-label="Result view preferences">
+            <div class="control-group pad-inline">
+              <label class="control-label" for="recommendationLayout">Layout</label>
+              <div class="segmented-control pad-inline" role="radiogroup" aria-label="Recommendation layout">
+                <button type="button" class="segment" data-layout="grid" aria-pressed="true">Grid</button>
+                <button type="button" class="segment" data-layout="carousel">Carousel</button>
+              </div>
+            </div>
+            <div class="control-group pad-inline">
+              <fieldset class="control-filter-set">
+                <legend class="control-label">Quick filters</legend>
+                <label class="control-chip">
+                  <input type="checkbox" id="filterTopRated" />
+                  <span>IMDb 7+</span>
+                </label>
+                <label class="control-chip">
+                  <input type="checkbox" id="filterStreaming" />
+                  <span>Streamable now</span>
+                </label>
+                <label class="control-chip">
+                  <input type="checkbox" id="filterFresh" />
+                  <span>Released &lt; 2 years</span>
+                </label>
+              </fieldset>
+            </div>
+          </div>
+
+          <div
+            id="recStatus"
+            class="status-row pad-inline"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <div class="status-primary pad-inline">
+              <span class="status-dot" id="recStatusDot"></span>
+              <span id="recStatusText">
+                No calls made yet. Hit “Find movies for me” to start.
+              </span>
+            </div>
+            <div
+              class="status-progress pad-inline"
+              id="recStatusProgress"
+              role="progressbar"
+              aria-hidden="true"
+              hidden
+            >
+              <span class="status-progress-fill"></span>
+            </div>
+            <span class="status-progress-stage" id="recStatusStage" hidden></span>
+          </div>
+
+          <div id="recError" class="error-text pad-inline" role="alert"></div>
+
+          <div id="recommendationsGrid" class="recommendations-grid pad-inline"></div>
+          <div class="recommendations-actions pad-inline" id="recommendationsActions">
+            <button type="button" class="btn-subtle btn-chip" id="showMoreRecsBtn">Show more</button>
+          </div>
+        </div>
+      </section>
+
       <section id="collectionsPanel" class="panel collections-panel pad-inline">
         <div class="panel-inner pad-inline">
           <div class="panel-header collections-header pad-inline">
@@ -424,7 +528,7 @@
         class="panel social-nudge-panel pad-inline"
         aria-live="polite"
         hidden
-       
+
       >
         <div class="panel-inner pad-inline">
           <div id="socialFirstRunCard" class="social-nudge-card pad-inline">
@@ -450,87 +554,6 @@
             <button type="button" id="socialFirstRunCta" class="btn-primary social-nudge-cta">
               Find people to follow
             </button>
-          </div>
-        </div>
-      </section>
-
-      <section id="recommendationsPanel" class="panel recommendations-panel pad-inline">
-        <div class="panel-inner pad-inline">
-          <div id="syncStatus" class="sync-status pad-inline" role="status" aria-live="polite"></div>
-          <div class="recommendations-header pad-inline">
-            <div class="pad-inline">
-              <div class="recommendations-title pad-inline" id="recTitle">Recommendations</div>
-              <div class="recommendations-meta pad-inline">
-                <span id="recMetaPrimary">Tune your preferences, then I’ll blend TMDB discovery with fresh OMDb details.</span>
-                <span class="pill-mini">
-                  <span class="swatch"></span>
-                  IMDb rating • genres • plot • trailer
-                </span>
-              </div>
-            </div>
-            <div class="pad-inline">
-              <button type="button" class="btn-subtle btn-chip btn-chip-muted" id="recNudgeBtn">
-                Shuffle suggestions
-              </button>
-            </div>
-          </div>
-
-          <div class="recommendations-controls pad-inline" role="region" aria-label="Result view preferences">
-            <div class="control-group pad-inline">
-              <label class="control-label" for="recommendationLayout">Layout</label>
-              <div class="segmented-control pad-inline" role="radiogroup" aria-label="Recommendation layout">
-                <button type="button" class="segment" data-layout="grid" aria-pressed="true">Grid</button>
-                <button type="button" class="segment" data-layout="carousel">Carousel</button>
-              </div>
-            </div>
-            <div class="control-group pad-inline">
-              <fieldset class="control-filter-set">
-                <legend class="control-label">Quick filters</legend>
-                <label class="control-chip">
-                  <input type="checkbox" id="filterTopRated" />
-                  <span>IMDb 7+</span>
-                </label>
-                <label class="control-chip">
-                  <input type="checkbox" id="filterStreaming" />
-                  <span>Streamable now</span>
-                </label>
-                <label class="control-chip">
-                  <input type="checkbox" id="filterFresh" />
-                  <span>Released &lt; 2 years</span>
-                </label>
-              </fieldset>
-            </div>
-          </div>
-
-          <div
-            id="recStatus"
-            class="status-row pad-inline"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            <div class="status-primary pad-inline">
-              <span class="status-dot" id="recStatusDot"></span>
-              <span id="recStatusText">
-                No calls made yet. Hit “Find movies for me” to start.
-              </span>
-            </div>
-            <div
-              class="status-progress pad-inline"
-              id="recStatusProgress"
-              role="progressbar"
-              aria-hidden="true"
-              hidden
-            >
-              <span class="status-progress-fill"></span>
-            </div>
-            <span class="status-progress-stage" id="recStatusStage" hidden></span>
-          </div>
-
-          <div id="recError" class="error-text pad-inline" role="alert"></div>
-
-          <div id="recommendationsGrid" class="recommendations-grid pad-inline"></div>
-          <div class="recommendations-actions pad-inline" id="recommendationsActions">
-            <button type="button" class="btn-subtle btn-chip" id="showMoreRecsBtn">Show more</button>
           </div>
         </div>
       </section>

@@ -1263,6 +1263,7 @@ function wireEvents() {
     filterTopRated.addEventListener("change", () => {
       state.recommendationFilters.topRated = filterTopRated.checked;
       updateFilteredRecommendations();
+      updateRecommendationFilterSummary();
     });
   }
 
@@ -1271,6 +1272,7 @@ function wireEvents() {
     filterStreaming.addEventListener("change", () => {
       state.recommendationFilters.streaming = filterStreaming.checked;
       updateFilteredRecommendations();
+      updateRecommendationFilterSummary();
     });
   }
 
@@ -1279,6 +1281,15 @@ function wireEvents() {
     filterFresh.addEventListener("change", () => {
       state.recommendationFilters.fresh = filterFresh.checked;
       updateFilteredRecommendations();
+      updateRecommendationFilterSummary();
+    });
+  }
+
+  const filterResetBtn = $("recFilterReset");
+  if (filterResetBtn) {
+    filterResetBtn.addEventListener("click", () => {
+      playUiClick();
+      clearAllActiveFilters();
     });
   }
 
@@ -3085,6 +3096,122 @@ function updatePreferencesPreview() {
     empty.textContent =
       "Choose genres or mark movies as favorites/watched and I’ll summarize them here in real time.";
     container.appendChild(empty);
+  }
+
+  updateRecommendationFilterSummary();
+}
+
+function getSelectedGenreLabels() {
+  const inputs = Array.from(
+    document.querySelectorAll('label.genre-pill input[name="genre"]:checked')
+  );
+  return inputs
+    .map((input) => {
+      const id = input.value;
+      if (id && TMDB_GENRES[id]) {
+        return TMDB_GENRES[id];
+      }
+      const label = input.closest(".genre-pill");
+      if (label) {
+        const text = label.querySelector(".genre-pill-label");
+        if (text) {
+          return text.textContent.trim();
+        }
+      }
+      return null;
+    })
+    .filter(Boolean);
+}
+
+function buildActiveFilterLabels() {
+  const labels = [];
+  if (state.activePreset && state.activePreset.title) {
+    labels.push(state.activePreset.title);
+  }
+  const genreLabels = getSelectedGenreLabels();
+  if (genreLabels.length) {
+    const preview = genreLabels.slice(0, 3);
+    let genreText = `Genres: ${preview.join(", ")}`;
+    if (genreLabels.length > preview.length) {
+      genreText += ` +${genreLabels.length - preview.length}`;
+    }
+    labels.push(genreText);
+  }
+  if (state.recommendationFilters.topRated) {
+    labels.push("IMDb 7+");
+  }
+  if (state.recommendationFilters.streaming) {
+    labels.push("Streamable now");
+  }
+  if (state.recommendationFilters.fresh) {
+    labels.push("Released <2y");
+  }
+  return labels;
+}
+
+function updateRecommendationFilterSummary() {
+  const summaryEl = $("recFilterSummary");
+  const resetBtn = $("recFilterReset");
+  const labels = buildActiveFilterLabels();
+  if (summaryEl) {
+    if (labels.length) {
+      summaryEl.textContent = labels.join(" • ");
+      summaryEl.hidden = false;
+    } else {
+      summaryEl.textContent = "";
+      summaryEl.hidden = true;
+    }
+  }
+  if (resetBtn) {
+    const shouldShow = labels.length > 0;
+    resetBtn.hidden = !shouldShow;
+    resetBtn.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+  }
+}
+
+function clearAllActiveFilters() {
+  const filterTopRated = $("filterTopRated");
+  const filterStreaming = $("filterStreaming");
+  const filterFresh = $("filterFresh");
+  let filtersChanged = false;
+
+  if (filterTopRated && filterTopRated.checked) {
+    filterTopRated.checked = false;
+    filtersChanged = true;
+  }
+  if (filterStreaming && filterStreaming.checked) {
+    filterStreaming.checked = false;
+    filtersChanged = true;
+  }
+  if (filterFresh && filterFresh.checked) {
+    filterFresh.checked = false;
+    filtersChanged = true;
+  }
+
+  state.recommendationFilters.topRated = false;
+  state.recommendationFilters.streaming = false;
+  state.recommendationFilters.fresh = false;
+
+  let preferencesChanged = false;
+  document.querySelectorAll('label.genre-pill input[name="genre"]:checked').forEach((checkbox) => {
+    checkbox.checked = false;
+    preferencesChanged = true;
+  });
+
+  if (state.activePreset) {
+    state.activePreset = null;
+    clearActivePresetUi();
+    preferencesChanged = true;
+  }
+
+  if (preferencesChanged) {
+    updatePreferencesPreview();
+  } else {
+    updateRecommendationFilterSummary();
+  }
+
+  if (filtersChanged) {
+    updateFilteredRecommendations({ preserveVisible: false });
   }
 }
 

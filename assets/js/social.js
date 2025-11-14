@@ -300,6 +300,8 @@ export function buildCommunitySection(movieContext) {
   const headerSummary = movieContext && movieContext.headerSummary ? movieContext.headerSummary : null;
   const condensedContainer =
     headerSummary && headerSummary.container instanceof HTMLElement ? headerSummary.container : null;
+  const condensedAvatars =
+    headerSummary && headerSummary.avatars instanceof HTMLElement ? headerSummary.avatars : null;
   const condensedOverall =
     headerSummary && headerSummary.overall instanceof HTMLElement ? headerSummary.overall : null;
   const condensedFriends =
@@ -480,6 +482,7 @@ export function buildCommunitySection(movieContext) {
     summaryFriendsMeta: summary.friendMeta,
     summaryUpdated: summary.updated,
     condensedEl: condensedContainer,
+    condensedAvatars,
     condensedOverall,
     condensedFriends,
     condensedActivity,
@@ -1818,6 +1821,7 @@ function createFriendsHighlight() {
 
 function updateCondensedHeader(sectionState, stats, reviews = []) {
   const container = sectionState.condensedEl;
+  const avatars = sectionState.condensedAvatars;
   const overall = sectionState.condensedOverall;
   const friends = sectionState.condensedFriends;
   const activity = sectionState.condensedActivity;
@@ -1827,6 +1831,9 @@ function updateCondensedHeader(sectionState, stats, reviews = []) {
   if (!hasStats) {
     if (container) {
       container.hidden = true;
+    }
+    if (avatars) {
+      avatars.innerHTML = '';
     }
     if (activity) {
       activity.hidden = true;
@@ -1858,6 +1865,17 @@ function updateCondensedHeader(sectionState, stats, reviews = []) {
     }
   }
 
+  if (avatars) {
+    const friendName = friendHighlight
+      ? formatDisplayNameFromHandle(friendHighlight.username) ||
+        (friendHighlight.username ? `@${friendHighlight.username}` : 'A friend')
+      : null;
+    const decoratedHighlight = friendHighlight
+      ? { ...friendHighlight, displayName: friendName }
+      : null;
+    renderCondensedAvatars(avatars, stats, decoratedHighlight);
+  }
+
   if (activity) {
     const activityTimestamp = stats.friendLastReviewAt || stats.lastReviewAt;
     if (friendHighlight) {
@@ -1882,6 +1900,68 @@ function updateCondensedHeader(sectionState, stats, reviews = []) {
       activity.hidden = true;
     }
   }
+}
+
+function renderCondensedAvatars(container, stats, friendHighlight) {
+  container.innerHTML = '';
+  if (friendHighlight) {
+    container.appendChild(
+      createCondensedAvatar(friendHighlight.displayName || 'Friend', {
+        ariaLabel: friendHighlight.displayName || 'Friend review'
+      })
+    );
+    if (friendHighlight.extraCount > 0) {
+      container.appendChild(
+        createCondensedAvatar(`+${friendHighlight.extraCount}`, {
+          variant: 'count',
+          ariaLabel: `+${friendHighlight.extraCount} more friend${friendHighlight.extraCount === 1 ? '' : 's'}`
+        })
+      );
+    }
+    return;
+  }
+  if (stats && stats.friendReviews > 0) {
+    const label = stats.friendReviews > 9 ? `${Math.min(stats.friendReviews, 9)}+` : String(stats.friendReviews);
+    container.appendChild(
+      createCondensedAvatar(label, {
+        variant: 'count',
+        ariaLabel: `${stats.friendReviews} friend reviews`
+      })
+    );
+  }
+}
+
+function createCondensedAvatar(label, options = {}) {
+  const avatar = document.createElement('span');
+  avatar.className = 'movie-community-avatar';
+  const variant = options.variant === 'count' ? 'count' : 'initial';
+  if (variant === 'count') {
+    avatar.classList.add('movie-community-avatar--count');
+    avatar.textContent = label;
+  } else {
+    const initial = getAvatarInitial(label);
+    avatar.textContent = initial;
+    if (label) {
+      avatar.title = label;
+    }
+  }
+  if (options.ariaLabel) {
+    avatar.setAttribute('aria-label', options.ariaLabel);
+  } else if (label) {
+    avatar.setAttribute('aria-label', label);
+  }
+  return avatar;
+}
+
+function getAvatarInitial(label) {
+  if (!label) {
+    return '?';
+  }
+  const trimmed = label.trim();
+  if (!trimmed) {
+    return '?';
+  }
+  return trimmed.charAt(0).toUpperCase();
 }
 
 function buildFriendReviewHighlight(reviews) {
