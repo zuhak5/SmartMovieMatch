@@ -22,10 +22,6 @@ import {
   subscribeToSocialOverview,
   followUserByUsername,
   unfollowUserByUsername,
-  blockUserByUsername,
-  unblockUserByUsername,
-  muteUserByUsername,
-  unmuteUserByUsername,
   searchSocialUsers,
   getFollowingSnapshot,
   getSocialOverviewSnapshot,
@@ -237,18 +233,6 @@ function persistRecommendationLayout(layout) {
   } catch (error) {
     console.warn("Failed to persist recommendation layout", error);
   }
-}
-
-function getSocialSafetySnapshot() {
-  const overview = state.socialOverview || getSocialOverviewSnapshot();
-  const blocked = Array.isArray(overview.blocked) ? overview.blocked : [];
-  const blockedBy = Array.isArray(overview.blockedBy) ? overview.blockedBy : [];
-  const muted = Array.isArray(overview.muted) ? overview.muted : [];
-  return {
-    blockedSet: new Set(blocked),
-    blockedBySet: new Set(blockedBy),
-    mutedSet: new Set(muted)
-  };
 }
 
 const ONBOARDING_STEPS = [
@@ -5716,16 +5700,6 @@ function renderSocialConnections() {
     shared: Array.isArray(collabLists.shared) ? collabLists.shared.length : 0,
     invites: Array.isArray(collabLists.invites) ? collabLists.invites.length : 0
   };
-  const safetySnapshot = getSocialSafetySnapshot();
-  const blockedSet = safetySnapshot.blockedSet;
-  const blockedBySet = safetySnapshot.blockedBySet;
-  const mutedSet = safetySnapshot.mutedSet;
-  const canUseSafety = Boolean(state.session && state.session.token);
-  const buildSafetyState = (handle) => ({
-    blocked: blockedSet.has(handle),
-    blockedBy: blockedBySet.has(handle),
-    muted: mutedSet.has(handle)
-  });
 
   const followingSet = new Set(following);
   const followersSet = new Set(followers);
@@ -5984,8 +5958,6 @@ function renderSocialConnections() {
           isFollowing: true,
           followsYou: followersSet.has(username),
           mutualFollowers: mutualFollowers.filter((value) => value !== username),
-          safety: buildSafetyState(username),
-          canUseSafety,
           onPrimaryAction: (button) => {
             playUiClick();
             handleUnfollowUser(username, button);
@@ -6013,8 +5985,6 @@ function renderSocialConnections() {
           isFollowing,
           followsYou: true,
           mutualFollowers: mutualFollowers.filter((value) => value !== username),
-          safety: buildSafetyState(username),
-          canUseSafety,
           onPrimaryAction: isFollowing
             ? null
             : (button) => {
@@ -7880,29 +7850,12 @@ function renderSocialProfileContent(profile) {
     socialProfileSubtitleEl.textContent = subtitleParts.join(" • ");
   }
 
-  const safetySnapshot = getSocialSafetySnapshot();
-  const safetyState = normalized
-    ? {
-        blocked: safetySnapshot.blockedSet.has(normalized),
-        blockedBy: safetySnapshot.blockedBySet.has(normalized),
-        muted: safetySnapshot.mutedSet.has(normalized)
-      }
-    : { blocked: false, blockedBy: false, muted: false };
-  const canUseSafety = Boolean(state.session && state.session.token);
-
   const contextBanner = buildPeerContextBanner({ displayName, isFollowing });
   if (contextBanner) {
     socialProfileBodyEl.appendChild(contextBanner);
   }
 
-  const hero = buildPeerHeroSection({
-    profile,
-    normalized,
-    displayName,
-    isFollowing,
-    safetyState,
-    canUseSafety
-  });
+  const hero = buildPeerHeroSection({ profile, normalized, displayName, isFollowing });
   if (hero) {
     socialProfileBodyEl.appendChild(hero);
   }
@@ -8006,14 +7959,7 @@ function buildPeerContextBanner({ displayName, isFollowing }) {
   return banner;
 }
 
-function buildPeerHeroSection({
-  profile,
-  normalized,
-  displayName,
-  isFollowing,
-  safetyState = null,
-  canUseSafety = false
-}) {
+function buildPeerHeroSection({ profile, normalized, displayName, isFollowing }) {
   if (!normalized && !displayName) {
     return null;
   }
@@ -8060,11 +8006,6 @@ function buildPeerHeroSection({
   const actions = createPeerHeroActions({ normalized, isFollowing, displayName });
   if (actions) {
     hero.appendChild(actions);
-  }
-
-  const safetyBlock = createPeerSafetyBlock({ normalized, displayName, safetyState, canUseSafety });
-  if (safetyBlock) {
-    hero.appendChild(safetyBlock);
   }
 
   return hero;
@@ -8792,15 +8733,7 @@ function createPinnedLink(explicitHref, normalizedHandle, type) {
   return link;
 }
 
-function buildSocialListItem({
-  username,
-  isFollowing,
-  followsYou,
-  mutualFollowers,
-  onPrimaryAction,
-  safety = null,
-  canUseSafety = false
-}) {
+function buildSocialListItem({ username, isFollowing, followsYou, mutualFollowers, onPrimaryAction }) {
   const item = document.createElement("div");
   item.className = "social-follow-item";
 
@@ -8850,22 +8783,6 @@ function buildSocialListItem({
     badge.textContent = followsYou ? "Mutual" : "Following";
     badges.appendChild(badge);
   }
-  if (safety?.blocked) {
-    const badge = document.createElement("span");
-    badge.className = "social-follow-badge social-follow-badge--danger";
-    badge.textContent = "Blocked";
-    badges.appendChild(badge);
-  } else if (safety?.blockedBy) {
-    const badge = document.createElement("span");
-    badge.className = "social-follow-badge";
-    badge.textContent = "Limited";
-    badges.appendChild(badge);
-  } else if (safety?.muted) {
-    const badge = document.createElement("span");
-    badge.className = "social-follow-badge social-follow-badge--muted";
-    badge.textContent = "Muted";
-    badges.appendChild(badge);
-  }
   if (badges.childElementCount) {
     row.appendChild(badges);
   }
@@ -8887,10 +8804,6 @@ function buildSocialListItem({
     status.textContent = followsYou ? "Following each other" : "Following";
     actions.appendChild(status);
   }
-  const safetyMenu = createSocialSafetyMenu({ username, safety, canUseSafety });
-  if (safetyMenu) {
-    actions.appendChild(safetyMenu);
-  }
   row.appendChild(actions);
 
   const detail = buildMutualDescription({ isFollowing, followsYou, mutualFollowers });
@@ -8902,264 +8815,6 @@ function buildSocialListItem({
   }
 
   return item;
-}
-
-function createSocialSafetyMenu({ username, safety, canUseSafety }) {
-  if (!canUseSafety || !username) {
-    return null;
-  }
-  const normalized = canonicalHandle(username);
-  if (!normalized) {
-    return null;
-  }
-  const current = safety || { blocked: false, blockedBy: false, muted: false };
-  const menu = document.createElement("details");
-  menu.className = "social-safety-menu";
-  const summary = document.createElement("summary");
-  summary.className = "social-safety-trigger";
-  summary.textContent = current.blocked
-    ? "Blocked"
-    : current.blockedBy
-    ? "Limited"
-    : current.muted
-    ? "Muted"
-    : "Safety";
-  summary.setAttribute("aria-label", `Safety controls for ${formatSocialDisplayName(normalized)}`);
-  menu.appendChild(summary);
-  const body = document.createElement("div");
-  body.className = "social-safety-body";
-  const copy = document.createElement("p");
-  copy.className = "social-safety-copy";
-  copy.textContent = formatSafetyCopy({ ...current, username: normalized });
-  body.appendChild(copy);
-  if (current.blockedBy) {
-    const status = document.createElement("p");
-    status.className = "social-safety-copy social-safety-copy--muted";
-    status.textContent = "This member limited interactions.";
-    body.appendChild(status);
-  } else {
-    const actions = document.createElement("div");
-    actions.className = "social-safety-actions";
-    const blockBtn = document.createElement("button");
-    blockBtn.type = "button";
-    blockBtn.className = current.blocked ? "btn-subtle btn-subtle-danger" : "btn-subtle";
-    blockBtn.textContent = current.blocked ? "Unblock" : "Block";
-    blockBtn.addEventListener("click", () => {
-      handleSafetyAction({
-        action: current.blocked ? "unblock" : "block",
-        username: normalized,
-        button: blockBtn,
-        onStateChange: () => {
-          menu.open = false;
-        }
-      });
-    });
-    actions.appendChild(blockBtn);
-    const muteBtn = document.createElement("button");
-    muteBtn.type = "button";
-    muteBtn.className = "btn-subtle";
-    muteBtn.textContent = current.muted ? "Unmute" : "Mute";
-    muteBtn.addEventListener("click", () => {
-      handleSafetyAction({
-        action: current.muted ? "unmute" : "mute",
-        username: normalized,
-        button: muteBtn,
-        onStateChange: () => {
-          menu.open = false;
-        }
-      });
-    });
-    actions.appendChild(muteBtn);
-    body.appendChild(actions);
-  }
-  menu.appendChild(body);
-  return menu;
-}
-
-function createPeerSafetyBlock({ normalized, displayName, safetyState, canUseSafety }) {
-  if (!normalized) {
-    return null;
-  }
-  const safety = safetyState || { blocked: false, blockedBy: false, muted: false };
-  const block = document.createElement("div");
-  block.className = "peeruser-safety";
-  const heading = document.createElement("strong");
-  heading.textContent = "Safety & comfort";
-  block.appendChild(heading);
-  const copy = document.createElement("p");
-  copy.className = "peeruser-safety-copy";
-  copy.textContent = formatSafetyCopy({
-    ...safety,
-    username: normalized,
-    displayName
-  });
-  block.appendChild(copy);
-
-  if (!canUseSafety) {
-    const hint = document.createElement("p");
-    hint.className = "peeruser-safety-copy peeruser-safety-copy--muted";
-    hint.textContent = "Sign in to adjust safety controls.";
-    block.appendChild(hint);
-    return block;
-  }
-
-  if (safety.blockedBy) {
-    const status = document.createElement("p");
-    status.className = "peeruser-safety-copy peeruser-safety-copy--muted";
-    const friendlyLabel = displayName || `@${normalized}`;
-    status.textContent = `${friendlyLabel} has limited their updates.`;
-    block.appendChild(status);
-    return block;
-  }
-
-  const actions = document.createElement("div");
-  actions.className = "peeruser-safety-actions";
-  const blockBtn = document.createElement("button");
-  blockBtn.type = "button";
-  blockBtn.className = safety.blocked ? "btn-subtle btn-subtle-danger" : "btn-subtle";
-  blockBtn.textContent = safety.blocked ? "Unblock" : "Block";
-  blockBtn.addEventListener("click", () => {
-    setSocialProfileStatus("Updating safety controls…", "loading");
-    handleSafetyAction({
-      action: safety.blocked ? "unblock" : "block",
-      username: normalized,
-      button: blockBtn,
-      onStateChange: (error) => {
-        if (error) {
-          setSocialProfileStatus(error.message || "Unable to update safety controls.", "error");
-        } else {
-          setSocialProfileStatus("", null);
-        }
-      }
-    });
-  });
-  actions.appendChild(blockBtn);
-  const muteBtn = document.createElement("button");
-  muteBtn.type = "button";
-  muteBtn.className = "btn-subtle";
-  muteBtn.textContent = safety.muted ? "Unmute" : "Mute";
-  muteBtn.addEventListener("click", () => {
-    setSocialProfileStatus("Updating safety controls…", "loading");
-    handleSafetyAction({
-      action: safety.muted ? "unmute" : "mute",
-      username: normalized,
-      button: muteBtn,
-      onStateChange: (error) => {
-        if (error) {
-          setSocialProfileStatus(error.message || "Unable to update safety controls.", "error");
-        } else {
-          setSocialProfileStatus("", null);
-        }
-      }
-    });
-  });
-  actions.appendChild(muteBtn);
-  block.appendChild(actions);
-  return block;
-}
-
-function formatSafetyCopy({ blocked, blockedBy, muted, username, displayName }) {
-  const label = displayName || (username ? formatSocialDisplayName(username) || `@${username}` : "this member");
-  if (blocked) {
-    return `You blocked ${label}. Unblock when you’re ready.`;
-  }
-  if (blockedBy) {
-    return `${label} has limited who can interact with them.`;
-  }
-  if (muted) {
-    return `You muted ${label}. Unmute to see their updates again.`;
-  }
-  return `Need space? Block or mute ${label} from here.`;
-}
-
-function handleSafetyAction({ action, username, button, onStateChange }) {
-  const normalized = canonicalHandle(username);
-  if (!normalized) {
-    if (typeof onStateChange === "function") {
-      onStateChange(new Error("Select a member"));
-    }
-    return;
-  }
-  const originalLabel = button ? button.textContent : "";
-  if (button) {
-    button.disabled = true;
-    button.dataset.loading = "true";
-    if (action === "block") {
-      button.textContent = "Blocking…";
-    } else if (action === "unblock") {
-      button.textContent = "Unblocking…";
-    } else if (action === "mute") {
-      button.textContent = "Muting…";
-    } else {
-      button.textContent = "Unmuting…";
-    }
-  }
-  const finalize = (error) => {
-    if (button) {
-      button.disabled = false;
-      button.textContent = originalLabel;
-      delete button.dataset.loading;
-    }
-    if (typeof onStateChange === "function") {
-      onStateChange(error || null);
-    }
-  };
-  let operation;
-  try {
-    if (action === "block") {
-      operation = blockUserByUsername(normalized);
-    } else if (action === "unblock") {
-      operation = unblockUserByUsername(normalized);
-    } else if (action === "mute") {
-      muteUserByUsername(normalized);
-      operation = Promise.resolve();
-    } else {
-      unmuteUserByUsername(normalized);
-      operation = Promise.resolve();
-    }
-  } catch (error) {
-    showToast({
-      title: "Unable to update safety controls",
-      text: error && error.message ? error.message : "Try again in a moment.",
-      icon: "⚠️"
-    });
-    finalize(error instanceof Error ? error : new Error("Unable to update safety controls"));
-    return;
-  }
-  Promise.resolve(operation)
-    .then(() => {
-      const safeName = formatSocialDisplayName(normalized) || `@${normalized}`;
-      let title = "Updated";
-      let text = "Safety preferences saved.";
-      let icon = "✅";
-      if (action === "block") {
-        title = `Blocked ${safeName}`;
-        text = "You won’t see their updates.";
-        icon = "⛔";
-      } else if (action === "unblock") {
-        title = `Unblocked ${safeName}`;
-        text = "Their updates are visible again.";
-        icon = "✅";
-      } else if (action === "mute") {
-        title = `Muted ${safeName}`;
-        text = "They’ll stay hidden until you unmute them.";
-        icon = "🔕";
-      } else if (action === "unmute") {
-        title = `Unmuted ${safeName}`;
-        text = "You’ll see their updates again.";
-        icon = "🔔";
-      }
-      showToast({ title, text, icon });
-      finalize(null);
-    })
-    .catch((error) => {
-      showToast({
-        title: "Unable to update safety controls",
-        text: error && error.message ? error.message : "Try again in a moment.",
-        icon: "⚠️"
-      });
-      finalize(error instanceof Error ? error : new Error("Unable to update safety controls"));
-    });
 }
 
 function buildSuggestionCard(suggestion, onFollow) {
