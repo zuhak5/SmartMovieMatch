@@ -1020,6 +1020,7 @@ body[data-theme="light"] .account-link:hover {
   font-size: 0.82rem;
   cursor: pointer;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  z-index: 50;
 }
 
 .notification-bell:hover,
