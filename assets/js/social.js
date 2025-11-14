@@ -20,6 +20,29 @@ const REVIEW_SORT_OPTIONS = [
   { key: 'newest', label: 'Newest' }
 ];
 const DEFAULT_REVIEW_SORT = 'newest';
+const MUTED_USERS_STORAGE_KEY = 'smm.social-muted.v1';
+
+function loadMutedUsersFromStorage() {
+  if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
+    return [];
+  }
+  try {
+    const raw = window.localStorage.getItem(MUTED_USERS_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .map((username) => canonicalUsername(username))
+      .filter(Boolean);
+  } catch (error) {
+    console.warn('Failed to parse muted users from storage', error);
+    return [];
+  }
+}
 
 export const PRESENCE_STATUS_PRESETS = [
   {
@@ -83,7 +106,9 @@ const state = {
     watchParties: { upcoming: [], invites: [] }
   },
   presenceTicker: null,
-  presenceStatusPreset: DEFAULT_PRESENCE_STATUS
+  presenceStatusPreset: DEFAULT_PRESENCE_STATUS,
+  blockedUsers: new Set(),
+  mutedUsers: new Set(loadMutedUsersFromStorage())
 };
 
 const followingSubscribers = new Set();
@@ -92,6 +117,59 @@ const notificationSubscribers = new Set();
 const socialOverviewSubscribers = new Set();
 const collaborativeSubscribers = new Set();
 const presenceStatusSubscribers = new Set();
+const mutedSubscribers = new Set();
+
+function persistMutedUsers(handles) {
+  if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
+    return;
+  }
+  try {
+    window.localStorage.setItem(MUTED_USERS_STORAGE_KEY, JSON.stringify(handles));
+  } catch (error) {
+    console.warn('Failed to persist muted users', error);
+  }
+}
+
+function notifyMutedSubscribers() {
+  const snapshot = Array.from(state.mutedUsers);
+  mutedSubscribers.forEach((callback) => {
+    try {
+      callback(snapshot);
+    } catch (error) {
+      console.warn('Muted subscriber error', error);
+    }
+  });
+}
+
+function setMutedUsers(handles) {
+  const normalized = Array.from(
+    new Set(handles.map((handle) => canonicalUsername(handle)).filter(Boolean))
+  );
+  const hasChanged =
+    normalized.length !== state.mutedUsers.size ||
+    normalized.some((handle) => !state.mutedUsers.has(handle));
+  if (!hasChanged) {
+    return;
+  }
+  state.mutedUsers = new Set(normalized);
+  persistMutedUsers(normalized);
+  notifyMutedSubscribers();
+  rerenderVisibleSections();
+}
+
+function applyBlockedUsers(handles = []) {
+  const normalized = Array.isArray(handles)
+    ? handles.map((handle) => canonicalUsername(handle)).filter(Boolean)
+    : [];
+  const hasChanged =
+    normalized.length !== state.blockedUsers.size ||
+    normalized.some((handle) => !state.blockedUsers.has(handle));
+  if (!hasChanged) {
+    return;
+  }
+  state.blockedUsers = new Set(normalized);
+  rerenderVisibleSections();
+}
 
 function notifyPresenceStatusSubscribers() {
   const preset = getPresenceStatusPreset();
@@ -175,6 +253,7 @@ subscribeToSession((session) => {
     state.followingLoaded = false;
     state.followingLoading = false;
     state.socialOverview = createDefaultSocialOverview();
+    state.blockedUsers = new Set();
     state.presence = {};
     state.presenceStatusPreset = DEFAULT_PRESENCE_STATUS;
     state.badges = [];
@@ -201,6 +280,7 @@ subscribeToSession((session) => {
   state.followingLoaded = false;
   state.followingLoading = false;
   state.socialOverview = createDefaultSocialOverview();
+  state.blockedUsers = new Set();
   loadFollowing().catch(() => {});
   state.notificationsLoaded = false;
   state.notificationsLoading = false;
@@ -365,6 +445,10 @@ export function buildCommunitySection(movieContext) {
   textArea.placeholder = 'Keep it spoiler-free unless you mark it below…';
   textField.appendChild(textLabel);
   textField.appendChild(textArea);
+  const toneHint = document.createElement('p');
+  toneHint.className = 'community-tone-hint';
+  toneHint.textContent = 'Keep it constructive and mark spoilers. Use [spoiler]…[/spoiler] for big reveals.';
+  textField.appendChild(toneHint);
 
   const advancedDetails = document.createElement('details');
   advancedDetails.className = 'community-advanced';
@@ -402,6 +486,32 @@ export function buildCommunitySection(movieContext) {
   spoilerLabel.appendChild(spoilerInput);
   spoilerLabel.appendChild(spoilerText);
   flagsRow.appendChild(spoilerLabel);
+
+  const visibilityField = document.createElement('div');
+  visibilityField.className = 'community-form-field community-visibility-field';
+  const visibilityLabel = document.createElement('label');
+  visibilityLabel.setAttribute('for', `communityVisibility-${tmdbId}`);
+  visibilityLabel.textContent = 'Who can see this?';
+  const visibilitySelect = document.createElement('select');
+  visibilitySelect.id = `communityVisibility-${tmdbId}`;
+  visibilitySelect.className = 'input-base community-visibility-select';
+  [
+    { value: 'public', label: 'Public (everyone)' },
+    { value: 'friends', label: 'Friends only' },
+    { value: 'private', label: 'Only me' }
+  ].forEach((option) => {
+    const node = document.createElement('option');
+    node.value = option.value;
+    node.textContent = option.label;
+    visibilitySelect.appendChild(node);
+  });
+  const visibilityHint = document.createElement('p');
+  visibilityHint.className = 'community-visibility-hint';
+  visibilityHint.textContent = 'Dial down visibility per diary entry to keep vulnerable takes comfy.';
+  visibilityField.appendChild(visibilityLabel);
+  visibilityField.appendChild(visibilitySelect);
+  visibilityField.appendChild(visibilityHint);
+  flagsRow.appendChild(visibilityField);
 
   const submitRow = document.createElement('div');
   submitRow.className = 'community-submit-row';
@@ -466,6 +576,7 @@ export function buildCommunitySection(movieContext) {
     fullTextArea: longArea,
     advancedDetails,
     spoilerInput,
+    visibilitySelect,
     submitBtn,
     statusEl,
     filter: 'all',
@@ -567,6 +678,54 @@ export function subscribeToFollowing(callback) {
   };
 }
 
+export function getMutedUsers() {
+  return Array.from(state.mutedUsers);
+}
+
+export function subscribeToMutedUsers(callback) {
+  if (typeof callback !== 'function') {
+    return () => {};
+  }
+  mutedSubscribers.add(callback);
+  try {
+    callback(getMutedUsers());
+  } catch (error) {
+    console.warn('Muted subscriber error', error);
+  }
+  return () => {
+    mutedSubscribers.delete(callback);
+  };
+}
+
+export function muteUser(username) {
+  const normalized = canonicalUsername(username);
+  if (!normalized) {
+    throw new Error('Select a valid username to mute.');
+  }
+  const next = new Set(state.mutedUsers);
+  next.add(normalized);
+  setMutedUsers(Array.from(next));
+}
+
+export function unmuteUser(username) {
+  const normalized = canonicalUsername(username);
+  if (!normalized || !state.mutedUsers.has(normalized)) {
+    return;
+  }
+  const next = Array.from(state.mutedUsers).filter((handle) => handle !== normalized);
+  setMutedUsers(next);
+}
+
+export function isUserMuted(username) {
+  const normalized = canonicalUsername(username);
+  return Boolean(normalized && state.mutedUsers.has(normalized));
+}
+
+export function isUserBlocked(username) {
+  const normalized = canonicalUsername(username);
+  return Boolean(normalized && state.blockedUsers.has(normalized));
+}
+
 export function subscribeToSocialOverview(callback) {
   if (typeof callback !== 'function') {
     return () => {};
@@ -647,6 +806,26 @@ export async function unfollowUserByUsername(username) {
   await callSocial('unfollowUser', { target: normalized });
   await loadFollowing(true);
   refreshAllSections();
+}
+
+export async function blockUserByUsername(username) {
+  const normalized = canonicalUsername(username);
+  if (!normalized) {
+    throw new Error('Enter a username to block.');
+  }
+  await callSocial('blockUser', { target: normalized });
+  await loadFollowing(true);
+  rerenderVisibleSections();
+}
+
+export async function unblockUserByUsername(username) {
+  const normalized = canonicalUsername(username);
+  if (!normalized) {
+    throw new Error('Enter a username to unblock.');
+  }
+  await callSocial('unblockUser', { target: normalized });
+  await loadFollowing(true);
+  rerenderVisibleSections();
 }
 
 export async function searchSocialUsers(query) {
@@ -813,6 +992,9 @@ async function handleSubmit(sectionState) {
     sectionState.ratingInput.focus();
     return;
   }
+  const visibilityValue = sectionState.visibilitySelect
+    ? sectionState.visibilitySelect.value
+    : 'public';
 
   sectionState.submitBtn.disabled = true;
   sectionState.statusEl.textContent = 'Saving your review…';
@@ -827,7 +1009,8 @@ async function handleSubmit(sectionState) {
         rating: ratingNumber,
         body: sectionState.textArea.value.trim(),
         fullText: longForm,
-        hasSpoilers: sectionState.spoilerInput.checked || hasMarkupSpoilers
+        hasSpoilers: sectionState.spoilerInput.checked || hasMarkupSpoilers,
+        visibility: visibilityValue
       }
     });
     sectionState.statusEl.textContent = 'Review saved.';
@@ -881,6 +1064,11 @@ function renderSection(sectionState, cache) {
         sectionState.advancedDetails.open = true;
       }
     }
+    if (sectionState.visibilitySelect) {
+      sectionState.visibilitySelect.value = myReview.visibility || 'public';
+    }
+  } else if (sectionState.visibilitySelect) {
+    sectionState.visibilitySelect.value = 'public';
   }
 
   sectionState.list.innerHTML = '';
@@ -1049,7 +1237,15 @@ function renderReviewItem(review, sectionState) {
   header.className = 'community-review-header';
 
   const rawUsername = typeof review.username === 'string' ? review.username : '';
+  const normalizedAuthor = canonicalUsername(rawUsername);
   const authorLabel = review.isSelf ? 'You' : rawUsername || 'Unknown reviewer';
+  const hiddenReason = isUserBlocked(normalizedAuthor)
+    ? 'blocked'
+    : isUserMuted(normalizedAuthor)
+    ? 'muted'
+    : null;
+  const hiddenSections = [];
+
   const author = createInlineProfileLink(rawUsername, {
     label: authorLabel,
     className: 'community-review-author'
@@ -1063,7 +1259,7 @@ function renderReviewItem(review, sectionState) {
     header.appendChild(fallback);
   }
 
-  const presenceKey = canonicalUsername(review.username);
+  const presenceKey = normalizedAuthor;
   const presence = presenceKey && state.presence ? state.presence[presenceKey] : null;
   if (presence && presence.state) {
     const presencePill = document.createElement('span');
@@ -1095,6 +1291,12 @@ function renderReviewItem(review, sectionState) {
     selfBadge.className = 'community-review-badge';
     selfBadge.textContent = 'Your review';
     header.appendChild(selfBadge);
+    if (review.visibility && review.visibility !== 'public') {
+      const visibilityBadge = document.createElement('span');
+      visibilityBadge.className = 'community-review-badge community-review-badge--visibility';
+      visibilityBadge.textContent = review.visibility === 'friends' ? 'Friends only' : 'Only you';
+      header.appendChild(visibilityBadge);
+    }
   }
 
   const rating = document.createElement('span');
@@ -1109,13 +1311,39 @@ function renderReviewItem(review, sectionState) {
 
   item.appendChild(header);
 
+  let hiddenNotice = null;
+  if (hiddenReason) {
+    hiddenNotice = createHiddenReviewNotice({
+      reason: hiddenReason,
+      username: authorLabel,
+      onReveal: () => {
+        hiddenSections.forEach((element) => {
+          if (element) {
+            element.hidden = false;
+          }
+        });
+        item.classList.remove('community-review-item--hidden');
+      }
+    });
+    item.classList.add('community-review-item--hidden');
+    item.appendChild(hiddenNotice);
+  }
+
   const bodyContainer = document.createElement('div');
   bodyContainer.className = 'community-review-body';
   renderReviewContent(bodyContainer, review);
+  if (hiddenReason) {
+    bodyContainer.hidden = true;
+    hiddenSections.push(bodyContainer);
+  }
   item.appendChild(bodyContainer);
 
   const metaBar = document.createElement('div');
   metaBar.className = 'community-review-meta';
+  if (hiddenReason) {
+    metaBar.hidden = true;
+    hiddenSections.push(metaBar);
+  }
 
   if (!review.isSelf && review.username) {
     const followBtn = document.createElement('button');
@@ -1173,15 +1401,48 @@ function renderReviewItem(review, sectionState) {
 
   const reactionBar = renderReactionBar(review, sectionState);
   if (reactionBar) {
+    if (hiddenReason) {
+      reactionBar.hidden = true;
+      hiddenSections.push(reactionBar);
+    }
     item.appendChild(reactionBar);
   }
 
   const thread = renderCommentThread(review, sectionState);
   if (thread) {
+    if (hiddenReason) {
+      thread.hidden = true;
+      hiddenSections.push(thread);
+    }
     item.appendChild(thread);
   }
 
   return item;
+}
+
+function createHiddenReviewNotice({ reason, username, onReveal }) {
+  const wrap = document.createElement('div');
+  wrap.className = 'community-review-hidden';
+  const text = document.createElement('p');
+  text.className = 'community-review-hidden-text';
+  const readableName = username && username !== 'You' ? username : 'this member';
+  text.textContent =
+    reason === 'blocked'
+      ? `You blocked ${readableName}. Their review stays hidden unless you show it.`
+      : `${readableName} is muted. Their review is hidden.`;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'btn-subtle community-review-hidden-btn';
+  button.textContent = 'Show anyway';
+  button.addEventListener('click', () => {
+    wrap.remove();
+    if (typeof onReveal === 'function') {
+      onReveal();
+    }
+  });
+  wrap.appendChild(text);
+  wrap.appendChild(button);
+  return wrap;
 }
 
 function renderReviewContent(container, review) {
@@ -2475,6 +2736,7 @@ async function loadFollowing(force = false) {
     const overview = normalizeSocialOverview(response);
     state.socialOverview = overview;
     state.following = overview.following.slice();
+    applyBlockedUsers(overview.blocked);
     state.presence = overview.presence || {};
     state.badges = Array.isArray(overview.badges) ? overview.badges.slice() : [];
     state.followingLoaded = true;
@@ -2895,6 +3157,9 @@ function normalizeSocialOverview(payload) {
     shared: Number.isFinite(collabRaw.shared) ? Number(collabRaw.shared) : 0,
     invites: Number.isFinite(collabRaw.invites) ? Number(collabRaw.invites) : 0
   };
+  const blocked = Array.isArray(payload && payload.blocked)
+    ? payload.blocked.map((handle) => canonicalUsername(handle)).filter(Boolean)
+    : [];
   return {
     following,
     followers,
@@ -2903,7 +3168,8 @@ function normalizeSocialOverview(payload) {
     suggestions,
     presence,
     badges,
-    collaborations
+    collaborations,
+    blocked
   };
 }
 
@@ -3220,7 +3486,8 @@ function createDefaultSocialOverview() {
     suggestions: [],
     presence: {},
     badges: [],
-    collaborations: { owned: 0, shared: 0, invites: 0 }
+    collaborations: { owned: 0, shared: 0, invites: 0 },
+    blocked: []
   };
 }
 
@@ -3258,6 +3525,15 @@ function normalizeMovieForApi(movie) {
     imdbId: movie.imdbId || movie.imdbID || null,
     title
   };
+}
+
+function rerenderVisibleSections() {
+  state.sections.forEach((section) => {
+    if (section.visible) {
+      const cache = state.reviewCache.get(section.key) || {};
+      renderSection(section, cache);
+    }
+  });
 }
 
 function refreshAllSections() {

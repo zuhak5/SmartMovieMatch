@@ -4245,6 +4245,55 @@ body[data-theme="light"] .pill-context {
   color: var(--text-subtle);
 }
 
+.social-follow-safety {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+  padding: 0.55rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(2, 6, 23, 0.55);
+}
+
+.social-follow-safety[data-state='blocked'] {
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.social-follow-safety[data-state='muted'] {
+  border-color: rgba(148, 163, 184, 0.3);
+  background: rgba(30, 41, 59, 0.65);
+}
+
+.social-follow-safety[data-variant='hero'] {
+  width: 100%;
+}
+
+.social-follow-safety-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(226, 232, 240, 0.92);
+}
+
+.social-follow-safety-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+.social-follow-safety-btn {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.65rem;
+}
+
+.social-follow-safety-note {
+  margin: 0;
+  flex-basis: 100%;
+  font-size: 0.76rem;
+  color: var(--text-subtle);
+}
+
 .social-suggestions {
   display: grid;
   gap: 1rem;
@@ -8684,6 +8733,12 @@ body[data-theme="light"] .control-chip input {
       resize: vertical;
     }
 
+    .community-tone-hint {
+      margin: 0.1rem 0 0;
+      font-size: 0.78rem;
+      color: var(--text-subtle);
+    }
+
     .community-flags-row {
       display: flex;
       flex-wrap: wrap;
@@ -8697,6 +8752,21 @@ body[data-theme="light"] .control-chip input {
       gap: 0.45rem;
       font-size: 0.85rem;
       color: rgba(226, 232, 240, 0.9);
+    }
+
+    .community-visibility-field {
+      flex: 1;
+      min-width: 220px;
+    }
+
+    .community-visibility-select {
+      width: 100%;
+    }
+
+    .community-visibility-hint {
+      margin: 0;
+      font-size: 0.75rem;
+      color: var(--text-subtle);
     }
 
     .community-submit-row {
@@ -8770,6 +8840,11 @@ body[data-theme="light"] .control-chip input {
       border: 1px solid rgba(148, 163, 184, 0.22);
     }
 
+    .community-review-item--hidden {
+      border-style: dashed;
+      background: rgba(15, 23, 42, 0.58);
+    }
+
     .community-review-header {
       display: flex;
       flex-wrap: wrap;
@@ -8835,6 +8910,12 @@ body[data-theme="light"] .control-chip input {
       color: rgba(191, 219, 254, 0.95);
     }
 
+    .community-review-badge--visibility {
+      background: rgba(248, 250, 252, 0.08);
+      border-color: rgba(248, 250, 252, 0.35);
+      color: rgba(248, 250, 252, 0.92);
+    }
+
     .community-presence-pill {
       display: inline-flex;
       align-items: center;
@@ -8898,6 +8979,28 @@ body[data-theme="light"] .control-chip input {
     .community-review-body {
       display: grid;
       gap: 0.45rem;
+    }
+
+    .community-review-hidden {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+      align-items: center;
+      padding: 0.65rem 0.9rem;
+      border-radius: 14px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px dashed rgba(148, 163, 184, 0.4);
+    }
+
+    .community-review-hidden-text {
+      margin: 0;
+      flex: 1 1 220px;
+      font-size: 0.82rem;
+      color: var(--text-subtle);
+    }
+
+    .community-review-hidden-btn {
+      margin-left: auto;
     }
 
     .community-review-meta {

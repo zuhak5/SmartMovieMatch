@@ -22,6 +22,8 @@ import {
   subscribeToSocialOverview,
   followUserByUsername,
   unfollowUserByUsername,
+  blockUserByUsername,
+  unblockUserByUsername,
   searchSocialUsers,
   getFollowingSnapshot,
   getSocialOverviewSnapshot,
@@ -38,6 +40,10 @@ import {
   postCollaborativeNoteRemote,
   subscribeToCollaborativeState,
   getCollaborativeStateSnapshot,
+  getMutedUsers,
+  subscribeToMutedUsers,
+  muteUser,
+  unmuteUser,
   generateInviteQrRemote,
   PRESENCE_STATUS_PRESETS,
   setPresenceStatusPreset,
@@ -104,6 +110,7 @@ const state = {
   favorites: [],
   followingUsers: [],
   socialOverview: getSocialOverviewSnapshot(),
+  mutedUsers: getMutedUsers(),
   collaborativeState: getCollaborativeStateSnapshot(),
   presenceStatusPreset: getPresenceStatusPreset(),
   presenceStatusDuration: getStoredPresenceStatusDuration(),
@@ -175,6 +182,7 @@ let unsubscribeSocialOverview = null;
 let unsubscribeCollaborative = null;
 let unsubscribePresenceStatus = null;
 let unsubscribeProfileOpen = null;
+let unsubscribeMuted = null;
 const presenceStatusButtons = new Map();
 let presenceStatusFeedbackTimer = null;
 let presenceStatusExpiryTimer = null;
@@ -4172,6 +4180,14 @@ function setupSocialFeatures() {
     renderSocialConnections();
   });
   state.socialOverview = getSocialOverviewSnapshot();
+  if (unsubscribeMuted) {
+    unsubscribeMuted();
+  }
+  unsubscribeMuted = subscribeToMutedUsers((handles) => {
+    state.mutedUsers = Array.isArray(handles) ? handles.slice() : [];
+    renderSocialConnections();
+  });
+  state.mutedUsers = getMutedUsers();
   if (unsubscribeCollaborative) {
     unsubscribeCollaborative();
   }
@@ -5760,6 +5776,12 @@ function renderSocialConnections() {
     shared: Array.isArray(collabLists.shared) ? collabLists.shared.length : 0,
     invites: Array.isArray(collabLists.invites) ? collabLists.invites.length : 0
   };
+  const blockedHandles = Array.isArray(overview.blocked) ? overview.blocked : [];
+  const blockedSet = new Set(
+    blockedHandles.map((handle) => canonicalHandle(handle)).filter((handle) => Boolean(handle))
+  );
+  const mutedSet = getMutedHandleSet();
+  const canBlockUsers = Boolean(state.session && state.session.token);
 
   const followingSet = new Set(following);
   const followersSet = new Set(followers);
@@ -6013,15 +6035,37 @@ function renderSocialConnections() {
       followingListEl.hidden = false;
       followingEmptyEl.hidden = true;
       following.forEach((username) => {
+        const normalizedHandle = canonicalHandle(username);
+        const isBlocked = normalizedHandle ? blockedSet.has(normalizedHandle) : false;
+        const isMuted = normalizedHandle ? mutedSet.has(normalizedHandle) : false;
         const item = buildSocialListItem({
           username,
           isFollowing: true,
           followsYou: followersSet.has(username),
           mutualFollowers: mutualFollowers.filter((value) => value !== username),
-          onPrimaryAction: (button) => {
-            playUiClick();
-            handleUnfollowUser(username, button);
-          }
+          isMuted,
+          isBlocked,
+          onPrimaryAction:
+            !isBlocked
+              ? (button) => {
+                  playUiClick();
+                  handleUnfollowUser(username, button);
+                }
+              : null,
+          onMuteToggle:
+            normalizedHandle
+              ? (button) => {
+                  playUiClick();
+                  handleMuteToggle(normalizedHandle, button, { statusTarget: 'social' });
+                }
+              : null,
+          onBlockToggle:
+            normalizedHandle && canBlockUsers
+              ? (button) => {
+                  playUiClick();
+                  handleBlockToggle(normalizedHandle, button, { statusTarget: 'social' });
+                }
+              : null
         });
         followingListEl.appendChild(item);
       });
@@ -6040,17 +6084,37 @@ function renderSocialConnections() {
       followersEmptyEl.hidden = true;
       followers.forEach((username) => {
         const isFollowing = followingSet.has(username);
+        const normalizedHandle = canonicalHandle(username);
+        const isBlocked = normalizedHandle ? blockedSet.has(normalizedHandle) : false;
+        const isMuted = normalizedHandle ? mutedSet.has(normalizedHandle) : false;
         const item = buildSocialListItem({
           username,
           isFollowing,
           followsYou: true,
           mutualFollowers: mutualFollowers.filter((value) => value !== username),
-          onPrimaryAction: isFollowing
-            ? null
-            : (button) => {
-                playUiClick();
-                handleFollowFromList(username, button);
-              }
+          isMuted,
+          isBlocked,
+          onPrimaryAction:
+            !isFollowing && !isBlocked
+              ? (button) => {
+                  playUiClick();
+                  handleFollowFromList(username, button);
+                }
+              : null,
+          onMuteToggle:
+            normalizedHandle
+              ? (button) => {
+                  playUiClick();
+                  handleMuteToggle(normalizedHandle, button, { statusTarget: 'social' });
+                }
+              : null,
+          onBlockToggle:
+            normalizedHandle && canBlockUsers
+              ? (button) => {
+                  playUiClick();
+                  handleBlockToggle(normalizedHandle, button, { statusTarget: 'social' });
+                }
+              : null
         });
         followersListEl.appendChild(item);
       });
@@ -8063,7 +8127,15 @@ function buildPeerHeroSection({ profile, normalized, displayName, isFollowing })
     hero.appendChild(compatibilityBlock);
   }
 
-  const actions = createPeerHeroActions({ normalized, isFollowing, displayName });
+  const mutedSet = getMutedHandleSet();
+  const blockedSet = getBlockedHandleSet();
+  const actions = createPeerHeroActions({
+    normalized,
+    isFollowing,
+    displayName,
+    isMuted: normalized ? mutedSet.has(normalized) : false,
+    isBlocked: normalized ? blockedSet.has(normalized) : false
+  });
   if (actions) {
     hero.appendChild(actions);
   }
@@ -8142,7 +8214,7 @@ function buildPeerTagline(profile) {
   return "";
 }
 
-function createPeerHeroActions({ normalized, isFollowing, displayName }) {
+function createPeerHeroActions({ normalized, isFollowing, displayName, isMuted, isBlocked }) {
   const container = document.createElement("div");
   container.className = "peeruser-hero-actions";
   if (normalized) {
@@ -8188,6 +8260,28 @@ function createPeerHeroActions({ normalized, isFollowing, displayName }) {
   });
   secondary.appendChild(collabBtn);
   container.appendChild(secondary);
+  if (normalized) {
+    const safety = buildSocialSafetyRow({
+      username: normalized,
+      isMuted,
+      isBlocked,
+      variant: "hero",
+      onMuteToggle: (button) => {
+        playUiClick();
+        handleMuteToggle(normalized, button, { statusTarget: "profile", clearOnSuccess: true });
+      },
+      onBlockToggle:
+        state.session && state.session.token
+          ? (button) => {
+              playUiClick();
+              handleBlockToggle(normalized, button, { statusTarget: "profile", clearOnSuccess: true });
+            }
+          : null
+    });
+    if (safety) {
+      container.appendChild(safety);
+    }
+  }
   return container.childElementCount ? container : null;
 }
 
@@ -8793,7 +8887,17 @@ function createPinnedLink(explicitHref, normalizedHandle, type) {
   return link;
 }
 
-function buildSocialListItem({ username, isFollowing, followsYou, mutualFollowers, onPrimaryAction }) {
+function buildSocialListItem({
+  username,
+  isFollowing,
+  followsYou,
+  mutualFollowers,
+  onPrimaryAction,
+  onMuteToggle,
+  onBlockToggle,
+  isMuted,
+  isBlocked
+}) {
   const item = document.createElement("div");
   item.className = "social-follow-item";
 
@@ -8849,7 +8953,7 @@ function buildSocialListItem({ username, isFollowing, followsYou, mutualFollower
 
   const actions = document.createElement("div");
   actions.className = "social-follow-actions";
-  if (typeof onPrimaryAction === "function") {
+  if (typeof onPrimaryAction === "function" && !isBlocked) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = isFollowing ? "btn-subtle social-unfollow-btn" : "btn-secondary";
@@ -8858,6 +8962,11 @@ function buildSocialListItem({ username, isFollowing, followsYou, mutualFollower
       onPrimaryAction(button);
     });
     actions.appendChild(button);
+  } else if (isBlocked) {
+    const status = document.createElement("span");
+    status.className = "social-follow-status";
+    status.textContent = "Blocked";
+    actions.appendChild(status);
   } else if (isFollowing) {
     const status = document.createElement("span");
     status.className = "social-follow-status";
@@ -8874,7 +8983,73 @@ function buildSocialListItem({ username, isFollowing, followsYou, mutualFollower
     item.appendChild(secondary);
   }
 
+  const safety = buildSocialSafetyRow({
+    username,
+    isMuted,
+    isBlocked,
+    onMuteToggle,
+    onBlockToggle
+  });
+  if (safety) {
+    item.appendChild(safety);
+  }
+
   return item;
+}
+
+function buildSocialSafetyRow({ username, isMuted, isBlocked, onMuteToggle, onBlockToggle, variant }) {
+  const normalized = canonicalHandle(username);
+  const canMute = Boolean(onMuteToggle && normalized);
+  const canBlock = Boolean(onBlockToggle && normalized);
+  if (!canMute && !canBlock) {
+    return null;
+  }
+  const row = document.createElement("div");
+  row.className = "social-follow-safety";
+  row.dataset.state = isBlocked ? "blocked" : isMuted ? "muted" : "default";
+  if (variant) {
+    row.dataset.variant = variant;
+  }
+  const label = document.createElement("span");
+  label.className = "social-follow-safety-label";
+  label.textContent = isBlocked ? "Safety controls" : "Safety tools";
+  row.appendChild(label);
+  const actions = document.createElement("div");
+  actions.className = "social-follow-safety-actions";
+  if (canMute) {
+    const muteBtn = document.createElement("button");
+    muteBtn.type = "button";
+    muteBtn.className = "btn-subtle social-follow-safety-btn";
+    muteBtn.textContent = isMuted ? "Unmute" : "Mute";
+    muteBtn.addEventListener("click", () => {
+      onMuteToggle(muteBtn);
+    });
+    actions.appendChild(muteBtn);
+  }
+  if (canBlock) {
+    const blockBtn = document.createElement("button");
+    blockBtn.type = "button";
+    blockBtn.className = isBlocked
+      ? "btn-subtle btn-subtle-danger social-follow-safety-btn"
+      : "btn-subtle social-follow-safety-btn";
+    blockBtn.textContent = isBlocked ? "Unblock" : "Block";
+    blockBtn.addEventListener("click", () => {
+      onBlockToggle(blockBtn);
+    });
+    actions.appendChild(blockBtn);
+  }
+  row.appendChild(actions);
+  const note = document.createElement("p");
+  note.className = "social-follow-safety-note";
+  if (isBlocked) {
+    note.textContent = "Blocked members can’t follow or comment on your reviews.";
+  } else if (isMuted) {
+    note.textContent = "Muted members stay hidden in your community feeds.";
+  } else {
+    note.textContent = "Mute hides their reviews. Block removes both of you from feeds.";
+  }
+  row.appendChild(note);
+  return row;
 }
 
 function buildSuggestionCard(suggestion, onFollow) {
@@ -9579,6 +9754,15 @@ async function handleFollowFromList(username, button) {
     return;
   }
 
+  const normalizedHandle = canonicalHandle(normalized);
+  if (normalizedHandle && getBlockedHandleSet().has(normalizedHandle)) {
+    if (button) {
+      button.disabled = false;
+    }
+    setSocialStatus("Unblock this member to follow them again.", "error");
+    return;
+  }
+
   if (button) {
     button.disabled = true;
   }
@@ -9590,6 +9774,108 @@ async function handleFollowFromList(username, button) {
   } catch (error) {
     setSocialStatus(
       error instanceof Error ? error.message : "Couldn’t follow that user right now.",
+      "error"
+    );
+  } finally {
+    if (button) {
+      button.disabled = false;
+    }
+  }
+}
+
+function getMutedHandleSet() {
+  const mutedList = Array.isArray(state.mutedUsers) ? state.mutedUsers : [];
+  return new Set(
+    mutedList.map((handle) => canonicalHandle(handle)).filter((handle) => Boolean(handle))
+  );
+}
+
+function getBlockedHandleSet() {
+  const source = state.socialOverview || getSocialOverviewSnapshot();
+  const blockedList = Array.isArray(source.blocked) ? source.blocked : [];
+  return new Set(
+    blockedList.map((handle) => canonicalHandle(handle)).filter((handle) => Boolean(handle))
+  );
+}
+
+function handleMuteToggle(username, button, options = {}) {
+  const normalized = canonicalHandle(username);
+  if (!normalized) {
+    return;
+  }
+  const statusTarget = options.statusTarget === "profile" ? setSocialProfileStatus : setSocialStatus;
+  const clearOnSuccess = options.clearOnSuccess === true;
+  const mutedSet = getMutedHandleSet();
+  const isMuted = mutedSet.has(normalized);
+  if (button) {
+    button.disabled = true;
+  }
+  statusTarget(`${isMuted ? "Unmuting" : "Muting"} @${normalized}…`, "loading");
+  try {
+    if (isMuted) {
+      unmuteUser(normalized);
+    } else {
+      muteUser(normalized);
+    }
+    if (clearOnSuccess) {
+      statusTarget("", null);
+    } else {
+      statusTarget(
+        isMuted ? `Unmuted @${normalized}.` : `Muted @${normalized}. Their reviews will be hidden.`,
+        "success"
+      );
+    }
+  } catch (error) {
+    statusTarget(
+      error instanceof Error ? error.message : "Unable to update mute settings right now.",
+      "error"
+    );
+  } finally {
+    if (button) {
+      button.disabled = false;
+    }
+  }
+}
+
+async function handleBlockToggle(username, button, options = {}) {
+  const normalized = canonicalHandle(username);
+  if (!normalized) {
+    return;
+  }
+  const statusTarget = options.statusTarget === "profile" ? setSocialProfileStatus : setSocialStatus;
+  const clearOnSuccess = options.clearOnSuccess === true;
+  const blockedSet = getBlockedHandleSet();
+  const isBlocked = blockedSet.has(normalized);
+  if (!state.session || !state.session.token) {
+    statusTarget("Sign in to manage block settings.", "error");
+    return;
+  }
+  if (!isBlocked && options.confirm !== false) {
+    const confirmed = window.confirm(
+      `Block @${normalized}? This removes each of you from the other's feeds and prevents follows.`
+    );
+    if (!confirmed) {
+      return;
+    }
+  }
+  if (button) {
+    button.disabled = true;
+  }
+  statusTarget(`${isBlocked ? "Unblocking" : "Blocking"} @${normalized}…`, "loading");
+  try {
+    if (isBlocked) {
+      await unblockUserByUsername(normalized);
+    } else {
+      await blockUserByUsername(normalized);
+    }
+    if (clearOnSuccess) {
+      statusTarget("", null);
+    } else {
+      statusTarget(isBlocked ? `Unblocked @${normalized}.` : `Blocked @${normalized}.`, "success");
+    }
+  } catch (error) {
+    statusTarget(
+      error instanceof Error ? error.message : "Unable to update block settings right now.",
       "error"
     );
   } finally {

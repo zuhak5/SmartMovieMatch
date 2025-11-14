@@ -35,6 +35,7 @@ const STREAM_HEARTBEAT_MS = 20000;
 const PRESENCE_TTL_MS = 120000;
 const REVIEW_REACTIONS = ['👍', '❤️', '😂', '😮'];
 const PRESENCE_STATUS_PRESETS = new Set(['default', 'available', 'comedy', 'rewatch']);
+const REVIEW_VISIBILITY_OPTIONS = new Set(['public', 'friends', 'private']);
 
 const streamClients = new Set();
 const presenceMap = new Map();
@@ -90,6 +91,12 @@ module.exports = async (req, res) => {
         break;
       case 'unfollowUser':
         result = await handleUnfollowUser(req, payload);
+        break;
+      case 'blockUser':
+        result = await handleBlockUser(req, payload);
+        break;
+      case 'unblockUser':
+        result = await handleUnblockUser(req, payload);
         break;
       case 'getMovieReviews':
         result = await handleGetMovieReviews(req, payload);
@@ -305,13 +312,18 @@ async function handleFollowUser(req, payload) {
     throw new HttpError(404, 'That username does not exist.');
   }
 
+  const isBlocked = await isBlockedRelationship(user.username, target);
+  if (isBlocked) {
+    throw new HttpError(403, 'This profile has disabled follows from your account.');
+  }
+
   const noteRaw = typeof payload.note === 'string' ? payload.note : '';
   if (noteRaw && stripControlCharacters(noteRaw).trim().length > MAX_FOLLOW_NOTE_LENGTH) {
     throw new HttpError(400, `Follow notes must be ${MAX_FOLLOW_NOTE_LENGTH} characters or fewer.`);
   }
   const note = sanitizeFollowNote(noteRaw);
 
-  await upsertFollow(user.username, target);
+  await upsertFollow(user.username, target, 'accepted');
   await enqueueNotification({
     username: target,
     type: 'follow',
@@ -337,6 +349,45 @@ async function handleUnfollowUser(req, payload) {
   }
 
   await deleteFollow(user.username, target);
+  return {
+    body: {
+      ok: true,
+      ...(await buildSocialOverview(user.username))
+    }
+  };
+}
+
+async function handleBlockUser(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const target = canonicalUsername(payload && payload.target ? payload.target : '');
+  if (!target) {
+    throw new HttpError(400, 'Enter a username to block.');
+  }
+  if (target === user.username) {
+    throw new HttpError(400, 'You cannot block yourself.');
+  }
+
+  await upsertFollow(target, user.username, 'blocked');
+  await deleteFollow(user.username, target);
+  return {
+    body: {
+      ok: true,
+      ...(await buildSocialOverview(user.username))
+    }
+  };
+}
+
+async function handleUnblockUser(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const target = canonicalUsername(payload && payload.target ? payload.target : '');
+  if (!target) {
+    throw new HttpError(400, 'Enter a username to unblock.');
+  }
+  if (target === user.username) {
+    throw new HttpError(400, 'You cannot unblock yourself.');
+  }
+
+  await deleteFollow(target, user.username);
   return {
     body: {
       ok: true,
@@ -380,6 +431,7 @@ async function handleUpsertReview(req, payload) {
   if (rating === null) {
     throw new HttpError(400, 'Enter a rating between 0 and 10.');
   }
+  const visibility = normalizeReviewVisibility(reviewInput.visibility);
 
   const content = normalizeReviewContent(reviewInput);
   const resolvedMovie = await resolveMovieIdentifiers(movie);
@@ -393,7 +445,8 @@ async function handleUpsertReview(req, payload) {
     body: content.capsule || null,
     hasSpoilers: content.hasSpoilers,
     fullText: content.fullText || null,
-    segments: content.segments
+    segments: content.segments,
+    visibility
   });
   await broadcastReviewActivity({
     actor: user.username,
@@ -1503,7 +1556,7 @@ async function listFollowing(username) {
   if (usingLocalStore()) {
     const store = await readSocialStore();
     return store.follows
-      .filter((entry) => entry.follower === username)
+      .filter((entry) => entry.follower === username && normalizeFollowStatus(entry.status) === 'accepted')
       .map((entry) => entry.followee)
       .filter(Boolean)
       .sort();
@@ -1513,7 +1566,8 @@ async function listFollowing(username) {
     rows = await supabaseFetch('user_follows', {
       query: {
         select: 'followed_username',
-        follower_username: `eq.${username}`
+        follower_username: `eq.${username}`,
+        status: 'eq.accepted'
       }
     });
   } catch (error) {
@@ -1536,7 +1590,7 @@ async function listFollowers(username) {
   if (usingLocalStore()) {
     const store = await readSocialStore();
     return store.follows
-      .filter((entry) => entry.followee === username)
+      .filter((entry) => entry.followee === username && normalizeFollowStatus(entry.status) === 'accepted')
       .map((entry) => entry.follower)
       .filter(Boolean)
       .sort();
@@ -1546,7 +1600,8 @@ async function listFollowers(username) {
     rows = await supabaseFetch('user_follows', {
       query: {
         select: 'follower_username',
-        followed_username: `eq.${username}`
+        followed_username: `eq.${username}`,
+        status: 'eq.accepted'
       }
     });
   } catch (error) {
@@ -1562,9 +1617,88 @@ async function listFollowers(username) {
     .sort();
 }
 
+async function listBlockedUsers(username) {
+  if (!username) {
+    return [];
+  }
+  if (usingLocalStore()) {
+    const store = await readSocialStore();
+    return store.follows
+      .filter((entry) => entry.followee === username && normalizeFollowStatus(entry.status) === 'blocked')
+      .map((entry) => entry.follower)
+      .filter(Boolean)
+      .sort();
+  }
+  let rows;
+  try {
+    rows = await supabaseFetch('user_follows', {
+      query: {
+        select: 'follower_username',
+        followed_username: `eq.${username}`,
+        status: 'eq.blocked'
+      }
+    });
+  } catch (error) {
+    enableLocalFallback('loading blocked users', error);
+    return listBlockedUsers(username);
+  }
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+  return rows
+    .map((row) => row.follower_username)
+    .filter(Boolean)
+    .sort();
+}
+
+async function isBlockedRelationship(follower, followee) {
+  const followerHandle = canonicalUsername(follower);
+  const followeeHandle = canonicalUsername(followee);
+  if (!followerHandle || !followeeHandle) {
+    return false;
+  }
+  if (usingLocalStore()) {
+    const store = await readSocialStore();
+    return store.follows.some(
+      (entry) =>
+        canonicalUsername(entry.follower) === followerHandle &&
+        canonicalUsername(entry.followee) === followeeHandle &&
+        normalizeFollowStatus(entry.status) === 'blocked'
+    );
+  }
+  let rows;
+  try {
+    rows = await supabaseFetch('user_follows', {
+      query: {
+        select: 'follower_username',
+        follower_username: `eq.${followerHandle}`,
+        followed_username: `eq.${followeeHandle}`,
+        status: 'eq.blocked',
+        limit: '1'
+      }
+    });
+  } catch (error) {
+    enableLocalFallback('checking block status', error);
+    return isBlockedRelationship(followerHandle, followeeHandle);
+  }
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+function normalizeFollowStatus(status) {
+  if (typeof status !== 'string') {
+    return 'accepted';
+  }
+  const normalized = status.trim().toLowerCase();
+  if (normalized === 'blocked' || normalized === 'pending') {
+    return normalized;
+  }
+  return 'accepted';
+}
+
 async function buildSocialOverview(username) {
   const graph = await loadSocialGraph(username);
   const suggestions = await buildFollowSuggestions(graph);
+  const blockedUsers = await listBlockedUsers(username);
   let badges = [];
   let collaborations = { owned: 0, shared: 0, invites: 0 };
   if (usingLocalStore()) {
@@ -1589,7 +1723,8 @@ async function buildSocialOverview(username) {
     suggestions,
     presence: buildPresenceSnapshot(),
     badges,
-    collaborations
+    collaborations,
+    blocked: blockedUsers
   };
 }
 
@@ -2176,12 +2311,15 @@ async function fetchAllUserProfiles() {
 async function fetchFollowGraph() {
   if (usingLocalStore()) {
     const store = await readSocialStore();
-    return Array.isArray(store.follows) ? store.follows.slice() : [];
+    return Array.isArray(store.follows)
+      ? store.follows.filter((entry) => normalizeFollowStatus(entry.status) === 'accepted')
+      : [];
   }
   try {
     const rows = await supabaseFetch('user_follows', {
       query: {
-        select: 'follower_username,followed_username'
+        select: 'follower_username,followed_username',
+        status: 'eq.accepted'
       }
     });
     return Array.isArray(rows) ? rows : [];
@@ -2440,14 +2578,18 @@ function normalizeGenreLabel(value) {
     .join(' ');
 }
 
-async function upsertFollow(follower, followee) {
+async function upsertFollow(follower, followee, status = 'accepted') {
   if (usingLocalStore()) {
     const store = await readSocialStore();
     const exists = store.follows.find(
       (entry) => entry.follower === follower && entry.followee === followee
     );
     if (!exists) {
-      store.follows.push({ follower, followee, createdAt: new Date().toISOString() });
+      store.follows.push({ follower, followee, status, createdAt: new Date().toISOString() });
+      await writeSocialStore(store);
+    } else {
+      exists.status = status;
+      exists.updatedAt = new Date().toISOString();
       await writeSocialStore(store);
     }
     return;
@@ -2456,11 +2598,11 @@ async function upsertFollow(follower, followee) {
     await supabaseFetch('user_follows', {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates' },
-      body: [{ follower_username: follower, followed_username: followee }]
+      body: [{ follower_username: follower, followed_username: followee, status }]
     });
   } catch (error) {
     enableLocalFallback('following a user', error);
-    await upsertFollow(follower, followee);
+    await upsertFollow(follower, followee, status);
   }
 }
 
@@ -2493,7 +2635,10 @@ async function fetchMovieReviews(movie, followingSet, currentUsername) {
     const rows = store.reviews
       .filter((entry) => entry.movieTmdbId === movie.tmdbId)
       .sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
-    const reviews = rows.map((row) => mapReviewRow(row, followingSet, currentUsername));
+    const mappedReviews = rows.map((row) => mapReviewRow(row, followingSet, currentUsername));
+    const reviews = mappedReviews.filter((review) =>
+      canViewReview(review, followingSet, currentUsername)
+    );
     const likeMap = new Map();
     const reactionMap = new Map();
     const commentMap = new Map();
@@ -2544,7 +2689,7 @@ async function fetchMovieReviews(movie, followingSet, currentUsername) {
   try {
     rows = await supabaseFetch('movie_reviews', {
       query: {
-        select: 'id,username,rating,body,is_spoiler,created_at,updated_at',
+        select: 'id,username,rating,body,is_spoiler,created_at,updated_at,visibility',
         movie_imdb_id: `eq.${movie.imdbId}`,
         order: 'updated_at.desc'
       }
@@ -2556,7 +2701,10 @@ async function fetchMovieReviews(movie, followingSet, currentUsername) {
   if (!Array.isArray(rows)) {
     return { reviews: [], myReview: null };
   }
-  const reviews = rows.map((row) => mapReviewRow(row, followingSet, currentUsername));
+  const mappedReviews = rows.map((row) => mapReviewRow(row, followingSet, currentUsername));
+  const reviews = mappedReviews.filter((review) =>
+    canViewReview(review, followingSet, currentUsername)
+  );
   const reviewIds = reviews.map((review) => review.id).filter(Boolean);
   try {
     if (reviewIds.length) {
@@ -2597,7 +2745,16 @@ async function fetchMovieReviews(movie, followingSet, currentUsername) {
   return { reviews, myReview, stats };
 }
 
-async function upsertReview({ username, movie, rating, body, hasSpoilers, fullText, segments }) {
+async function upsertReview({
+  username,
+  movie,
+  rating,
+  body,
+  hasSpoilers,
+  fullText,
+  segments,
+  visibility = 'public'
+}) {
   const timestamp = new Date().toISOString();
   if (usingLocalStore()) {
     const store = await readSocialStore();
@@ -2619,6 +2776,7 @@ async function upsertReview({ username, movie, rating, body, hasSpoilers, fullTe
       fullText: fullText || null,
       segments: Array.isArray(segments) ? segments : existing?.segments || null,
       hasSpoilers,
+      visibility: normalizeReviewVisibility(visibility),
       createdAt: timestamp,
       updatedAt: timestamp
     };
@@ -2631,6 +2789,7 @@ async function upsertReview({ username, movie, rating, body, hasSpoilers, fullTe
         fullText: fullText || existing?.fullText || null,
         segments: Array.isArray(segments) ? segments : existing?.segments || null,
         hasSpoilers,
+        visibility: normalizeReviewVisibility(visibility),
         updatedAt: timestamp,
         movieTitle: movie.title,
         movieImdbId: movie.imdbId || null,
@@ -2655,6 +2814,7 @@ async function upsertReview({ username, movie, rating, body, hasSpoilers, fullTe
           rating,
           body: body || null,
           is_spoiler: hasSpoilers,
+          visibility: normalizeReviewVisibility(visibility),
           updated_at: timestamp
         }
       ]
@@ -2668,7 +2828,8 @@ async function upsertReview({ username, movie, rating, body, hasSpoilers, fullTe
       body,
       hasSpoilers,
       fullText,
-      segments
+      segments,
+      visibility
     });
   }
 }
@@ -2698,6 +2859,8 @@ async function userExists(username) {
 
 function mapReviewRow(row, followingSet, currentUsername) {
   const username = row.username || row.author_username || '';
+  const normalizedAuthor = canonicalUsername(username);
+  const normalizedViewer = canonicalUsername(currentUsername);
   const fallbackId = buildLocalReviewId(row.movieTmdbId || row.movie_tmdb_id, username);
   const segments = Array.isArray(row.segments)
     ? row.segments
@@ -2721,9 +2884,32 @@ function mapReviewRow(row, followingSet, currentUsername) {
       Boolean(row.has_spoilers || row.hasSpoilers || row.is_spoiler) || segments.some((segment) => segment.spoiler),
     createdAt: row.created_at || row.createdAt || null,
     updatedAt: row.updated_at || row.updatedAt || row.created_at || row.createdAt || null,
-    isFriend: username !== currentUsername && followingSet.has(username),
-    isSelf: username === currentUsername
+    isFriend: normalizedAuthor !== normalizedViewer && followingSet.has(normalizedAuthor),
+    isSelf: normalizedAuthor === normalizedViewer,
+    visibility: normalizeReviewVisibility(row.visibility || row.review_visibility || row.visibilityStatus)
   };
+}
+
+function canViewReview(review, followingSet, currentUsername) {
+  if (!review || !review.username) {
+    return false;
+  }
+  const normalizedAuthor = canonicalUsername(review.username);
+  const normalizedViewer = canonicalUsername(currentUsername);
+  if (!normalizedAuthor) {
+    return false;
+  }
+  if (normalizedAuthor === normalizedViewer) {
+    return true;
+  }
+  const visibility = normalizeReviewVisibility(review.visibility);
+  if (visibility === 'private') {
+    return false;
+  }
+  if (visibility === 'friends' && !followingSet.has(normalizedAuthor)) {
+    return false;
+  }
+  return true;
 }
 
 function calculateReviewStats(reviews) {
@@ -2884,7 +3070,9 @@ async function recordLibraryActivity({ username, action, movie }) {
       createdAt: timestamp
     });
     store.follows
-      .filter((entry) => entry.followee === username)
+      .filter(
+        (entry) => entry.followee === username && normalizeFollowStatus(entry.status) === 'accepted'
+      )
       .map((entry) => entry.follower)
       .filter((follower) => follower && follower !== username)
       .forEach((follower) => {
@@ -2938,38 +3126,6 @@ async function recordLibraryActivity({ username, action, movie }) {
         })
       )
   );
-}
-
-async function listFollowers(username) {
-  if (!username) {
-    return [];
-  }
-  if (usingLocalStore()) {
-    const store = await readSocialStore();
-    return store.follows
-      .filter((entry) => entry.followee === username)
-      .map((entry) => entry.follower)
-      .filter(Boolean)
-      .sort();
-  }
-  try {
-    const rows = await supabaseFetch('user_follows', {
-      query: {
-        select: 'follower_username',
-        followed_username: `eq.${username}`
-      }
-    });
-    if (!Array.isArray(rows)) {
-      return [];
-    }
-    return rows
-      .map((row) => row.follower_username)
-      .filter(Boolean)
-      .sort();
-  } catch (error) {
-    enableLocalFallback('loading followers', error);
-    return listFollowers(username);
-  }
 }
 
 async function resolveMentionTargets(body, actor) {
@@ -4173,6 +4329,14 @@ function normalizeReviewContent(input = {}) {
     segments,
     hasSpoilers
   };
+}
+
+function normalizeReviewVisibility(value) {
+  if (typeof value !== 'string') {
+    return 'public';
+  }
+  const normalized = value.trim().toLowerCase();
+  return REVIEW_VISIBILITY_OPTIONS.has(normalized) ? normalized : 'public';
 }
 
 function canonicalUsername(username) {
