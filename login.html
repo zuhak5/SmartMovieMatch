@@ -10,8 +10,48 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="assets/css/mobile.css" />
   </head>
-  <body class="auth-body">
-    <main class="auth-page">
+  <body class="auth-body" data-page="auth">
+    <div class="site-shell site-shell--auth">
+      <header class="site-header pad-inline">
+        <div class="site-header__inner">
+          <a class="site-brand" href="index.html">
+            <span class="site-brand__icon" aria-hidden="true">🍿</span>
+            <span class="site-brand__text">
+              <span class="site-brand__title">SmartMovieMatch</span>
+              <span class="site-brand__tagline">Movie nights, dialed in</span>
+            </span>
+          </a>
+          <nav class="site-nav" aria-label="Primary">
+            <a class="site-nav-link" href="index.html" data-nav="home">Home</a>
+            <a class="site-nav-link" href="profile.html#collectionsPanel" data-nav="lists">My Lists</a>
+            <a class="site-nav-link" href="peeruser.html" data-nav="friends">Friends</a>
+            <a class="site-nav-link" href="profile.html" data-nav="profile">Profile</a>
+            <a class="site-nav-link" href="account-settings.html" data-nav="account" aria-current="page">Account</a>
+          </nav>
+          <div class="site-header__actions">
+            <button
+              id="themeToggle"
+              class="btn-theme-toggle"
+              type="button"
+              aria-label="Switch to light theme"
+              data-theme-target="light"
+            >
+              <span class="btn-theme-icon" aria-hidden="true">🌙</span>
+              <span class="btn-theme-label">Dark</span>
+            </button>
+            <div class="account-bar pad-inline" role="navigation" data-account-state="guest">
+              <div class="account-bar-top">
+                <span id="accountGreeting" class="account-greeting">You’re browsing as guest.</span>
+              </div>
+              <div class="account-bar-actions pad-inline">
+                <a id="accountLoginLink" class="account-link" href="login.html">Log in / Sign up</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+      <div class="site-main site-main--auth">
+        <main class="auth-page">
       <section class="auth-card pad-inline" aria-labelledby="authTitle">
         <div class="auth-card-header pad-inline">
           <a class="auth-logo" href="index.html">🎬 Smart Movie Match</a>
@@ -186,7 +226,15 @@
           <a class="btn-link" href="index.html">Return to the app</a>
         </div>
       </aside>
-    </main>
+        </main>
+      </div>
+      <footer class="site-footer pad-inline">
+        <div class="site-footer__inner">
+          <p class="site-footer__copy">© SmartMovieMatch — friends-first movie intelligence.</p>
+          <p class="site-footer__note">Sign in to sync your cinematic vibe everywhere.</p>
+        </div>
+      </footer>
+    </div>
 
     <script type="module" src="assets/js/auth-page.js"></script>
   </body>

@@ -26,6 +26,7 @@ const COLOR_SCHEME_META_CONTENT = {
 const authMetaThemeColor = document.querySelector('meta[name="theme-color"]');
 const authMetaColorScheme = document.querySelector('meta[name="color-scheme"]');
 const authRootElement = document.documentElement;
+let activeTheme = "dark";
 
 function resolveStoredTheme() {
   try {
@@ -39,8 +40,37 @@ function resolveStoredTheme() {
   return "dark";
 }
 
-function applyResolvedTheme(theme) {
+function updateAuthThemeToggle(theme) {
+  const button = document.getElementById("themeToggle");
+  if (!button) {
+    return;
+  }
+  const icon = button.querySelector(".btn-theme-icon");
+  const label = button.querySelector(".btn-theme-label");
+  if (theme === "light") {
+    if (icon) {
+      icon.textContent = "☀️";
+    }
+    if (label) {
+      label.textContent = "Light";
+    }
+    button.setAttribute("aria-label", "Switch to dark theme");
+    button.dataset.themeTarget = "dark";
+  } else {
+    if (icon) {
+      icon.textContent = "🌙";
+    }
+    if (label) {
+      label.textContent = "Dark";
+    }
+    button.setAttribute("aria-label", "Switch to light theme");
+    button.dataset.themeTarget = "light";
+  }
+}
+
+function applyThemeChoice(theme, { persist = false } = {}) {
   const normalized = theme === "light" ? "light" : "dark";
+  activeTheme = normalized;
   if (authRootElement) {
     authRootElement.dataset.theme = normalized;
     authRootElement.style.setProperty("color-scheme", normalized);
@@ -58,9 +88,31 @@ function applyResolvedTheme(theme) {
     const color = THEME_COLOR_MAP[normalized] || THEME_COLOR_MAP.dark;
     authMetaThemeColor.setAttribute("content", color);
   }
+  updateAuthThemeToggle(normalized);
+  if (persist) {
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, normalized);
+    } catch (error) {
+      console.warn("Failed to persist auth theme", error);
+    }
+  }
 }
 
-applyResolvedTheme(resolveStoredTheme());
+activeTheme = resolveStoredTheme();
+applyThemeChoice(activeTheme, { persist: false });
+
+function initThemeToggle() {
+  const toggle = document.getElementById("themeToggle");
+  if (!toggle) {
+    return;
+  }
+  updateAuthThemeToggle(activeTheme);
+  toggle.addEventListener("click", () => {
+    const nextTheme = activeTheme === "light" ? "dark" : "light";
+    applyThemeChoice(nextTheme, { persist: true });
+    playUiClick();
+  });
+}
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -348,10 +400,15 @@ function initAuthPage() {
   });
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initAuthPage, { once: true });
-} else {
+function bootAuthExperience() {
   initAuthPage();
+  initThemeToggle();
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", bootAuthExperience, { once: true });
+} else {
+  bootAuthExperience();
 }
 
 function updateModeUi({ nameGroup, avatarGroup, passwordChecklist, modeTabs }) {
