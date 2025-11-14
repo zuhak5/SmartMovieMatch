@@ -384,6 +384,28 @@
           <p class="social-mini-hint">Friend stats power the inline context on each card.</p>
         </div>
 
+        <section
+          id="friendsInlinePanel"
+          class="friends-inline-panel pad-inline"
+          aria-live="polite"
+          aria-hidden="true"
+          hidden
+        >
+          <div class="friends-inline-header">
+            <div class="friends-inline-title">
+              <span aria-hidden="true">✨</span>
+              <span>From your friends</span>
+            </div>
+            <button type="button" id="friendsInlineSeeAll" class="btn-link btn-link-inline">
+              Open notifications
+            </button>
+          </div>
+          <div id="friendsInlineList" class="friends-inline-list" role="list"></div>
+          <p id="friendsInlineEmpty" class="friends-inline-empty">
+            Follow friends to see what they’re watching, reviewing, and planning.
+          </p>
+        </section>
+
         <div class="recommendations-controls pad-inline" role="region" aria-label="Result view preferences">
             <div class="control-group pad-inline">
               <label class="control-label" for="recommendationLayout">Layout</label>
