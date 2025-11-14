@@ -73,13 +73,18 @@ body {
 }
 
 /*
-  Panels already include their own inline padding. Prevent the pad-inline
-  utility from compounding gutters inside panels so content does not drift
-  toward the right edge on narrow screens.
+  Keep the pad-inline helper functional inside cards/panels while making sure
+  adding the helper class to a panel itself does not wipe away its built-in
+  gutters.
 */
-.panel.pad-inline,
-.panel .pad-inline {
-  padding-inline: 0;
+.panel.pad-inline {
+  padding-inline: var(--panel-padding-inline);
+}
+
+@media (max-width: 640px) {
+  .panel .pad-inline {
+    padding-inline: clamp(0.75rem, 2vw + 0.45rem, 1.1rem);
+  }
 }
 
 body[data-theme="light"] {
