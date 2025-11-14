@@ -275,6 +275,34 @@ const GENRE_NAME_ICON_MAP = Object.entries(TMDB_GENRES).reduce((map, [id, name])
   return map;
 }, Object.create(null));
 
+const TMDB_GENRE_LABEL_LOOKUP = Object.entries(TMDB_GENRES).reduce((map, [id, name]) => {
+  const label = typeof name === "string" ? name.trim() : "";
+  if (label) {
+    map.set(String(id), label);
+    map.set(label, label);
+    map.set(label.toLowerCase(), label);
+  }
+  return map;
+}, new Map());
+
+function resolveGenreLabel(value) {
+  if (typeof value === "number") {
+    return TMDB_GENRE_LABEL_LOOKUP.get(String(value)) || "";
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return "";
+    }
+    return (
+      TMDB_GENRE_LABEL_LOOKUP.get(trimmed) ||
+      TMDB_GENRE_LABEL_LOOKUP.get(trimmed.toLowerCase()) ||
+      trimmed
+    );
+  }
+  return "";
+}
+
 function getGenreIconByLabel(label) {
   if (!label) {
     return "🎬";
@@ -2604,11 +2632,14 @@ function refreshProfileOverviewCallout(options = {}) {
   const genreEmpty = $("profileCalloutGenreEmpty");
   const selectedGenres = Array.isArray(session?.preferencesSnapshot?.selectedGenres)
     ? session.preferencesSnapshot.selectedGenres
-        .map((genre) => (typeof genre === "string" ? genre.trim() : ""))
+        .map((genre) => (typeof genre === "number" ? String(genre) : typeof genre === "string" ? genre.trim() : ""))
         .filter(Boolean)
     : [];
-  const uniqueGenres = Array.from(new Set(selectedGenres.map((genre) => genre.toLowerCase()))).map((key) => {
-    const match = selectedGenres.find((genre) => genre.toLowerCase() === key);
+  const selectedGenreLabels = selectedGenres.map((genre) => resolveGenreLabel(genre)).filter(Boolean);
+  const uniqueGenres = Array.from(
+    new Set(selectedGenreLabels.map((genre) => genre.toLowerCase()))
+  ).map((key) => {
+    const match = selectedGenreLabels.find((genre) => genre.toLowerCase() === key);
     return match || key;
   });
 
