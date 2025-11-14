@@ -1440,9 +1440,10 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
     card.dataset.title = title.toLowerCase();
   }
 
-  const summaryButton = document.createElement("button");
-  summaryButton.type = "button";
+  const summaryButton = document.createElement("div");
   summaryButton.className = "movie-summary";
+  summaryButton.setAttribute("role", "button");
+  summaryButton.setAttribute("tabindex", "0");
   summaryButton.setAttribute("aria-expanded", "false");
   const summaryBackdrop = document.createElement("div");
   summaryBackdrop.className = "movie-summary-backdrop";
@@ -1989,15 +1990,29 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
     }
   };
 
-  summaryButton.addEventListener("click", (event) => {
-    event.preventDefault();
+  const handleSummaryInteraction = (event) => {
+    if (event) {
+      if (event.type === "keydown") {
+        if (event.target !== summaryButton) {
+          return;
+        }
+        const key = event.key;
+        if (key !== "Enter" && key !== " ") {
+          return;
+        }
+      }
+      event.preventDefault();
+    }
     playUiClick();
     const handledByOverlay = showMovieOverlay(card);
     if (!handledByOverlay) {
       const shouldExpand = !card.classList.contains("expanded");
       setExpansionState(shouldExpand);
     }
-  });
+  };
+
+  summaryButton.addEventListener("click", handleSummaryInteraction);
+  summaryButton.addEventListener("keydown", handleSummaryInteraction);
 
   card.addEventListener("movie-card:set-state", (event) => {
     const detail = event && event.detail ? event.detail : {};
