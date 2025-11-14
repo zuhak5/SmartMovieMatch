@@ -1886,18 +1886,19 @@ function updateCondensedHeader(sectionState, stats, reviews = []) {
   if (container) {
     container.hidden = false;
     if (overall) {
-      overall.textContent = `Community ${formatCondensedScore(stats.averageRating)}`;
+      const reviewLabel = stats.totalReviews === 1 ? "review" : "reviews";
+      overall.textContent = `Avg ${formatCondensedScore(stats.averageRating)} • ${stats.totalReviews} ${reviewLabel}`;
     }
     if (friends) {
       if (stats.friendReviews > 0) {
-        const countLabel = stats.friendReviews === 1 ? '1 friend review' : `${stats.friendReviews} friend reviews`;
+        const countLabel = stats.friendReviews === 1 ? "1 friend logged it" : `${stats.friendReviews} friends logged it`;
         const avgLabel = Number.isFinite(stats.friendAverageRating)
           ? ` • Avg ${formatCondensedScore(stats.friendAverageRating)}`
-          : '';
+          : "";
         friends.textContent = `${countLabel}${avgLabel}`;
         friends.dataset.empty = 'false';
       } else {
-        friends.textContent = 'No friend reviews yet';
+        friends.textContent = 'No friend notes yet';
         friends.dataset.empty = 'true';
       }
     }
