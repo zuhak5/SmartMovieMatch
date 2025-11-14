@@ -1551,10 +1551,16 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
     infoWrap.appendChild(synopsisBlock);
   }
 
+  const communityContext = document.createElement("div");
+  communityContext.className = "movie-community-context";
+  communityContext.hidden = true;
+
+  const communityAvatars = document.createElement("div");
+  communityAvatars.className = "movie-community-avatars";
+  communityContext.appendChild(communityAvatars);
+
   const communityMeta = document.createElement("div");
   communityMeta.className = "movie-community-meta";
-  communityMeta.hidden = true;
-
   const communityOverall = document.createElement("span");
   communityOverall.className = "movie-community-chip";
   communityMeta.appendChild(communityOverall);
@@ -1563,12 +1569,31 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
   communityFriends.className = "movie-community-chip is-friends";
   communityMeta.appendChild(communityFriends);
 
-  infoWrap.appendChild(communityMeta);
+  communityContext.appendChild(communityMeta);
+  infoWrap.appendChild(communityContext);
 
   const communityActivity = document.createElement("div");
   communityActivity.className = "movie-community-activity";
   communityActivity.hidden = true;
   infoWrap.appendChild(communityActivity);
+
+  const communityQuickEntry = document.createElement("button");
+  communityQuickEntry.type = "button";
+  communityQuickEntry.className = "movie-community-quick";
+  communityQuickEntry.textContent = "Leave a quick note";
+  communityQuickEntry.setAttribute("aria-label", "Open community notes to leave a quick review");
+  communityQuickEntry.hidden = !(handlers && handlers.community);
+  communityQuickEntry.addEventListener("click", (event) => {
+    event.stopPropagation();
+    playUiClick();
+    card.dispatchEvent(
+      new CustomEvent("movie-card:set-state", {
+        detail: { expand: true }
+      })
+    );
+    focusCommunitySection(card, { pulse: true, focusInput: true });
+  });
+  infoWrap.appendChild(communityQuickEntry);
 
   const stateIcons = document.createElement("div");
   stateIcons.className = "movie-state-icons";
@@ -1888,7 +1913,8 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
       imdbId: imdbID,
       title,
       headerSummary: {
-        container: communityMeta,
+        container: communityContext,
+        avatars: communityAvatars,
         overall: communityOverall,
         friends: communityFriends,
         activity: communityActivity,
@@ -1983,21 +2009,38 @@ export function highlightRecommendationCard(target, options = {}) {
     );
   }
   if (options.focusCommunity) {
-    window.requestAnimationFrame(() => {
-      const community = match.querySelector(".community-notes");
-      if (community) {
-        community.classList.add("community-notes--pulse");
-        community.scrollIntoView({ behavior: "smooth", block: "start" });
-        window.setTimeout(() => {
-          community.classList.remove("community-notes--pulse");
-        }, duration);
-      }
-    });
+    focusCommunitySection(match, { pulse: true, pulseDuration: duration });
   }
   if (typeof options.onFocused === "function") {
     options.onFocused(match);
   }
   return true;
+}
+
+function focusCommunitySection(card, { pulse = false, focusInput = false, pulseDuration = 1800 } = {}) {
+  if (!card) {
+    return;
+  }
+  window.requestAnimationFrame(() => {
+    const community = card.querySelector(".community-notes");
+    if (!community) {
+      return;
+    }
+    community.hidden = false;
+    if (pulse) {
+      community.classList.add("community-notes--pulse");
+      window.setTimeout(() => {
+        community.classList.remove("community-notes--pulse");
+      }, pulseDuration);
+    }
+    community.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (focusInput) {
+      const input = community.querySelector(".community-textarea");
+      if (input) {
+        input.focus();
+      }
+    }
+  });
 }
 
 function appendDetail(container, label, value, options = {}) {
