@@ -14,97 +14,124 @@
 <body data-page="discovery" data-theme="dark">
 <div class="app pad-inline">
   <header class="app-header">
-    <div class="account-bar pad-inline" role="navigation" data-account-state="guest">
-      <span id="accountGreeting" class="account-greeting">You’re browsing as guest.</span>
-      <div class="account-bar-actions pad-inline">
+    <div class="hero-rail pad-inline">
+      <div class="account-bar" role="navigation" data-account-state="guest">
+        <span id="accountGreeting" class="account-greeting">You’re browsing as guest.</span>
+        <div class="account-bar-actions">
+          <button
+            id="themeToggle"
+            class="btn-theme-toggle"
+            type="button"
+            aria-label="Switch to light theme"
+            data-theme-target="light"
+          >
+            <span class="btn-theme-icon" aria-hidden="true">🌙</span>
+            <span class="btn-theme-label">Dark</span>
+          </button>
+          <a id="accountLoginLink" class="account-link" href="login.html">Log in / Sign up</a>
+        </div>
         <button
-          id="themeToggle"
-          class="btn-theme-toggle"
+          id="notificationBell"
+          class="notification-bell"
           type="button"
-          aria-label="Switch to light theme"
-          data-theme-target="light"
-        >
-          <span class="btn-theme-icon" aria-hidden="true">🌙</span>
-          <span class="btn-theme-label">Dark</span>
-        </button>
-        <a id="accountLoginLink" class="account-link" href="login.html">Log in / Sign up</a>
-      </div>
-      <button
-        id="notificationBell"
-        class="notification-bell"
-        type="button"
-        aria-haspopup="true"
-        aria-expanded="false"
-        aria-controls="notificationPanel"
-        hidden
-      >
-        <span class="notification-icon" aria-hidden="true">🔔</span>
-        <span id="notificationCount" class="notification-count" hidden>0</span>
-        <span class="sr-only">Open notifications</span>
-      </button>
-      <div id="accountProfile" class="account-profile pad-inline" hidden>
-        <button
-          id="accountProfileBtn"
-          class="account-pill"
-          type="button"
-          aria-haspopup="menu"
+          aria-haspopup="true"
           aria-expanded="false"
-          aria-controls="accountMenu"
-        >
-          <span class="account-avatar" id="accountAvatar" aria-hidden="true">
-            <span id="accountAvatarInitials" class="account-avatar-initials">GM</span>
-            <img id="accountAvatarImg" alt="" />
-          </span>
-          <span class="account-pill-text">
-            <span id="accountName" class="account-name">Guest</span>
-            <span id="accountPillSync" class="account-pill-sub">Cloud sync inactive</span>
-          </span>
-          <span class="account-pill-caret" aria-hidden="true">▾</span>
-        </button>
-        <ul id="accountMenu" class="account-menu" role="menu" aria-label="Account actions">
-          <li>
-            <button class="account-menu-item" type="button" data-action="profile" role="menuitem">
-              Profile overview
-            </button>
-          </li>
-          <li>
-            <button class="account-menu-item" type="button" data-action="settings" role="menuitem">
-              Account settings
-            </button>
-          </li>
-          <li>
-            <button
-              class="account-menu-item account-menu-item--danger"
-              type="button"
-              data-action="logout"
-              role="menuitem"
-            >
-              Sign out
-            </button>
-          </li>
-        </ul>
-        <span
-          id="socialActivityIndicator"
-          class="social-activity-indicator"
+          aria-controls="notificationPanel"
           hidden
-          aria-hidden="true"
-        ></span>
+        >
+          <span class="notification-icon" aria-hidden="true">🔔</span>
+          <span id="notificationCount" class="notification-count" hidden>0</span>
+          <span class="sr-only">Open notifications</span>
+        </button>
+        <div id="accountProfile" class="account-profile" hidden>
+          <button
+            id="accountProfileBtn"
+            class="account-pill"
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded="false"
+            aria-controls="accountMenu"
+          >
+            <span class="account-avatar" id="accountAvatar" aria-hidden="true">
+              <span id="accountAvatarInitials" class="account-avatar-initials">GM</span>
+              <img id="accountAvatarImg" alt="" />
+            </span>
+            <span class="account-pill-text">
+              <span id="accountName" class="account-name">Guest</span>
+              <span id="accountPillSync" class="account-pill-sub">Cloud sync inactive</span>
+            </span>
+            <span class="account-pill-caret" aria-hidden="true">▾</span>
+          </button>
+          <ul id="accountMenu" class="account-menu" role="menu" aria-label="Account actions">
+            <li>
+              <button class="account-menu-item" type="button" data-action="profile" role="menuitem">
+                Profile overview
+              </button>
+            </li>
+            <li>
+              <button class="account-menu-item" type="button" data-action="settings" role="menuitem">
+                Account settings
+              </button>
+            </li>
+            <li>
+              <button
+                class="account-menu-item account-menu-item--danger"
+                type="button"
+                data-action="logout"
+                role="menuitem"
+              >
+                Sign out
+              </button>
+            </li>
+          </ul>
+          <span
+            id="socialActivityIndicator"
+            class="social-activity-indicator"
+            hidden
+            aria-hidden="true"
+          ></span>
+        </div>
+      </div>
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <p class="hero-eyebrow">Cinematic co-pilot</p>
+          <div class="app-title-row">
+            <h1 class="app-title">Smart Movie Match</h1>
+            <span class="pill-context">
+              <span class="pill-dot"></span>
+              Live taste graph updating every hour
+            </span>
+          </div>
+          <p class="app-subtitle">
+            A new interface for planning movie nights. Share your vibe, get hyper-personalized
+            suggestions, then sync them with friends, lists, and watch parties.
+          </p>
+          <div class="hero-highlights">
+            <span class="hero-highlight">⚡️ Instant mood-based search</span>
+            <span class="hero-highlight">🎯 Real-time quality filters</span>
+            <span class="hero-highlight">🧑‍🤝‍🧑 Social context baked in</span>
+          </div>
+        </div>
+        <div class="hero-panel">
+          <h3>Tonight’s Focus</h3>
+          <p>Mix a mood, pick a few genres, and I’ll deliver a curated slate within seconds.</p>
+          <ul class="hero-panel-metrics">
+            <li>
+              <span class="metric-value">32k</span>
+              <span class="metric-label">Live community cues</span>
+            </li>
+            <li>
+              <span class="metric-value">+89%</span>
+              <span class="metric-label">Match confidence</span>
+            </li>
+            <li>
+              <span class="metric-value">145</span>
+              <span class="metric-label">Fresh drops today</span>
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
-    <div class="app-title-row pad-inline">
-      <h1 class="app-title">
-        🎬 Smart Movie Match
-      </h1>
-      <span class="pill-context">
-        <span class="pill-dot"></span>
-        No static catalog – everything fetched live
-      </span>
-    </div>
-    <p class="app-subtitle">
-      Tell me what you’re into and I’ll hunt for fresh movies online, then tailor the picks
-      to your mood and what you’ve already watched.
-    </p>
-
   </header>
 
   <main class="app-main">
