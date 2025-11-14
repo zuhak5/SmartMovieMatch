@@ -108,18 +108,17 @@
   </header>
 
   <main class="app-main">
-    <div class="discovery-columns">
-      <!-- Preferences -->
-      <section id="preferencesPanel" class="panel panel-sticky pad-inline">
-        <div class="panel-inner pad-inline">
-          <div class="panel-header pad-inline">
-            <div class="pad-inline">
-              <div class="panel-title pad-inline">Your vibe</div>
-              <div class="panel-subtitle pad-inline">Genres, mood &amp; what you’ve liked</div>
-            </div>
+    <!-- Preferences -->
+    <section id="preferencesPanel" class="panel panel-sticky pad-inline">
+      <div class="panel-inner pad-inline">
+        <div class="panel-header pad-inline">
+          <div class="pad-inline">
+            <div class="panel-title pad-inline">Your vibe</div>
+            <div class="panel-subtitle pad-inline">Genres, mood &amp; what you’ve liked</div>
           </div>
+        </div>
         <p class="hint-text hint-text--compact">
-          Pick a vibe or toggle a few genres—recommendations refresh instantly.
+          Share a few favorites or genres and the live feed adapts instantly.
         </p>
 
         <form id="prefsForm" class="prefs-form">
@@ -206,8 +205,9 @@
           <!-- Genres -->
           <section class="prefs-section prefs-section--genres" aria-label="Fine-tune genres">
             <div class="prefs-section-header pad-inline">
-              <p class="prefs-section-label">Fine-tune genres</p>
-              <p class="prefs-section-hint">Layer a couple of go-to genres to bias the next batch.</p>
+              <p class="prefs-section-eyebrow">Fine-tune genres</p>
+              <h3 class="prefs-section-title">Dial in exactly what you’re craving</h3>
+              <p class="prefs-section-subtitle">Mix and match anything — I’ll balance the picks.</p>
             </div>
             <div class="genre-grid pad-inline" role="group" aria-label="Genre preferences">
               <!-- TMDB genre IDs -->
@@ -316,8 +316,8 @@
       </div>
     </section>
 
-      <!-- Right column: recommendations + collections -->
-      <div class="right-column discovery-stack pad-inline">
+    <!-- Right column: recommendations + collections -->
+    <div class="right-column pad-inline">
       <section id="recommendationsPanel" class="panel recommendations-panel pad-inline">
         <div class="panel-inner pad-inline">
           <div id="syncStatus" class="sync-status pad-inline" role="status" aria-live="polite"></div>
@@ -327,11 +327,13 @@
               <div class="recommendations-meta pad-inline">
                 <div class="recommendations-meta-pill-row">
                   <span id="recMetaPrimary" class="recommendations-pill recommendations-pill--meta">
-                    Personal mix
+                    Tune your preferences, then I’ll blend TMDB discovery with fresh OMDb details.
                   </span>
-                  <span id="recFilterSummary" class="recommendations-pill recommendations-pill--filters">
-                    Genres: Popular mix
-                  </span>
+                  <span
+                    id="recFilterSummary"
+                    class="recommendations-pill recommendations-pill--filters"
+                    hidden
+                  ></span>
                   <button
                     type="button"
                     id="recFilterReset"
@@ -342,9 +344,9 @@
                     Clear all
                   </button>
                 </div>
-                <span id="recResultsMeta" class="pill-mini">
+                <span class="pill-mini">
                   <span class="swatch"></span>
-                  Waiting for your vibe…
+                  IMDb rating • genres • plot • trailer
                 </span>
               </div>
             </div>
@@ -596,7 +598,6 @@
         </div>
       </section>
 
-    </div>
     </div>
   </main>
 </div>
