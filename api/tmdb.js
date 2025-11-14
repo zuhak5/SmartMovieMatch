@@ -3,15 +3,16 @@ const { fetchJson, TIMEOUT_ERROR_NAME } = require('../lib/http-client');
 const ALLOWED_PATHS = new Set([
   'discover/movie',
   'search/movie',
-  'trending/movie/week'
+  'trending/movie/week',
+  'genre/movie/list'
 ]);
 
 const TMDB_TIMEOUT_MS = 10000;
 
 module.exports = async (req, res) => {
   try {
-    const apiKey = process.env.TMDB_API_READ_ACCESS_TOKEN;
-    if (!apiKey) {
+    const apiToken = process.env.TMDB_API_READ_ACCESS_TOKEN;
+    if (!apiToken) {
       res.status(503).json({ error: 'TMDB API key not configured' });
       return;
     }
@@ -24,38 +25,63 @@ module.exports = async (req, res) => {
       return;
     }
 
-    const baseUrl = `https://api.themoviedb.org/4/${path}`;
-    const params = new URLSearchParams();
-    params.set('api_key', apiKey);
+    const isV3Path = path.startsWith('genre/');
+    const apiBase = isV3Path
+      ? 'https://api.themoviedb.org/3/'
+      : 'https://api.themoviedb.org/4/';
+    const baseUrl = `${apiBase}${path}`;
 
-    const language = rest.language || 'en-US';
-    if (language) {
-      params.set('language', language);
-    }
-
-    if (!Object.prototype.hasOwnProperty.call(rest, 'include_adult')) {
-      params.set('include_adult', 'false');
-    }
-
-    Object.entries(rest).forEach(([key, value]) => {
+    const paramEntries = [];
+    const appendParam = (key, value) => {
       if (value === undefined || value === null || value === '') {
         return;
       }
-      if (key === 'language') {
-        params.set('language', value);
+      paramEntries.push([key, value]);
+    };
+
+    const language = rest.language || 'en-US';
+    if (language) {
+      appendParam('language', language);
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(rest, 'include_adult')) {
+      appendParam('include_adult', 'false');
+    }
+
+    Object.entries(rest).forEach(([key, value]) => {
+      if (key === 'language' || key === 'include_adult') {
+        appendParam(key, value);
         return;
       }
-      if (key === 'include_adult') {
-        params.set('include_adult', value);
-        return;
-      }
-      params.set(key, value);
+      appendParam(key, value);
     });
 
-    const url = `${baseUrl}?${params.toString()}`;
+    const headers = {
+      Accept: 'application/json',
+      Authorization: `Bearer ${apiToken}`
+    };
+
+    let url = baseUrl;
+    let body;
+    let method = 'GET';
+
+    if (isV3Path) {
+      if (paramEntries.length) {
+        const search = new URLSearchParams(paramEntries);
+        url = `${baseUrl}?${search.toString()}`;
+      }
+    } else {
+      method = 'POST';
+      headers['Content-Type'] = 'application/json;charset=utf-8';
+      const payload = Object.fromEntries(paramEntries);
+      body = JSON.stringify(payload);
+    }
+
     const result = await fetchJson(url, {
       timeoutMs: TMDB_TIMEOUT_MS,
-      headers: { Accept: 'application/json' }
+      method,
+      body,
+      headers
     });
 
     if (!result.ok) {
