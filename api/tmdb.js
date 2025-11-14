@@ -11,12 +11,6 @@ const TMDB_TIMEOUT_MS = 10000;
 
 module.exports = async (req, res) => {
   try {
-    const apiToken = process.env.TMDB_API_READ_ACCESS_TOKEN;
-    if (!apiToken) {
-      res.status(503).json({ error: 'TMDB API key not configured' });
-      return;
-    }
-
     const { query = {} } = req;
     const { path = 'discover/movie', ...rest } = query;
 
@@ -26,6 +20,19 @@ module.exports = async (req, res) => {
     }
 
     const isV3Path = path.startsWith('genre/');
+    const v4AccessToken = process.env.TMDB_API_READ_ACCESS_TOKEN;
+    const v3ApiKey = process.env.TMDB_API_KEY;
+
+    if (isV3Path && !v3ApiKey) {
+      res.status(503).json({ error: 'TMDB v3 API key not configured' });
+      return;
+    }
+
+    if (!isV3Path && !v4AccessToken) {
+      res.status(503).json({ error: 'TMDB API Read Access Token not configured' });
+      return;
+    }
+
     const apiBase = isV3Path
       ? 'https://api.themoviedb.org/3/'
       : 'https://api.themoviedb.org/4/';
@@ -57,8 +64,7 @@ module.exports = async (req, res) => {
     });
 
     const headers = {
-      Accept: 'application/json',
-      Authorization: `Bearer ${apiToken}`
+      Accept: 'application/json'
     };
 
     let url = baseUrl;
@@ -66,12 +72,14 @@ module.exports = async (req, res) => {
     let method = 'GET';
 
     if (isV3Path) {
+      appendParam('api_key', v3ApiKey);
       if (paramEntries.length) {
         const search = new URLSearchParams(paramEntries);
         url = `${baseUrl}?${search.toString()}`;
       }
     } else {
       method = 'POST';
+      headers.Authorization = `Bearer ${v4AccessToken}`;
       headers['Content-Type'] = 'application/json;charset=utf-8';
       const payload = Object.fromEntries(paramEntries);
       body = JSON.stringify(payload);
