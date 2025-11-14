@@ -87,21 +87,27 @@
             <div class="panel-subtitle pad-inline">Tailor your details and protect your account.</div>
           </div>
         </div>
-        <nav class="settings-nav pad-inline" aria-label="Settings sections">
-          <a class="settings-nav-link is-active" href="#profile" aria-current="true">Profile</a>
-          <a class="settings-nav-link" href="#security">Security</a>
-        </nav>
-
         <div id="accountSettingsSignedOut" class="settings-signed-out pad-inline" hidden aria-hidden="true">
-          <h2>Sign in to manage settings</h2>
-          <p>Log in to update your profile, change your password, and keep every device up to date.</p>
-          <a class="btn-primary" href="login.html">Log in / Sign up</a>
+          <p>Sign in to update your profile and security settings.</p>
+          <div class="settings-signed-out-actions pad-inline">
+            <a class="btn-primary" href="login.html">Log in / Sign up</a>
+            <a class="btn-link" href="login.html">Switch account</a>
+          </div>
         </div>
 
         <div id="accountSettingsContent" class="settings-content pad-inline" hidden aria-hidden="true">
-          <div id="profile" class="settings-anchor pad-inline" aria-hidden="true"></div>
-          <div class="settings-layout pad-inline">
+          <div class="settings-shell pad-inline">
+            <aside class="settings-sidebar pad-inline" aria-label="Settings navigation">
+              <p class="settings-sidebar-title">Settings</p>
+              <nav class="settings-nav" aria-label="Settings sections">
+                <a class="settings-nav-link is-active" href="#profile" aria-current="true">Profile</a>
+                <a class="settings-nav-link" href="#security">Security</a>
+              </nav>
+              <p class="settings-sidebar-copy">Jump straight to a section without endless scrolling.</p>
+            </aside>
+
             <div class="settings-views pad-inline">
+              <div id="profile" class="settings-anchor pad-inline" aria-hidden="true"></div>
               <section
                 class="settings-card pad-inline"
                 aria-labelledby="accountSettingsProfileHeading"
@@ -148,12 +154,30 @@
                       </div>
                       <p class="field-hint">Used across friend profiles, watch parties, and notifications.</p>
                     </div>
+                  </div>
+
+                  <div class="settings-fieldset settings-fieldset--discoverability pad-inline">
+                    <p class="settings-fieldset-title">Discoverability</p>
+                    <div class="field-grid pad-inline">
+                      <span class="field-label">Handle</span>
+                      <div class="settings-static-field pad-inline">
+                        <span id="accountHandleValue" class="settings-handle" role="text">@guest</span>
+                        <p class="field-hint">Friends use this handle to follow and invite you.</p>
+                      </div>
+                    </div>
+                    <div class="field-grid pad-inline">
+                      <span class="field-label">Tagline</span>
+                      <div class="settings-static-field pad-inline">
+                        <p id="accountTaglinePreview" class="settings-tagline-preview">
+                          Synced from your vibe preferences.
+                        </p>
+                        <p class="field-hint">Appears in your social hero, invites, and community replies.</p>
+                      </div>
+                    </div>
                     <div class="settings-helper-card pad-inline" role="note">
-                      <p class="settings-helper-title">Social discoverability</p>
-                      <p class="settings-helper-copy">
-                        Your @handle mirrors your username and your hero tagline still comes from the “Your vibe”
-                        preferences you set on your profile. We’ll surface dedicated handle and tagline controls in this
-                        panel soon so everything lives in one place.
+                      <p class="settings-helper-title">Sync info</p>
+                      <p id="accountProfileSyncCopy" class="settings-helper-copy">
+                        Used for favorites, reviews, and friend suggestions.
                       </p>
                     </div>
                   </div>

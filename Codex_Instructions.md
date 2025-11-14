@@ -576,7 +576,7 @@ Implementation notes for Codex (internal):
 - Social connections panel is reorganized into highlights, presence, collapsible collaboration blocks, a dedicated “Find friends” area, and a separate share panel. Recognition badges and collaboration shells collapse on mobile via `initResponsiveCollapsibles()`.
 
 ## 3. peeruser.html – Peer / Friend Profile
-[Codex status: TODO]  (Last updated: 2025-11-13 by Codex)
+[Codex status: DONE]  (Last updated: 2025-11-14 by Codex)
 
 
 This page wraps the same #socialProfileBody content from the overlay but uses the full-page profile-main layout.
@@ -617,7 +617,7 @@ That’s a very strong social signal and deserves top placement.
 
 
 ## 4. login.html – Auth Page
-[Codex status: TODO]  (Last updated: 2025-11-13 by Codex)
+[Codex status: DONE]  (Last updated: 2025-11-14 by Codex)
 
 
 Goal: Make it obvious what you get socially by signing in, and get people through the form with as little friction as possible.
@@ -661,7 +661,7 @@ Ensure #authStatus appears directly below the submit button, not at the very bot
 
 
 ## 5. account-settings.html – Account & Security
-[Codex status: TODO]  (Last updated: 2025-11-13 by Codex)
+[Codex status: DONE]  (Last updated: 2025-11-14 by Codex)
 
 
 Goal: Make it effortless to manage identity + safety, while hinting at how that affects the social side.
@@ -1119,9 +1119,9 @@ Notification: “Maya replied to your review” → banner: “View discussion�
 
 - [x] 1. index.html – Discovery / Home  (Done: 2025-11-14 by Codex)
 - [x] 2. profile.html – Profile Overview  (Done: 2025-11-14 by Codex)
-- [ ] 3. peeruser.html – Peer / Friend Profile
-- [ ] 4. login.html – Auth Page
-- [ ] 5. account-settings.html – Account & Security
+- [x] 3. peeruser.html – Peer / Friend Profile  (Done: 2025-11-14 by Codex)
+- [x] 4. login.html – Auth Page  (Done: 2025-11-14 by Codex)
+- [x] 5. account-settings.html – Account & Security  (Done: 2025-11-14 by Codex)
 
 **Codex instructions for this tracker:**
 

@@ -4732,6 +4732,39 @@ body[data-page="account-settings"] .app-main {
   align-items: flex-start;
 }
 
+.settings-shell {
+  display: grid;
+  grid-template-columns: minmax(200px, 0.4fr) minmax(0, 1fr);
+  gap: 2rem;
+}
+
+.settings-sidebar {
+  position: sticky;
+  top: 92px;
+  align-self: flex-start;
+  display: grid;
+  gap: 0.9rem;
+  padding: 1.2rem 1.4rem;
+  border-radius: 0.85rem;
+  border: 1px solid var(--border-subtle);
+  background: rgba(15, 23, 42, 0.72);
+  box-shadow: 0 18px 38px rgba(2, 6, 23, 0.45);
+}
+
+.settings-sidebar-title {
+  margin: 0;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.settings-sidebar-copy {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-subtle);
+}
+
 .settings-content {
   display: grid;
   gap: 2rem;
@@ -4820,28 +4853,62 @@ body[data-page="account-settings"] .app-main {
 .settings-signed-out {
   border: 1px dashed rgba(148, 163, 184, 0.45);
   border-radius: var(--radius-lg);
-  padding: 1.6rem 1.8rem;
+  padding: 1.8rem;
   background: rgba(15, 23, 42, 0.72);
   display: grid;
-  gap: 0.85rem;
+  gap: 1.25rem;
   max-width: 520px;
   margin-inline: auto;
   justify-self: center;
-}
-
-.settings-signed-out h2 {
-  margin: 0;
-  font-size: 1.12rem;
+  text-align: center;
 }
 
 .settings-signed-out p {
   margin: 0;
   color: var(--text-subtle);
-  line-height: 1.6;
+  line-height: 1.5;
+}
+
+.settings-signed-out-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .settings-signed-out .btn-primary {
   width: fit-content;
+}
+
+.settings-fieldset--discoverability {
+  border-style: dashed;
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.settings-static-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.settings-handle {
+  font-weight: 600;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+}
+
+.settings-tagline-preview {
+  margin: 0;
+  color: var(--text-main);
+  line-height: 1.5;
+}
+
+.settings-helper-card[role="note"] {
+  border-style: dashed;
+}
+
+.settings-helper-card[role="note"] .settings-helper-title {
+  color: var(--text-muted);
 }
 
 .settings-anchor {
@@ -4857,6 +4924,25 @@ body[data-page="account-settings"] .app-main {
 
   .settings-views {
     gap: 1.2rem;
+  }
+
+  .settings-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-sidebar {
+    position: static;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    background: transparent;
+  }
+
+  .settings-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
   }
 }
 
@@ -10423,6 +10509,7 @@ body.auth-body {
       font-size: 0.78rem;
       min-height: 1.2rem;
       color: var(--text-subtle);
+      align-self: stretch;
     }
 
     .status-success {
@@ -10435,6 +10522,23 @@ body.auth-body {
 
     .status-loading {
       color: #fde68a;
+    }
+
+    .auth-status span {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 0.35rem;
+      background: rgba(15, 23, 42, 0.4);
+      padding: 0.35rem 0.65rem;
+      border-radius: 0.5rem;
+    }
+
+    .auth-status [data-status-label]::before {
+      content: attr(data-status-label) ":";
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: rgba(248, 250, 252, 0.85);
     }
 
     .auth-divider {
@@ -10697,6 +10801,15 @@ body.auth-body {
 
       .auth-actions button {
         flex: unset;
+        width: 100%;
+      }
+
+      .auth-mode-tabs {
+        width: 100%;
+        flex-direction: column;
+      }
+
+      .auth-mode-tab {
         width: 100%;
       }
     }
@@ -11795,8 +11908,8 @@ body[data-theme="dark"] .signup-page {
 
 .settings-nav {
   display: flex;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .settings-nav-link {
