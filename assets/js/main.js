@@ -1160,6 +1160,7 @@ function wireEvents() {
   const notificationPanel = $("notificationPanel");
   const notificationOverlay = $("notificationOverlay");
   const notificationMarkRead = $("notificationMarkRead");
+  const notificationClose = $("notificationClose");
   const themeToggle = $("themeToggle");
   const collectionFilterGenre = $("collectionFilterGenre");
   const collectionFilterSort = $("collectionFilterSort");
@@ -1206,6 +1207,13 @@ function wireEvents() {
   if (notificationMarkRead) {
     notificationMarkRead.addEventListener("click", () => {
       acknowledgeNotifications();
+    });
+  }
+
+  if (notificationClose) {
+    notificationClose.addEventListener("click", () => {
+      playUiClick();
+      closeNotificationPanel();
     });
   }
 
@@ -9052,6 +9060,10 @@ function normalizePartyResponse(response) {
 }
 
 function syncNotificationOverlay(overlay, isOpen) {
+  const body = typeof document !== "undefined" ? document.body : null;
+  if (body) {
+    body.classList.toggle("notification-overlay-open", Boolean(isOpen));
+  }
   if (overlay) {
     if (isOpen) {
       overlay.hidden = false;
