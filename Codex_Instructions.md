@@ -368,7 +368,7 @@ Implementation notes for Codex (internal):
 
 
 ## 8. Safety, comfort, and control in the social layer
-[Codex status: TODO]  (Last updated: 2025-11-13 by Codex)
+[Codex status: DONE]  (Last updated: 2025-11-14 by Codex)
 
 
 Expose blocking / muting in the UI
@@ -391,10 +391,16 @@ Let users optionally mark certain reviews or diary entries as “private” or �
 
 That encourages sharing honest takes without worrying everything is public.
 
+Implementation notes for Codex (internal):
+
+- Profile hero + social follow rows now expose the mute/block safety row; controls persist per user.
+- Blocked or muted members render reviews and threaded comments in a hidden state with a “Show anyway” affordance.
+- Community composer shows tone/spoiler guidance alongside a per-entry visibility selector (public / friends / only you).
+
 
 
 ## 9. Reduce friction to find and follow people
-[Codex status: TODO]  (Last updated: 2025-11-13 by Codex)
+[Codex status: DONE]  (Last updated: 2025-11-14 by Codex)
 
 
 Inline follow buttons wherever names appear
@@ -420,6 +426,12 @@ In the member search, show why each person is recommended:
 “Also into horror / sci-fi”
 
 You already compute shared favorites and interests; surface those signals directly in the search results.
+
+Implementation notes for Codex (internal):
+
+- Inline follow pills now sit next to review headers, comment authors, friend-activity names, and watch-party hosts for quick follows.
+- Discovery’s friends panel adds a “People you might like” card sourced from `socialOverview.suggestions`, with context copy + follow CTAs.
+- Member search rows reuse the same reason builder so every result explains the overlap (shared favorites, genres, parties).
 
 
 
@@ -1097,8 +1109,8 @@ Notification: “Maya replied to your review” → banner: “View discussion�
 - [x] 5. Watch parties that feel live, not just scheduled  (Done: 2025-11-13 by Codex)
 - [x] 6. Presence that actually leads to interaction  (Done: 2025-11-14 by Codex)
 - [x] 7. Social notifications that feel like a feed  (Done: 2025-11-13 by Codex)
-- [ ] 8. Safety, comfort, and control in the social layer
-- [ ] 9. Reduce friction to find and follow people
+- [x] 8. Safety, comfort, and control in the social layer  (Done: 2025-11-14 by Codex)
+- [x] 9. Reduce friction to find and follow people  (Done: 2025-11-14 by Codex)
 
 - [ ] 1. index.html – Discovery / Home
 - [ ] 2. profile.html – Profile Overview

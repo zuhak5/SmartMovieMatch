@@ -45,6 +45,7 @@ import {
   muteUser,
   unmuteUser,
   generateInviteQrRemote,
+  createInlineFollowPill,
   PRESENCE_STATUS_PRESETS,
   setPresenceStatusPreset,
   getPresenceStatusPreset,
@@ -4170,6 +4171,7 @@ function setupSocialFeatures() {
   unsubscribeFollowing = subscribeToFollowing((list) => {
     state.followingUsers = Array.isArray(list) ? list.slice() : [];
     renderSocialConnections();
+    renderFriendsActivityFeed();
   });
   state.followingUsers = getFollowingSnapshot();
   if (unsubscribeSocialOverview) {
@@ -4178,6 +4180,7 @@ function setupSocialFeatures() {
   unsubscribeSocialOverview = subscribeToSocialOverview((overview) => {
     state.socialOverview = overview;
     renderSocialConnections();
+    renderFriendsActivityFeed();
   });
   state.socialOverview = getSocialOverviewSnapshot();
   if (unsubscribeMuted) {
@@ -5057,10 +5060,11 @@ function wireFollowForm() {
         infoButton.appendChild(handle);
       }
 
-      if (result.reason) {
+      const reasonText = buildSocialSuggestionReason(result);
+      if (reasonText) {
         const reason = document.createElement("span");
         reason.className = "social-follow-search-reason";
-        reason.textContent = result.reason;
+        reason.textContent = reasonText;
         infoButton.appendChild(reason);
       }
 
@@ -5491,6 +5495,7 @@ function renderFriendsActivityFeed() {
       content.setAttribute("aria-hidden", "true");
       content.style.display = "none";
     }
+    renderDiscoveryFollowSuggestions();
     return;
   }
   if (signedOut) {
@@ -5505,6 +5510,7 @@ function renderFriendsActivityFeed() {
   }
   renderFriendWatchActivity(buildFriendWatchActivityEntries());
   renderFriendListActivity(buildCollaborativeListActivityEntries());
+  renderDiscoveryFollowSuggestions();
 }
 
 function buildFriendWatchActivityEntries(limit = 4) {
@@ -5563,6 +5569,14 @@ function renderFriendWatchActivity(entries) {
       });
     if (link) {
       text.appendChild(link);
+      const inlineFollow = createInlineFollowPill(entry.username, {
+        size: "xs",
+        className: "friends-inline-follow",
+        ariaLabel: `Follow ${formatSocialDisplayName(entry.username)}`
+      });
+      if (inlineFollow) {
+        text.appendChild(inlineFollow);
+      }
     } else if (entry.username) {
       const fallback = document.createElement("span");
       fallback.className = "friends-activity-link";
@@ -5645,6 +5659,14 @@ function renderFriendListActivity(entries) {
       });
     if (ownerLink) {
       text.appendChild(ownerLink);
+      const inlineFollow = createInlineFollowPill(entry.owner, {
+        size: "xs",
+        className: "friends-inline-follow",
+        ariaLabel: `Follow ${formatSocialDisplayName(entry.owner)}`
+      });
+      if (inlineFollow) {
+        text.appendChild(inlineFollow);
+      }
       text.appendChild(document.createTextNode(" updated "));
     } else if (entry.owner) {
       const owner = document.createElement("span");
@@ -6140,6 +6162,120 @@ function renderSocialConnections() {
       });
     }
   }
+}
+
+function renderDiscoveryFollowSuggestions() {
+  const panel = $("friendSuggestionsCard");
+  const listEl = $("friendSuggestionsList");
+  const emptyEl = $("friendSuggestionsEmpty");
+  if (!panel || !listEl || !emptyEl) {
+    return;
+  }
+  if (!state.session || !state.session.token) {
+    panel.hidden = true;
+    return;
+  }
+  panel.hidden = false;
+  listEl.innerHTML = "";
+  const overview = state.socialOverview || getSocialOverviewSnapshot();
+  const suggestions = Array.isArray(overview.suggestions) ? overview.suggestions : [];
+  const followingSet = new Set(
+    (Array.isArray(state.followingUsers) ? state.followingUsers : [])
+      .map((handle) => canonicalHandle(handle))
+      .filter(Boolean)
+  );
+  const available = suggestions.filter((suggestion) => {
+    const normalized = canonicalHandle(suggestion && suggestion.username ? suggestion.username : "");
+    return normalized && !followingSet.has(normalized);
+  });
+  const subset = available.slice(0, 3);
+  if (!subset.length) {
+    listEl.hidden = true;
+    emptyEl.hidden = false;
+    return;
+  }
+  listEl.hidden = false;
+  emptyEl.hidden = true;
+  subset.forEach((suggestion) => {
+    const row = buildFriendSuggestionRow(suggestion);
+    if (row) {
+      listEl.appendChild(row);
+    }
+  });
+}
+
+function buildFriendSuggestionRow(suggestion) {
+  const normalized = canonicalHandle(suggestion && suggestion.username ? suggestion.username : "");
+  if (!normalized) {
+    return null;
+  }
+  const displayName = suggestion.displayName || formatSocialDisplayName(normalized);
+  const item = document.createElement("div");
+  item.className = "friend-suggestion-item";
+  item.setAttribute("role", "listitem");
+  const identityButton = createProfileButton(normalized, {
+    className: "friend-suggestion-identity",
+    ariaLabel: `View profile for ${displayName}`
+  });
+  if (identityButton) {
+    const avatar = document.createElement("span");
+    avatar.className = "friend-suggestion-avatar";
+    avatar.textContent = computePeerInitials(displayName || normalized);
+    identityButton.appendChild(avatar);
+    const names = document.createElement("span");
+    names.className = "friend-suggestion-names";
+    const nameEl = document.createElement("strong");
+    nameEl.className = "friend-suggestion-name";
+    nameEl.textContent = displayName;
+    const handleEl = document.createElement("span");
+    handleEl.className = "friend-suggestion-handle";
+    handleEl.textContent = `@${normalized}`;
+    names.appendChild(nameEl);
+    names.appendChild(handleEl);
+    identityButton.appendChild(names);
+    item.appendChild(identityButton);
+  }
+  const reasonText = buildSocialSuggestionReason(suggestion);
+  if (reasonText) {
+    const reason = document.createElement("p");
+    reason.className = "friend-suggestion-reason";
+    reason.textContent = reasonText;
+    item.appendChild(reason);
+  }
+  const followPill = createInlineFollowPill(normalized, {
+    size: "sm",
+    className: "friend-suggestion-follow",
+    ariaLabel: `Follow ${displayName}`
+  });
+  if (followPill) {
+    item.appendChild(followPill);
+  }
+  return item;
+}
+
+function buildSocialSuggestionReason(entry) {
+  if (!entry || typeof entry !== "object") {
+    return "";
+  }
+  if (Array.isArray(entry.sharedFavorites) && entry.sharedFavorites.length) {
+    return `You both love ${formatFriendlyList(entry.sharedFavorites, 2)}.`;
+  }
+  if (Array.isArray(entry.sharedInterests) && entry.sharedInterests.length) {
+    return `Also into ${formatFriendlyList(entry.sharedInterests, 2)} vibes.`;
+  }
+  if (Array.isArray(entry.sharedWatchHistory) && entry.sharedWatchHistory.length) {
+    return `Logged ${formatFriendlyList(entry.sharedWatchHistory, 2)} recently too.`;
+  }
+  if (Array.isArray(entry.sharedWatchParties) && entry.sharedWatchParties.length) {
+    return `Joined ${formatPlural(entry.sharedWatchParties.length, "party", "parties")} together.`;
+  }
+  if (Array.isArray(entry.mutualFollowers) && entry.mutualFollowers.length) {
+    return `Shares ${formatPlural(entry.mutualFollowers.length, "mutual", "mutuals")}.`;
+  }
+  if (typeof entry.reason === "string" && entry.reason.trim()) {
+    return entry.reason.trim();
+  }
+  return "High taste match from your vibe settings.";
 }
 
 function handlePresenceInviteAction(username) {
@@ -7138,6 +7274,14 @@ function buildWatchPartyCard(entry, mode) {
       meta.appendChild(hostLink);
     } else {
       meta.appendChild(document.createTextNode(`@${entry.host}`));
+    }
+    const inlineFollow = createInlineFollowPill(entry.host, {
+      size: "xs",
+      className: "watch-party-inline-follow",
+      ariaLabel: `Follow ${formatSocialDisplayName(entry.host)}`
+    });
+    if (inlineFollow) {
+      meta.appendChild(inlineFollow);
     }
   }
   card.appendChild(meta);

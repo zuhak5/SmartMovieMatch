@@ -8885,6 +8885,46 @@ body[data-theme="light"] .control-chip input {
       gap: 0.5rem;
     }
 
+    .inline-follow-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      background: rgba(15, 23, 42, 0.45);
+      color: rgba(248, 250, 252, 0.9);
+      font-size: 0.78rem;
+      font-weight: 600;
+      line-height: 1.2;
+      padding: 0.25rem 0.7rem;
+      transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+    }
+
+    .inline-follow-pill--xs {
+      font-size: 0.7rem;
+      padding: 0.15rem 0.5rem;
+    }
+
+    .inline-follow-pill[data-state='loading'] {
+      opacity: 0.6;
+      cursor: progress;
+    }
+
+    .inline-follow-pill[data-state='success'] {
+      background: rgba(34, 197, 94, 0.22);
+      border-color: rgba(34, 197, 94, 0.65);
+      color: rgba(240, 253, 244, 0.95);
+    }
+
+    .community-inline-follow {
+      margin-left: 0.35rem;
+    }
+
+    .friends-inline-follow,
+    .watch-party-inline-follow {
+      margin-left: 0.35rem;
+    }
+
     .community-review-actions {
       display: flex;
       flex-wrap: wrap;
@@ -9014,7 +9054,7 @@ body[data-theme="light"] .control-chip input {
       gap: 0.45rem;
     }
 
-    .community-review-hidden {
+    .community-hidden-notice {
       display: flex;
       flex-wrap: wrap;
       gap: 0.55rem;
@@ -9025,14 +9065,14 @@ body[data-theme="light"] .control-chip input {
       border: 1px dashed rgba(148, 163, 184, 0.4);
     }
 
-    .community-review-hidden-text {
+    .community-hidden-text {
       margin: 0;
       flex: 1 1 220px;
       font-size: 0.82rem;
       color: var(--text-subtle);
     }
 
-    .community-review-hidden-btn {
+    .community-hidden-btn {
       margin-left: auto;
     }
 
@@ -9123,6 +9163,11 @@ body[data-theme="light"] .control-chip input {
       border: 1px solid rgba(148, 163, 184, 0.15);
       border-radius: 12px;
       padding: 0.55rem 0.7rem;
+    }
+
+    .community-comment--hidden {
+      border-style: dashed;
+      background: rgba(15, 23, 42, 0.4);
     }
 
     .community-comment--nested {
@@ -10805,6 +10850,12 @@ body[data-theme="light"] .onboarding-card {
   box-shadow: 0 18px 45px rgba(15, 23, 42, 0.35);
 }
 
+.friends-activity-card--suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
 .friends-activity-card-header h3 {
   margin: 0 0 0.2rem;
   font-size: 1.05rem;
@@ -10820,6 +10871,73 @@ body[data-theme="light"] .onboarding-card {
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
+}
+
+.friend-suggestions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.friend-suggestion-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.4);
+}
+
+.friend-suggestion-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+.friend-suggestion-avatar {
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.2);
+  color: rgba(191, 219, 254, 0.95);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.friend-suggestion-names {
+  display: flex;
+  flex-direction: column;
+}
+
+.friend-suggestion-name {
+  font-size: 0.95rem;
+  color: #e2e8f0;
+}
+
+.friend-suggestion-handle {
+  font-size: 0.8rem;
+  color: rgba(148, 163, 184, 0.85);
+}
+
+.friend-suggestion-reason {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.friend-suggestion-follow {
+  margin-top: 0.25rem;
 }
 
 .friends-activity-row {
