@@ -1586,7 +1586,9 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
 
   const communityContext = document.createElement("div");
   communityContext.className = "movie-community-context";
-  communityContext.hidden = true;
+  communityContext.dataset.state = "idle";
+  communityContext.hidden = false;
+  communityContext.setAttribute("aria-live", "polite");
 
   const communityAvatars = document.createElement("div");
   communityAvatars.className = "movie-community-avatars";
@@ -1596,10 +1598,13 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
   communityMeta.className = "movie-community-meta";
   const communityOverall = document.createElement("span");
   communityOverall.className = "movie-community-chip";
+  communityOverall.textContent = "Community intel warming up";
   communityMeta.appendChild(communityOverall);
 
   const communityFriends = document.createElement("span");
   communityFriends.className = "movie-community-chip is-friends";
+  communityFriends.dataset.empty = "true";
+  communityFriends.textContent = "No friend reviews yet";
   communityMeta.appendChild(communityFriends);
 
   communityContext.appendChild(communityMeta);
@@ -1607,7 +1612,8 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
 
   const communityActivity = document.createElement("div");
   communityActivity.className = "movie-community-activity";
-  communityActivity.hidden = true;
+  communityActivity.hidden = false;
+  communityActivity.textContent = "Leave a quick note to start the thread.";
   infoWrap.appendChild(communityActivity);
 
   const communityQuickEntry = document.createElement("button");
