@@ -3333,9 +3333,14 @@ function updateRecommendationFilterSummary() {
       state.recommendationFilters.topRated ||
       state.recommendationFilters.streaming ||
       state.recommendationFilters.fresh;
-    const shouldShow = hasPreset || hasGenres || hasQuickFilters;
-    resetBtn.hidden = !shouldShow;
-    resetBtn.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+    const shouldEnable = hasPreset || hasGenres || hasQuickFilters;
+    resetBtn.disabled = !shouldEnable;
+    resetBtn.setAttribute("aria-disabled", shouldEnable ? "false" : "true");
+    if (shouldEnable) {
+      resetBtn.removeAttribute("data-disabled");
+    } else {
+      resetBtn.setAttribute("data-disabled", "true");
+    }
   }
 }
 
