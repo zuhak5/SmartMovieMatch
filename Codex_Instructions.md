@@ -436,7 +436,7 @@ Implementation notes for Codex (internal):
 
 
 ## 1. index.html – Discovery / Home
-[Codex status: TODO]  (Last updated: 2025-11-13 by Codex)
+[Codex status: DONE]  (Last updated: 2025-11-14 by Codex)
 
 
 Goal: “What should I watch right now?” + “What are my people into?” should be the first things you feel.
@@ -1112,7 +1112,7 @@ Notification: “Maya replied to your review” → banner: “View discussion�
 - [x] 8. Safety, comfort, and control in the social layer  (Done: 2025-11-14 by Codex)
 - [x] 9. Reduce friction to find and follow people  (Done: 2025-11-14 by Codex)
 
-- [ ] 1. index.html – Discovery / Home
+- [x] 1. index.html – Discovery / Home  (Done: 2025-11-14 by Codex)
 - [ ] 2. profile.html – Profile Overview
 - [ ] 3. peeruser.html – Peer / Friend Profile
 - [ ] 4. login.html – Auth Page

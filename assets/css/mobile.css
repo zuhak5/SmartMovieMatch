@@ -5750,6 +5750,19 @@ form {
   gap: 0.75rem;
 }
 
+.prefs-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+}
+
+@media (min-width: 960px) {
+  .prefs-groups {
+    gap: 1.5rem;
+  }
+}
+
 .prefs-section-header {
   display: flex;
   flex-direction: column;
@@ -6718,11 +6731,11 @@ body[data-theme="light"] .preferences-preview-preset {
       flex-wrap: wrap;
     }
 
-    .recommendations-pill-row {
+    .recommendations-summary-row {
       display: flex;
+      align-items: center;
+      gap: 0.55rem;
       flex-wrap: wrap;
-      gap: 0.45rem;
-      flex: 1;
     }
 
     .recommendations-actions {
@@ -6786,8 +6799,23 @@ body[data-theme="light"] .preferences-preview-preset {
       color: #fecaca;
     }
 
+    .recommendations-pill--action[disabled],
+    .recommendations-pill--action[data-disabled='true'] {
+      opacity: 0.5;
+      cursor: not-allowed;
+      border-color: rgba(148, 163, 184, 0.35);
+      color: rgba(191, 219, 254, 0.7);
+      pointer-events: none;
+    }
+
     .recommendations-pill--clear {
       white-space: nowrap;
+    }
+
+    .recommendations-summary-pill {
+      flex: 1 1 auto;
+      min-width: 200px;
+      white-space: normal;
     }
 
     .recommendations-meta-status {
@@ -6802,7 +6830,7 @@ body[data-theme="light"] .preferences-preview-preset {
         align-items: stretch;
       }
 
-      .recommendations-pill-row {
+      .recommendations-summary-row {
         width: 100%;
       }
 
@@ -8070,10 +8098,20 @@ body[data-theme="light"] .control-chip input {
     .movie-community-context {
       display: flex;
       align-items: center;
-      gap: 0.6rem;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
       margin-top: 0.2rem;
       margin-bottom: 0.1rem;
-      min-height: 1.8rem;
+      min-height: 2rem;
+    }
+
+    .movie-community-summary {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      flex: 1 1 auto;
+      min-width: 0;
     }
 
     .movie-community-context[data-state='idle'] .movie-community-chip {
@@ -8118,7 +8156,8 @@ body[data-theme="light"] .control-chip input {
       flex-wrap: wrap;
       gap: 0.35rem;
       margin-top: 0;
-      flex: 1;
+      flex: 1 1 auto;
+      min-width: 0;
     }
 
     .movie-community-chip {
@@ -8147,29 +8186,40 @@ body[data-theme="light"] .control-chip input {
     }
 
     .movie-community-activity {
-      margin-top: 0.15rem;
+      margin-top: 0.25rem;
       font-size: 0.7rem;
       color: rgba(148, 163, 184, 0.85);
     }
 
     .movie-community-quick {
-      margin-top: 0.25rem;
       font-size: 0.72rem;
       color: rgba(248, 250, 252, 0.92);
-      background: transparent;
-      border: none;
-      padding: 0;
+      background: rgba(30, 64, 175, 0.28);
+      border: 1px dashed rgba(148, 163, 184, 0.5);
+      padding: 0.25rem 0.75rem;
       display: inline-flex;
       align-items: center;
-      gap: 0.25rem;
+      gap: 0.3rem;
       cursor: pointer;
-      text-decoration: underline;
-      text-decoration-style: dashed;
+      border-radius: 999px;
+      white-space: nowrap;
     }
 
     .movie-community-quick:hover,
     .movie-community-quick:focus-visible {
-      color: rgba(129, 140, 248, 0.95);
+      border-color: rgba(129, 140, 248, 0.65);
+      color: rgba(199, 210, 254, 0.95);
+    }
+
+    .movie-community-quick-icon {
+      font-size: 0.85rem;
+      line-height: 1;
+    }
+
+    .movie-community-quick-label {
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
     }
 
     .movie-community-badge {

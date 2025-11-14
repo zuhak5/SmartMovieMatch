@@ -1523,8 +1523,6 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
 
   const communityAvatars = document.createElement("div");
   communityAvatars.className = "movie-community-avatars";
-  communityContext.appendChild(communityAvatars);
-
   const communityMeta = document.createElement("div");
   communityMeta.className = "movie-community-meta";
   const communityOverall = document.createElement("span");
@@ -1538,7 +1536,11 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
   communityFriends.textContent = "No friend reviews yet";
   communityMeta.appendChild(communityFriends);
 
-  communityContext.appendChild(communityMeta);
+  const communitySummary = document.createElement("div");
+  communitySummary.className = "movie-community-summary";
+  communitySummary.appendChild(communityAvatars);
+  communitySummary.appendChild(communityMeta);
+  communityContext.appendChild(communitySummary);
 
   const communityActivity = document.createElement("div");
   communityActivity.className = "movie-community-activity";
@@ -1548,10 +1550,15 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
   const communityQuickEntry = document.createElement("button");
   communityQuickEntry.type = "button";
   communityQuickEntry.className = "movie-community-quick";
-  communityQuickEntry.textContent = "Leave a quick note";
-  communityQuickEntry.setAttribute("aria-label", "Open community notes to leave a quick review");
+  communityQuickEntry.innerHTML =
+    '<span class="movie-community-quick-icon" aria-hidden="true">💬</span><span class="movie-community-quick-label">Notes</span>';
+  communityQuickEntry.setAttribute(
+    "aria-label",
+    "Open community notes and leave a quick review"
+  );
   communityQuickEntry.hidden = !(handlers && handlers.community);
   communityQuickEntry.addEventListener("click", (event) => {
+    event.preventDefault();
     event.stopPropagation();
     playUiClick();
     card.dispatchEvent(
@@ -1561,6 +1568,7 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
     );
     focusCommunitySection(card, { pulse: true, focusInput: true });
   });
+  communityContext.appendChild(communityQuickEntry);
 
   const ratingsRow = document.createElement("div");
   ratingsRow.className = "movie-ratings";
@@ -1607,7 +1615,6 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
   infoWrap.appendChild(titleRow);
   infoWrap.appendChild(communityContext);
   infoWrap.appendChild(communityActivity);
-  infoWrap.appendChild(communityQuickEntry);
   if (titleVariants) {
     infoWrap.appendChild(titleVariants);
   }
