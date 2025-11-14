@@ -276,8 +276,41 @@ export function isMovieOverlayOpen() {
   return Boolean(movieOverlayState.card);
 }
 
+function prefersInlineMovieDetails() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const hasMatchMedia = typeof window.matchMedia === "function";
+  const matches = (query) => (hasMatchMedia ? window.matchMedia(query).matches : false);
+
+  const prefersCoarsePointer = matches("(pointer: coarse)") || matches("(any-pointer: coarse)");
+  const prefersNoHover = matches("(hover: none)") || matches("(any-hover: none)");
+  const prefersSmallViewport = matches("(max-width: 900px)") || matches("(max-device-width: 900px)");
+
+  let measuredViewport = 0;
+  if (typeof window.innerWidth === "number" && window.innerWidth > 0) {
+    measuredViewport = window.innerWidth;
+  } else if (typeof document !== "undefined" && document.documentElement) {
+    measuredViewport = document.documentElement.clientWidth || 0;
+  }
+  const viewportIsSmall = measuredViewport > 0 && measuredViewport <= 900;
+
+  const hasTouch =
+    (typeof navigator !== "undefined" && Number(navigator.maxTouchPoints) > 0) ||
+    (typeof window !== "undefined" && "ontouchstart" in window);
+
+  return (
+    prefersCoarsePointer ||
+    prefersNoHover ||
+    prefersSmallViewport ||
+    viewportIsSmall ||
+    hasTouch
+  );
+}
+
 function showMovieOverlay(card) {
-  if (!card) {
+  if (!card || prefersInlineMovieDetails()) {
     return false;
   }
   const elements = getMovieOverlayElements();
