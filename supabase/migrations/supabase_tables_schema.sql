@@ -34,6 +34,7 @@ create table public.movie_reviews (
   body text null,
   rating numeric(2, 1) null,
   is_spoiler boolean not null default false,
+  visibility text not null default 'public'::text,
   created_at timestamp with time zone not null default timezone ('utc'::text, now()),
   updated_at timestamp with time zone not null default timezone ('utc'::text, now()),
   constraint movie_reviews_pkey primary key (id),
@@ -45,6 +46,17 @@ create table public.movie_reviews (
       or (
         (rating >= (0)::numeric)
         and (rating <= (10)::numeric)
+      )
+    )
+  ),
+  constraint movie_reviews_visibility_check check (
+    (
+      visibility = any (
+        array[
+          'public'::text,
+          'friends'::text,
+          'private'::text
+        ]
       )
     )
   )
@@ -201,6 +213,7 @@ create table public.watch_diary (
   rating numeric(2, 1) null,
   review_id uuid null,
   tags text[] null,
+  visibility text not null default 'public'::text,
   created_at timestamp with time zone not null default timezone ('utc'::text, now()),
   updated_at timestamp with time zone not null default timezone ('utc'::text, now()),
   constraint watch_diary_pkey primary key (id),
@@ -213,6 +226,17 @@ create table public.watch_diary (
       or (
         (rating >= (0)::numeric)
         and (rating <= (10)::numeric)
+      )
+    )
+  ),
+  constraint watch_diary_visibility_check check (
+    (
+      visibility = any (
+        array[
+          'public'::text,
+          'friends'::text,
+          'private'::text
+        ]
       )
     )
   )

@@ -44,6 +44,7 @@ create table if not exists public.watch_diary (
     rating numeric(2,1),
     review_id uuid,
     tags text[],
+    visibility text not null default 'public' check (visibility in ('public','friends','private')),
     created_at timestamptz not null default timezone('utc', now()),
     updated_at timestamptz not null default timezone('utc', now()),
     constraint watch_diary_rating_range check (rating is null or (rating >= 0 and rating <= 10))
@@ -63,6 +64,7 @@ create table if not exists public.movie_reviews (
     body text,
     rating numeric(2,1),
     is_spoiler boolean not null default false,
+    visibility text not null default 'public' check (visibility in ('public','friends','private')),
     created_at timestamptz not null default timezone('utc', now()),
     updated_at timestamptz not null default timezone('utc', now()),
     constraint movie_reviews_rating_range check (rating is null or (rating >= 0 and rating <= 10))
