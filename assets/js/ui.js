@@ -1084,19 +1084,12 @@ function applyCollectionCollapse(listEl, viewEl, items, options = {}) {
 
 export function updateWatchedSummary(watchedMovies) {
   const el = $("watchedSummary");
-  const previewEl = document.getElementById("watchlistPreviewCount");
   if (!el) {
-    if (previewEl) {
-      previewEl.textContent = "0 queued";
-    }
     return;
   }
   if (!watchedMovies.length) {
     el.textContent =
       "Mark titles as watched to steer future suggestions and avoid repeats.";
-    if (previewEl) {
-      previewEl.textContent = "0 queued";
-    }
     return;
   }
 
@@ -1118,9 +1111,6 @@ export function updateWatchedSummary(watchedMovies) {
   }
 
   el.textContent = pieces.join(" • ");
-  if (previewEl) {
-    previewEl.textContent = `${total} queued`;
-  }
 }
 
 export function renderFavoritesList(favorites, options = {}) {
@@ -1309,19 +1299,12 @@ export function renderFavoritesList(favorites, options = {}) {
 
 export function updateFavoritesSummary(favorites) {
   const el = $("favoritesSummary");
-  const previewEl = document.getElementById("favoritesPreviewCount");
   if (!el) {
-    if (previewEl) {
-      previewEl.textContent = "0 saved";
-    }
     return;
   }
 
   if (!favorites.length) {
     el.textContent = "No favorites yet – tap the heart on any movie to pin it here.";
-    if (previewEl) {
-      previewEl.textContent = "0 saved";
-    }
     return;
   }
 
@@ -1329,9 +1312,6 @@ export function updateFavoritesSummary(favorites) {
   const latest = favorites[favorites.length - 1];
   const label = latest && latest.title ? latest.title : "new pick";
   el.textContent = `${total} saved • newest: ${label}`;
-  if (previewEl) {
-    previewEl.textContent = `${total} saved`;
-  }
 }
 
 export function renderRecommendations(items, watchedMovies, options = {}) {

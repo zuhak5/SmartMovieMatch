@@ -452,22 +452,22 @@ You must work through these sections in numeric order. Within each section, prog
 
 ### 7.1 Global shell & shared layout
 
-- [TODO id="global-reset" status="done 2025-11-14 21:25"] Implement a global CSS base/reset (box-sizing, margin reset, basic typography, link and image defaults).
-- [TODO id="app-shell" status="done 2025-11-14 21:25"] Create a reusable app shell layout: consistent header, main content area with max-width and padding, optional footer.
-- [TODO id="theme-system" status="done 2025-11-14 21:25"] Define a theme system using CSS custom properties for dark mode (and optional light mode), applied via a class or data attribute on `<body>`.
-- [TODO id="theme-toggle" status="done 2025-11-14 21:25"] Add a theme toggle control in the header that updates the theme attribute on `<body>` with vanilla JS and optionally persists choice in `localStorage`.
-- [TODO id="global-nav" status="done 2025-11-14 21:25"] Design and implement a global navigation bar (logo/app name, Home, My Lists, Friends/Community, Profile, Account) reused across pages.
+- [TODO id="global-reset" status="pending"] Implement a global CSS base/reset (box-sizing, margin reset, basic typography, link and image defaults).
+- [TODO id="app-shell" status="pending"] Create a reusable app shell layout: consistent header, main content area with max-width and padding, optional footer.
+- [TODO id="theme-system" status="pending"] Define a theme system using CSS custom properties for dark mode (and optional light mode), applied via a class or data attribute on `<body>`.
+- [TODO id="theme-toggle" status="pending"] Add a theme toggle control in the header that updates the theme attribute on `<body>` with vanilla JS and optionally persists choice in `localStorage`.
+- [TODO id="global-nav" status="pending"] Design and implement a global navigation bar (logo/app name, Home, My Lists, Friends/Community, Profile, Account) reused across pages.
 
 ### 7.2 Home / Dashboard (`index.html`)
 
-- [TODO id="home-hero" status="done 2025-11-14 21:25"] Redesign the hero strip with cinematic dark styling, a short explanation, and a main CTA for starting a movie search or vibe.
-- [TODO id="home-search" status="done 2025-11-14 21:25"] Implement a prominent search/vibe entry area: search bar plus quick vibe shortcuts (movies, friends, genres).
-- [TODO id="home-filters" status="done 2025-11-14 21:25"] Build a “Dial in your vibe” filter area with mood chips, genre chips, runtime controls, and placeholder space for future filters (platform, crew, etc.).
-- [TODO id="home-recs" status="done 2025-11-14 21:25"] Create the main recommendations grid/list with rich movie cards, including stats, actions, and social context indicators.
-- [TODO id="home-lists-preview" status="done 2025-11-14 21:25"] Add a “My lists” preview section showing slices of Favorites, Watchlist, and/or a featured custom list with CTAs to view all and create new lists.
-- [TODO id="home-streak" status="done 2025-11-14 21:25"] Implement a “watched streak” widget showing streak count and a simple visual indicator using mock data.
-- [TODO id="home-friend-activity" status="done 2025-11-14 21:25"] Build a compact friend activity area displaying recent list updates, overlaps, and highlights from friends.
-- [TODO id="home-responsive" status="done 2025-11-14 21:25"] Ensure the home/dashboard layout is mobile-first and scales gracefully to tablet and desktop.
+- [TODO id="home-hero" status="pending"] Redesign the hero strip with cinematic dark styling, a short explanation, and a main CTA for starting a movie search or vibe.
+- [TODO id="home-search" status="pending"] Implement a prominent search/vibe entry area: search bar plus quick vibe shortcuts (movies, friends, genres).
+- [TODO id="home-filters" status="pending"] Build a “Dial in your vibe” filter area with mood chips, genre chips, runtime controls, and placeholder space for future filters (platform, crew, etc.).
+- [TODO id="home-recs" status="pending"] Create the main recommendations grid/list with rich movie cards, including stats, actions, and social context indicators.
+- [TODO id="home-lists-preview" status="pending"] Add a “My lists” preview section showing slices of Favorites, Watchlist, and/or a featured custom list with CTAs to view all and create new lists.
+- [TODO id="home-streak" status="pending"] Implement a “watched streak” widget showing streak count and a simple visual indicator using mock data.
+- [TODO id="home-friend-activity" status="pending"] Build a compact friend activity area displaying recent list updates, overlaps, and highlights from friends.
+- [TODO id="home-responsive" status="pending"] Ensure the home/dashboard layout is mobile-first and scales gracefully to tablet and desktop.
 
 ### 7.3 Auth (`login.html` + signup flow)
 

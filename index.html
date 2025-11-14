@@ -105,72 +105,14 @@
       to your mood and what you’ve already watched.
     </p>
 
-  </header>
-
-  <main class="app-main">
-    <section id="homeHero" class="panel home-hero pad-inline" aria-labelledby="homeHeroTitle">
-      <div class="panel-inner home-hero-inner pad-inline">
-        <div class="home-hero-copy">
-          <p class="eyebrow">Tonight’s feature</p>
-          <h2 id="homeHeroTitle">Your cinematic concierge</h2>
-          <p class="home-hero-body">
-            Blend vibes, friends, and live data to unlock the perfect watch. Smart Movie Match pulls
-            from TMDB, OMDb, and your circle to serve something that actually fits.
-          </p>
-          <div class="home-hero-actions">
-            <button type="button" class="btn-primary" data-scroll="#preferencesPanel">
-              Start a new vibe
-            </button>
-            <button type="button" class="btn-secondary" data-scroll="#recommendationsPanel">
-              Show tonight’s picks
-            </button>
+    <section id="globalSearchPanel" class="panel global-search-panel pad-inline" aria-label="Global search">
+      <div class="panel-inner pad-inline">
+        <div class="panel-header pad-inline">
+          <div class="pad-inline">
+            <p class="global-search-eyebrow">Search Smart Movie Match</p>
+            <h2 class="panel-title">Find movies, friends, or genres</h2>
+            <p class="panel-subtitle">Type anything you’re curious about and jump to the right spot.</p>
           </div>
-          <dl class="home-hero-stats" aria-label="Live Smart Movie Match stats">
-            <div>
-              <dt>Live vibes</dt>
-              <dd>12 curated moods</dd>
-            </div>
-            <div>
-              <dt>Fresh reviews</dt>
-              <dd>48 from friends</dd>
-            </div>
-            <div>
-              <dt>Compatibility</dt>
-              <dd>86% taste match avg</dd>
-            </div>
-          </dl>
-        </div>
-        <div class="home-hero-preview" aria-hidden="true">
-          <div class="hero-card hero-card--primary">
-            <p class="hero-card-eyebrow">Pulse</p>
-            <h3>“Cozy sci-fi”</h3>
-            <p>5 new arrivals with warm visuals + low-stress stakes.</p>
-            <div class="hero-card-tags">
-              <span>TMDB</span>
-              <span>OMDb</span>
-              <span>Friends</span>
-            </div>
-          </div>
-          <div class="hero-card hero-card--secondary">
-            <p class="hero-card-eyebrow">Friend streak</p>
-            <h3>3 synced tonight</h3>
-            <p>Riley, Musa, and Park all watched thrillers.</p>
-          </div>
-          <div class="hero-card hero-card--secondary">
-            <p class="hero-card-eyebrow">Your watchlist</p>
-            <h3>17 titles ready</h3>
-            <p>Sorted by runtime for movie night.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="globalSearchPanel" class="panel global-search-panel home-search-panel pad-inline" aria-label="Search Smart Movie Match">
-      <div class="panel-inner home-search-inner pad-inline">
-        <div class="home-search-copy">
-          <p class="eyebrow">Search + vibe entry</p>
-          <h2>Find movies, friends, or genres instantly</h2>
-          <p>Type anything or tap a shortcut to jump into the right lane.</p>
         </div>
         <form id="globalSearchForm" class="global-search-form" role="search" novalidate>
           <label class="sr-only" for="globalSearchInput">Search movies, friends, or genres</label>
@@ -191,24 +133,6 @@
             </button>
           </div>
         </form>
-        <div class="home-search-shortcuts">
-          <button type="button" class="search-shortcut" data-search-shortcut="feel-good comedies">
-            <span aria-hidden="true">🍿</span>
-            <span>Feel-good comedies</span>
-          </button>
-          <button type="button" class="search-shortcut" data-search-shortcut="@riley">
-            <span aria-hidden="true">👥</span>
-            <span>Friends online</span>
-          </button>
-          <button type="button" class="search-shortcut" data-search-shortcut="slow-burn thriller">
-            <span aria-hidden="true">🔥</span>
-            <span>Slow-burn thrillers</span>
-          </button>
-          <button type="button" class="search-shortcut" data-search-shortcut="animated adventure">
-            <span aria-hidden="true">✨</span>
-            <span>Animated adventures</span>
-          </button>
-        </div>
         <p id="globalSearchStatus" class="global-search-status" role="status" aria-live="polite">
           Search for a movie title, friend handle, or genre.
         </p>
@@ -254,742 +178,614 @@
       </div>
     </section>
 
-    <div class="home-columns">
-      <div class="home-column home-column--left">
-        <!-- Preferences -->
-        <section id="preferencesPanel" class="panel panel-sticky pad-inline">
-          <div class="panel-inner pad-inline">
-            <div class="panel-header pad-inline">
-              <div class="pad-inline">
-                <div class="panel-title pad-inline">Dial in your vibe</div>
-                <div class="panel-subtitle pad-inline">Set the vibe and I’ll spin up a fresh batch.</div>
-              </div>
-            </div>
-            <p class="hint-text hint-text--compact">
-              Share a vibe or two and I’ll refresh the feed instantly.
-            </p>
+  </header>
 
-            <form id="prefsForm" class="prefs-form">
-              <div class="prefs-groups pad-inline">
-                <section class="prefs-section prefs-section--presets">
-                  <div class="vibe-preset-panel pad-inline" aria-label="Starter vibe presets">
-                    <div class="vibe-preset-header pad-inline">
-                      <div class="pad-inline">
-                        <p class="vibe-preset-eyebrow">Need inspiration?</p>
-                        <h3 class="vibe-preset-title">Jump in with a preset</h3>
-                        <p class="vibe-preset-subtitle">
-                          Tap a card to auto-fill genres, then fine-tune below.
-                        </p>
-                      </div>
-                    </div>
-                    <div class="vibe-preset-grid pad-inline" role="group">
-                      <button
-                        type="button"
-                        class="vibe-preset-card"
-                        data-vibe-preset="cozy-sci-fi"
-                        data-preset-genres="878,12,53"
-                        data-preset-title="Cozy sci-fi night"
-                        data-preset-summary="Hopeful space adventures & low-key thrills"
-                        data-preset-icon="🌌"
-                        aria-pressed="false"
-                      >
-                        <span class="vibe-preset-icon" aria-hidden="true">🌌</span>
-                        <span class="vibe-preset-copy">
-                          <span>Cozy sci-fi night</span>
-                          <span class="vibe-preset-meta">Hopeful space adventures &amp; low-key thrills</span>
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        class="vibe-preset-card"
-                        data-vibe-preset="feel-good"
-                        data-preset-genres="10751,16,35"
-                        data-preset-title="Feel-good family time"
-                        data-preset-summary="Animated laughs &amp; family comfort picks"
-                        data-preset-icon="🧸"
-                        aria-pressed="false"
-                      >
-                        <span class="vibe-preset-icon" aria-hidden="true">🧸</span>
-                        <span class="vibe-preset-copy">
-                          <span>Feel-good family time</span>
-                          <span class="vibe-preset-meta">Animated laughs &amp; cozy comfort picks</span>
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        class="vibe-preset-card"
-                        data-vibe-preset="midnight-mystery"
-                        data-preset-genres="9648,53,80"
-                        data-preset-title="Midnight mystery run"
-                        data-preset-summary="Twisty thrillers with noir vibes"
-                        data-preset-icon="🌙"
-                        aria-pressed="false"
-                      >
-                        <span class="vibe-preset-icon" aria-hidden="true">🌙</span>
-                        <span class="vibe-preset-copy">
-                          <span>Midnight mystery run</span>
-                          <span class="vibe-preset-meta">Twisty thrillers with noir vibes</span>
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        class="vibe-preset-card"
-                        data-vibe-preset="indie-hearts"
-                        data-preset-genres="18,10749,35"
-                        data-preset-title="Indie hearts club"
-                        data-preset-summary="Character dramas &amp; offbeat romances"
-                        data-preset-icon="💖"
-                        aria-pressed="false"
-                      >
-                        <span class="vibe-preset-icon" aria-hidden="true">💖</span>
-                        <span class="vibe-preset-copy">
-                          <span>Indie hearts club</span>
-                          <span class="vibe-preset-meta">Character dramas &amp; offbeat romances</span>
-                        </span>
-                      </button>
-                    </div>
-                  </div>
-                </section>
-
-                <section class="prefs-section prefs-section--moods" aria-label="Mood shortcuts">
-                  <div class="prefs-section-header pad-inline">
-                    <p class="prefs-section-eyebrow">Quick mood chips</p>
-                    <h3 class="prefs-section-title">Tell me how the night should feel</h3>
-                    <p class="prefs-section-subtitle">Mix moods with genres for sharper pulls.</p>
-                  </div>
-                  <div class="mood-chip-grid pad-inline" role="group">
-                    <button
-                      type="button"
-                      class="mood-chip"
-                      data-vibe-preset="mood-playful"
-                      data-preset-genres="35,18"
-                      data-preset-title="Playful &amp; grounded"
-                      data-preset-summary="Light laughs with human stories"
-                      data-preset-icon="😊"
-                    >
-                      <span aria-hidden="true">😊</span>
-                      <span>Playful &amp; grounded</span>
-                    </button>
-                    <button
-                      type="button"
-                      class="mood-chip"
-                      data-vibe-preset="mood-slowburn"
-                      data-preset-genres="53,9648"
-                      data-preset-title="Slow-burn suspense"
-                      data-preset-summary="Atmospheric thrillers and mysteries"
-                      data-preset-icon="🌫️"
-                    >
-                      <span aria-hidden="true">🌫️</span>
-                      <span>Slow-burn suspense</span>
-                    </button>
-                    <button
-                      type="button"
-                      class="mood-chip"
-                      data-vibe-preset="mood-true-story"
-                      data-preset-genres="99,18"
-                      data-preset-title="True-story binge"
-                      data-preset-summary="Documentary dramas &amp; docuseries"
-                      data-preset-icon="📽️"
-                    >
-                      <span aria-hidden="true">📽️</span>
-                      <span>True-story binge</span>
-                    </button>
-                    <button
-                      type="button"
-                      class="mood-chip"
-                      data-vibe-preset="mood-soft-romance"
-                      data-preset-genres="10749,35"
-                      data-preset-title="Soft romance"
-                      data-preset-summary="Cozy, uplifting love stories"
-                      data-preset-icon="💐"
-                    >
-                      <span aria-hidden="true">💐</span>
-                      <span>Soft romance</span>
-                    </button>
-                  </div>
-                </section>
-
-                <section class="prefs-section prefs-section--genres" aria-label="Fine-tune genres">
-                  <div class="prefs-section-header pad-inline">
-                    <p class="prefs-section-eyebrow">Fine-tune genres</p>
-                    <h3 class="prefs-section-title">Dial in exactly what you’re craving</h3>
-                    <p class="prefs-section-subtitle">Mix and match anything — I’ll balance the picks.</p>
-                  </div>
-                  <div class="genre-grid pad-inline" role="group" aria-label="Genre preferences">
-                    <!-- TMDB genre IDs -->
-                    <label class="genre-pill">
-                      <input type="checkbox" name="genre" value="28" />
-                      <span class="genre-pill-label">
-                        <span class="dot"></span>
-                        Action
-                      </span>
-                    </label>
-                    <label class="genre-pill">
-                      <input type="checkbox" name="genre" value="12" />
-                      <span class="genre-pill-label">
-                        <span class="dot"></span>
-                        Adventure
-                      </span>
-                    </label>
-                    <label class="genre-pill">
-                      <input type="checkbox" name="genre" value="16" />
-                      <span class="genre-pill-label">
-                        <span class="dot"></span>
-                        Animation
-                      </span>
-                    </label>
-                    <label class="genre-pill">
-                      <input type="checkbox" name="genre" value="35" />
-                      <span class="genre-pill-label">
-                        <span class="dot"></span>
-                        Comedy
-                      </span>
-                    </label>
-                    <label class="genre-pill">
-                      <input type="checkbox" name="genre" value="80" />
-                      <span class="genre-pill-label">
-                        <span class="dot"></span>
-                        Crime
-                      </span>
-                    </label>
-                    <label class="genre-pill">
-                      <input type="checkbox" name="genre" value="99" />
-                      <span class="genre-pill-label">
-                        <span class="dot"></span>
-                        Documentary
-                      </span>
-                    </label>
-                    <label class="genre-pill">
-                      <input type="checkbox" name="genre" value="18" />
-                      <span class="genre-pill-label">
-                        <span class="dot"></span>
-                        Drama
-                      </span>
-                    </label>
-                    <label class="genre-pill">
-                      <input type="checkbox" name="genre" value="10751" />
-                      <span class="genre-pill-label">
-                        <span class="dot"></span>
-                        Family
-                      </span>
-                    </label>
-                    <label class="genre-pill">
-                      <input type="checkbox" name="genre" value="14" />
-                      <span class="genre-pill-label">
-                        <span class="dot"></span>
-                        Fantasy
-                      </span>
-                    </label>
-                    <label class="genre-pill">
-                      <input type="checkbox" name="genre" value="36" />
-                      <span class="genre-pill-label">
-                        <span class="dot"></span>
-                        History
-                      </span>
-                    </label>
-                    <label class="genre-pill">
-                      <input type="checkbox" name="genre" value="27" />
-                      <span class="genre-pill-label">
-                        <span class="dot"></span>
-                        Horror
-                      </span>
-                    </label>
-                    <label class="genre-pill">
-                      <input type="checkbox" name="genre" value="10402" />
-                      <span class="genre-pill-label">
-                        <span class="dot"></span>
-                        Music
-                      </span>
-                    </label>
-                    <label class="genre-pill">
-                      <input type="checkbox" name="genre" value="9648" />
-                      <span class="genre-pill-label">
-                        <span class="dot"></span>
-                        Mystery
-                      </span>
-                    </label>
-                    <label class="genre-pill">
-                      <input type="checkbox" name="genre" value="10749" />
-                      <span class="genre-pill-label">
-                        <span class="dot"></span>
-                        Romance
-                      </span>
-                    </label>
-                    <label class="genre-pill">
-                      <input type="checkbox" name="genre" value="878" />
-                      <span class="genre-pill-label">
-                        <span class="dot"></span>
-                        Science Fiction
-                      </span>
-                    </label>
-                    <label class="genre-pill">
-                      <input type="checkbox" name="genre" value="10770" />
-                      <span class="genre-pill-label">
-                        <span class="dot"></span>
-                        TV Movie
-                      </span>
-                    </label>
-                    <label class="genre-pill">
-                      <input type="checkbox" name="genre" value="53" />
-                      <span class="genre-pill-label">
-                        <span class="dot"></span>
-                        Thriller
-                      </span>
-                    </label>
-                    <label class="genre-pill">
-                      <input type="checkbox" name="genre" value="10752" />
-                      <span class="genre-pill-label">
-                        <span class="dot"></span>
-                        War
-                      </span>
-                    </label>
-                    <label class="genre-pill">
-                      <input type="checkbox" name="genre" value="37" />
-                      <span class="genre-pill-label">
-                        <span class="dot"></span>
-                        Western
-                      </span>
-                    </label>
-                  </div>
-                </section>
-
-                <section class="prefs-section prefs-section--advanced">
-                  <div class="runtime-row pad-inline">
-                    <label for="runtimeInput">Runtime sweet spot</label>
-                    <input
-                      type="range"
-                      id="runtimeInput"
-                      name="runtime"
-                      min="75"
-                      max="180"
-                      value="120"
-                      aria-label="Preferred runtime in minutes"
-                    />
-                    <output id="runtimeValue" for="runtimeInput">120 min</output>
-                  </div>
-                  <details>
-                    <summary>Advanced filters</summary>
-                    <p>Runtime ranges, streaming sources, and crew filters will live here as they roll out.</p>
-                  </details>
-                </section>
-              </div>
-
-              <div class="preferences-preview pad-inline" id="preferencesPreview" aria-live="polite"></div>
-
-              <div class="button-row pad-inline">
-                <button type="submit" class="btn-primary">
-                  <span>Find movies for me</span>
-                  <span aria-hidden="true">🔍</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </section>
-
-        <section id="streakPanel" class="panel streak-panel pad-inline" aria-live="polite">
-          <div class="panel-inner pad-inline">
-            <div class="panel-header pad-inline">
-              <div class="pad-inline">
-                <p class="streak-eyebrow">Consistency pays off</p>
-                <h3 class="panel-title">Watched streak</h3>
-                <p class="panel-subtitle">Log something every night to keep recommendations spicy.</p>
-              </div>
-              <button type="button" class="btn-link" data-scroll="#collectionsPanel">View history</button>
-            </div>
-            <div class="streak-grid">
-              <div class="streak-pill">
-                <span class="streak-label">Current streak</span>
-                <span class="streak-value">7 nights</span>
-                <span class="streak-sub">Goal: 10</span>
-              </div>
-              <div class="streak-pill">
-                <span class="streak-label">Last logged</span>
-                <span class="streak-value">“Past Lives”</span>
-                <span class="streak-sub">Rated ★★★★☆</span>
-              </div>
-              <div class="streak-pill">
-                <span class="streak-label">Friends active</span>
-                <span class="streak-value">4 tonight</span>
-                <span class="streak-sub">Jump in!</span>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <div class="home-column home-column--right">
-        <section id="recommendationsPanel" class="panel recommendations-panel pad-inline">
-          <div class="panel-inner pad-inline">
-            <div id="syncStatus" class="sync-status pad-inline" role="status" aria-live="polite"></div>
-            <div class="recommendations-header pad-inline">
-              <div class="recommendations-headline pad-inline">
-                <div class="recommendations-title-row pad-inline">
-                  <div class="recommendations-title pad-inline" id="recTitle">Recommendations</div>
-                  <span class="pill-mini">
-                    <span class="swatch"></span>
-                    IMDb rating • genres • plot • trailer
-                  </span>
-                </div>
-                <div class="recommendations-summary-row pad-inline">
-                  <span
-                    id="recMetaSummary"
-                    class="recommendations-pill recommendations-pill--meta recommendations-summary-pill"
-                    aria-live="polite"
-                  >
-                    Discovery mix • Genres: All • Quick filters off
-                  </span>
-                  <button
-                    type="button"
-                    id="recFilterReset"
-                    class="recommendations-pill recommendations-pill--action recommendations-pill--clear"
-                    aria-disabled="true"
-                    disabled
-                  >
-                    Clear all
-                  </button>
-                </div>
-                <div id="recMetaStatus" class="recommendations-meta-status" aria-live="polite">
-                  Tune your preferences, then I’ll blend TMDB discovery with fresh OMDb details.
-                </div>
-              </div>
-              <div class="recommendations-actions pad-inline">
-                <button type="button" class="btn-subtle btn-chip btn-chip-muted" id="recNudgeBtn">
-                  Shuffle suggestions
-                </button>
-              </div>
-            </div>
-
-            <div
-              id="socialMiniPreview"
-              class="social-mini-preview pad-inline"
-              aria-live="polite"
-              aria-hidden="true"
-              hidden
-            >
-              <div class="social-mini-chip">
-                <span class="social-mini-label">Following</span>
-                <span id="socialMiniFollowing" class="social-mini-value">0</span>
-              </div>
-              <div class="social-mini-chip">
-                <span class="social-mini-label">Followers</span>
-                <span id="socialMiniFollowers" class="social-mini-value">0</span>
-              </div>
-              <div class="social-mini-chip">
-                <span class="social-mini-label">Mutual</span>
-                <span id="socialMiniMutual" class="social-mini-value">0</span>
-              </div>
-              <p class="social-mini-hint">Friend stats power the inline context on each card.</p>
-            </div>
-
-            <section
-              id="friendsInlinePanel"
-              class="friends-inline-panel pad-inline"
-              aria-live="polite"
-              aria-hidden="true"
-              hidden
-            >
-              <div class="friends-inline-header">
-                <div class="friends-inline-title">
-                  <span aria-hidden="true">✨</span>
-                  <span>From your friends</span>
-                </div>
-                <button type="button" id="friendsInlineSeeAll" class="btn-link btn-link-inline">
-                  Open notifications
-                </button>
-              </div>
-              <div id="friendsInlineList" class="friends-inline-list" role="list"></div>
-              <p id="friendsInlineEmpty" class="friends-inline-empty">
-                Follow friends to see what they’re watching, reviewing, and planning.
-              </p>
-            </section>
-
-            <div class="recommendations-controls pad-inline" role="region" aria-label="Result view preferences">
-              <div class="control-group pad-inline">
-                <label class="control-label" for="recommendationLayout">Layout</label>
-                <div class="segmented-control pad-inline" role="radiogroup" aria-label="Recommendation layout">
-                  <button type="button" class="segment" data-layout="grid" aria-pressed="true">Grid</button>
-                  <button type="button" class="segment" data-layout="carousel">Carousel</button>
-                </div>
-              </div>
-              <div class="control-group pad-inline">
-                <fieldset class="control-filter-set">
-                  <legend class="control-label">Quick filters</legend>
-                  <label class="control-chip">
-                    <input type="checkbox" id="filterTopRated" />
-                    <span>IMDb 7+</span>
-                  </label>
-                  <label class="control-chip">
-                    <input type="checkbox" id="filterStreaming" />
-                    <span>Streamable now</span>
-                  </label>
-                  <label class="control-chip">
-                    <input type="checkbox" id="filterFresh" />
-                    <span>Released &lt; 2 years</span>
-                  </label>
-                </fieldset>
-              </div>
-            </div>
-
-            <div
-              id="recStatus"
-              class="status-row pad-inline"
-              aria-live="polite"
-              aria-atomic="true"
-            >
-              <div class="status-primary pad-inline">
-                <span class="status-dot" id="recStatusDot"></span>
-                <span id="recStatusText">
-                  No calls made yet. Hit “Find movies for me” to start.
-                </span>
-              </div>
-              <div
-                class="status-progress pad-inline"
-                id="recStatusProgress"
-                role="progressbar"
-                aria-hidden="true"
-                hidden
-              >
-                <span class="status-progress-fill"></span>
-              </div>
-              <span class="status-progress-stage" id="recStatusStage" hidden></span>
-            </div>
-
-            <div id="recError" class="error-text pad-inline" role="alert"></div>
-
-            <div id="recommendationsGrid" class="recommendations-grid pad-inline"></div>
-            <div class="recommendations-actions pad-inline" id="recommendationsActions">
-              <button type="button" class="btn-subtle btn-chip" id="showMoreRecsBtn">Show more</button>
-            </div>
-          </div>
-        </section>
-
-        <section id="collectionsPanel" class="panel collections-panel pad-inline">
-          <div class="panel-inner pad-inline">
-            <div class="panel-header collections-header pad-inline">
-              <div class="pad-inline">
-                <div class="panel-title pad-inline">Your saved lists</div>
-                <div class="panel-subtitle pad-inline">Favorites and watched picks stay close while you explore.</div>
-              </div>
-              <div class="collection-tabs pad-inline" role="tablist">
-                <button
-                  type="button"
-                  class="collection-tab active"
-                  id="favoritesTab"
-                  data-target="favorites"
-                  role="tab"
-                  aria-controls="favoritesView"
-                  aria-selected="true"
-                >
-                  Favorites
-                </button>
-                <button
-                  type="button"
-                  class="collection-tab"
-                  id="watchedTab"
-                  data-target="watched"
-                  role="tab"
-                  aria-controls="watchedView"
-                  aria-selected="false"
-                >
-                  Watched
-                </button>
-              </div>
-            </div>
-            <div class="list-preview-grid pad-inline">
-              <div class="list-preview-card">
-                <p class="list-preview-label">Favorites pulse</p>
-                <p id="favoritesPreviewCount" class="list-preview-value">0 saved</p>
-                <p class="list-preview-sub">Newest title updates live.</p>
-              </div>
-              <div class="list-preview-card">
-                <p class="list-preview-label">Watchlist ready</p>
-                <p id="watchlistPreviewCount" class="list-preview-value">0 queued</p>
-                <p class="list-preview-sub">Sort by runtime or vibe.</p>
-              </div>
-              <div class="list-preview-card">
-                <p class="list-preview-label">Custom lists</p>
-                <p class="list-preview-value">Create +</p>
-                <button type="button" class="btn-link" data-profile-action="favorites">See all lists</button>
-              </div>
-            </div>
-            <div class="collection-summary pad-inline" id="favoritesSummary"></div>
-            <div class="collection-summary pad-inline" id="watchedSummary"></div>
-            <div class="collection-filters pad-inline" role="region" aria-label="Collection filters">
-              <div class="collection-filter-group pad-inline">
-                <label class="collection-filter-label" for="collectionFilterGenre">Filter by genre</label>
-                <select id="collectionFilterGenre" class="collection-filter-select">
-                  <option value="">All</option>
-                </select>
-              </div>
-              <div class="collection-filter-group pad-inline">
-                <label class="collection-filter-label" for="collectionFilterSort">Sort by</label>
-                <select id="collectionFilterSort" class="collection-filter-select">
-                  <option value="recent">Recently added</option>
-                  <option value="alpha">Alphabetical</option>
-                  <option value="rating">IMDb rating</option>
-                  <option value="year">Release year</option>
-                </select>
-              </div>
-            </div>
-            <div id="favoritesView" class="collection-view active pad-inline" role="tabpanel" aria-labelledby="favoritesTab">
-              <div id="favoritesList" class="favorites-list pad-inline"></div>
-              <div id="favoritesEmpty" class="empty-state empty-state-card pad-inline">
-                <div class="empty-state-illustration pad-inline" aria-hidden="true">⭐</div>
-                <div class="empty-state-body pad-inline">
-                  <h3>Build a favorites lane</h3>
-                  <p>Tap the star on any recommendation to stash it for later or share with friends.</p>
-                  <div class="empty-state-carousel pad-inline" aria-hidden="true">
-                    <span class="empty-state-chip">Indie rom-com</span>
-                    <span class="empty-state-chip">Cult classic</span>
-                    <span class="empty-state-chip">Feel-good sports</span>
-                  </div>
-                  <button type="button" class="btn-secondary" data-empty-scroll="#recommendationsPanel">
-                    Browse live recommendations
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div id="watchedView" class="collection-view pad-inline" role="tabpanel" aria-labelledby="watchedTab">
-              <div id="watchedList" class="watched-panel-list pad-inline"></div>
-              <div id="watchedEmpty" class="empty-state empty-state-card pad-inline">
-                <div class="empty-state-illustration pad-inline" aria-hidden="true">🎟️</div>
-                <div class="empty-state-body pad-inline">
-                  <h3>Keep a watched streak</h3>
-                  <p>Mark recommendations as <strong>“I’ve watched this”</strong> so I can bias future batches.</p>
-                  <div class="empty-state-carousel pad-inline" aria-hidden="true">
-                    <span class="empty-state-chip">Thriller Friday</span>
-                    <span class="empty-state-chip">Animated matinée</span>
-                    <span class="empty-state-chip">Classic noir</span>
-                  </div>
-                  <button type="button" class="btn-subtle" data-empty-scroll="#recommendationsPanel">
-                    See how it works
-                  </button>
-                </div>
-              </div>
-              <div class="collection-actions pad-inline">
-                <button type="button" class="btn-subtle btn-subtle-danger" id="clearWatchedBtn">
-                  <span>Clear history</span>
-                  <span aria-hidden="true">🧹</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-    </div>
-
-    <section
-      id="socialFirstRunPanel"
-      class="panel social-nudge-panel pad-inline"
-      aria-live="polite"
-      hidden
-    >
-      <div class="panel-inner pad-inline">
-        <div id="socialFirstRunCard" class="social-nudge-card pad-inline">
-          <p class="social-nudge-eyebrow">Make it social</p>
-          <h3 class="social-nudge-title">See what your friends loved</h3>
-          <p id="socialFirstRunMessage" class="social-nudge-text">
-            Sign in and follow friends to see which picks they loved (or hated).
-          </p>
-          <div class="social-nudge-stats" role="presentation">
-            <div class="social-nudge-stat">
-              <span class="social-nudge-stat-label">Following</span>
-              <span id="socialNudgeFollowing" class="social-nudge-stat-value">0</span>
-            </div>
-            <div class="social-nudge-stat">
-              <span class="social-nudge-stat-label">Followers</span>
-              <span id="socialNudgeFollowers" class="social-nudge-stat-value">0</span>
-            </div>
-            <div class="social-nudge-stat">
-              <span class="social-nudge-stat-label">Mutual</span>
-              <span id="socialNudgeMutual" class="social-nudge-stat-value">0</span>
-            </div>
-          </div>
-          <button type="button" id="socialFirstRunCta" class="btn-primary social-nudge-cta">
-            Find people to follow
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <section
-      id="friendsActivityPanel"
-      class="panel friends-activity-panel pad-inline"
-      aria-live="polite"
-    >
+  <main class="app-main">
+    <!-- Preferences -->
+    <section id="preferencesPanel" class="panel panel-sticky pad-inline">
       <div class="panel-inner pad-inline">
         <div class="panel-header pad-inline">
           <div class="pad-inline">
-            <div class="panel-title">Friends activity</div>
-            <div class="panel-subtitle">See what your circle is doing in real time.</div>
-          </div>
-          <div class="friends-activity-metrics">
-            <div class="friends-activity-chip">
-              <span class="friends-activity-chip-label">Watching now</span>
-              <span class="friends-activity-chip-value">3</span>
-            </div>
-            <div class="friends-activity-chip">
-              <span class="friends-activity-chip-label">New lists</span>
-              <span class="friends-activity-chip-value">2</span>
-            </div>
-            <div class="friends-activity-chip">
-              <span class="friends-activity-chip-label">DM invites</span>
-              <span class="friends-activity-chip-value">1</span>
-            </div>
+            <div class="panel-title pad-inline">Your vibe</div>
+            <div class="panel-subtitle pad-inline">Set the vibe and I’ll spin up a fresh batch.</div>
           </div>
         </div>
-        <div id="friendsActivitySignedOut" class="friends-activity-signedout pad-inline">
-          <p>Sign in and follow a few friends to light up this feed.</p>
-          <a class="btn-secondary" href="login.html">Sign in</a>
-        </div>
-        <div
-          id="friendsActivityContent"
-          class="friends-activity-content pad-inline"
-          hidden
-          aria-hidden="true"
-        >
-          <div class="friends-activity-grid">
-            <article class="friends-activity-card" aria-live="polite">
-              <header class="friends-activity-card-header">
-                <h3>Recently logged by friends</h3>
-                <p>Your circle’s latest watches and saves.</p>
-              </header>
-              <div id="friendsWatchList" class="friends-activity-list" role="list"></div>
-              <p id="friendsWatchEmpty" class="friends-activity-empty">
-                Follow friends to see what they’re logging.
-              </p>
-            </article>
-            <article class="friends-activity-card" aria-live="polite">
-              <header class="friends-activity-card-header">
-                <h3>New lists from people you follow</h3>
-                <p>Fresh collaborative playlists and watch queues.</p>
-              </header>
-              <div id="friendsListsList" class="friends-activity-list" role="list"></div>
-              <p id="friendsListsEmpty" class="friends-activity-empty">
-                Collaborative lists from your circle will land here.
-              </p>
-            </article>
-            <article
-              id="friendSuggestionsCard"
-              class="friends-activity-card friends-activity-card--suggestions"
-              aria-live="polite"
-              hidden
-            >
-              <header class="friends-activity-card-header">
-                <h3>People you might like</h3>
-                <p>High-overlap movie fans pulled from your vibe signals.</p>
-              </header>
-              <div id="friendSuggestionsList" class="friend-suggestions-list" role="list" hidden></div>
-              <p id="friendSuggestionsEmpty" class="friends-activity-empty">
-                Follow a few favorites to unlock tailored matches.
-              </p>
-            </article>
+        <p class="hint-text hint-text--compact">
+          Share a vibe or two and I’ll refresh the feed instantly.
+        </p>
+
+        <form id="prefsForm" class="prefs-form">
+          <div class="prefs-groups pad-inline">
+            <section class="prefs-section prefs-section--presets">
+              <div class="vibe-preset-panel pad-inline" aria-label="Starter vibe presets">
+                <div class="vibe-preset-header pad-inline">
+                  <div class="pad-inline">
+                    <p class="vibe-preset-eyebrow">Need inspiration?</p>
+                    <h3 class="vibe-preset-title">Jump in with a preset</h3>
+                    <p class="vibe-preset-subtitle">
+                      Tap a card to auto-fill genres, then fine-tune below.
+                    </p>
+                  </div>
+                </div>
+                <div class="vibe-preset-grid pad-inline" role="group">
+                  <button
+                    type="button"
+                    class="vibe-preset-card"
+                    data-vibe-preset="cozy-sci-fi"
+                    data-preset-genres="878,12,53"
+                    data-preset-title="Cozy sci-fi night"
+                    data-preset-summary="Hopeful space adventures & low-key thrills"
+                    data-preset-icon="🌌"
+                    aria-pressed="false"
+                  >
+                    <span class="vibe-preset-icon" aria-hidden="true">🌌</span>
+                    <span class="vibe-preset-copy">
+                      <span>Cozy sci-fi night</span>
+                      <span class="vibe-preset-meta">Hopeful space adventures &amp; low-key thrills</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    class="vibe-preset-card"
+                    data-vibe-preset="feel-good"
+                    data-preset-genres="10751,16,35"
+                    data-preset-title="Feel-good family time"
+                    data-preset-summary="Animated laughs &amp; family comfort picks"
+                    data-preset-icon="🧸"
+                    aria-pressed="false"
+                  >
+                    <span class="vibe-preset-icon" aria-hidden="true">🧸</span>
+                    <span class="vibe-preset-copy">
+                      <span>Feel-good family time</span>
+                      <span class="vibe-preset-meta">Animated laughs &amp; cozy comfort picks</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    class="vibe-preset-card"
+                    data-vibe-preset="midnight-mystery"
+                    data-preset-genres="9648,53,80"
+                    data-preset-title="Midnight mystery run"
+                    data-preset-summary="Twisty thrillers with noir vibes"
+                    data-preset-icon="🌙"
+                    aria-pressed="false"
+                  >
+                    <span class="vibe-preset-icon" aria-hidden="true">🌙</span>
+                    <span class="vibe-preset-copy">
+                      <span>Midnight mystery run</span>
+                      <span class="vibe-preset-meta">Twisty thrillers with noir vibes</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    class="vibe-preset-card"
+                    data-vibe-preset="indie-hearts"
+                    data-preset-genres="18,10749,35"
+                    data-preset-title="Indie hearts club"
+                    data-preset-summary="Character dramas &amp; offbeat romances"
+                    data-preset-icon="💖"
+                    aria-pressed="false"
+                  >
+                    <span class="vibe-preset-icon" aria-hidden="true">💖</span>
+                    <span class="vibe-preset-copy">
+                      <span>Indie hearts club</span>
+                      <span class="vibe-preset-meta">Character dramas &amp; offbeat romances</span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </section>
+
+          <!-- Genres -->
+            <section class="prefs-section prefs-section--genres" aria-label="Fine-tune genres">
+              <div class="prefs-section-header pad-inline">
+                <p class="prefs-section-eyebrow">Fine-tune genres</p>
+                <h3 class="prefs-section-title">Dial in exactly what you’re craving</h3>
+                <p class="prefs-section-subtitle">Mix and match anything — I’ll balance the picks.</p>
+              </div>
+              <div class="genre-grid pad-inline" role="group" aria-label="Genre preferences">
+              <!-- TMDB genre IDs -->
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="28" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Action
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="12" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Adventure
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="16" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Animation
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="35" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Comedy
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="80" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Crime
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="99" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Documentary
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="18" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Drama
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="10751" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Family
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="14" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Fantasy
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="36" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  History
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="27" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Horror
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="10402" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Music
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="9648" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Mystery
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="10749" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Romance
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="878" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Science Fiction
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="10770" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  TV Movie
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="53" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Thriller
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="10752" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  War
+                </span>
+              </label>
+              <label class="genre-pill">
+                <input type="checkbox" name="genre" value="37" />
+                <span class="genre-pill-label">
+                  <span class="dot"></span>
+                  Western
+                </span>
+              </label>
+              </div>
+            </section>
+
+            <details class="prefs-section prefs-section--advanced">
+              <summary>Advanced filters</summary>
+              <p>Runtime ranges, streaming sources, and crew filters will live here as they roll out.</p>
+            </details>
+
           </div>
-        </div>
+
+
+          <div class="preferences-preview pad-inline" id="preferencesPreview" aria-live="polite"></div>
+
+          <div class="button-row pad-inline">
+            <button type="submit" class="btn-primary">
+              <span>Find movies for me</span>
+              <span aria-hidden="true">🔍</span>
+            </button>
+          </div>
+        </form>
       </div>
     </section>
-  </main>
 
+    <!-- Right column: recommendations + collections -->
+    <div class="right-column pad-inline">
+      <section id="recommendationsPanel" class="panel recommendations-panel pad-inline">
+        <div class="panel-inner pad-inline">
+          <div id="syncStatus" class="sync-status pad-inline" role="status" aria-live="polite"></div>
+          <div class="recommendations-header pad-inline">
+            <div class="recommendations-headline pad-inline">
+              <div class="recommendations-title-row pad-inline">
+                <div class="recommendations-title pad-inline" id="recTitle">Recommendations</div>
+                <span class="pill-mini">
+                  <span class="swatch"></span>
+                  IMDb rating • genres • plot • trailer
+                </span>
+              </div>
+              <div class="recommendations-summary-row pad-inline">
+                <span
+                  id="recMetaSummary"
+                  class="recommendations-pill recommendations-pill--meta recommendations-summary-pill"
+                  aria-live="polite"
+                >
+                  Discovery mix • Genres: All • Quick filters off
+                </span>
+                <button
+                  type="button"
+                  id="recFilterReset"
+                  class="recommendations-pill recommendations-pill--action recommendations-pill--clear"
+                  aria-disabled="true"
+                  disabled
+                >
+                  Clear all
+                </button>
+              </div>
+              <div id="recMetaStatus" class="recommendations-meta-status" aria-live="polite">
+                Tune your preferences, then I’ll blend TMDB discovery with fresh OMDb details.
+              </div>
+            </div>
+            <div class="recommendations-actions pad-inline">
+              <button type="button" class="btn-subtle btn-chip btn-chip-muted" id="recNudgeBtn">
+                Shuffle suggestions
+              </button>
+            </div>
+          </div>
+
+        <div
+          id="socialMiniPreview"
+          class="social-mini-preview pad-inline"
+          aria-live="polite"
+          aria-hidden="true"
+          hidden
+        >
+          <div class="social-mini-chip">
+            <span class="social-mini-label">Following</span>
+            <span id="socialMiniFollowing" class="social-mini-value">0</span>
+          </div>
+          <div class="social-mini-chip">
+            <span class="social-mini-label">Followers</span>
+            <span id="socialMiniFollowers" class="social-mini-value">0</span>
+          </div>
+          <div class="social-mini-chip">
+            <span class="social-mini-label">Mutual</span>
+            <span id="socialMiniMutual" class="social-mini-value">0</span>
+          </div>
+          <p class="social-mini-hint">Friend stats power the inline context on each card.</p>
+        </div>
+
+        <section
+          id="friendsInlinePanel"
+          class="friends-inline-panel pad-inline"
+          aria-live="polite"
+          aria-hidden="true"
+          hidden
+        >
+          <div class="friends-inline-header">
+            <div class="friends-inline-title">
+              <span aria-hidden="true">✨</span>
+              <span>From your friends</span>
+            </div>
+            <button type="button" id="friendsInlineSeeAll" class="btn-link btn-link-inline">
+              Open notifications
+            </button>
+          </div>
+          <div id="friendsInlineList" class="friends-inline-list" role="list"></div>
+          <p id="friendsInlineEmpty" class="friends-inline-empty">
+            Follow friends to see what they’re watching, reviewing, and planning.
+          </p>
+        </section>
+
+        <div class="recommendations-controls pad-inline" role="region" aria-label="Result view preferences">
+            <div class="control-group pad-inline">
+              <label class="control-label" for="recommendationLayout">Layout</label>
+              <div class="segmented-control pad-inline" role="radiogroup" aria-label="Recommendation layout">
+                <button type="button" class="segment" data-layout="grid" aria-pressed="true">Grid</button>
+                <button type="button" class="segment" data-layout="carousel">Carousel</button>
+              </div>
+            </div>
+            <div class="control-group pad-inline">
+              <fieldset class="control-filter-set">
+                <legend class="control-label">Quick filters</legend>
+                <label class="control-chip">
+                  <input type="checkbox" id="filterTopRated" />
+                  <span>IMDb 7+</span>
+                </label>
+                <label class="control-chip">
+                  <input type="checkbox" id="filterStreaming" />
+                  <span>Streamable now</span>
+                </label>
+                <label class="control-chip">
+                  <input type="checkbox" id="filterFresh" />
+                  <span>Released &lt; 2 years</span>
+                </label>
+              </fieldset>
+            </div>
+          </div>
+
+          <div
+            id="recStatus"
+            class="status-row pad-inline"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <div class="status-primary pad-inline">
+              <span class="status-dot" id="recStatusDot"></span>
+              <span id="recStatusText">
+                No calls made yet. Hit “Find movies for me” to start.
+              </span>
+            </div>
+            <div
+              class="status-progress pad-inline"
+              id="recStatusProgress"
+              role="progressbar"
+              aria-hidden="true"
+              hidden
+            >
+              <span class="status-progress-fill"></span>
+            </div>
+            <span class="status-progress-stage" id="recStatusStage" hidden></span>
+          </div>
+
+          <div id="recError" class="error-text pad-inline" role="alert"></div>
+
+          <div id="recommendationsGrid" class="recommendations-grid pad-inline"></div>
+          <div class="recommendations-actions pad-inline" id="recommendationsActions">
+            <button type="button" class="btn-subtle btn-chip" id="showMoreRecsBtn">Show more</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="collectionsPanel" class="panel collections-panel pad-inline">
+        <div class="panel-inner pad-inline">
+          <div class="panel-header collections-header pad-inline">
+            <div class="pad-inline">
+              <div class="panel-title pad-inline">Your saved lists</div>
+              <div class="panel-subtitle pad-inline">Favorites and watched picks stay close while you explore.</div>
+            </div>
+            <div class="collection-tabs pad-inline" role="tablist">
+              <button
+                type="button"
+                class="collection-tab active"
+                id="favoritesTab"
+                data-target="favorites"
+                role="tab"
+                aria-controls="favoritesView"
+                aria-selected="true"
+              >
+                Favorites
+              </button>
+              <button
+                type="button"
+                class="collection-tab"
+                id="watchedTab"
+                data-target="watched"
+                role="tab"
+                aria-controls="watchedView"
+                aria-selected="false"
+              >
+                Watched
+              </button>
+            </div>
+          </div>
+          <div class="collection-summary pad-inline" id="favoritesSummary"></div>
+          <div class="collection-summary pad-inline" id="watchedSummary"></div>
+          <div class="collection-filters pad-inline" role="region" aria-label="Collection filters">
+            <div class="collection-filter-group pad-inline">
+              <label class="collection-filter-label" for="collectionFilterGenre">Filter by genre</label>
+              <select id="collectionFilterGenre" class="collection-filter-select">
+                <option value="">All</option>
+              </select>
+            </div>
+            <div class="collection-filter-group pad-inline">
+              <label class="collection-filter-label" for="collectionFilterSort">Sort by</label>
+              <select id="collectionFilterSort" class="collection-filter-select">
+                <option value="recent">Recently added</option>
+                <option value="alpha">Alphabetical</option>
+                <option value="rating">IMDb rating</option>
+                <option value="year">Release year</option>
+              </select>
+            </div>
+          </div>
+          <div id="favoritesView" class="collection-view active pad-inline" role="tabpanel" aria-labelledby="favoritesTab">
+            <div id="favoritesList" class="favorites-list pad-inline"></div>
+            <div id="favoritesEmpty" class="empty-state empty-state-card pad-inline">
+              <div class="empty-state-illustration pad-inline" aria-hidden="true">⭐</div>
+              <div class="empty-state-body pad-inline">
+                <h3>Build a favorites lane</h3>
+                <p>Tap the star on any recommendation to stash it for later or share with friends.</p>
+                <div class="empty-state-carousel pad-inline" aria-hidden="true">
+                  <span class="empty-state-chip">Indie rom-com</span>
+                  <span class="empty-state-chip">Cult classic</span>
+                  <span class="empty-state-chip">Feel-good sports</span>
+                </div>
+                <button type="button" class="btn-secondary" data-empty-scroll="#recommendationsPanel">
+                  Browse live recommendations
+                </button>
+              </div>
+            </div>
+          </div>
+          <div id="watchedView" class="collection-view pad-inline" role="tabpanel" aria-labelledby="watchedTab">
+            <div id="watchedList" class="watched-panel-list pad-inline"></div>
+            <div id="watchedEmpty" class="empty-state empty-state-card pad-inline">
+              <div class="empty-state-illustration pad-inline" aria-hidden="true">🎟️</div>
+              <div class="empty-state-body pad-inline">
+                <h3>Keep a watched streak</h3>
+                <p>Mark recommendations as <strong>“I’ve watched this”</strong> so I can bias future batches.</p>
+                <div class="empty-state-carousel pad-inline" aria-hidden="true">
+                  <span class="empty-state-chip">Thriller Friday</span>
+                  <span class="empty-state-chip">Animated matinée</span>
+                  <span class="empty-state-chip">Classic noir</span>
+                </div>
+                <button type="button" class="btn-subtle" data-empty-scroll="#recommendationsPanel">
+                  See how it works
+                </button>
+              </div>
+            </div>
+            <div class="collection-actions pad-inline">
+              <button type="button" class="btn-subtle btn-subtle-danger" id="clearWatchedBtn">
+                <span>Clear history</span>
+                <span aria-hidden="true">🧹</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="socialFirstRunPanel"
+        class="panel social-nudge-panel pad-inline"
+        aria-live="polite"
+        hidden
+
+      >
+        <div class="panel-inner pad-inline">
+          <div id="socialFirstRunCard" class="social-nudge-card pad-inline">
+            <p class="social-nudge-eyebrow">Make it social</p>
+            <h3 class="social-nudge-title">See what your friends loved</h3>
+            <p id="socialFirstRunMessage" class="social-nudge-text">
+              Sign in and follow friends to see which picks they loved (or hated).
+            </p>
+            <div class="social-nudge-stats" role="presentation">
+              <div class="social-nudge-stat">
+                <span class="social-nudge-stat-label">Following</span>
+                <span id="socialNudgeFollowing" class="social-nudge-stat-value">0</span>
+              </div>
+              <div class="social-nudge-stat">
+                <span class="social-nudge-stat-label">Followers</span>
+                <span id="socialNudgeFollowers" class="social-nudge-stat-value">0</span>
+              </div>
+              <div class="social-nudge-stat">
+                <span class="social-nudge-stat-label">Mutual</span>
+                <span id="socialNudgeMutual" class="social-nudge-stat-value">0</span>
+              </div>
+            </div>
+            <button type="button" id="socialFirstRunCta" class="btn-primary social-nudge-cta">
+              Find people to follow
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="friendsActivityPanel"
+        class="panel friends-activity-panel pad-inline"
+        aria-live="polite"
+       
+      >
+        <div class="panel-inner pad-inline">
+          <div class="panel-header pad-inline">
+            <div class="pad-inline">
+              <div class="panel-title">Friends activity</div>
+              <div class="panel-subtitle">See what your circle is doing in real time.</div>
+            </div>
+          </div>
+          <div id="friendsActivitySignedOut" class="friends-activity-signedout pad-inline">
+            <p>Sign in and follow a few friends to light up this feed.</p>
+            <a class="btn-secondary" href="login.html">Sign in</a>
+          </div>
+          <div
+            id="friendsActivityContent"
+            class="friends-activity-content pad-inline"
+            hidden
+            aria-hidden="true"
+           
+          >
+            <div class="friends-activity-grid">
+              <article class="friends-activity-card" aria-live="polite">
+                <header class="friends-activity-card-header">
+                  <h3>Recently logged by friends</h3>
+                  <p>Your circle’s latest watches and saves.</p>
+                </header>
+                <div id="friendsWatchList" class="friends-activity-list" role="list"></div>
+                <p id="friendsWatchEmpty" class="friends-activity-empty">
+                  Follow friends to see what they’re logging.
+                </p>
+              </article>
+              <article class="friends-activity-card" aria-live="polite">
+                <header class="friends-activity-card-header">
+                  <h3>New lists from people you follow</h3>
+                  <p>Fresh collaborative playlists and watch queues.</p>
+                </header>
+                <div id="friendsListsList" class="friends-activity-list" role="list"></div>
+                <p id="friendsListsEmpty" class="friends-activity-empty">
+                  Collaborative lists from your circle will land here.
+                </p>
+              </article>
+              <article
+                id="friendSuggestionsCard"
+                class="friends-activity-card friends-activity-card--suggestions"
+                aria-live="polite"
+                hidden
+              >
+                <header class="friends-activity-card-header">
+                  <h3>People you might like</h3>
+                  <p>High-overlap movie fans pulled from your vibe signals.</p>
+                </header>
+                <div id="friendSuggestionsList" class="friend-suggestions-list" role="list" hidden></div>
+                <p id="friendSuggestionsEmpty" class="friends-activity-empty">
+                  Follow a few favorites to unlock tailored matches.
+                </p>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
 </div>
 
   <div id="onboardingCoach" class="onboarding-coach pad-inline" role="dialog" aria-modal="true" hidden>
