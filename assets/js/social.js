@@ -828,6 +828,70 @@ export async function unblockUserByUsername(username) {
   rerenderVisibleSections();
 }
 
+export function createInlineFollowPill(username, options = {}) {
+  const normalized = canonicalUsername(username);
+  if (!normalized) {
+    return null;
+  }
+  if (!state.session || !state.session.token) {
+    return null;
+  }
+  const currentUser = canonicalUsername(state.session.username || '');
+  if (currentUser && currentUser === normalized) {
+    return null;
+  }
+  if (state.blockedUsers.has(normalized)) {
+    return null;
+  }
+  const followingSet = new Set(state.following.map((handle) => canonicalUsername(handle)).filter(Boolean));
+  if (followingSet.has(normalized)) {
+    return null;
+  }
+  const pill = document.createElement('button');
+  pill.type = 'button';
+  pill.className = 'inline-follow-pill';
+  pill.dataset.state = 'default';
+  if (options.size) {
+    pill.classList.add(`inline-follow-pill--${options.size}`);
+  }
+  if (options.className) {
+    pill.classList.add(options.className);
+  }
+  const baseLabel = options.label || 'Follow';
+  const loadingLabel = options.loadingLabel || 'Following…';
+  const successLabel = options.successLabel || 'Following';
+  pill.textContent = baseLabel;
+  pill.setAttribute('aria-label', options.ariaLabel || `Follow @${normalized}`);
+
+  const resetState = () => {
+    pill.disabled = false;
+    pill.dataset.state = 'default';
+    pill.textContent = baseLabel;
+  };
+
+  pill.addEventListener('click', async () => {
+    if (!state.session || !state.session.token) {
+      queueToast('Sign in to follow people.', { variant: 'error' });
+      return;
+    }
+    pill.disabled = true;
+    pill.dataset.state = 'loading';
+    pill.textContent = loadingLabel;
+    try {
+      await followUserByUsername(normalized, { note: options.note });
+      pill.dataset.state = 'success';
+      pill.textContent = successLabel;
+      pill.setAttribute('aria-label', options.successAriaLabel || `Now following @${normalized}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to follow right now.';
+      queueToast(message, { variant: 'error' });
+      resetState();
+    }
+  });
+
+  return pill;
+}
+
 export async function searchSocialUsers(query) {
   const trimmed = typeof query === 'string' ? query.trim() : '';
   if (!trimmed) {
@@ -1259,6 +1323,15 @@ function renderReviewItem(review, sectionState) {
     header.appendChild(fallback);
   }
 
+  const inlineFollow = createInlineFollowPill(review.username, {
+    size: 'xs',
+    className: 'community-inline-follow',
+    ariaLabel: `Follow ${authorLabel}`
+  });
+  if (inlineFollow) {
+    header.appendChild(inlineFollow);
+  }
+
   const presenceKey = normalizedAuthor;
   const presence = presenceKey && state.presence ? state.presence[presenceKey] : null;
   if (presence && presence.state) {
@@ -1313,9 +1386,10 @@ function renderReviewItem(review, sectionState) {
 
   let hiddenNotice = null;
   if (hiddenReason) {
-    hiddenNotice = createHiddenReviewNotice({
+    hiddenNotice = createHiddenContentNotice({
       reason: hiddenReason,
       username: authorLabel,
+      context: 'review',
       onReveal: () => {
         hiddenSections.forEach((element) => {
           if (element) {
@@ -1420,19 +1494,20 @@ function renderReviewItem(review, sectionState) {
   return item;
 }
 
-function createHiddenReviewNotice({ reason, username, onReveal }) {
+function createHiddenContentNotice({ reason, username, context = 'review', onReveal }) {
   const wrap = document.createElement('div');
-  wrap.className = 'community-review-hidden';
+  wrap.className = 'community-hidden-notice';
   const text = document.createElement('p');
-  text.className = 'community-review-hidden-text';
+  text.className = 'community-hidden-text';
   const readableName = username && username !== 'You' ? username : 'this member';
+  const noun = context === 'comment' ? 'comment' : 'review';
   text.textContent =
     reason === 'blocked'
-      ? `You blocked ${readableName}. Their review stays hidden unless you show it.`
-      : `${readableName} is muted. Their review is hidden.`;
+      ? `You blocked ${readableName}. Their ${noun} stays hidden unless you show it.`
+      : `${readableName} is muted. Their ${noun} is hidden.`;
   const button = document.createElement('button');
   button.type = 'button';
-  button.className = 'btn-subtle community-review-hidden-btn';
+  button.className = 'btn-subtle community-hidden-btn';
   button.textContent = 'Show anyway';
   button.addEventListener('click', () => {
     wrap.remove();
@@ -1604,6 +1679,16 @@ function renderCommentNode(comment, review, sectionState, depth) {
     ? rawUsername === state.session.username
     : false;
   const commentLabel = isSelfComment ? 'You' : rawUsername || 'Anonymous';
+  const normalizedAuthor = canonicalUsername(rawUsername);
+  const hiddenReason = isUserBlocked(normalizedAuthor)
+    ? 'blocked'
+    : isUserMuted(normalizedAuthor)
+    ? 'muted'
+    : null;
+  const hiddenSections = [];
+  if (hiddenReason) {
+    wrapper.classList.add('community-comment--hidden');
+  }
   let author = createInlineProfileLink(rawUsername, {
     label: commentLabel,
     className: 'community-comment-author'
@@ -1614,16 +1699,42 @@ function renderCommentNode(comment, review, sectionState, depth) {
     author.textContent = commentLabel;
   }
   header.appendChild(author);
+  if (hiddenReason) {
+    author.hidden = true;
+    hiddenSections.push(author);
+  }
   const timestamp = document.createElement('span');
   timestamp.className = 'community-comment-timestamp';
   timestamp.textContent = formatRelativeTime(comment.createdAt);
   header.appendChild(timestamp);
+  if (hiddenReason) {
+    timestamp.hidden = true;
+    hiddenSections.push(timestamp);
+  }
+
+  const inlineFollow = createInlineFollowPill(rawUsername, {
+    size: 'xs',
+    className: 'community-inline-follow',
+    ariaLabel: `Follow ${commentLabel}`
+  });
+  if (inlineFollow) {
+    header.appendChild(inlineFollow);
+    if (hiddenReason) {
+      inlineFollow.hidden = true;
+      hiddenSections.push(inlineFollow);
+    }
+  }
+
   wrapper.appendChild(header);
 
   const body = document.createElement('p');
   body.className = 'community-comment-body';
   body.textContent = comment.body || '';
   wrapper.appendChild(body);
+  if (hiddenReason) {
+    body.hidden = true;
+    hiddenSections.push(body);
+  }
 
   if (state.session && state.session.token) {
     const replyBtn = document.createElement('button');
@@ -1643,6 +1754,10 @@ function renderCommentNode(comment, review, sectionState, depth) {
       replyBtn.setAttribute('aria-expanded', 'true');
     });
     wrapper.appendChild(replyBtn);
+    if (hiddenReason) {
+      replyBtn.hidden = true;
+      hiddenSections.push(replyBtn);
+    }
   }
 
   if (Array.isArray(comment.replies) && comment.replies.length) {
@@ -1655,6 +1770,29 @@ function renderCommentNode(comment, review, sectionState, depth) {
       }
     });
     wrapper.appendChild(childList);
+    if (hiddenReason) {
+      childList.hidden = true;
+      hiddenSections.push(childList);
+    }
+  }
+
+  if (hiddenReason) {
+    const notice = createHiddenContentNotice({
+      reason: hiddenReason,
+      username: commentLabel,
+      context: 'comment',
+      onReveal: () => {
+        hiddenSections.forEach((node) => {
+          if (node) {
+            node.hidden = false;
+          }
+        });
+        wrapper.classList.remove('community-comment--hidden');
+      }
+    });
+    if (notice) {
+      wrapper.insertBefore(notice, wrapper.firstChild);
+    }
   }
   return wrapper;
 }
