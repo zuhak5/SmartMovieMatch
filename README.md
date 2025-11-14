@@ -17,7 +17,9 @@ Smart Movie Match is a client-first movie recommendation assistant. It lets peop
 2. A [Supabase](https://supabase.com/) project for storing accounts. See [Supabase setup](#supabase-setup) for the schema definition.
 3. API keys for the external services:
    - [OMDb API](https://www.omdbapi.com/apikey.aspx) → `OMDB_API_KEY`
-   - [The Movie Database (TMDB)](https://www.themoviedb.org/settings/api) → `TMDB_API_READ_ACCESS_TOKEN`
+   - [The Movie Database (TMDB)](https://www.themoviedb.org/settings/api)
+     - `TMDB_API_KEY` (use the **API Key (v3 auth)** for genre list calls)
+     - `TMDB_API_READ_ACCESS_TOKEN` (use the **API Read Access Token (v4)** for discovery/search requests)
    - [YouTube Data API v3](https://console.cloud.google.com/apis/library/youtube.googleapis.com) → `YOUTUBE_API_KEY`
 
 ### Local development
@@ -57,7 +59,8 @@ Key modules:
 | Variable          | Description                                             |
 | ----------------- | ------------------------------------------------------- |
 | `OMDB_API_KEY`    | OMDb API key used by the `/api/omdb` proxy.             |
-| `TMDB_API_READ_ACCESS_TOKEN`    | TMDB API key used by the `/api/tmdb` proxy.             |
+| `TMDB_API_KEY` | TMDB API Key (v3) used for `genre/movie/list` requests. |
+| `TMDB_API_READ_ACCESS_TOKEN`    | TMDB API Read Access Token (v4) used by the `/api/tmdb` proxy. |
 | `YOUTUBE_API_KEY` | YouTube Data API key used by the `/api/youtube` proxy.  |
 | `SUPABASE_URL`    | Supabase project URL used for remote auth persistence.  |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key used by the auth API. |
