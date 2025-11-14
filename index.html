@@ -90,26 +90,6 @@
           aria-hidden="true"
         ></span>
       </div>
-      <div id="notificationPanel" class="notification-panel pad-inline" role="region" aria-label="Notifications" hidden>
-        <div class="notification-panel-header pad-inline">
-          <span class="notification-panel-title">Notifications</span>
-          <div class="notification-panel-actions">
-            <button id="notificationMarkRead" class="btn-subtle notification-mark-read" type="button">
-              Mark all read
-            </button>
-            <button
-              id="notificationClose"
-              class="notification-close"
-              type="button"
-              aria-label="Close notifications"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-        <div id="notificationList" class="notification-list pad-inline" role="list"></div>
-        <div id="notificationEmpty" class="notification-empty pad-inline">You’re all caught up!</div>
-      </div>
     </div>
     <div class="app-title-row pad-inline">
       <h1 class="app-title">
@@ -639,6 +619,22 @@
   <div id="globalToastRegion" class="global-toast-region pad-inline" role="status" aria-live="polite"></div>
 
   <div id="notificationOverlay" class="notification-overlay" aria-hidden="true" hidden></div>
+
+  <div id="notificationPanel" class="notification-panel pad-inline" role="region" aria-label="Notifications" hidden>
+    <div class="notification-panel-header pad-inline">
+      <span class="notification-panel-title">Notifications</span>
+      <div class="notification-panel-actions">
+        <button id="notificationMarkRead" class="btn-subtle notification-mark-read" type="button">
+          Mark all read
+        </button>
+        <button id="notificationClose" class="notification-close" type="button" aria-label="Close notifications">
+          ✕
+        </button>
+      </div>
+    </div>
+    <div id="notificationList" class="notification-list pad-inline" role="list"></div>
+    <div id="notificationEmpty" class="notification-empty pad-inline">You’re all caught up!</div>
+  </div>
 
   <div
     id="movieOverlay"
