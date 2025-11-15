@@ -1862,7 +1862,7 @@ body[data-theme="light"] .account-link:hover {
     width: 100%;
     max-height: 90vh;
     transform-origin: bottom center;
-    border-radius: 24px 24px 0 0;
+    border: double;
     --notification-panel-translate-x: -50%;
     padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0));
     padding-top: clamp(0.9rem, 3vw, 1.2rem);
@@ -1903,6 +1903,7 @@ body[data-theme="light"] .account-link:hover {
 
 .notification-panel.is-visible {
   opacity: 1;
+  position-area: x-start;
   transform: translate(var(--notification-panel-translate-x), 0) scale(1);
 }
 
