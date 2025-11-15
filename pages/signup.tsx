@@ -24,13 +24,6 @@ function SiteHeader({ activeNav }: { activeNav: NavKey }) {
     <header className="site-header pad-inline">
       <div className="site-header__inner">
         <div className="site-header__top">
-          <a className="site-brand site-brand--chip" href="index.html">
-            <span className="site-brand__icon" aria-hidden="true">🍿</span>
-            <span className="site-brand__text">
-              <span className="site-brand__title">SmartMovieMatch</span>
-              <span className="site-brand__tagline">Movie nights, dialed in</span>
-            </span>
-          </a>
           <nav className="site-nav" aria-label="Primary navigation">
             <div className="site-nav__scroller">
               {primaryNavLinks.map(({ href, label, nav, icon }) => (
