@@ -14,61 +14,62 @@
   <div class="site-shell">
     <header class="site-header pad-inline">
       <div class="site-header__inner">
-        <div class="site-header__top">
-          <nav class="site-nav" aria-label="Primary navigation">
-            <div class="site-nav__scroller">
-              <a class="site-nav-link" href="index.html" data-nav="home">
-                <span class="site-nav-link__icon" aria-hidden="true">🏠</span>
-                <span class="site-nav-link__label">Home</span>
-              </a>
-              <a class="site-nav-link" href="profile.html#collectionsPanel" data-nav="lists">
-                <span class="site-nav-link__icon" aria-hidden="true">🎯</span>
-                <span class="site-nav-link__label">My Lists</span>
-              </a>
-              <a class="site-nav-link" href="peeruser.html" data-nav="friends" aria-current="page">
-                <span class="site-nav-link__icon" aria-hidden="true">🤝</span>
-                <span class="site-nav-link__label">Friends</span>
-              </a>
-              <a class="site-nav-link" href="profile.html" data-nav="profile">
-                <span class="site-nav-link__icon" aria-hidden="true">👤</span>
-                <span class="site-nav-link__label">Profile</span>
-              </a>
-              <a class="site-nav-link" href="account-settings.html" data-nav="account">
-                <span class="site-nav-link__icon" aria-hidden="true">⚙️</span>
-                <span class="site-nav-link__label">Account</span>
-              </a>
-            </div>
+        <div class="site-header__primary">
+          <a class="site-header__brand" href="index.html" aria-label="Smart Movie Match home">
+            <span class="site-header__brand-icon" aria-hidden="true">🎬</span>
+            <span class="site-header__brand-text">Smart Movie Match</span>
+          </a>
+          <nav class="site-header__nav" aria-label="Primary navigation">
+            <a class="site-header__link" href="index.html" data-nav="home">
+              <span class="site-header__icon" aria-hidden="true">🏠</span>
+              <span class="site-header__label">Home</span>
+            </a>
+            <a class="site-header__link" href="profile.html#collectionsPanel" data-nav="lists">
+              <span class="site-header__icon" aria-hidden="true">🎯</span>
+              <span class="site-header__label">My Lists</span>
+            </a>
+            <a class="site-header__link" href="peeruser.html" data-nav="friends" aria-current="page">
+              <span class="site-header__icon" aria-hidden="true">🤝</span>
+              <span class="site-header__label">Friends</span>
+            </a>
+            <a class="site-header__link" href="profile.html" data-nav="profile">
+              <span class="site-header__icon" aria-hidden="true">👤</span>
+              <span class="site-header__label">Profile</span>
+            </a>
+            <a class="site-header__link" href="account-settings.html" data-nav="account">
+              <span class="site-header__icon" aria-hidden="true">⚙️</span>
+              <span class="site-header__label">Account</span>
+            </a>
           </nav>
         </div>
-        <div class="site-header__bottom">
+        <div class="site-header__secondary">
+          <div class="site-header__controls">
+            <button
+              id="themeToggle"
+              class="btn-theme-toggle"
+              type="button"
+              aria-label="Switch to light theme"
+              data-theme-target="light"
+            >
+              <span class="btn-theme-icon" aria-hidden="true">🌙</span>
+              <span class="btn-theme-label">Dark</span>
+            </button>
+            <button
+              id="notificationBell"
+              class="notification-bell"
+              type="button"
+              aria-haspopup="true"
+              aria-expanded="false"
+              aria-controls="notificationPanel"
+              hidden
+            >
+              <span class="notification-icon" aria-hidden="true">🔔</span>
+              <span id="notificationCount" class="notification-count" hidden>0</span>
+              <span class="sr-only">Open notifications</span>
+            </button>
+          </div>
           <div class="site-header__account">
-                        <div class="account-bar" role="navigation" data-account-state="guest">
-              <div class="account-bar__utilities site-header__actions">
-                <button
-                  id="themeToggle"
-                  class="btn-theme-toggle"
-                  type="button"
-                  aria-label="Switch to light theme"
-                  data-theme-target="light"
-                >
-                  <span class="btn-theme-icon" aria-hidden="true">🌙</span>
-                  <span class="btn-theme-label">Dark</span>
-                </button>
-                <button
-                  id="notificationBell"
-                  class="notification-bell"
-                  type="button"
-                  aria-haspopup="true"
-                  aria-expanded="false"
-                  aria-controls="notificationPanel"
-                  hidden
-                >
-                  <span class="notification-icon" aria-hidden="true">🔔</span>
-                  <span id="notificationCount" class="notification-count" hidden>0</span>
-                  <span class="sr-only">Open notifications</span>
-                </button>
-              </div>
-              <span class="account-bar__divider" aria-hidden="true"></span>
+            <div class="account-bar" role="navigation" data-account-state="guest">
               <div class="account-bar__content">
                 <div class="account-bar-actions">
                   <a id="accountLoginLink" class="account-link" href="login.html">Log in / Sign up</a>
