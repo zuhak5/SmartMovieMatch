@@ -5,6 +5,7 @@ import {
   unfollowUserByUsername
 } from './social.js';
 import { closest } from './dom.js';
+import { initAppViewRouter, revealSection, setActiveAppView } from './view-router.js';
 
 function initCustomFixes() {
   enhanceLogoutButtons();
@@ -35,6 +36,7 @@ function initCustomFixes() {
 }
 
 function initShellInteractions() {
+  initAppViewRouter();
   initBottomNav();
   initFilterSheet();
   initTabChips();
@@ -51,6 +53,13 @@ function initBottomNav() {
       entry.setAttribute('aria-current', isActive ? 'page' : 'false');
     });
   };
+  document.addEventListener('appviewchange', (event) => {
+    const nextView = event?.detail?.view;
+    if (typeof nextView === 'string') {
+      setActive(nextView);
+    }
+  });
+
   nav.addEventListener('click', (event) => {
     const target = closest(event.target, '[data-nav]');
     if (!(target instanceof HTMLElement)) {
@@ -59,15 +68,24 @@ function initBottomNav() {
     const navId = target.dataset.nav;
     const url = target.dataset.navUrl;
     const selector = target.dataset.navTarget;
+    const focusSelector = target.dataset.navFocus;
+    const view = target.dataset.navView;
     if (url) {
       window.location.assign(url);
       return;
     }
     if (selector) {
-      const section = document.querySelector(selector);
-      if (section) {
-        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      revealSection(selector);
+      if (focusSelector) {
+        window.requestAnimationFrame(() => {
+          const focusTarget = document.querySelector(focusSelector);
+          if (focusTarget instanceof HTMLElement) {
+            focusTarget.focus();
+          }
+        });
       }
+    } else if (view) {
+      setActiveAppView(view);
     }
     if (navId) {
       setActive(navId);

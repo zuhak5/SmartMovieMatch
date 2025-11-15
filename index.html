@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="assets/css/mobile.css" />
 
 </head>
-<body data-page="discovery" data-theme="dark">
+<body data-page="discovery" data-theme="dark" data-active-view="home">
   <div class="site-shell">
     <header class="site-header pad-inline">
       <div class="site-header__inner">
@@ -142,7 +142,12 @@
       </button>
     </div>
 
-    <section id="globalSearchPanel" class="panel global-search-panel pad-inline" aria-label="Global search">
+    <section
+      id="globalSearchPanel"
+      class="panel global-search-panel pad-inline"
+      aria-label="Global search"
+      data-app-section="home search"
+    >
       <div class="panel-inner pad-inline">
         <div class="panel-header pad-inline">
           <div>
@@ -230,7 +235,11 @@
 
   <main class="app-main">
     <!-- Preferences -->
-    <section id="preferencesPanel" class="panel panel-sticky pad-inline">
+    <section
+      id="preferencesPanel"
+      class="panel panel-sticky pad-inline"
+      data-app-section="home"
+    >
       <div class="panel-inner pad-inline">
         <div class="panel-header pad-inline">
           <div class="pad-inline">
@@ -504,7 +513,11 @@
 
     <!-- Right column: recommendations + collections -->
     <div class="right-column pad-inline">
-      <section id="recommendationsPanel" class="panel recommendations-panel pad-inline">
+      <section
+        id="recommendationsPanel"
+        class="panel recommendations-panel pad-inline"
+        data-app-section="home"
+      >
         <div class="panel-inner pad-inline">
           <div id="syncStatus" class="sync-status pad-inline" role="status" aria-live="polite"></div>
           <div class="recommendations-header pad-inline">
@@ -649,7 +662,11 @@
         </div>
       </section>
 
-      <section id="collectionsPanel" class="panel collections-panel pad-inline">
+      <section
+        id="collectionsPanel"
+        class="panel collections-panel pad-inline"
+        data-app-section="home"
+      >
         <div class="panel-inner pad-inline">
           <div class="panel-header collections-header pad-inline">
             <div class="pad-inline">
@@ -780,7 +797,12 @@
         </div>
       </section>
 
-      <section id="watchPartyPanel" class="panel watch-party-panel pad-inline" aria-label="Watch party">
+      <section
+        id="watchPartyPanel"
+        class="panel watch-party-panel pad-inline"
+        aria-label="Watch party"
+        data-app-section="home activity"
+      >
         <div class="panel-inner pad-inline">
           <div class="panel-header pad-inline">
             <div>
@@ -853,7 +875,7 @@
         id="friendsActivityPanel"
         class="panel friends-activity-panel pad-inline"
         aria-live="polite"
-       
+        data-app-section="activity"
       >
         <div class="panel-inner pad-inline">
           <div class="panel-header pad-inline">
@@ -1090,6 +1112,7 @@
         class="bottom-nav__action"
         data-nav="home"
         data-nav-target="#preferencesPanel"
+        data-nav-view="home"
         aria-current="page"
       >
         <span aria-hidden="true">🏠</span>
@@ -1100,6 +1123,8 @@
         class="bottom-nav__action"
         data-nav="search"
         data-nav-target="#globalSearchPanel"
+        data-nav-view="search"
+        data-nav-focus="#globalSearchInput"
       >
         <span aria-hidden="true">🔎</span>
         Search
@@ -1109,6 +1134,7 @@
         class="bottom-nav__action"
         data-nav="activity"
         data-nav-target="#friendsActivityPanel"
+        data-nav-view="activity"
       >
         <span aria-hidden="true">✨</span>
         Activity
