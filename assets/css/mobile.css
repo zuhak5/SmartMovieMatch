@@ -1903,6 +1903,7 @@ body[data-theme="light"] .account-link:hover {
 
 .notification-panel.is-visible {
   opacity: 1;
+  z-index: 45;
   position-area: x-start;
   transform: translate(var(--notification-panel-translate-x), 0) scale(1);
 }
