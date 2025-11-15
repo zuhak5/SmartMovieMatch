@@ -14,93 +14,103 @@
   <div class="site-shell">
     <header class="site-header pad-inline">
       <div class="site-header__inner">
-        <a class="site-brand" href="index.html">
-          <span class="site-brand__icon" aria-hidden="true">🍿</span>
-          <span class="site-brand__text">
-            <span class="site-brand__title">SmartMovieMatch</span>
-            <span class="site-brand__tagline">Movie nights, dialed in</span>
-          </span>
-        </a>
-        <nav class="site-nav" aria-label="Primary">
-          <a class="site-nav-link" href="index.html" data-nav="home">Home</a>
-          <a class="site-nav-link" href="profile.html#collectionsPanel" data-nav="lists">My Lists</a>
-          <a class="site-nav-link" href="peeruser.html" data-nav="friends">Friends</a>
-          <a class="site-nav-link" href="profile.html" data-nav="profile" aria-current="page">Profile</a>
-          <a class="site-nav-link" href="account-settings.html" data-nav="account">Account</a>
-        </nav>
-        <div class="site-header__actions">
-          <button
-            id="themeToggle"
-            class="btn-theme-toggle"
-            type="button"
-            aria-label="Switch to light theme"
-            data-theme-target="light"
-          >
-            <span class="btn-theme-icon" aria-hidden="true">🌙</span>
-            <span class="btn-theme-label">Dark</span>
-          </button>
-          <div class="account-bar" role="navigation" data-account-state="guest">
-            <div class="account-bar-top">
-              <span id="accountGreeting" class="account-greeting">You’re browsing as guest.</span>
-              <button
-                id="notificationBell"
-                class="notification-bell"
-                type="button"
-                aria-haspopup="true"
-                aria-expanded="false"
-                aria-controls="notificationPanel"
-                hidden
-              >
-                <span class="notification-icon" aria-hidden="true">🔔</span>
-                <span id="notificationCount" class="notification-count" hidden>0</span>
-                <span class="sr-only">Open notifications</span>
-              </button>
-            </div>
-            <div class="account-bar-actions">
-              <a id="accountLoginLink" class="account-link" href="login.html">Log in / Sign up</a>
-            </div>
-            <div id="accountProfile" class="account-profile" hidden>
-              <button
-                id="accountProfileBtn"
-                class="account-pill"
-                type="button"
-                aria-haspopup="menu"
-                aria-expanded="false"
-                aria-controls="accountMenu"
-              >
-                <span class="account-avatar" id="accountAvatar" aria-hidden="true">
-                  <span id="accountAvatarInitials" class="account-avatar-initials">GM</span>
-                  <img id="accountAvatarImg" alt="" />
-                </span>
-                <span class="account-pill-text">
-                  <span id="accountName" class="account-name">Guest</span>
-                  <span id="accountPillSync" class="account-pill-sub">Cloud sync inactive</span>
-                </span>
-                <span class="account-pill-caret" aria-hidden="true">▾</span>
-              </button>
-              <ul id="accountMenu" class="account-menu" role="menu" aria-label="Account actions">
-                <li>
-                  <button class="account-menu-item" type="button" data-action="profile" role="menuitem">
-                    Profile overview
-                  </button>
-                </li>
-                <li>
-                  <button class="account-menu-item" type="button" data-action="settings" role="menuitem">
-                    Account settings
-                  </button>
-                </li>
-                <li>
-                  <button
-                    class="account-menu-item account-menu-item--danger"
-                    type="button"
-                    data-action="logout"
-                    role="menuitem"
-                  >
-                    Sign out
-                  </button>
-                </li>
-              </ul>
-              <span id="socialActivityIndicator" class="social-activity-indicator" hidden aria-hidden="true"></span>
+        <div class="site-header__brand-row">
+          <a class="site-brand" href="index.html">
+            <span class="site-brand__icon" aria-hidden="true">🍿</span>
+            <span class="site-brand__text">
+              <span class="site-brand__title">SmartMovieMatch</span>
+              <span class="site-brand__tagline">Movie nights, dialed in</span>
+            </span>
+          </a>
+          <div class="site-header__quick">
+            <button
+              id="themeToggle"
+              class="btn-theme-toggle"
+              type="button"
+              aria-label="Switch to light theme"
+              data-theme-target="light"
+            >
+              <span class="btn-theme-icon" aria-hidden="true">🌙</span>
+              <span class="btn-theme-label">Dark</span>
+            </button>
+            <span class="site-header__quick-pill">
+              <span class="site-header__quick-dot" aria-hidden="true"></span>
+              Live discovery
+            </span>
+          </div>
+        </div>
+        <div class="site-header__nav-row">
+          <nav class="site-nav" aria-label="Primary">
+            <a class="site-nav-link" href="index.html" data-nav="home">Home</a>
+            <a class="site-nav-link" href="profile.html#collectionsPanel" data-nav="lists">My Lists</a>
+            <a class="site-nav-link" href="peeruser.html" data-nav="friends">Friends</a>
+            <a class="site-nav-link" href="profile.html" data-nav="profile" aria-current="page">Profile</a>
+            <a class="site-nav-link" href="account-settings.html" data-nav="account">Account</a>
+          </nav>
+          <div class="site-header__account">
+            <div class="account-bar" role="navigation" data-account-state="guest">
+              <div class="account-bar-top">
+                <span id="accountGreeting" class="account-greeting">You’re browsing as guest.</span>
+                <button
+                  id="notificationBell"
+                  class="notification-bell"
+                  type="button"
+                  aria-haspopup="true"
+                  aria-expanded="false"
+                  aria-controls="notificationPanel"
+                  hidden
+                >
+                  <span class="notification-icon" aria-hidden="true">🔔</span>
+                  <span id="notificationCount" class="notification-count" hidden>0</span>
+                  <span class="sr-only">Open notifications</span>
+                </button>
+              </div>
+              <div class="account-bar-actions">
+                <a id="accountLoginLink" class="account-link" href="login.html">Log in / Sign up</a>
+              </div>
+              <div id="accountProfile" class="account-profile" hidden>
+                <button
+                  id="accountProfileBtn"
+                  class="account-pill"
+                  type="button"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                  aria-controls="accountMenu"
+                >
+                  <span class="account-avatar" id="accountAvatar" aria-hidden="true">
+                    <span id="accountAvatarInitials" class="account-avatar-initials">GM</span>
+                    <img id="accountAvatarImg" alt="" />
+                  </span>
+                  <span class="account-pill-text">
+                    <span id="accountName" class="account-name">Guest</span>
+                    <span id="accountPillSync" class="account-pill-sub">Cloud sync inactive</span>
+                  </span>
+                  <span class="account-pill-caret" aria-hidden="true">▾</span>
+                </button>
+                <ul id="accountMenu" class="account-menu" role="menu" aria-label="Account actions">
+                  <li>
+                    <button class="account-menu-item" type="button" data-action="profile" role="menuitem">
+                      Profile overview
+                    </button>
+                  </li>
+                  <li>
+                    <button class="account-menu-item" type="button" data-action="settings" role="menuitem">
+                      Account settings
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      class="account-menu-item account-menu-item--danger"
+                      type="button"
+                      data-action="logout"
+                      role="menuitem"
+                    >
+                      Sign out
+                    </button>
+                  </li>
+                </ul>
+                <span id="socialActivityIndicator" class="social-activity-indicator" hidden aria-hidden="true"></span>
+              </div>
             </div>
           </div>
         </div>
