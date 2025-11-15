@@ -23,57 +23,56 @@ function SiteHeader({ activeNav }: { activeNav: NavKey }) {
   return (
     <header className="site-header pad-inline">
       <div className="site-header__inner">
-        <div className="site-header__top">
-          <nav className="site-nav" aria-label="Primary navigation">
-            <div className="site-nav__scroller">
-              {primaryNavLinks.map(({ href, label, nav, icon }) => (
-                <a
-                  key={nav}
-                  className="site-nav-link"
-                  href={href}
-                  data-nav={nav}
-                  aria-current={activeNav === nav ? 'page' : undefined}
-                >
-                  <span className="site-nav-link__icon" aria-hidden="true">
-                    {icon}
-                  </span>
-                  <span className="site-nav-link__label">{label}</span>
-                </a>
-              ))}
-            </div>
+        <div className="site-header__primary">
+          <a className="site-header__brand" href="index.html" aria-label="Smart Movie Match home">
+            <span className="site-header__brand-icon" aria-hidden="true">🎬</span>
+            <span className="site-header__brand-text">Smart Movie Match</span>
+          </a>
+          <nav className="site-header__nav" aria-label="Primary navigation">
+            {primaryNavLinks.map(({ href, label, nav, icon }) => (
+              <a
+                key={nav}
+                className="site-header__link"
+                href={href}
+                data-nav={nav}
+                aria-current={activeNav === nav ? 'page' : undefined}
+              >
+                <span className="site-header__icon" aria-hidden="true">{icon}</span>
+                <span className="site-header__label">{label}</span>
+              </a>
+            ))}
           </nav>
         </div>
-        <div className="site-header__bottom">
+        <div className="site-header__secondary">
+          <div className="site-header__controls">
+            <button
+              id="themeToggle"
+              className="btn-theme-toggle"
+              type="button"
+              aria-label="Switch to light theme"
+              data-theme-target="light"
+            >
+              <span className="btn-theme-icon" aria-hidden="true">🌙</span>
+              <span className="btn-theme-label">Dark</span>
+            </button>
+            <button
+              id="notificationBell"
+              className="notification-bell"
+              type="button"
+              aria-haspopup="true"
+              aria-expanded="false"
+              aria-controls="notificationPanel"
+              hidden
+            >
+              <span className="notification-icon" aria-hidden="true">🔔</span>
+              <span id="notificationCount" className="notification-count" hidden>
+                0
+              </span>
+              <span className="sr-only">Open notifications</span>
+            </button>
+          </div>
           <div className="site-header__account">
             <div className="account-bar" role="navigation" data-account-state="guest">
-              <div className="account-bar__utilities site-header__actions">
-                <button
-                  id="themeToggle"
-                  className="btn-theme-toggle"
-                  type="button"
-                  aria-label="Switch to light theme"
-                  data-theme-target="light"
-                >
-                  <span className="btn-theme-icon" aria-hidden="true">🌙</span>
-                  <span className="btn-theme-label">Dark</span>
-                </button>
-                <button
-                  id="notificationBell"
-                  className="notification-bell"
-                  type="button"
-                  aria-haspopup="true"
-                  aria-expanded="false"
-                  aria-controls="notificationPanel"
-                  hidden
-                >
-                  <span className="notification-icon" aria-hidden="true">🔔</span>
-                  <span id="notificationCount" className="notification-count" hidden>
-                    0
-                  </span>
-                  <span className="sr-only">Open notifications</span>
-                </button>
-              </div>
-              <span className="account-bar__divider" aria-hidden="true"></span>
               <div className="account-bar__content">
                 <div className="account-bar-actions">
                   <a id="accountLoginLink" className="account-link" href="login.html">
@@ -90,16 +89,12 @@ function SiteHeader({ activeNav }: { activeNav: NavKey }) {
                     aria-controls="accountMenu"
                   >
                     <span className="account-avatar" id="accountAvatar" aria-hidden="true">
-                      <span id="accountAvatarInitials" className="account-avatar-initials">
-                        GM
-                      </span>
+                      <span id="accountAvatarInitials" className="account-avatar-initials">GM</span>
                       <img id="accountAvatarImg" alt="" />
                     </span>
                     <span className="account-pill-text">
                       <span id="accountName" className="account-name">Guest</span>
-                      <span id="accountPillSync" className="account-pill-sub">
-                        Cloud sync inactive
-                      </span>
+                      <span id="accountPillSync" className="account-pill-sub">Cloud sync inactive</span>
                     </span>
                     <span className="account-pill-caret" aria-hidden="true">▾</span>
                   </button>
