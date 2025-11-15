@@ -129,8 +129,13 @@
         </div>
       </div>
     </header>
-    <div class="site-main">
-      <div class="app pad-inline">
+    <main class="site-main">
+      <div class="site-main__backdrop" aria-hidden="true"></div>
+      <div class="site-main__glow" aria-hidden="true"></div>
+      <div class="site-main__inner pad-inline">
+        <div class="site-main__grid">
+          <section class="site-main__content">
+            <div class="app pad-inline">
   <header class="app-header">
     <div class="app-title-row pad-inline">
       <h1 class="app-title">🔐 Account settings</h1>
@@ -575,8 +580,64 @@
         </div>
       </div>
       </section>
+
+    </div>
     </main>
-  </div>
+          </section>
+          <aside class="site-main__sidebar" aria-label="Security snapshot">
+            <section class="site-sidebar-card">
+              <p class="site-sidebar-card__eyebrow">Security</p>
+              <h2 class="site-sidebar-card__title">Account status</h2>
+              <p class="site-sidebar-card__body">
+                Keep your login protected and devices organized so collaborative lists stay safe.
+              </p>
+              <div class="site-main__stat-grid">
+                <div class="site-main__stat">
+                  <span class="site-main__stat-value" aria-live="polite">On</span>
+                  <span class="site-main__stat-label">2FA</span>
+                </div>
+                <div class="site-main__stat">
+                  <span class="site-main__stat-value" aria-live="polite">30d</span>
+                  <span class="site-main__stat-label">Password age</span>
+                </div>
+              </div>
+              <div class="site-main__actions">
+                <button type="button" class="btn-primary site-sidebar-btn" data-action="update-password">
+                  Update password
+                </button>
+                <a class="site-sidebar-link" href="#settingsNotifications">Notification preferences</a>
+              </div>
+            </section>
+            <section class="site-sidebar-card">
+              <p class="site-sidebar-card__eyebrow">Quick actions</p>
+              <ul class="site-main__checklist">
+                <li class="site-main__check-item">
+                  <span class="site-main__check-icon" aria-hidden="true">🔐</span>
+                  <div>
+                    <p class="site-main__check-title">Review connected apps</p>
+                    <p class="site-main__check-subtitle">Disconnect anything you no longer use for sign-in.</p>
+                  </div>
+                </li>
+                <li class="site-main__check-item">
+                  <span class="site-main__check-icon" aria-hidden="true">📣</span>
+                  <div>
+                    <p class="site-main__check-title">Tune notifications</p>
+                    <p class="site-main__check-subtitle">Pick which alerts hit email vs. push.</p>
+                  </div>
+                </li>
+                <li class="site-main__check-item">
+                  <span class="site-main__check-icon" aria-hidden="true">⚠️</span>
+                  <div>
+                    <p class="site-main__check-title">Verify recovery info</p>
+                    <p class="site-main__check-subtitle">Make sure backup email and phone are current.</p>
+                  </div>
+                </li>
+              </ul>
+            </section>
+          </aside>
+        </div>
+      </div>
+    </main>
 
       </div>
     </div>

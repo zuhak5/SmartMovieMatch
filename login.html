@@ -129,8 +129,13 @@
           </div>
         </div>
       </header>
-      <div class="site-main site-main--auth">
-        <main class="auth-page">
+      <main class="site-main site-main--auth">
+        <div class="site-main__backdrop" aria-hidden="true"></div>
+        <div class="site-main__glow" aria-hidden="true"></div>
+        <div class="site-main__inner pad-inline">
+          <div class="site-main__grid">
+            <section class="site-main__content site-main__content--auth">
+              <main class="auth-page">
       <section class="auth-card pad-inline" aria-labelledby="authTitle">
         <div class="auth-card-header pad-inline">
           <a class="auth-logo" href="index.html">🎬 Smart Movie Match</a>
@@ -305,8 +310,56 @@
           <a class="btn-link" href="index.html">Return to the app</a>
         </div>
       </aside>
-        </main>
-      </div>
+              </main>
+            </section>
+            <aside class="site-main__sidebar site-main__sidebar--auth" aria-label="Membership highlights">
+              <section class="site-sidebar-card">
+                <p class="site-sidebar-card__eyebrow">Why join</p>
+                <h2 class="site-sidebar-card__title">Movie nights that adapt</h2>
+                <p class="site-sidebar-card__body">
+                  Sync your mood, pull in friends, and save every discovery with one secure login.
+                </p>
+                <div class="site-main__stat-grid">
+                  <div class="site-main__stat">
+                    <span class="site-main__stat-value">∞</span>
+                    <span class="site-main__stat-label">Live recs</span>
+                  </div>
+                  <div class="site-main__stat">
+                    <span class="site-main__stat-value">Cloud</span>
+                    <span class="site-main__stat-label">Sync state</span>
+                  </div>
+                </div>
+              </section>
+              <section class="site-sidebar-card">
+                <p class="site-sidebar-card__eyebrow">Perks</p>
+                <ul class="site-main__checklist">
+                  <li class="site-main__check-item">
+                    <span class="site-main__check-icon" aria-hidden="true">🪄</span>
+                    <div>
+                      <p class="site-main__check-title">Taste-aware matching</p>
+                      <p class="site-main__check-subtitle">Every rating, skip, and vibe builds a smarter reel.</p>
+                    </div>
+                  </li>
+                  <li class="site-main__check-item">
+                    <span class="site-main__check-icon" aria-hidden="true">🎉</span>
+                    <div>
+                      <p class="site-main__check-title">Collaborative parties</p>
+                      <p class="site-main__check-subtitle">Drop into watch rooms with synced chat and reactions.</p>
+                    </div>
+                  </li>
+                  <li class="site-main__check-item">
+                    <span class="site-main__check-icon" aria-hidden="true">🔔</span>
+                    <div>
+                      <p class="site-main__check-title">Smart notifications</p>
+                      <p class="site-main__check-subtitle">Get nudges when friends finish a film you loved.</p>
+                    </div>
+                  </li>
+                </ul>
+              </section>
+            </aside>
+          </div>
+        </div>
+      </main>
       <footer class="site-footer pad-inline">
         <div class="site-footer__inner">
           <p class="site-footer__copy">© SmartMovieMatch — friends-first movie intelligence.</p>

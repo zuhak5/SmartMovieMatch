@@ -300,9 +300,14 @@ export default function SignupPage() {
   return (
     <div className="site-shell site-shell--auth">
       <SiteHeader activeNav="account" />
-      <main className="site-main">
-        <div className="page signup-page">
-          <div className="card signup-card">
+      <main className="site-main site-main--auth">
+        <div className="site-main__backdrop" aria-hidden="true"></div>
+        <div className="site-main__glow" aria-hidden="true"></div>
+        <div className="site-main__inner pad-inline">
+          <div className="site-main__grid">
+            <section className="site-main__content site-main__content--auth">
+              <div className="page signup-page">
+                <div className="card signup-card">
           <h1 className="signup-title">Create your account</h1>
           <p className="signup-subtitle">Join SmartMovieMatch and start curating your perfect watchlist.</p>
 
@@ -394,6 +399,54 @@ export default function SignupPage() {
 
           {error && <p className="signup-error">{error}</p>}
         </form>
+                </div>
+              </div>
+            </section>
+            <aside className="site-main__sidebar site-main__sidebar--auth" aria-label="Signup highlights">
+              <section className="site-sidebar-card">
+                <p className="site-sidebar-card__eyebrow">What you get</p>
+                <h2 className="site-sidebar-card__title">Curated nights, synced</h2>
+                <p className="site-sidebar-card__body">
+                  Build a taste profile, follow friends, and let the engine queue perfect sessions.
+                </p>
+                <div className="site-main__stat-grid">
+                  <div className="site-main__stat">
+                    <span className="site-main__stat-value">Realtime</span>
+                    <span className="site-main__stat-label">Taste map</span>
+                  </div>
+                  <div className="site-main__stat">
+                    <span className="site-main__stat-value">5+</span>
+                    <span className="site-main__stat-label">Collaborative modes</span>
+                  </div>
+                </div>
+              </section>
+              <section className="site-sidebar-card">
+                <p className="site-sidebar-card__eyebrow">Fast track</p>
+                <ul className="site-main__checklist">
+                  <li className="site-main__check-item">
+                    <span className="site-main__check-icon" aria-hidden="true">⚡</span>
+                    <div>
+                      <p className="site-main__check-title">One-minute signup</p>
+                      <p className="site-main__check-subtitle">Pick a handle and avatar—no credit card required.</p>
+                    </div>
+                  </li>
+                  <li className="site-main__check-item">
+                    <span className="site-main__check-icon" aria-hidden="true">🧭</span>
+                    <div>
+                      <p className="site-main__check-title">Guided onboarding</p>
+                      <p className="site-main__check-subtitle">Initial prompts teach the algorithm your mood quickly.</p>
+                    </div>
+                  </li>
+                  <li className="site-main__check-item">
+                    <span className="site-main__check-icon" aria-hidden="true">🧑‍🤝‍🧑</span>
+                    <div>
+                      <p className="site-main__check-title">Instant friend sync</p>
+                      <p className="site-main__check-subtitle">Find people via handle or email to start sharing queues.</p>
+                    </div>
+                  </li>
+                </ul>
+              </section>
+            </aside>
           </div>
         </div>
       </main>
