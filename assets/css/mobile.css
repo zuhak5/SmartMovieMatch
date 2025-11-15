@@ -313,12 +313,12 @@ a {
 
 .site-header {
   position: sticky;
+  border-end-start-radius: 15px;
+  border-bottom-right-radius: 15px;
   top: 0;
   z-index: 70;
   padding-block: clamp(0.55rem, 1.6vw, 1.2rem);
-  background:
-    linear-gradient(140deg, rgba(2, 6, 23, 0.98), rgba(15, 23, 42, 0.82)),
-    radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.22), transparent 58%);
+  background: content-box;
   border-bottom: 1px solid rgba(59, 130, 246, 0.28);
   box-shadow:
     0 22px 50px rgba(2, 6, 23, 0.65),
@@ -459,8 +459,7 @@ body[data-theme="light"] .site-header__nav {
   padding: 0.45rem 0.9rem;
   border-radius: 999px;
   border: 1px solid rgba(59, 130, 246, 0.32);
-  background:
-    linear-gradient(130deg, rgba(15, 23, 42, 0.88), rgba(15, 23, 42, 0.6));
+  background: content-box;
   box-shadow:
     0 18px 40px rgba(2, 6, 23, 0.55),
     inset 0 0 0 1px rgba(15, 23, 42, 0.35);
@@ -10561,9 +10560,7 @@ body[data-theme="light"] .control-chip input {
   bottom: clamp(0.65rem, 1.6vw, 1.8rem);
   transform: translateX(-50%);
   width: min(560px, calc(100% - clamp(1rem, 5vw, 3rem)));
-  background:
-    linear-gradient(145deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.72)),
-    radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.18), transparent 62%);
+  background: content-box;
   border: 1px solid rgba(59, 130, 246, 0.25);
   border-radius: 28px;
   padding: 0.35rem;
