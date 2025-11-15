@@ -1876,7 +1876,7 @@ body[data-theme="light"] .account-link:hover {
   }
   @media (max-width: 720px) {
     .notification-panel {
-      max-height: 92dvh;
+      max-height: 60dvh;
     }
   }
 }
