@@ -129,8 +129,13 @@
         </div>
       </div>
     </header>
-    <div class="site-main">
-      <div class="app pad-inline">
+    <main class="site-main">
+      <div class="site-main__backdrop" aria-hidden="true"></div>
+      <div class="site-main__glow" aria-hidden="true"></div>
+      <div class="site-main__inner pad-inline">
+        <div class="site-main__grid">
+          <section class="site-main__content">
+            <div class="app pad-inline">
   <header class="app-header">
     <div class="app-title-row pad-inline">
       <h1 class="app-title">🧾 Profile overview</h1>
@@ -1003,8 +1008,61 @@
       </div>
     </section>
 
+    </div>
   </main>
-</div>
+          </section>
+          <aside class="site-main__sidebar" aria-label="Profile snapshot">
+            <section class="site-sidebar-card">
+              <p class="site-sidebar-card__eyebrow">Profile health</p>
+              <h2 class="site-sidebar-card__title">Cloud sync ready</h2>
+              <p class="site-sidebar-card__body">
+                Keep logging watches and ratings so the taste engine has richer signals for your picks.
+              </p>
+              <div class="site-main__stat-grid">
+                <div class="site-main__stat">
+                  <span class="site-main__stat-value" aria-live="polite">8</span>
+                  <span class="site-main__stat-label">Active lists</span>
+                </div>
+                <div class="site-main__stat">
+                  <span class="site-main__stat-value" aria-live="polite">Live</span>
+                  <span class="site-main__stat-label">Sync status</span>
+                </div>
+              </div>
+              <div class="site-main__actions">
+                <a class="btn-primary site-sidebar-btn" href="#collectionsPanel">Manage collections</a>
+                <a class="site-sidebar-link" href="#friendsPanel">See recent activity</a>
+              </div>
+            </section>
+            <section class="site-sidebar-card">
+              <p class="site-sidebar-card__eyebrow">Quick wins</p>
+              <ul class="site-main__checklist">
+                <li class="site-main__check-item">
+                  <span class="site-main__check-icon" aria-hidden="true">⭐</span>
+                  <div>
+                    <p class="site-main__check-title">Rate a few standouts</p>
+                    <p class="site-main__check-subtitle">Favorites inform the matchmaker and populate your highlights.</p>
+                  </div>
+                </li>
+                <li class="site-main__check-item">
+                  <span class="site-main__check-icon" aria-hidden="true">🗂️</span>
+                  <div>
+                    <p class="site-main__check-title">Organize lists</p>
+                    <p class="site-main__check-subtitle">Drag-and-drop in Collections to curate themed watch parties.</p>
+                  </div>
+                </li>
+                <li class="site-main__check-item">
+                  <span class="site-main__check-icon" aria-hidden="true">🕒</span>
+                  <div>
+                    <p class="site-main__check-title">Log watched items</p>
+                    <p class="site-main__check-subtitle">Anything you mark as watched boosts the timeline accuracy.</p>
+                  </div>
+                </li>
+              </ul>
+            </section>
+          </aside>
+        </div>
+      </div>
+    </main>
 
 <div id="globalToastRegion" class="global-toast-region pad-inline" role="status" aria-live="polite"></div>
 

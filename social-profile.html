@@ -129,8 +129,13 @@
         </div>
       </div>
     </header>
-    <div class="site-main">
-      <div class="app pad-inline">
+    <main class="site-main">
+      <div class="site-main__backdrop" aria-hidden="true"></div>
+      <div class="site-main__glow" aria-hidden="true"></div>
+      <div class="site-main__inner pad-inline">
+        <div class="site-main__grid">
+          <section class="site-main__content">
+            <div class="app pad-inline">
   <header class="app-header">
     <div class="app-title-row pad-inline">
       <h1 id="socialProfileTitle" class="app-title">Friend profile</h1>
@@ -223,7 +228,62 @@
         <div id="socialProfileBody" class="modal-section social-profile-body pad-inline"></div>
       </div>
     </section>
+
+    </div>
   </main>
+          </section>
+          <aside class="site-main__sidebar" aria-label="Community context">
+            <section class="site-sidebar-card">
+              <p class="site-sidebar-card__eyebrow">Social signal</p>
+              <h2 class="site-sidebar-card__title">Community pulse</h2>
+              <p class="site-sidebar-card__body">
+                Glance at followers, recent logs, and collaborative invites while reviewing this member.
+              </p>
+              <div class="site-main__stat-grid">
+                <div class="site-main__stat">
+                  <span class="site-main__stat-value" aria-live="polite">1.2k</span>
+                  <span class="site-main__stat-label">Followers</span>
+                </div>
+                <div class="site-main__stat">
+                  <span class="site-main__stat-value" aria-live="polite">3</span>
+                  <span class="site-main__stat-label">Live lists</span>
+                </div>
+              </div>
+              <div class="site-main__actions">
+                <a class="btn-primary site-sidebar-btn" href="#socialProfileBody">View activity</a>
+                <a class="site-sidebar-link" href="#peeruserHeroHost">Open hero card</a>
+              </div>
+            </section>
+            <section class="site-sidebar-card">
+              <p class="site-sidebar-card__eyebrow">Recommended steps</p>
+              <ul class="site-main__checklist">
+                <li class="site-main__check-item">
+                  <span class="site-main__check-icon" aria-hidden="true">📌</span>
+                  <div>
+                    <p class="site-main__check-title">Pin to watch party</p>
+                    <p class="site-main__check-subtitle">Invite them to co-host an upcoming watch party lobby.</p>
+                  </div>
+                </li>
+                <li class="site-main__check-item">
+                  <span class="site-main__check-icon" aria-hidden="true">📝</span>
+                  <div>
+                    <p class="site-main__check-title">Leave a comment</p>
+                    <p class="site-main__check-subtitle">Respond to their latest review to keep the convo going.</p>
+                  </div>
+                </li>
+                <li class="site-main__check-item">
+                  <span class="site-main__check-icon" aria-hidden="true">🎬</span>
+                  <div>
+                    <p class="site-main__check-title">Share a rec</p>
+                    <p class="site-main__check-subtitle">Drop a direct recommendation into their feed.</p>
+                  </div>
+                </li>
+              </ul>
+            </section>
+          </aside>
+        </div>
+      </div>
+    </main>
       </div>
     </div>
     <footer class="site-footer pad-inline">

@@ -129,8 +129,13 @@
         </div>
       </div>
     </header>
-    <div class="site-main">
-      <div class="app pad-inline">
+    <main class="site-main">
+      <div class="site-main__backdrop" aria-hidden="true"></div>
+      <div class="site-main__glow" aria-hidden="true"></div>
+      <div class="site-main__inner pad-inline">
+        <div class="site-main__grid">
+          <section class="site-main__content">
+            <div class="app pad-inline">
   <header class="app-header">
     <div class="app-title-row pad-inline">
       <h1 id="socialProfileTitle" class="app-title">Peer user profile</h1>
@@ -227,8 +232,62 @@
         <div id="socialProfileBody" class="modal-section social-profile-body pad-inline"></div>
       </div>
     </section>
+
+    </div>
   </main>
-</div>
+          </section>
+          <aside class="site-main__sidebar" aria-label="Friend signals">
+            <section class="site-sidebar-card">
+              <p class="site-sidebar-card__eyebrow">Signal check</p>
+              <h2 class="site-sidebar-card__title">Taste overlap</h2>
+              <p class="site-sidebar-card__body">
+                Compare logs, shared lists, and upcoming watch parties before sending an invite.
+              </p>
+              <div class="site-main__stat-grid">
+                <div class="site-main__stat">
+                  <span class="site-main__stat-value" aria-live="polite">72%</span>
+                  <span class="site-main__stat-label">Overlap</span>
+                </div>
+                <div class="site-main__stat">
+                  <span class="site-main__stat-value" aria-live="polite">5</span>
+                  <span class="site-main__stat-label">Shared lists</span>
+                </div>
+              </div>
+              <div class="site-main__actions">
+                <a class="btn-primary site-sidebar-btn" href="#socialProfileBody">Open full profile</a>
+                <a class="site-sidebar-link" href="#peeruserMutualHost">See mutuals</a>
+              </div>
+            </section>
+            <section class="site-sidebar-card">
+              <p class="site-sidebar-card__eyebrow">Ways to connect</p>
+              <ul class="site-main__checklist">
+                <li class="site-main__check-item">
+                  <span class="site-main__check-icon" aria-hidden="true">🤝</span>
+                  <div>
+                    <p class="site-main__check-title">Follow for activity</p>
+                    <p class="site-main__check-subtitle">Stay updated when they log a new film or list.</p>
+                  </div>
+                </li>
+                <li class="site-main__check-item">
+                  <span class="site-main__check-icon" aria-hidden="true">🎟️</span>
+                  <div>
+                    <p class="site-main__check-title">Invite to a watch party</p>
+                    <p class="site-main__check-subtitle">Use overlap as a guide for the next co-op queue.</p>
+                  </div>
+                </li>
+                <li class="site-main__check-item">
+                  <span class="site-main__check-icon" aria-hidden="true">💬</span>
+                  <div>
+                    <p class="site-main__check-title">Send a note</p>
+                    <p class="site-main__check-subtitle">Shout out a favorite list or suggest a swap.</p>
+                  </div>
+                </li>
+              </ul>
+            </section>
+          </aside>
+        </div>
+      </div>
+    </main>
 
       </div>
     </div>

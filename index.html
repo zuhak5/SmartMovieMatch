@@ -134,8 +134,13 @@
         </div>
       </div>
     </header>
-    <div class="site-main">
-      <div class="app pad-inline">
+    <main class="site-main">
+      <div class="site-main__backdrop" aria-hidden="true"></div>
+      <div class="site-main__glow" aria-hidden="true"></div>
+      <div class="site-main__inner pad-inline">
+        <div class="site-main__grid">
+          <section class="site-main__content">
+            <div class="app pad-inline">
   <header class="app-header">
     <div class="app-title-row pad-inline">
       <h1 class="app-title">
@@ -961,7 +966,61 @@
 
     </div>
   </main>
-</div>
+          </section>
+          <aside class="site-main__sidebar" aria-label="Live discovery snapshot">
+            <section class="site-sidebar-card">
+              <p class="site-sidebar-card__eyebrow">Session status</p>
+              <h2 class="site-sidebar-card__title">Tonight’s focus</h2>
+              <p class="site-sidebar-card__body">
+                Keep the reel personal — steer the filters, jump to search, or ride the social hype.
+              </p>
+              <div class="site-main__stat-grid">
+                <div class="site-main__stat">
+                  <span class="site-main__stat-value" aria-live="polite">Live</span>
+                  <span class="site-main__stat-label">Discovery engine</span>
+                </div>
+                <div class="site-main__stat">
+                  <span class="site-main__stat-value" aria-live="polite">24h</span>
+                  <span class="site-main__stat-label">Activity window</span>
+                </div>
+              </div>
+              <div class="site-main__actions">
+                <button type="button" class="btn-primary site-sidebar-btn" data-sheet-open="filters">
+                  Tune filters
+                </button>
+                <a class="site-sidebar-link" href="#globalSearchPanel">Jump to search</a>
+              </div>
+            </section>
+            <section class="site-sidebar-card">
+              <p class="site-sidebar-card__eyebrow">Quick cues</p>
+              <ul class="site-main__checklist">
+                <li class="site-main__check-item">
+                  <span class="site-main__check-icon" aria-hidden="true">🌘</span>
+                  <div>
+                    <p class="site-main__check-title">Switch moods</p>
+                    <p class="site-main__check-subtitle">Toggle the Tonight / Fresh / Watchlist tabs up top.</p>
+                  </div>
+                </li>
+                <li class="site-main__check-item">
+                  <span class="site-main__check-icon" aria-hidden="true">🎛️</span>
+                  <div>
+                    <p class="site-main__check-title">Dial filters</p>
+                    <p class="site-main__check-subtitle">Genre, services, runtimes, and more live inside the sheet.</p>
+                  </div>
+                </li>
+                <li class="site-main__check-item">
+                  <span class="site-main__check-icon" aria-hidden="true">✨</span>
+                  <div>
+                    <p class="site-main__check-title">Catch friends hype</p>
+                    <p class="site-main__check-subtitle">Scroll to Activity to see what your circle is buzzing about.</p>
+                  </div>
+                </li>
+              </ul>
+            </section>
+          </aside>
+        </div>
+      </div>
+    </main>
 
   <div id="onboardingCoach" class="onboarding-coach pad-inline" role="dialog" aria-modal="true" hidden>
     <div class="onboarding-card pad-inline">
