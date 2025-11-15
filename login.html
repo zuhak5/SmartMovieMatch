@@ -48,40 +48,33 @@
             </nav>
           </div>
           <div class="site-header__bottom">
-            <div class="site-header__stack">
-              <span class="site-header__quick-pill">
-                <span class="site-header__quick-dot" aria-hidden="true"></span>
-                Live discovery
-              </span>
-              <button
-                id="themeToggle"
-                class="btn-theme-toggle"
-                type="button"
-                aria-label="Switch to light theme"
-                data-theme-target="light"
-              >
-                <span class="btn-theme-icon" aria-hidden="true">🌙</span>
-                <span class="btn-theme-label">Dark</span>
-              </button>
-            </div>
             <div class="site-header__account">
+              <div class="site-header__actions">
+                <button
+                  id="themeToggle"
+                  class="btn-theme-toggle"
+                  type="button"
+                  aria-label="Switch to light theme"
+                  data-theme-target="light"
+                >
+                  <span class="btn-theme-icon" aria-hidden="true">🌙</span>
+                  <span class="btn-theme-label">Dark</span>
+                </button>
+                <button
+                  id="notificationBell"
+                  class="notification-bell"
+                  type="button"
+                  aria-haspopup="true"
+                  aria-expanded="false"
+                  aria-controls="notificationPanel"
+                  hidden
+                >
+                  <span class="notification-icon" aria-hidden="true">🔔</span>
+                  <span id="notificationCount" class="notification-count" hidden>0</span>
+                  <span class="sr-only">Open notifications</span>
+                </button>
+              </div>
               <div class="account-bar" role="navigation" data-account-state="guest">
-                <div class="account-bar-top">
-                  <span id="accountGreeting" class="account-greeting">You’re browsing as guest.</span>
-                  <button
-                    id="notificationBell"
-                    class="notification-bell"
-                    type="button"
-                    aria-haspopup="true"
-                    aria-expanded="false"
-                    aria-controls="notificationPanel"
-                    hidden
-                  >
-                    <span class="notification-icon" aria-hidden="true">🔔</span>
-                    <span id="notificationCount" class="notification-count" hidden>0</span>
-                    <span class="sr-only">Open notifications</span>
-                  </button>
-                </div>
                 <div class="account-bar-actions">
                   <a id="accountLoginLink" class="account-link" href="login.html">Log in / Sign up</a>
                 </div>
