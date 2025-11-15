@@ -1655,6 +1655,7 @@ body[data-theme="light"] .account-bar {
   gap: 0.45rem;
   cursor: pointer;
   font-size: 0.78rem;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.35);
   transition:
     background-color var(--transition-fast),
     color var(--transition-fast),
@@ -1683,6 +1684,7 @@ body[data-theme="light"] .account-bar {
 
 body[data-theme="light"] .btn-theme-toggle {
   color: var(--text-strong);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
 }
 
 body[data-theme="light"] .btn-theme-toggle:hover {
