@@ -70,25 +70,40 @@ function initBottomNav() {
     const selector = target.dataset.navTarget;
     const focusSelector = target.dataset.navFocus;
     const view = target.dataset.navView;
-    if (url) {
-      window.location.assign(url);
+    const fallbackHref = target instanceof HTMLAnchorElement ? target.getAttribute('href') : null;
+    const destination = url || fallbackHref;
+    let handled = false;
+    if (selector) {
+      const resolved = document.querySelector(selector);
+      if (resolved) {
+        revealSection(resolved);
+        handled = true;
+        if (focusSelector) {
+          window.requestAnimationFrame(() => {
+            const focusTarget = document.querySelector(focusSelector);
+            if (focusTarget instanceof HTMLElement) {
+              focusTarget.focus();
+            }
+          });
+        }
+      }
+    }
+    if (!handled && view) {
+      setActiveAppView(view);
+      handled = true;
+    }
+    if (handled) {
+      event.preventDefault();
+      if (navId) {
+        setActive(navId);
+      }
       return;
     }
-    if (selector) {
-      revealSection(selector);
-      if (focusSelector) {
-        window.requestAnimationFrame(() => {
-          const focusTarget = document.querySelector(focusSelector);
-          if (focusTarget instanceof HTMLElement) {
-            focusTarget.focus();
-          }
-        });
+    if (destination) {
+      if (url || !(target instanceof HTMLAnchorElement)) {
+        event.preventDefault();
+        window.location.assign(destination);
       }
-    } else if (view) {
-      setActiveAppView(view);
-    }
-    if (navId) {
-      setActive(navId);
     }
   });
 }
