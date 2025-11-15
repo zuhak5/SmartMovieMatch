@@ -8,6 +8,10 @@
   <meta name="theme-color" content="#020617" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap"
+    rel="stylesheet"
+  />
   <link rel="stylesheet" href="assets/css/mobile.css" />
 
 </head>
@@ -123,14 +127,39 @@
       Tell me what you’re into and I’ll hunt for fresh movies online, then tailor the picks
       to your mood and what you’ve already watched.
     </p>
+    <div class="app-top-tabs pad-inline" role="tablist" aria-label="Discovery spotlight">
+      <button class="tab-chip is-active" type="button" role="tab" aria-selected="true" data-tab-chip>
+        Tonight
+      </button>
+      <button class="tab-chip" type="button" role="tab" aria-selected="false" data-tab-chip>
+        Fresh for you
+      </button>
+      <button class="tab-chip" type="button" role="tab" aria-selected="false" data-tab-chip>
+        Watchlist
+      </button>
+      <button class="tab-chip" type="button" role="tab" aria-selected="false" data-tab-chip>
+        Friends hype
+      </button>
+    </div>
 
     <section id="globalSearchPanel" class="panel global-search-panel pad-inline" aria-label="Global search">
       <div class="panel-inner pad-inline">
         <div class="panel-header pad-inline">
-          <div class="pad-inline">
+          <div>
             <p class="global-search-eyebrow">Search Smart Movie Match</p>
             <h2 class="panel-title">Find movies, friends, or genres</h2>
             <p class="panel-subtitle">Type anything you’re curious about and jump to the right spot.</p>
+          </div>
+          <div class="panel-actions">
+            <button
+              type="button"
+              class="icon-button"
+              id="filtersSheetOpen"
+              data-sheet-open="filters"
+            >
+              <span aria-hidden="true">🎛️</span>
+              Filters
+            </button>
           </div>
         </div>
         <form id="globalSearchForm" class="global-search-form" role="search" novalidate>
@@ -751,6 +780,75 @@
         </div>
       </section>
 
+      <section id="watchPartyPanel" class="panel watch-party-panel pad-inline" aria-label="Watch party">
+        <div class="panel-inner pad-inline">
+          <div class="panel-header pad-inline">
+            <div>
+              <div class="panel-title">Watch party</div>
+              <div class="panel-subtitle">Gather your crew, sync the stream, and chat live.</div>
+            </div>
+            <div class="panel-actions">
+              <button type="button" class="icon-button">
+                <span aria-hidden="true">➕</span>
+                Invite
+              </button>
+            </div>
+          </div>
+          <div class="watch-party-grid">
+            <article class="watch-party-card watch-party-card--lobby" aria-label="Watch party lobby">
+              <header>
+                <p class="pill-context">
+                  <span class="pill-dot" aria-hidden="true"></span>
+                  Lobby open · Starts in 12 min
+                </p>
+                <h3>Blade Runner 2049 · Cozy neon rewatch</h3>
+              </header>
+              <div class="watch-party-meta">
+                <p>Runtime · 2h 44m · Streaming on Hulu</p>
+                <p>Host: <strong>@embertrail</strong> · Private</p>
+              </div>
+              <div class="watch-party-participants" aria-label="Participants">
+                <span class="watch-party-avatar" aria-hidden="true"></span>
+                <span class="watch-party-avatar" aria-hidden="true"></span>
+                <span class="watch-party-avatar" aria-hidden="true"></span>
+                <span class="watch-party-avatar" aria-hidden="true"></span>
+                <span class="watch-party-count">+ 5 more</span>
+              </div>
+              <div class="watch-party-chat" aria-live="polite">
+                <p><strong>@sol</strong> queued a synthwave warm-up playlist.</p>
+                <p><strong>@ari</strong> can host the post-show talkback!</p>
+                <p><strong>You</strong>: grabbing snacks, brb 🍿</p>
+              </div>
+              <div class="watch-party-input">
+                <label class="sr-only" for="watchPartyMessage">Chat message</label>
+                <input id="watchPartyMessage" type="text" placeholder="Drop a message" />
+                <button type="button" class="btn-primary">Ready</button>
+              </div>
+            </article>
+            <article class="watch-party-card watch-party-card--live" aria-label="Live party overlay">
+              <div class="pill-context">
+                <span class="pill-dot" aria-hidden="true"></span>
+                Neon noir club · LIVE
+              </div>
+              <div class="watch-party-meta">
+                <p>We’re synced on <strong>Prime Video</strong>. Stream controls stay here.</p>
+              </div>
+              <div class="watch-party-chat">
+                <p><strong>@embertrail</strong>: Pause at the spinner transition?</p>
+                <p><strong>@you</strong>: Locked in. These visuals 😮‍💨</p>
+              </div>
+              <div class="watch-party-input">
+                <input type="text" placeholder="Send a quick reaction" />
+                <button type="button" class="btn-secondary">👏</button>
+                <button type="button" class="btn-secondary">🔥</button>
+                <button type="button" class="btn-secondary">😭</button>
+              </div>
+              <button type="button" class="btn-ghost">Leave party</button>
+            </article>
+          </div>
+        </div>
+      </section>
+
       <section
         id="friendsActivityPanel"
         class="panel friends-activity-panel pad-inline"
@@ -855,6 +953,79 @@
   </div>
 
   <div
+    id="filtersSheet"
+    class="filters-sheet"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="filtersSheetTitle"
+    aria-hidden="true"
+    hidden
+  >
+    <div class="filters-sheet__surface">
+      <div class="filters-sheet__header">
+        <div>
+          <p class="global-search-eyebrow">Dial the lineup</p>
+          <h2 id="filtersSheetTitle" class="panel-title">Filters</h2>
+        </div>
+        <button type="button" class="icon-button" id="filtersSheetClose" aria-label="Close filters">
+          ✕
+        </button>
+      </div>
+      <div class="filters-sheet__body">
+        <section class="filter-group">
+          <h3>Sort by</h3>
+          <div class="filter-group__options">
+            <button type="button" class="chip is-active" data-filter-chip>List order</button>
+            <button type="button" class="chip" data-filter-chip>Rating</button>
+            <button type="button" class="chip" data-filter-chip>Release date</button>
+          </div>
+        </section>
+        <section class="filter-group">
+          <h3>Appearance</h3>
+          <div class="filter-group__options">
+            <label class="chip">
+              <input type="checkbox" checked />
+              <span>Fade watched films</span>
+            </label>
+            <label class="chip">
+              <input type="checkbox" />
+              <span>Use custom posters</span>
+            </label>
+          </div>
+        </section>
+        <section class="filter-group">
+          <h3>Content</h3>
+          <div class="filter-group__options">
+            <button type="button" class="chip" data-filter-chip>Year range</button>
+            <button type="button" class="chip" data-filter-chip>Genre</button>
+            <button type="button" class="chip" data-filter-chip>Country</button>
+            <button type="button" class="chip" data-filter-chip>Language</button>
+            <button type="button" class="chip" data-filter-chip>Service</button>
+            <button type="button" class="chip" data-filter-chip>Release type</button>
+            <button type="button" class="chip" data-filter-chip>Length</button>
+            <button type="button" class="chip" data-filter-chip>Film vs TV</button>
+          </div>
+        </section>
+        <section class="filter-group">
+          <h3>Your account</h3>
+          <div class="filter-group__options">
+            <button type="button" class="chip" data-filter-chip>Any status</button>
+            <button type="button" class="chip" data-filter-chip>Only watched</button>
+            <button type="button" class="chip" data-filter-chip>Only unwatched</button>
+            <label class="chip">
+              <input type="checkbox" />
+              <span>Liked only</span>
+            </label>
+          </div>
+        </section>
+      </div>
+      <div class="filters-sheet__footer">
+        <button type="button" class="btn-primary" id="filtersSheetApply">Apply filters</button>
+      </div>
+    </div>
+  </div>
+
+  <div
     id="movieOverlay"
     class="movie-overlay"
     role="dialog"
@@ -911,6 +1082,57 @@
       </div>
     </footer>
   </div>
+
+  <nav class="bottom-nav" aria-label="Primary">
+    <div class="bottom-nav__inner">
+      <button
+        type="button"
+        class="bottom-nav__action"
+        data-nav="home"
+        data-nav-target="#preferencesPanel"
+        aria-current="page"
+      >
+        <span aria-hidden="true">🏠</span>
+        Home
+      </button>
+      <button
+        type="button"
+        class="bottom-nav__action"
+        data-nav="search"
+        data-nav-target="#globalSearchPanel"
+      >
+        <span aria-hidden="true">🔎</span>
+        Search
+      </button>
+      <button
+        type="button"
+        class="bottom-nav__action"
+        data-nav="activity"
+        data-nav-target="#friendsActivityPanel"
+      >
+        <span aria-hidden="true">✨</span>
+        Activity
+      </button>
+      <button
+        type="button"
+        class="bottom-nav__action"
+        data-nav="lists"
+        data-nav-url="profile.html#collectionsPanel"
+      >
+        <span aria-hidden="true">📋</span>
+        Lists
+      </button>
+      <button
+        type="button"
+        class="bottom-nav__action"
+        data-nav="profile"
+        data-nav-url="profile.html"
+      >
+        <span aria-hidden="true">👤</span>
+        Profile
+      </button>
+    </div>
+  </nav>
 
   <script type="module" src="assets/js/main.js"></script>
   <script type="module" src="assets/js/custom-fixes.js"></script>
