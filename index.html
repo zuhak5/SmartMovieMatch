@@ -216,7 +216,11 @@
         <form id="prefsForm" class="prefs-form">
           <div class="prefs-groups pad-inline">
             <section class="prefs-section prefs-section--presets">
-              <div class="vibe-preset-panel pad-inline" aria-label="Starter vibe presets">
+              <div
+                class="vibe-preset-panel pad-inline"
+                aria-label="Starter vibe presets"
+                data-component="vibe-presets"
+              >
                 <div class="vibe-preset-header pad-inline">
                   <div class="pad-inline">
                     <p class="vibe-preset-eyebrow">Need inspiration?</p>
@@ -225,8 +229,17 @@
                       Tap a card to auto-fill genres, then fine-tune below.
                     </p>
                   </div>
+                  <button
+                    type="button"
+                    class="vibe-preset-toggle"
+                    id="vibePresetToggle"
+                    aria-expanded="true"
+                    aria-controls="vibePresetGrid"
+                  >
+                    Hide presets
+                  </button>
                 </div>
-                <div class="vibe-preset-grid pad-inline" role="group">
+                <div class="vibe-preset-grid pad-inline" role="group" id="vibePresetGrid">
                   <button
                     type="button"
                     class="vibe-preset-card"
@@ -900,6 +913,7 @@
   </div>
 
   <script type="module" src="assets/js/main.js"></script>
+  <script type="module" src="assets/js/custom-fixes.js"></script>
 
 </body>
 </html>

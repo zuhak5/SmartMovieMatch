@@ -220,6 +220,7 @@
                 <a class="settings-nav-link is-active" href="#profile" aria-current="true">Profile</a>
                 <a class="settings-nav-link" href="#security">Security</a>
                 <a class="settings-nav-link" href="#notifications">Notifications</a>
+                <a class="settings-nav-link" href="#safety">Safety</a>
               </nav>
               <p class="settings-sidebar-copy">Jump straight to a section without endless scrolling.</p>
             </aside>
@@ -483,6 +484,69 @@
                 </form>
               </section>
 
+              <div id="safety" class="settings-anchor pad-inline" aria-hidden="true"></div>
+              <section
+                class="settings-card pad-inline"
+                aria-labelledby="accountSettingsSafetyHeading"
+                data-settings-section="safety"
+              >
+                <div class="settings-card-header pad-inline">
+                  <h2 id="accountSettingsSafetyHeading">Safety</h2>
+                  <p>Mute or block members and sign out everywhere with one tap.</p>
+                </div>
+                <div class="settings-safety-grid pad-inline" role="list">
+                  <article class="settings-safety-card pad-inline" role="listitem">
+                    <div>
+                      <h3>Muted members</h3>
+                      <p>Keep a low profile without notifying the other person.</p>
+                    </div>
+                    <div
+                      id="settingsMutedEmpty"
+                      class="settings-safety-empty"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      You haven’t muted anyone yet. Use the Mute button on a profile to hide their updates.
+                    </div>
+                    <div
+                      id="settingsMutedList"
+                      class="settings-safety-list"
+                      role="list"
+                      hidden
+                    ></div>
+                  </article>
+                  <article class="settings-safety-card pad-inline" role="listitem">
+                    <div>
+                      <h3>Blocked members</h3>
+                      <p>Completely stop follows, comments, and invites from specific handles.</p>
+                    </div>
+                    <div
+                      id="settingsBlockedEmpty"
+                      class="settings-safety-empty"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      No blocked members yet. Choose Block from any profile’s safety tools to add someone here.
+                    </div>
+                    <div
+                      id="settingsBlockedList"
+                      class="settings-safety-list"
+                      role="list"
+                      hidden
+                    ></div>
+                  </article>
+                </div>
+                <div class="settings-signout-block pad-inline">
+                  <div class="settings-signout-copy">
+                    <h3>Sign out everywhere</h3>
+                    <p>Clears cached sessions on this device and returns you to the home page.</p>
+                  </div>
+                  <button type="button" class="btn-secondary settings-signout-btn" data-global-signout="true">
+                    Sign out everywhere
+                  </button>
+                </div>
+              </section>
+
             </div>
           </div>
         </div>
@@ -504,6 +568,7 @@
   <div id="globalToastRegion" class="global-toast-region pad-inline" role="status" aria-live="polite"></div>
 
   <script type="module" src="assets/js/main.js"></script>
+  <script type="module" src="assets/js/custom-fixes.js"></script>
 
 </body>
 </html>

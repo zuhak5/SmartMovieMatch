@@ -232,6 +232,14 @@
                   <span class="social-stat-label">Mutual followers</span>
                   <span id="profileHeroMutual" class="social-stat-value">0</span>
                 </div>
+                <div class="social-stat pad-inline profile-hero-stat--library">
+                  <span class="social-stat-label">Favorites</span>
+                  <span id="profileHeroFavorites" class="social-stat-value">0</span>
+                </div>
+                <div class="social-stat pad-inline profile-hero-stat--library">
+                  <span class="social-stat-label">Watched</span>
+                  <span id="profileHeroWatched" class="social-stat-value">0</span>
+                </div>
               </div>
             </div>
           </div>
@@ -801,15 +809,43 @@
                 <div id="socialFollowersList" class="social-following-list pad-inline" hidden></div>
               </section>
             </div>
-            <section class="social-suggestions pad-inline">
-              <header class="social-section-header">
-                <h3>People you may know</h3>
-                <p>Follow recommendations based on mutual followers, interests, and favorites.</p>
+            <section class="social-suggestions pad-inline" data-carousel="friends">
+              <header class="social-section-header social-suggestions-header">
+                <div>
+                  <h3>People you may know</h3>
+                  <p>Follow recommendations based on mutual followers, interests, and favorites.</p>
+                </div>
+                <div class="social-suggestions-nav" aria-label="Suggestion controls">
+                  <button
+                    type="button"
+                    class="carousel-nav"
+                    id="socialSuggestionsPrev"
+                    aria-label="Scroll suggestions backward"
+                  >
+                    ←
+                  </button>
+                  <button
+                    type="button"
+                    class="carousel-nav"
+                    id="socialSuggestionsNext"
+                    aria-label="Scroll suggestions forward"
+                  >
+                    →
+                  </button>
+                </div>
               </header>
               <div id="socialSuggestionsEmpty" class="empty-state empty-state--subtle pad-inline">
                 We’ll suggest critics and friends as your circle grows.
               </div>
-              <div id="socialSuggestionsList" class="social-suggestions-list pad-inline" hidden></div>
+              <div class="social-suggestions-carousel">
+                <div
+                  id="socialSuggestionsList"
+                  class="social-suggestions-list pad-inline"
+                  role="list"
+                  tabindex="0"
+                  hidden
+                ></div>
+              </div>
             </section>
           </section>
           <section class="social-share-panel pad-inline">
@@ -989,6 +1025,7 @@
   </div>
 
 <script type="module" src="assets/js/main.js"></script>
+<script type="module" src="assets/js/custom-fixes.js"></script>
 
 </body>
 </html>
