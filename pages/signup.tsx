@@ -41,33 +41,33 @@ function SiteHeader({ activeNav }: { activeNav: NavKey }) {
         </div>
         <div className="site-header__secondary">
           <div className="site-header__controls">
-            <button
-              id="themeToggle"
-              className="btn-theme-toggle"
-              type="button"
-              aria-label="Switch to light theme"
-              data-theme-target="light"
-            >
-              <span className="btn-theme-icon" aria-hidden="true">🌙</span>
-              <span className="btn-theme-label">Dark</span>
-            </button>
-            <button
-              id="notificationBell"
-              className="notification-bell"
-              type="button"
-              aria-haspopup="true"
-              aria-expanded="false"
-              aria-controls="notificationPanel"
-              hidden
-            >
-              <span className="notification-icon" aria-hidden="true">🔔</span>
-              <span id="notificationCount" className="notification-count" hidden>
-                0
-              </span>
-              <span className="sr-only">Open notifications</span>
-            </button>
-          </div>
-          <div className="site-header__account">
+            <div className="site-header__control-group">
+              <button
+                id="themeToggle"
+                className="btn-theme-toggle"
+                type="button"
+                aria-label="Switch to light theme"
+                data-theme-target="light"
+              >
+                <span className="btn-theme-icon" aria-hidden="true">🌙</span>
+                <span className="btn-theme-label">Dark</span>
+              </button>
+              <button
+                id="notificationBell"
+                className="notification-bell"
+                type="button"
+                aria-haspopup="true"
+                aria-expanded="false"
+                aria-controls="notificationPanel"
+                hidden
+              >
+                <span className="notification-icon" aria-hidden="true">🔔</span>
+                <span id="notificationCount" className="notification-count" hidden>
+                  0
+                </span>
+                <span className="sr-only">Open notifications</span>
+              </button>
+            </div>
             <div className="account-bar" role="navigation" data-account-state="guest">
               <div className="account-bar__content">
                 <div className="account-bar-actions">
