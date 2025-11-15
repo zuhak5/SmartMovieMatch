@@ -66,7 +66,7 @@ import {
   closeMovieOverlay,
   isMovieOverlayOpen
 } from "./ui.js";
-import { $ } from "./dom.js";
+import { $, closest } from "./dom.js";
 import { playUiClick, playExpandSound } from "./sound.js";
 import {
   createProfileButton,
@@ -1668,7 +1668,7 @@ function wireEvents() {
   });
 
   document.addEventListener("click", (event) => {
-    const settingsButton = event.target.closest("[data-profile-settings-action]");
+    const settingsButton = closest(event.target, "[data-profile-settings-action]");
     if (!settingsButton) {
       return;
     }
@@ -3970,7 +3970,7 @@ function updatePreferencesPreview() {
       };
 
       wrapper.addEventListener("click", (event) => {
-        if (event.target.closest("button")) {
+        if (closest(event.target, "button")) {
           return;
         }
         if (ensureSnapshotExpandedFromItem(wrapper, event)) {
@@ -3983,6 +3983,9 @@ function updatePreferencesPreview() {
       wrapper.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
+          if (closest(event.target, "button")) {
+            return;
+          }
           if (ensureSnapshotExpandedFromItem(wrapper, event)) {
             return;
           }

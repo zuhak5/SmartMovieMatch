@@ -1,5 +1,5 @@
 import { computeWatchedGenreWeights } from "./taste.js";
-import { $ } from "./dom.js";
+import { $, closest } from "./dom.js";
 import { playExpandSound, playFavoriteSound, playUiClick } from "./sound.js";
 import { acknowledgeFriendActivity } from "./social.js";
 import { TMDB_GENRES } from "./config.js";
@@ -972,7 +972,7 @@ export function renderWatchedList(watchedMovies, options = {}) {
       }
 
       item.addEventListener("click", (event) => {
-        if (event.target.closest(".favorite-remove")) {
+        if (closest(event.target, ".favorite-remove")) {
           return;
         }
         playUiClick();
@@ -980,7 +980,7 @@ export function renderWatchedList(watchedMovies, options = {}) {
       });
 
       item.addEventListener("keydown", (event) => {
-        if (event.target.closest(".favorite-remove")) {
+        if (closest(event.target, ".favorite-remove")) {
           return;
         }
         if (event.key === "Enter" || event.key === " ") {
@@ -1270,7 +1270,7 @@ export function renderFavoritesList(favorites, options = {}) {
       }
 
       item.addEventListener("click", (event) => {
-        if (event.target.closest(".favorite-remove")) {
+        if (closest(event.target, ".favorite-remove")) {
           return;
         }
         playUiClick();
@@ -1278,7 +1278,7 @@ export function renderFavoritesList(favorites, options = {}) {
       });
 
       item.addEventListener("keydown", (event) => {
-        if (event.target.closest(".favorite-remove")) {
+        if (closest(event.target, ".favorite-remove")) {
           return;
         }
         if (event.key === "Enter" || event.key === " ") {

@@ -4,6 +4,7 @@ import {
   followUserByUsername,
   unfollowUserByUsername
 } from './social.js';
+import { closest } from './dom.js';
 
 function initCustomFixes() {
   enhanceLogoutButtons();
@@ -51,7 +52,7 @@ function initBottomNav() {
     });
   };
   nav.addEventListener('click', (event) => {
-    const target = event.target.closest('[data-nav]');
+    const target = closest(event.target, '[data-nav]');
     if (!(target instanceof HTMLElement)) {
       return;
     }
