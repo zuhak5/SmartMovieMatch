@@ -851,6 +851,8 @@ export function createInlineFollowPill(username, options = {}) {
   pill.type = 'button';
   pill.className = 'inline-follow-pill';
   pill.dataset.state = 'default';
+  pill.dataset.followAction = 'follow';
+  pill.dataset.username = normalized;
   if (options.size) {
     pill.classList.add(`inline-follow-pill--${options.size}`);
   }
@@ -860,6 +862,10 @@ export function createInlineFollowPill(username, options = {}) {
   const baseLabel = options.label || 'Follow';
   const loadingLabel = options.loadingLabel || 'Following…';
   const successLabel = options.successLabel || 'Following';
+  pill.dataset.followLabel = baseLabel;
+  pill.dataset.followingLabel = successLabel;
+  pill.dataset.followLoadingLabel = loadingLabel;
+  pill.dataset.following = 'false';
   pill.textContent = baseLabel;
   pill.setAttribute('aria-label', options.ariaLabel || `Follow @${normalized}`);
 
@@ -870,6 +876,9 @@ export function createInlineFollowPill(username, options = {}) {
   };
 
   pill.addEventListener('click', async () => {
+    if (pill.dataset.customFollowBound === 'true') {
+      return;
+    }
     if (!state.session || !state.session.token) {
       queueToast('Sign in to follow people.', { variant: 'error' });
       return;
@@ -881,6 +890,7 @@ export function createInlineFollowPill(username, options = {}) {
       await followUserByUsername(normalized, { note: options.note });
       pill.dataset.state = 'success';
       pill.textContent = successLabel;
+      pill.dataset.following = 'true';
       pill.setAttribute('aria-label', options.successAriaLabel || `Now following @${normalized}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to follow right now.';

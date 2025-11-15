@@ -164,7 +164,8 @@ const state = {
   },
   globalSearch: {
     controller: null
-  }
+  },
+  suggestionCarousel: null
 };
 
 const collabSuggestionSelections = new Set();
@@ -747,12 +748,18 @@ function closeOnboarding({ persist = true } = {}) {
   overlay.hidden = true;
   overlay.dataset.open = "false";
   overlay.setAttribute("aria-hidden", "true");
+  overlay.dataset.dismissed = "true";
   if (document.body) {
     document.body.classList.remove("onboarding-open");
   }
   clearOnboardingFocus();
   if (persist) {
     markOnboardingComplete();
+    window.requestAnimationFrame(() => {
+      if (overlay && overlay.parentElement) {
+        overlay.parentElement.removeChild(overlay);
+      }
+    });
   }
 }
 
@@ -1308,6 +1315,9 @@ function wireEvents() {
       item.addEventListener("click", (event) => {
         event.stopPropagation();
         const action = item.getAttribute("data-action");
+        if (action === "logout" && item.dataset.customLogoutBound === "true") {
+          return;
+        }
         handleAccountMenuAction(action);
       });
     });
@@ -1668,7 +1678,10 @@ function wireEvents() {
     openAccountSettings(section);
   });
 
+  initVibePresetToggle();
+  initSuggestionsCarousel();
   setupGlobalSearch();
+  bindGlobalSignOutButtons();
 }
 
 function setupGlobalSearch() {
@@ -3050,6 +3063,7 @@ function refreshWatchedUi() {
   updatePreferencesPreview();
   refreshProfileOverviewCallout();
   updateCollectionFilterOptions();
+  updateProfileHeroLibraryStats();
   if (state.recommendations.length && !state.activeRecAbort) {
     updateRecommendationsView();
   }
@@ -3063,6 +3077,7 @@ function refreshFavoritesUi() {
   updatePreferencesPreview();
   refreshProfileOverviewCallout();
   updateCollectionFilterOptions();
+  updateProfileHeroLibraryStats();
   if (state.recommendations.length && !state.activeRecAbort) {
     updateRecommendationsView();
   }
@@ -5100,6 +5115,111 @@ function initResponsiveCollapsibles() {
   }
 }
 
+function initVibePresetToggle() {
+  const panel = document.querySelector('[data-component="vibe-presets"]');
+  const toggle = $("vibePresetToggle");
+  if (!panel || !toggle) {
+    return;
+  }
+  const storageKey = "smm.vibePresetsCollapsed";
+  const applyState = (collapsed) => {
+    panel.dataset.collapsed = collapsed ? "true" : "false";
+    toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    toggle.textContent = collapsed ? "Show presets" : "Hide presets";
+  };
+  let collapsed = false;
+  try {
+    collapsed = window.localStorage?.getItem(storageKey) === "true";
+  } catch (error) {
+    collapsed = false;
+  }
+  applyState(collapsed);
+  toggle.addEventListener("click", () => {
+    collapsed = !collapsed;
+    applyState(collapsed);
+    try {
+      window.localStorage?.setItem(storageKey, collapsed ? "true" : "false");
+    } catch (error) {
+      // Ignore storage errors.
+    }
+  });
+}
+
+function initSuggestionsCarousel() {
+  const elements = getSuggestionCarouselElements();
+  if (!elements) {
+    return;
+  }
+  refreshSuggestionCarouselNav();
+}
+
+function getSuggestionCarouselElements() {
+  if (state.suggestionCarousel) {
+    return state.suggestionCarousel;
+  }
+  const list = $("socialSuggestionsList");
+  const prev = $("socialSuggestionsPrev");
+  const next = $("socialSuggestionsNext");
+  if (!list || !prev || !next) {
+    state.suggestionCarousel = null;
+    return null;
+  }
+  prev.addEventListener("click", () => {
+    list.scrollBy({ left: -getSuggestionScrollAmount(list), behavior: "smooth" });
+  });
+  next.addEventListener("click", () => {
+    list.scrollBy({ left: getSuggestionScrollAmount(list), behavior: "smooth" });
+  });
+  list.addEventListener("scroll", () => {
+    refreshSuggestionCarouselNav();
+  });
+  window.addEventListener("resize", refreshSuggestionCarouselNav);
+  state.suggestionCarousel = { list, prev, next };
+  return state.suggestionCarousel;
+}
+
+function getSuggestionScrollAmount(list) {
+  return Math.max(list.clientWidth * 0.8, 280);
+}
+
+function refreshSuggestionCarouselNav() {
+  const elements = state.suggestionCarousel || getSuggestionCarouselElements();
+  if (!elements) {
+    return;
+  }
+  const { list, prev, next } = elements;
+  const container = document.querySelector(".social-suggestions");
+  const hasOverflow = list.scrollWidth > list.clientWidth + 4;
+  const atStart = list.scrollLeft <= 0;
+  const atEnd = list.scrollLeft + list.clientWidth >= list.scrollWidth - 4;
+  prev.disabled = !hasOverflow || atStart;
+  next.disabled = !hasOverflow || atEnd;
+  if (container) {
+    container.dataset.carouselState = hasOverflow ? "active" : "idle";
+  }
+}
+
+function bindGlobalSignOutButtons() {
+  const buttons = document.querySelectorAll('[data-global-signout="true"]');
+  buttons.forEach((button) => {
+    if (button.dataset.globalSignoutBound === "true") {
+      return;
+    }
+    button.dataset.globalSignoutBound = "true";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      playUiClick();
+      logoutSession();
+      try {
+        window.localStorage?.removeItem("smartMovieMatch.sessionCache");
+      } catch (error) {
+        // Ignore storage errors so the sign-out still completes.
+      }
+      window.location.assign("index.html");
+    });
+  });
+}
+
 function updateProfileHeroIdentity(session) {
   const heroName = $("profileHeroName");
   if (!heroName) {
@@ -5152,6 +5272,13 @@ function updateProfileHeroIdentity(session) {
       heroAvatar.classList.remove("has-image");
     }
   }
+}
+
+function updateProfileHeroLibraryStats() {
+  const favoritesCount = Array.isArray(state.favorites) ? state.favorites.length : 0;
+  const watchedCount = Array.isArray(state.watchedMovies) ? state.watchedMovies.length : 0;
+  updateSocialCount("profileHeroFavorites", favoritesCount);
+  updateSocialCount("profileHeroWatched", watchedCount);
 }
 
 function buildProfileHeroTagline(session) {
@@ -6336,8 +6463,17 @@ function wireFollowForm() {
       const followBtn = document.createElement("button");
       followBtn.type = "button";
       followBtn.className = "btn-secondary social-follow-search-follow";
-      followBtn.textContent = "Follow";
+      applyFollowButtonMetadata(followBtn, {
+        username: result.username,
+        isFollowing: false,
+        followLabel: "Follow",
+        followingLabel: "Unfollow",
+        loadingLabel: "Following…"
+      });
       followBtn.addEventListener("click", async () => {
+        if (followBtn.dataset.customFollowBound === "true") {
+          return;
+        }
         if (!state.session || !state.session.token) {
           window.location.href = "login.html";
           return;
@@ -7508,6 +7644,8 @@ function renderSocialConnections() {
       });
     }
   }
+
+  renderAccountSafetyLists(blockedHandles, Array.from(mutedSet));
 }
 
 function renderDiscoveryFollowSuggestions() {
@@ -7534,10 +7672,13 @@ function renderDiscoveryFollowSuggestions() {
     const normalized = canonicalHandle(suggestion && suggestion.username ? suggestion.username : "");
     return normalized && !followingSet.has(normalized);
   });
-  const subset = available.slice(0, 3);
+  const subset = available.slice(0, 12);
   if (!subset.length) {
     listEl.hidden = true;
     emptyEl.hidden = false;
+    window.requestAnimationFrame(() => {
+      refreshSuggestionCarouselNav();
+    });
     return;
   }
   listEl.hidden = false;
@@ -7547,6 +7688,14 @@ function renderDiscoveryFollowSuggestions() {
     if (row) {
       listEl.appendChild(row);
     }
+  });
+  if (typeof listEl.scrollTo === "function") {
+    listEl.scrollTo({ left: 0 });
+  } else {
+    listEl.scrollLeft = 0;
+  }
+  window.requestAnimationFrame(() => {
+    refreshSuggestionCarouselNav();
   });
 }
 
@@ -9730,16 +9879,34 @@ function createPeerHeroActions({ normalized, isFollowing, displayName, isMuted, 
     followBtn.id = "peerHeroFollowBtn";
     if (isFollowing) {
       followBtn.className = "btn-subtle btn-subtle-danger";
-      followBtn.textContent = "Unfollow";
+      applyFollowButtonMetadata(followBtn, {
+        username: normalized,
+        isFollowing: true,
+        followLabel: "Follow",
+        followingLabel: "Unfollow",
+        loadingLabel: "Updating…"
+      });
       followBtn.addEventListener("click", async () => {
+        if (followBtn.dataset.customFollowBound === "true") {
+          return;
+        }
         setSocialProfileStatus(`Removing @${normalized}…`, "loading");
         await handleUnfollowUser(normalized, followBtn);
         setSocialProfileStatus("", null);
       });
     } else {
       followBtn.className = "btn-primary";
-      followBtn.textContent = "Follow";
+      applyFollowButtonMetadata(followBtn, {
+        username: normalized,
+        isFollowing: false,
+        followLabel: "Follow",
+        followingLabel: "Unfollow",
+        loadingLabel: "Following…"
+      });
       followBtn.addEventListener("click", async () => {
+        if (followBtn.dataset.customFollowBound === "true") {
+          return;
+        }
         setSocialProfileStatus(`Following @${normalized}…`, "loading");
         await handleFollowFromList(normalized, followBtn);
         setSocialProfileStatus("", null);
@@ -10564,6 +10731,31 @@ function createPinnedLink(explicitHref, normalizedHandle, type) {
   return link;
 }
 
+function applyFollowButtonMetadata(button, { username, isFollowing, followLabel, followingLabel, loadingLabel }) {
+  if (!button) {
+    return;
+  }
+  const normalized = canonicalHandle(username);
+  if (!normalized) {
+    return;
+  }
+  const cleanFollowLabel = followLabel || button.dataset.followLabel || button.textContent?.trim() || 'Follow';
+  const cleanFollowingLabel =
+    followingLabel ||
+    button.dataset.followingLabel ||
+    (isFollowing ? button.textContent?.trim() : '') ||
+    'Unfollow';
+  if (loadingLabel) {
+    button.dataset.followLoadingLabel = loadingLabel;
+  }
+  button.dataset.followLabel = cleanFollowLabel;
+  button.dataset.followingLabel = cleanFollowingLabel;
+  button.dataset.followAction = isFollowing ? 'unfollow' : 'follow';
+  button.dataset.following = isFollowing ? 'true' : 'false';
+  button.dataset.username = normalized;
+  button.textContent = isFollowing ? cleanFollowingLabel : cleanFollowLabel;
+}
+
 function buildSocialListItem({
   username,
   isFollowing,
@@ -10634,8 +10826,17 @@ function buildSocialListItem({
     const button = document.createElement("button");
     button.type = "button";
     button.className = isFollowing ? "btn-subtle social-unfollow-btn" : "btn-secondary";
-    button.textContent = isFollowing ? "Unfollow" : "Follow back";
+    applyFollowButtonMetadata(button, {
+      username,
+      isFollowing,
+      followLabel: isFollowing ? "Follow" : "Follow back",
+      followingLabel: "Unfollow",
+      loadingLabel: isFollowing ? "Updating…" : "Following…"
+    });
     button.addEventListener("click", () => {
+      if (button.dataset.customFollowBound === "true") {
+        return;
+      }
       onPrimaryAction(button);
     });
     actions.appendChild(button);
@@ -10672,6 +10873,82 @@ function buildSocialListItem({
   }
 
   return item;
+}
+
+function renderAccountSafetyLists(blockedHandles = [], mutedHandles = []) {
+  const mutedListEl = $("settingsMutedList");
+  const mutedEmptyEl = $("settingsMutedEmpty");
+  const blockedListEl = $("settingsBlockedList");
+  const blockedEmptyEl = $("settingsBlockedEmpty");
+  if (!mutedListEl || !mutedEmptyEl || !blockedListEl || !blockedEmptyEl) {
+    return;
+  }
+  const normalizedMuted = Array.from(
+    new Set(mutedHandles.map((handle) => canonicalHandle(handle)).filter(Boolean))
+  );
+  const normalizedBlocked = Array.from(
+    new Set(blockedHandles.map((handle) => canonicalHandle(handle)).filter(Boolean))
+  );
+
+  const buildRow = (handle, actionLabel, onClick) => {
+    const row = document.createElement("div");
+    row.className = "settings-safety-row";
+    row.setAttribute("role", "listitem");
+    const info = document.createElement("div");
+    info.className = "settings-safety-info";
+    const name = document.createElement("span");
+    name.className = "settings-safety-handle";
+    name.textContent = `@${handle}`;
+    const copy = document.createElement("p");
+    copy.className = "settings-safety-copy";
+    copy.textContent = formatSocialDisplayName(handle);
+    info.appendChild(name);
+    info.appendChild(copy);
+    row.appendChild(info);
+    const actionBtn = document.createElement("button");
+    actionBtn.type = "button";
+    actionBtn.className = "btn-subtle safety-list-action";
+    actionBtn.textContent = actionLabel;
+    actionBtn.addEventListener("click", () => {
+      if (typeof onClick === "function") {
+        onClick(actionBtn, handle);
+      }
+    });
+    row.appendChild(actionBtn);
+    return row;
+  };
+
+  mutedListEl.innerHTML = "";
+  if (!normalizedMuted.length) {
+    mutedListEl.hidden = true;
+    mutedEmptyEl.hidden = false;
+  } else {
+    mutedListEl.hidden = false;
+    mutedEmptyEl.hidden = true;
+    normalizedMuted.forEach((handle) => {
+      const row = buildRow(handle, "Unmute", (button) => {
+        playUiClick();
+        handleMuteToggle(handle, button, { forceState: false, statusTarget: "profile", clearOnSuccess: true });
+      });
+      mutedListEl.appendChild(row);
+    });
+  }
+
+  blockedListEl.innerHTML = "";
+  if (!normalizedBlocked.length) {
+    blockedListEl.hidden = true;
+    blockedEmptyEl.hidden = false;
+  } else {
+    blockedListEl.hidden = false;
+    blockedEmptyEl.hidden = true;
+    normalizedBlocked.forEach((handle) => {
+      const row = buildRow(handle, "Unblock", (button) => {
+        playUiClick();
+        handleBlockToggle(handle, button, { forceState: false, statusTarget: "profile", clearOnSuccess: true, confirm: false });
+      });
+      blockedListEl.appendChild(row);
+    });
+  }
 }
 
 function buildSocialSafetyRow({ username, isMuted, isBlocked, onMuteToggle, onBlockToggle, variant }) {
@@ -10786,9 +11063,18 @@ function buildSuggestionCard(suggestion, onFollow) {
   const followBtn = document.createElement("button");
   followBtn.type = "button";
   followBtn.className = "btn-secondary";
-  followBtn.textContent = "Follow";
+  applyFollowButtonMetadata(followBtn, {
+    username: suggestion.username,
+    isFollowing: false,
+    followLabel: "Follow",
+    followingLabel: "Unfollow",
+    loadingLabel: "Following…"
+  });
   if (typeof onFollow === "function") {
     followBtn.addEventListener("click", () => {
+      if (followBtn.dataset.customFollowBound === "true") {
+        return;
+      }
       onFollow(followBtn);
     });
   } else {
@@ -11391,6 +11677,9 @@ function countUnreadSocialNotifications(list = state.notifications) {
 }
 
 async function handleUnfollowUser(username, button) {
+  if (button && button.dataset.customFollowBound === 'true') {
+    return;
+  }
   if (!state.session || !state.session.token) {
     window.location.href = "login.html";
     return;
@@ -11428,6 +11717,9 @@ async function handleUnfollowUser(username, button) {
 }
 
 async function handleFollowFromList(username, button) {
+  if (button && button.dataset.customFollowBound === 'true') {
+    return;
+  }
   if (!state.session || !state.session.token) {
     window.location.href = "login.html";
     return;
@@ -11491,24 +11783,41 @@ function handleMuteToggle(username, button, options = {}) {
   const clearOnSuccess = options.clearOnSuccess === true;
   const mutedSet = getMutedHandleSet();
   const isMuted = mutedSet.has(normalized);
+  const desiredState =
+    typeof options.forceState === "boolean"
+      ? options.forceState
+      : !isMuted;
+  if (desiredState === isMuted) {
+    return;
+  }
   if (button) {
     button.disabled = true;
   }
-  statusTarget(`${isMuted ? "Unmuting" : "Muting"} @${normalized}…`, "loading");
+  statusTarget(`${desiredState ? "Muting" : "Unmuting"} @${normalized}…`, "loading");
   try {
-    if (isMuted) {
-      unmuteUser(normalized);
-    } else {
+    if (desiredState) {
       muteUser(normalized);
+    } else {
+      unmuteUser(normalized);
     }
     if (clearOnSuccess) {
       statusTarget("", null);
     } else {
       statusTarget(
-        isMuted ? `Unmuted @${normalized}.` : `Muted @${normalized}. Their reviews will be hidden.`,
+        desiredState
+          ? `Muted @${normalized}. Their reviews will be hidden.`
+          : `Unmuted @${normalized}.`,
         "success"
       );
     }
+    showToast({
+      title: desiredState ? "Muted" : "Unmuted",
+      text: desiredState
+        ? `@${normalized} will stay hidden until you unmute them in settings.`
+        : `You’ll see updates from @${normalized} again.`,
+      icon: desiredState ? "🙊" : "🔊",
+      variant: desiredState ? "success" : "info"
+    });
   } catch (error) {
     statusTarget(
       error instanceof Error ? error.message : "Unable to update mute settings right now.",
@@ -11516,7 +11825,15 @@ function handleMuteToggle(username, button, options = {}) {
     );
   } finally {
     if (button) {
-      button.disabled = false;
+      if (desiredState) {
+        button.disabled = true;
+        button.classList.add("is-static");
+        button.textContent = "Muted";
+      } else {
+        button.disabled = false;
+        button.classList.remove("is-static");
+        button.textContent = "Mute";
+      }
     }
   }
 }
@@ -11530,11 +11847,18 @@ async function handleBlockToggle(username, button, options = {}) {
   const clearOnSuccess = options.clearOnSuccess === true;
   const blockedSet = getBlockedHandleSet();
   const isBlocked = blockedSet.has(normalized);
+  const desiredState =
+    typeof options.forceState === "boolean"
+      ? options.forceState
+      : !isBlocked;
+  if (desiredState === isBlocked) {
+    return;
+  }
   if (!state.session || !state.session.token) {
     statusTarget("Sign in to manage block settings.", "error");
     return;
   }
-  if (!isBlocked && options.confirm !== false) {
+  if (desiredState && options.confirm !== false) {
     const confirmed = window.confirm(
       `Block @${normalized}? This removes each of you from the other's feeds and prevents follows.`
     );
@@ -11545,18 +11869,26 @@ async function handleBlockToggle(username, button, options = {}) {
   if (button) {
     button.disabled = true;
   }
-  statusTarget(`${isBlocked ? "Unblocking" : "Blocking"} @${normalized}…`, "loading");
+  statusTarget(`${desiredState ? "Blocking" : "Unblocking"} @${normalized}…`, "loading");
   try {
-    if (isBlocked) {
-      await unblockUserByUsername(normalized);
-    } else {
+    if (desiredState) {
       await blockUserByUsername(normalized);
+    } else {
+      await unblockUserByUsername(normalized);
     }
     if (clearOnSuccess) {
       statusTarget("", null);
     } else {
-      statusTarget(isBlocked ? `Unblocked @${normalized}.` : `Blocked @${normalized}.`, "success");
+      statusTarget(desiredState ? `Blocked @${normalized}.` : `Unblocked @${normalized}.`, "success");
     }
+    showToast({
+      title: desiredState ? "Blocked" : "Unblocked",
+      text: desiredState
+        ? `@${normalized} can’t follow or message you until you unblock them in settings.`
+        : `@${normalized} can interact with you again.`,
+      icon: desiredState ? "🚫" : "🤝",
+      variant: desiredState ? "warning" : "info"
+    });
   } catch (error) {
     statusTarget(
       error instanceof Error ? error.message : "Unable to update block settings right now.",
@@ -11564,7 +11896,15 @@ async function handleBlockToggle(username, button, options = {}) {
     );
   } finally {
     if (button) {
-      button.disabled = false;
+      if (desiredState) {
+        button.disabled = true;
+        button.classList.add("is-static");
+        button.textContent = "Blocked";
+      } else {
+        button.disabled = false;
+        button.classList.remove("is-static");
+        button.textContent = "Block";
+      }
     }
   }
 }
