@@ -75,51 +75,79 @@
                 </button>
               </div>
               <div class="account-bar" role="navigation" data-account-state="guest">
-                <div class="account-bar-actions">
-                  <a id="accountLoginLink" class="account-link" href="login.html">Log in / Sign up</a>
-                </div>
-                <div id="accountProfile" class="account-profile" hidden>
+                <div class="account-bar__utilities site-header__actions">
                   <button
-                    id="accountProfileBtn"
-                    class="account-pill"
+                    id="themeToggle"
+                    class="btn-theme-toggle"
                     type="button"
-                    aria-haspopup="menu"
-                    aria-expanded="false"
-                    aria-controls="accountMenu"
+                    aria-label="Switch to light theme"
+                    data-theme-target="light"
                   >
-                    <span class="account-avatar" id="accountAvatar" aria-hidden="true">
-                      <span id="accountAvatarInitials" class="account-avatar-initials">GM</span>
-                      <img id="accountAvatarImg" alt="" />
-                    </span>
-                    <span class="account-pill-text">
-                      <span id="accountName" class="account-name">Guest</span>
-                      <span id="accountPillSync" class="account-pill-sub">Cloud sync inactive</span>
-                    </span>
-                    <span class="account-pill-caret" aria-hidden="true">▾</span>
+                    <span class="btn-theme-icon" aria-hidden="true">🌙</span>
+                    <span class="btn-theme-label">Dark</span>
                   </button>
-                  <ul id="accountMenu" class="account-menu" role="menu" aria-label="Account actions">
-                    <li>
-                      <button class="account-menu-item" type="button" data-action="profile" role="menuitem">
-                        Profile overview
-                      </button>
-                    </li>
-                    <li>
-                      <button class="account-menu-item" type="button" data-action="settings" role="menuitem">
-                        Account settings
-                      </button>
-                    </li>
-                    <li>
-                      <button
-                        class="account-menu-item account-menu-item--danger"
-                        type="button"
-                        data-action="logout"
-                        role="menuitem"
-                      >
-                        Sign out
-                      </button>
-                    </li>
-                  </ul>
-                  <span id="socialActivityIndicator" class="social-activity-indicator" hidden aria-hidden="true"></span>
+                  <button
+                    id="notificationBell"
+                    class="notification-bell"
+                    type="button"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    aria-controls="notificationPanel"
+                    hidden
+                  >
+                    <span class="notification-icon" aria-hidden="true">🔔</span>
+                    <span id="notificationCount" class="notification-count" hidden>0</span>
+                    <span class="sr-only">Open notifications</span>
+                  </button>
+                </div>
+                <span class="account-bar__divider" aria-hidden="true"></span>
+                <div class="account-bar__content">
+                  <div class="account-bar-actions">
+                    <a id="accountLoginLink" class="account-link" href="login.html">Log in / Sign up</a>
+                  </div>
+                  <div id="accountProfile" class="account-profile" hidden>
+                    <button
+                      id="accountProfileBtn"
+                      class="account-pill"
+                      type="button"
+                      aria-haspopup="menu"
+                      aria-expanded="false"
+                      aria-controls="accountMenu"
+                    >
+                      <span class="account-avatar" id="accountAvatar" aria-hidden="true">
+                        <span id="accountAvatarInitials" class="account-avatar-initials">GM</span>
+                        <img id="accountAvatarImg" alt="" />
+                      </span>
+                      <span class="account-pill-text">
+                        <span id="accountName" class="account-name">Guest</span>
+                        <span id="accountPillSync" class="account-pill-sub">Cloud sync inactive</span>
+                      </span>
+                      <span class="account-pill-caret" aria-hidden="true">▾</span>
+                    </button>
+                    <ul id="accountMenu" class="account-menu" role="menu" aria-label="Account actions">
+                      <li>
+                        <button class="account-menu-item" type="button" data-action="profile" role="menuitem">
+                          Profile overview
+                        </button>
+                      </li>
+                      <li>
+                        <button class="account-menu-item" type="button" data-action="settings" role="menuitem">
+                          Account settings
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          class="account-menu-item account-menu-item--danger"
+                          type="button"
+                          data-action="logout"
+                          role="menuitem"
+                        >
+                          Sign out
+                        </button>
+                      </li>
+                    </ul>
+                    <span id="socialActivityIndicator" class="social-activity-indicator" hidden aria-hidden="true"></span>
+                  </div>
                 </div>
               </div>
             </div>
