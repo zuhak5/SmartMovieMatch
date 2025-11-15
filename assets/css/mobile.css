@@ -341,44 +341,20 @@ body[data-theme="light"] .site-header {
 
 .site-header__bottom {
   width: 100%;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
-  gap: clamp(0.5rem, 1.15vw, 1.1rem);
-}
-
-.site-header__stack {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: var(--space-sm);
+  justify-content: flex-end;
+  gap: clamp(0.5rem, 1.1vw, 1.4rem);
   flex-wrap: wrap;
-  min-width: 0;
 }
 
 .site-header__account {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.site-header__quick-pill {
+  width: 100%;
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.25rem 0.8rem;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  background: rgba(148, 163, 184, 0.1);
-  color: var(--text-subtle);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-}
-
-.site-header__quick-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, rgba(34, 211, 238, 0.9), rgba(168, 85, 247, 0.9));
-  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.2);
+  justify-content: flex-end;
+  gap: clamp(0.5rem, 1vw, 1.25rem);
+  flex-wrap: wrap;
 }
 
 .site-brand {
@@ -474,19 +450,19 @@ body[data-theme="light"] .site-nav {
 
 .site-nav-link {
   flex: 1;
-  min-width: clamp(5rem, 18vw, 8rem);
+  min-width: clamp(4.75rem, 16vw, 6.75rem);
   display: inline-flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.2rem;
-  padding: 0.35rem 0.8rem;
-  border-radius: calc(var(--radius-md) * 0.9);
+  gap: 0.15rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: calc(var(--radius-md) * 0.85);
   border: 1px solid transparent;
   background: rgba(148, 163, 184, 0.08);
   color: var(--text-subtle);
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   text-decoration: none;
   scroll-snap-align: center;
   transition: color var(--transition-fast),
@@ -496,7 +472,7 @@ body[data-theme="light"] .site-nav {
 }
 
 .site-nav-link__icon {
-  font-size: 1rem;
+  font-size: 0.95rem;
 }
 
 .site-nav-link:hover,
@@ -515,23 +491,37 @@ body[data-theme="light"] .site-nav {
 }
 
 .site-header__actions {
-  display: flex;
-  align-items: stretch;
-  gap: var(--space-sm);
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(0.35rem, 0.8vw, 0.85rem);
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.7);
+  box-shadow: 0 12px 26px rgba(2, 6, 23, 0.45);
+}
+
+.site-header__actions > * {
+  flex-shrink: 0;
+}
+
+body[data-theme="light"] .site-header__actions {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(148, 163, 184, 0.35);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
 }
 
 .site-header .account-bar {
   display: inline-flex;
   flex-direction: row;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.55rem;
+  flex-wrap: nowrap;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.32);
   background: rgba(15, 23, 42, 0.72);
   box-shadow: 0 18px 32px rgba(2, 6, 23, 0.55);
-  padding: 0.35rem 0.85rem;
+  padding: 0.3rem 0.8rem;
   min-width: 0;
 }
 
@@ -539,19 +529,6 @@ body[data-theme="light"] .site-header .account-bar {
   background: rgba(255, 255, 255, 0.9);
   border-color: rgba(148, 163, 184, 0.35);
   box-shadow: 0 18px 32px rgba(148, 163, 184, 0.25);
-}
-
-.account-bar-top {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-xs);
-  min-width: 0;
-}
-
-.account-greeting {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .account-bar-actions {
@@ -645,8 +622,12 @@ body[data-theme="light"] .site-footer {
   }
 
   .site-header__bottom {
-    grid-template-columns: minmax(0, 1fr);
-    row-gap: var(--space-xs);
+    justify-content: center;
+    gap: var(--space-sm);
+  }
+
+  .site-header__account {
+    justify-content: center;
   }
 
   .site-brand--chip {
@@ -658,27 +639,27 @@ body[data-theme="light"] .site-footer {
 @media (max-width: 640px) {
   .site-nav {
     border-radius: var(--radius-md);
-    padding: 0.25rem;
+    padding: 0.2rem;
   }
 
   .site-nav-link {
-    min-width: clamp(4.5rem, 26vw, 6rem);
-    font-size: 0.78rem;
-    padding-block: 0.45rem;
+    min-width: clamp(4rem, 26vw, 5.5rem);
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
   }
 
   .site-nav-link__icon {
-    font-size: 0.95rem;
+    font-size: 0.9rem;
   }
 
-  .site-header__stack {
-    justify-content: flex-start;
+  .site-header__actions {
+    width: 100%;
+    justify-content: center;
   }
 
   .site-header .account-bar {
     gap: 0.45rem;
-    padding-inline: 0.75rem;
-    flex-direction: row;
+    padding-inline: 0.65rem;
   }
 }
 
@@ -810,12 +791,6 @@ body[data-theme="light"]::after {
     inset: auto 1rem 1rem;
     width: calc(100% - 2rem);
     max-width: 360px;
-  }
-
-  .account-greeting {
-    width: 100%;
-    justify-content: center;
-    font-size: 0.8rem;
   }
 
   .account-profile,
@@ -1497,33 +1472,6 @@ body[data-theme="light"] .account-bar {
   }
 }
 
-.account-greeting { 
-  font-size: 0.82rem;
-  color: var(--text-subtle);
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin-right: auto;
-}
-
-.account-greeting::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, rgba(34, 211, 238, 0.9), rgba(168, 85, 247, 0.9));
-  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.2);
-}
-
-.account-greeting-auth {
-  color: var(--accent-secondary);
-}
-
-.account-greeting-auth::before {
-  background: var(--success);
-  box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.22);
-}
-
 .account-bar-actions {
   display: inline-flex;
   align-items: center;
@@ -1592,20 +1540,6 @@ body[data-theme="light"] .btn-theme-toggle:hover {
   background:
     linear-gradient(130deg, rgba(191, 219, 254, 0.9), rgba(224, 231, 255, 0.7));
   box-shadow: 0 16px 32px rgba(15, 23, 42, 0.22);
-}
-
-@media (max-width: 720px) {
-  .account-greeting {
-    margin-right: 0;
-    justify-content: flex-start;
-    width: 100%;
-  }
-}
-
-@media (max-width: 540px) {
-  .account-greeting {
-    line-height: 1.4;
-  }
 }
 
 @media (max-width: 420px) {

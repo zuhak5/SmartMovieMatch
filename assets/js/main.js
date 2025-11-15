@@ -4955,7 +4955,6 @@ function updateCollectionVisibility() {
 }
 
 function updateAccountUi(session) {
-  const greeting = $("accountGreeting");
   const loginLink = $("accountLoginLink");
   const accountProfile = $("accountProfile");
   const accountName = $("accountName");
@@ -4967,7 +4966,7 @@ function updateAccountUi(session) {
   const accountBar = document.querySelector(".account-bar");
   const activePage = document.body ? document.body.getAttribute("data-page") : null;
 
-  if (!greeting || !loginLink || !accountProfile || !accountName || !accountPillSync || !accountAvatar || !accountAvatarImg || !accountAvatarInitials) {
+  if (!loginLink || !accountProfile || !accountName || !accountPillSync || !accountAvatar || !accountAvatarImg || !accountAvatarInitials) {
     return;
   }
 
@@ -5017,8 +5016,6 @@ function updateAccountUi(session) {
   }
 
   if (isSignedIn) {
-    greeting.textContent = `Welcome back, ${displayName}!`;
-    greeting.classList.add("account-greeting-auth");
     loginLink.style.display = "none";
     loginLink.hidden = true;
     loginLink.setAttribute("aria-hidden", "true");
@@ -5049,8 +5046,6 @@ function updateAccountUi(session) {
     }
   } else {
     closeAccountMenu();
-    greeting.textContent = "You’re browsing as guest.";
-    greeting.classList.remove("account-greeting-auth");
     loginLink.style.display = "inline-flex";
     loginLink.hidden = false;
     loginLink.setAttribute("aria-hidden", "false");

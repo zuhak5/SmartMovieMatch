@@ -51,44 +51,35 @@ function SiteHeader({ activeNav }: { activeNav: NavKey }) {
           </nav>
         </div>
         <div className="site-header__bottom">
-          <div className="site-header__stack">
-            <span className="site-header__quick-pill">
-              <span className="site-header__quick-dot" aria-hidden="true" />
-              Live discovery
-            </span>
-            <button
-              id="themeToggle"
-              className="btn-theme-toggle"
-              type="button"
-              aria-label="Switch to light theme"
-              data-theme-target="light"
-            >
-              <span className="btn-theme-icon" aria-hidden="true">🌙</span>
-              <span className="btn-theme-label">Dark</span>
-            </button>
-          </div>
           <div className="site-header__account">
-            <div className="account-bar" role="navigation" data-account-state="guest">
-              <div className="account-bar-top">
-                <span id="accountGreeting" className="account-greeting">
-                  You’re browsing as guest.
+            <div className="site-header__actions">
+              <button
+                id="themeToggle"
+                className="btn-theme-toggle"
+                type="button"
+                aria-label="Switch to light theme"
+                data-theme-target="light"
+              >
+                <span className="btn-theme-icon" aria-hidden="true">🌙</span>
+                <span className="btn-theme-label">Dark</span>
+              </button>
+              <button
+                id="notificationBell"
+                className="notification-bell"
+                type="button"
+                aria-haspopup="true"
+                aria-expanded="false"
+                aria-controls="notificationPanel"
+                hidden
+              >
+                <span className="notification-icon" aria-hidden="true">🔔</span>
+                <span id="notificationCount" className="notification-count" hidden>
+                  0
                 </span>
-                <button
-                  id="notificationBell"
-                  className="notification-bell"
-                  type="button"
-                  aria-haspopup="true"
-                  aria-expanded="false"
-                  aria-controls="notificationPanel"
-                  hidden
-                >
-                  <span className="notification-icon" aria-hidden="true">🔔</span>
-                  <span id="notificationCount" className="notification-count" hidden>
-                    0
-                  </span>
-                  <span className="sr-only">Open notifications</span>
-                </button>
-              </div>
+                <span className="sr-only">Open notifications</span>
+              </button>
+            </div>
+            <div className="account-bar" role="navigation" data-account-state="guest">
               <div className="account-bar-actions">
                 <a id="accountLoginLink" className="account-link" href="login.html">
                   Log in / Sign up
