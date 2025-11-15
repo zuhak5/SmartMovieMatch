@@ -67,6 +67,7 @@ import {
   isMovieOverlayOpen
 } from "./ui.js";
 import { $, closest } from "./dom.js";
+import { revealSection } from "./view-router.js";
 import { playUiClick, playExpandSound } from "./sound.js";
 import {
   createProfileButton,
@@ -602,10 +603,9 @@ function focusOnboardingTarget(selector) {
   if (!selector) {
     return;
   }
-  const target = document.querySelector(selector);
+  const target = revealSection(selector, { scrollBehavior: "smooth", block: "center" });
   if (target) {
     target.classList.add("onboarding-focus");
-    target.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 }
 
@@ -1568,10 +1568,7 @@ function wireEvents() {
       if (!selector) {
         return;
       }
-      const target = document.querySelector(selector);
-      if (target) {
-        target.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
+      revealSection(selector);
     });
   });
 
@@ -2341,11 +2338,7 @@ function scrollToPreferencesPanel() {
     return;
   }
   window.requestAnimationFrame(() => {
-    try {
-      panel.scrollIntoView({ behavior: "smooth", block: "start" });
-    } catch (error) {
-      panel.scrollIntoView();
-    }
+    revealSection(panel, { scrollBehavior: "smooth" });
   });
 }
 

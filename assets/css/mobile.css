@@ -656,6 +656,10 @@ select:focus-visible {
   color: var(--text-primary);
 }
 
+.app-view-hidden {
+  display: none !important;
+}
+
 .bottom-nav {
   position: sticky;
   bottom: 0;
