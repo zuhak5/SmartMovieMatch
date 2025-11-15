@@ -7,19 +7,16 @@ import React, {
   KeyboardEvent,
 } from 'react';
 
-type NavKey = 'home' | 'lists' | 'friends' | 'profile' | 'account';
+type NavKey = 'lists' | 'friends';
 
 type PrimaryNavLink = { href: string; label: string; nav: NavKey; icon: string };
 
 const primaryNavLinks: Array<PrimaryNavLink> = [
-  { href: 'index.html', label: 'Home', nav: 'home', icon: '🏠' },
   { href: 'profile.html#collectionsPanel', label: 'My Lists', nav: 'lists', icon: '🎯' },
   { href: 'peeruser.html', label: 'Friends', nav: 'friends', icon: '🤝' },
-  { href: 'profile.html', label: 'Profile', nav: 'profile', icon: '👤' },
-  { href: 'account-settings.html', label: 'Account', nav: 'account', icon: '⚙️' },
 ];
 
-function SiteHeader({ activeNav }: { activeNav: NavKey }) {
+function SiteHeader({ activeNav }: { activeNav?: NavKey }) {
   return (
     <header className="site-header pad-inline">
       <div className="site-header__inner">
@@ -40,17 +37,18 @@ function SiteHeader({ activeNav }: { activeNav: NavKey }) {
           </nav>
         </div>
         <div className="site-header__secondary">
-          <div className="site-header__controls">
-            <button
-              id="themeToggle"
-              className="btn-theme-toggle"
-              type="button"
-              aria-label="Switch to light theme"
-              data-theme-target="light"
-            >
-              <span className="btn-theme-icon" aria-hidden="true">🌙</span>
-              <span className="btn-theme-label">Dark</span>
-            </button>
+          <div className="site-header__utility">
+            <div className="site-header__quick-actions">
+              <button
+                id="themeToggle"
+                className="btn-theme-toggle"
+                type="button"
+                aria-label="Switch to light theme"
+                data-theme-target="light"
+              >
+                <span className="btn-theme-icon" aria-hidden="true">🌙</span>
+                <span className="btn-theme-label">Dark</span>
+              </button>
             <button
               id="notificationBell"
               className="notification-bell"
@@ -59,15 +57,14 @@ function SiteHeader({ activeNav }: { activeNav: NavKey }) {
               aria-expanded="false"
               aria-controls="notificationPanel"
               hidden
-            >
-              <span className="notification-icon" aria-hidden="true">🔔</span>
-              <span id="notificationCount" className="notification-count" hidden>
-                0
-              </span>
-              <span className="sr-only">Open notifications</span>
-            </button>
-          </div>
-          <div className="site-header__account">
+              >
+                <span className="notification-icon" aria-hidden="true">🔔</span>
+                <span id="notificationCount" className="notification-count" hidden>
+                  0
+                </span>
+                <span className="sr-only">Open notifications</span>
+              </button>
+            </div>
             <div className="account-bar" role="navigation" data-account-state="guest">
               <div className="account-bar__content">
                 <div className="account-bar-actions">
@@ -120,7 +117,6 @@ function SiteHeader({ activeNav }: { activeNav: NavKey }) {
                 </div>
               </div>
             </div>
-          </div>
         </div>
       </div>
     </header>
@@ -283,7 +279,7 @@ export default function SignupPage() {
 
   return (
     <div className="site-shell site-shell--auth">
-      <SiteHeader activeNav="account" />
+      <SiteHeader />
       <main className="site-main site-main--auth">
         <div className="site-main__backdrop" aria-hidden="true"></div>
         <div className="site-main__glow" aria-hidden="true"></div>
