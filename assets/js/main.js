@@ -1020,6 +1020,7 @@ function init() {
     state.session ? "success" : "muted"
   );
   initResponsiveCollapsibles();
+  ensureNotificationUi();
 
   subscribeToSession((session) => {
     const previousSession = state.session;
@@ -1238,6 +1239,7 @@ function maybeApplyDiscoverySearchIntent() {
 }
 
 function wireEvents() {
+  ensureNotificationUi();
   const accountProfileBtn = $("accountProfileBtn");
   const accountMenu = $("accountMenu");
   const accountProfile = $("accountProfile");
@@ -11284,6 +11286,74 @@ function normalizePartyResponse(response) {
   return "pending";
 }
 
+function ensureNotificationUi() {
+  if (typeof document === "undefined") {
+    return;
+  }
+  const body = document.body;
+  if (!body) {
+    return;
+  }
+  if (!document.getElementById("notificationOverlay")) {
+    const overlay = document.createElement("div");
+    overlay.id = "notificationOverlay";
+    overlay.className = "notification-overlay";
+    overlay.setAttribute("aria-hidden", "true");
+    overlay.hidden = true;
+    body.appendChild(overlay);
+  }
+  if (!document.getElementById("notificationPanel")) {
+    const panel = document.createElement("div");
+    panel.id = "notificationPanel";
+    panel.className = "notification-panel pad-inline";
+    panel.setAttribute("role", "region");
+    panel.setAttribute("aria-label", "Notifications");
+    panel.hidden = true;
+
+    const header = document.createElement("div");
+    header.className = "notification-panel-header pad-inline";
+    const title = document.createElement("span");
+    title.className = "notification-panel-title";
+    title.textContent = "Notifications";
+    header.appendChild(title);
+
+    const actions = document.createElement("div");
+    actions.className = "notification-panel-actions";
+
+    const markReadBtn = document.createElement("button");
+    markReadBtn.id = "notificationMarkRead";
+    markReadBtn.type = "button";
+    markReadBtn.className = "btn-subtle notification-mark-read";
+    markReadBtn.textContent = "Mark all read";
+    actions.appendChild(markReadBtn);
+
+    const closeBtn = document.createElement("button");
+    closeBtn.id = "notificationClose";
+    closeBtn.type = "button";
+    closeBtn.className = "notification-close";
+    closeBtn.setAttribute("aria-label", "Close notifications");
+    closeBtn.textContent = "✕";
+    actions.appendChild(closeBtn);
+
+    header.appendChild(actions);
+    panel.appendChild(header);
+
+    const list = document.createElement("div");
+    list.id = "notificationList";
+    list.className = "notification-list pad-inline";
+    list.setAttribute("role", "list");
+    panel.appendChild(list);
+
+    const empty = document.createElement("div");
+    empty.id = "notificationEmpty";
+    empty.className = "notification-empty pad-inline";
+    empty.textContent = "You\u2019re all caught up!";
+    panel.appendChild(empty);
+
+    body.appendChild(panel);
+  }
+}
+
 function syncNotificationOverlay(overlay, isOpen) {
   const body = typeof document !== "undefined" ? document.body : null;
   const overlayEnabled = shouldUseNotificationOverlay();
@@ -11307,6 +11377,7 @@ function syncNotificationOverlay(overlay, isOpen) {
 }
 
 function renderNotificationCenter(payload = {}) {
+  ensureNotificationUi();
   const notifications = Array.isArray(payload.notifications)
     ? payload.notifications
     : Array.isArray(state.notifications)
