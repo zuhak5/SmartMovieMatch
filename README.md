@@ -59,8 +59,8 @@ Key modules:
 | Variable          | Description                                             |
 | ----------------- | ------------------------------------------------------- |
 | `OMDB_API_KEY`    | OMDb API key used by the `/api/omdb` proxy.             |
-| `TMDB_API_KEY` | TMDB API Key (v3) used for `genre/movie/list` requests. |
-| `TMDB_API_READ_ACCESS_TOKEN`    | TMDB API Read Access Token (v4) used by the `/api/tmdb` proxy. |
+| `TMDB_API_KEY` | TMDB API Key (v3) used for `genre/movie/list` requests and TMDB avatar fallbacks. |
+| `TMDB_API_READ_ACCESS_TOKEN`    | TMDB API Read Access Token (v4) used by the `/api/tmdb` proxy and celebrity avatar fetches. |
 | `YOUTUBE_API_KEY` | YouTube Data API key used by the `/api/youtube` proxy.  |
 | `SUPABASE_URL`    | Supabase project URL used for remote auth persistence.  |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key used by the auth API. |
@@ -111,7 +111,7 @@ This update adds avatar upload during signup.
 - Server API: `/api/signup` (uploads avatar using Service Role, inserts user & session)
 - Client: signup page includes `<input type="file" name="avatar" />` and posts base64 to API
 - Migration: `supabase/migrations/add_auth_users_avatar.sql` (idempotent)
-- If a user skips the upload step, the server now assigns a random avatar pulled from a curated list of iconic actors and directors so every profile starts with a recognizable face.
+- If a user skips the upload step, the server now fetches a random TMDB headshot of a famous actor or director and uploads it to Supabase so every profile starts with a recognizable face.
 
 ### Environment
 Set in `.env.local`:

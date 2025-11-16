@@ -4,6 +4,7 @@ const fs = require("fs/promises");
 
 const { fetchWithTimeout } = require("../lib/http-client");
 const { FALLBACK_AVATARS } = require("../lib/fallbackAvatars");
+const { downloadRandomCelebrityAvatar } = require("../lib/tmdbCelebrity");
 
 const fetch = (input, init = {}) => fetchWithTimeout(input, { timeoutMs: 15000, ...init });
 
@@ -163,6 +164,31 @@ async function signup(payload) {
     }
   } catch (e) {
     console.warn("Avatar upload skipped:", e && e.message ? e.message : e);
+  }
+
+  if (!avatar_url) {
+    try {
+      const celebrityAvatar = await downloadRandomCelebrityAvatar({ fetchImpl: fetch });
+      if (celebrityAvatar) {
+        const fallbackName = `tmdb-${celebrityAvatar.personId}-${Date.now()}${celebrityAvatar.extension}`;
+        if (AUTH_SERVICE_CONFIGURED) {
+          const objectPath = `${canonical}/${fallbackName}`;
+          const uploaded = await uploadToStorage(
+            "avatars",
+            objectPath,
+            celebrityAvatar.buffer,
+            celebrityAvatar.contentType
+          );
+          avatar_path = uploaded.path;
+          avatar_url = uploaded.publicUrl;
+        } else {
+          avatar_path = `local:${fallbackName}`;
+          avatar_url = buildDataUrlFromBuffer(celebrityAvatar.buffer, celebrityAvatar.contentType);
+        }
+      }
+    } catch (error) {
+      console.warn("TMDB celebrity avatar skipped", error && error.message ? error.message : error);
+    }
   }
 
   if (!avatar_url) {
@@ -851,6 +877,14 @@ function cloneObject(value) {
 function buildDataUrlFromBase64(base64, fileName) {
   const mimeType = inferMimeTypeFromName(fileName);
   return `data:${mimeType};base64,${base64}`;
+}
+
+function buildDataUrlFromBuffer(buffer, contentType) {
+  if (!buffer || typeof buffer.toString !== "function") {
+    return "";
+  }
+  const mime = typeof contentType === "string" && contentType.trim() ? contentType : "image/jpeg";
+  return `data:${mime};base64,${buffer.toString("base64")}`;
 }
 
 function inferMimeTypeFromName(fileName) {
