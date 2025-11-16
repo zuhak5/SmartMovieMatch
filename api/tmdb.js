@@ -1,4 +1,5 @@
 const { fetchJson, TIMEOUT_ERROR_NAME } = require('../lib/http-client');
+const { RouteCache } = require('../lib/route-cache');
 
 const ALLOWED_PATH_PATTERNS = [
   /^discover\/movie$/,
@@ -25,6 +26,8 @@ function isV3Path(path) {
 }
 
 const TMDB_TIMEOUT_MS = 10000;
+const TMDB_CACHE_CONTROL = 'public, max-age=0, s-maxage=60, stale-while-revalidate=120';
+const tmdbCache = new RouteCache({ ttlMs: 60000, maxEntries: 256 });
 
 module.exports = async (req, res) => {
   try {
@@ -105,6 +108,15 @@ module.exports = async (req, res) => {
       body = JSON.stringify(payload);
     }
 
+    const cacheKey = buildCacheKey(method, url, body);
+    const cached = tmdbCache.get(cacheKey);
+    if (cached) {
+      res.setHeader('Cache-Control', TMDB_CACHE_CONTROL);
+      res.setHeader('X-Cache', 'TMDB-HIT');
+      res.status(cached.status).json(cached.data);
+      return;
+    }
+
     const result = await fetchJson(url, {
       timeoutMs: TMDB_TIMEOUT_MS,
       method,
@@ -126,6 +138,9 @@ module.exports = async (req, res) => {
       return;
     }
 
+    tmdbCache.set(cacheKey, { status: result.status, data: result.data });
+    res.setHeader('Cache-Control', TMDB_CACHE_CONTROL);
+    res.setHeader('X-Cache', 'TMDB-MISS');
     res.status(result.status).json(result.data);
   } catch (err) {
     console.error('TMDB proxy error', err);
@@ -136,3 +151,7 @@ module.exports = async (req, res) => {
     res.status(500).json({ error: 'TMDB proxy error' });
   }
 };
+
+function buildCacheKey(method, url, body) {
+  return `${method}:${url}:${body || ''}`;
+}

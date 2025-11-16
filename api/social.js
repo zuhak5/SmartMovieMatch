@@ -1,6 +1,5 @@
 const fs = require('fs/promises');
 const path = require('path');
-const QRCode = require('qrcode');
 const { randomUUID } = require('crypto');
 const { setInterval: nodeSetInterval, clearInterval: nodeClearInterval } = require('timers');
 
@@ -12,6 +11,15 @@ const SOCIAL_STORE_PATH = path.join(__dirname, '..', 'data', 'social.json');
 const AUTH_STORE_PATH = path.join(__dirname, '..', 'data', 'auth-users.json');
 const USING_LOCAL_STORE = !(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 let forceLocalStore = false;
+let qrCodeModulePromise = null;
+
+async function getQrCodeModule() {
+  if (!qrCodeModulePromise) {
+    qrCodeModulePromise = import('qrcode');
+  }
+  const mod = await qrCodeModulePromise;
+  return mod && mod.default ? mod.default : mod;
+}
 
 function usingLocalStore() {
   return USING_LOCAL_STORE || forceLocalStore;
@@ -1480,13 +1488,14 @@ async function handleGenerateInviteQr(req, payload) {
     throw new HttpError(400, 'Use your own invite link when creating a QR code.');
   }
 
-  const normalized = parsed.toString();
+    const normalized = parsed.toString();
 
-  try {
-    const dataUrl = await QRCode.toDataURL(normalized, {
-      errorCorrectionLevel: 'M',
-      margin: 2,
-      scale: 6,
+    try {
+      const QRCode = await getQrCodeModule();
+      const dataUrl = await QRCode.toDataURL(normalized, {
+        errorCorrectionLevel: 'M',
+        margin: 2,
+        scale: 6,
       color: {
         dark: '#05050F',
         light: '#FFFFFF'

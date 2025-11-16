@@ -1,8 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseServer } from '@/lib/supabaseServer'
 import crypto from 'crypto'
+import { promisify } from 'util'
 import fallbackAvatars, { FamousAvatar } from '../../lib/fallbackAvatars'
 import { downloadRandomCelebrityAvatar } from '../../lib/tmdbCelebrity'
+
+const PBKDF2_ITERATIONS = 100000
+const pbkdf2Async = promisify(crypto.pbkdf2)
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -14,7 +18,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const salt = crypto.randomBytes(16).toString('hex')
-    const password_hash = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex')
+    const derivedKey = await pbkdf2Async(password, salt, PBKDF2_ITERATIONS, 64, 'sha512')
+    const password_hash = derivedKey.toString('hex')
     const now = new Date().toISOString()
 
     let avatar_path: string | null = null
