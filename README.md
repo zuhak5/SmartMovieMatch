@@ -111,6 +111,7 @@ This update adds avatar upload during signup.
 - Server API: `/api/signup` (uploads avatar using Service Role, inserts user & session)
 - Client: signup page includes `<input type="file" name="avatar" />` and posts base64 to API
 - Migration: `supabase/migrations/add_auth_users_avatar.sql` (idempotent)
+- If a user skips the upload step, the server now assigns a random avatar pulled from a curated list of iconic actors and directors so every profile starts with a recognizable face.
 
 ### Environment
 Set in `.env.local`:

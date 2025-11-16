@@ -914,6 +914,7 @@ export async function searchSocialUsers(query) {
   return response.results.map((entry) => ({
     username: entry.username,
     displayName: entry.displayName,
+    avatarUrl: entry.avatarUrl || '',
     tagline: entry.tagline || '',
     sharedInterests: Array.isArray(entry.sharedInterests) ? entry.sharedInterests.slice() : [],
     sharedFavorites: Array.isArray(entry.sharedFavorites) ? entry.sharedFavorites.slice() : [],
@@ -3332,6 +3333,9 @@ function normalizeSocialSuggestion(entry, followersSet, followingSet) {
   const displayName = typeof entry.displayName === 'string' && entry.displayName.trim()
     ? entry.displayName.trim()
     : formatDisplayNameFromHandle(username);
+  const avatarUrl = typeof entry.avatarUrl === 'string' && entry.avatarUrl.trim()
+    ? entry.avatarUrl.trim()
+    : '';
   const tagline = typeof entry.tagline === 'string' ? entry.tagline.trim() : '';
   const reason = typeof entry.reason === 'string' ? entry.reason.trim() : '';
   const sharedInterests = Array.isArray(entry.sharedInterests)
@@ -3357,6 +3361,7 @@ function normalizeSocialSuggestion(entry, followersSet, followingSet) {
   return {
     username,
     displayName,
+    avatarUrl,
     tagline,
     sharedInterests,
     sharedFavorites,
@@ -3517,6 +3522,7 @@ function cloneSocialOverview(overview) {
       ? overview.suggestions.map((entry) => ({
           username: entry.username,
           displayName: entry.displayName,
+          avatarUrl: entry.avatarUrl || '',
           tagline: entry.tagline,
           sharedInterests: Array.isArray(entry.sharedInterests)
             ? entry.sharedInterests.slice()
