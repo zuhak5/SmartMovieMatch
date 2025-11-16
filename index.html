@@ -2,1248 +2,784 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Smart Movie Match – Online Recommender</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="color-scheme" content="dark light" />
-  <meta name="theme-color" content="#020617" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap"
-    rel="stylesheet"
-  />
-  <link rel="stylesheet" href="assets/css/mobile.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartMovieMatch</title>
+  <style>
+    :root {
+      --bg: #0b0f17;
+      --surface: #101722;
+      --surface-2: #151c28;
+      --text: #e7ecf5;
+      --muted: #9aa4b5;
+      --accent: #6ee7ff;
+      --accent-strong: #22d3ee;
+      --danger: #f87171;
+      --card-radius: 16px;
+      --pad: 16px;
+      --pad-lg: 20px;
+      --shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+      --border: 1px solid rgba(255, 255, 255, 0.08);
+    }
 
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Inter", system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at 20% 20%, rgba(34, 211, 238, 0.12), transparent 40%),
+        radial-gradient(circle at 80% 0%, rgba(236, 72, 153, 0.1), transparent 42%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 24px 12px 32px;
+    }
+
+    .app-shell {
+      position: relative;
+      width: 100%;
+      max-width: 560px;
+      min-height: calc(100vh - 56px);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0) 60%), var(--surface);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+    }
+
+    header.app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--pad-lg);
+      gap: 12px;
+      background: rgba(255, 255, 255, 0.02);
+      backdrop-filter: blur(8px);
+      border-bottom: var(--border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      font-size: 18px;
+    }
+
+    .brand span {
+      color: var(--accent);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: transform 120ms ease, border-color 120ms ease;
+    }
+
+    .icon-btn:hover {
+      border-color: rgba(110, 231, 255, 0.5);
+      transform: translateY(-1px);
+    }
+
+    .avatar-placeholder {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(110, 231, 255, 0.12), rgba(255, 255, 255, 0.04));
+      border: var(--border);
+      display: grid;
+      place-items: center;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .top-tabs {
+      display: none;
+      gap: 8px;
+      padding: 0 var(--pad-lg) var(--pad);
+      background: rgba(255, 255, 255, 0.02);
+      border-bottom: var(--border);
+      overflow-x: auto;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    .top-tabs.active { display: flex; }
+
+    .tab-button {
+      flex: 1;
+      min-width: 120px;
+      border: var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 600;
+      letter-spacing: 0.1px;
+      transition: background 160ms ease, transform 160ms ease, border-color 160ms ease;
+    }
+
+    .tab-button[aria-selected="true"] {
+      background: linear-gradient(135deg, rgba(110, 231, 255, 0.16), rgba(34, 211, 238, 0.24));
+      border-color: rgba(110, 231, 255, 0.6);
+      color: #0b1727;
+    }
+
+    .tab-button:active { transform: translateY(1px); }
+
+    main {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .content-area {
+      height: calc(100vh - 180px);
+      overflow-y: auto;
+      padding: var(--pad-lg);
+      padding-bottom: 100px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 30%);
+      display: grid;
+      gap: 16px;
+    }
+
+    .section-panel { display: none; }
+    .section-panel.active { display: grid; gap: 16px; }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: grid; gap: 16px; }
+
+    .pill-active,
+    .tab-button[aria-selected="true"],
+    .bottom-btn[aria-selected="true"] {
+      filter: brightness(1.02);
+    }
+
+    .card {
+      background: var(--surface-2);
+      border-radius: var(--card-radius);
+      padding: var(--pad-lg);
+      border: var(--border);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    }
+
+    .card-header { display:flex; justify-content: space-between; align-items: center; gap: 12px; }
+
+    h1,h2,h3,h4 { margin: 0; }
+    p { margin: 6px 0 0; color: var(--muted); }
+
+    .hero-card {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 120px 1fr;
+      align-items: center;
+    }
+
+    .poster { width: 100%; border-radius: 14px; aspect-ratio: 2/3; background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(110,231,255,0.12)); border: var(--border); }
+
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    .btn-primary, .btn-ghost, .btn-pill {
+      border: none;
+      cursor: pointer;
+      font-weight: 700;
+      border-radius: 12px;
+      padding: 10px 14px;
+      transition: transform 120ms ease, filter 120ms ease;
+    }
+
+    .btn-primary {   
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      color: #0b0f17;
+    }
+
+    .btn-ghost {     
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      border: var(--border);
+    }
+
+    .btn-pill {      
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      border: var(--border);
+      border-radius: 999px;
+      transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+    }
+
+    .btn-pill.pill-active {
+      background: rgba(110, 231, 255, 0.16);
+      color: #0b1727;
+      border-color: rgba(110, 231, 255, 0.7);
+    }
+
+    .btn-primary:hover, .btn-ghost:hover, .btn-pill:hover { filter: brightness(1.05); }
+    .btn-primary:active, .btn-ghost:active, .btn-pill:active { transform: translateY(1px); }
+
+    .subtitle { color: var(--muted); font-size: 14px; }
+
+    .h-scroll {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: 160px;
+      gap: 12px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+    }
+
+    .movie-card, .list-card, .person-card, .feed-card, .request-card { display: grid; gap: 8px; }
+
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; background: rgba(255,255,255,0.08); color: var(--text); font-size: 12px; }
+
+    .grid-two { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+
+    .pill-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .meta { color: var(--muted); font-size: 13px; }
+
+    .avatar-row { display: flex; gap: 10px; align-items: center; }
+    .avatar-sm { width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg, rgba(110,231,255,0.12), rgba(255,255,255,0.04)); border: var(--border); display: grid; place-items: center; font-weight: 600; }
+
+    .poster-mini-row { display: flex; gap: 6px; }
+    .poster-mini { width: 50px; height: 70px; border-radius: 10px; background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(110,231,255,0.14)); border: var(--border); }
+
+    .stacked-bar { display: flex; gap: 4px; height: 10px; border-radius: 999px; overflow: hidden; background: rgba(255,255,255,0.06); }
+    .stacked-bar span { display: block; height: 100%; }
+
+    .bottom-nav {
+      position: sticky;
+      bottom: 0;
+      width: 100%;
+      background: rgba(16, 23, 34, 0.94);
+      backdrop-filter: blur(8px);
+      border-top: var(--border);
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      padding: 8px;
+      gap: 8px;
+    }
+
+    .bottom-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-weight: 600;
+      display: grid;
+      place-items: center;
+      gap: 4px;
+      padding: 8px 6px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 140ms ease, color 140ms ease;
+    }
+
+    .bottom-btn[aria-selected="true"] {
+      background: rgba(110, 231, 255, 0.12);
+      color: var(--accent);
+    }
+
+    .bottom-btn span { font-size: 12px; }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 96px;
+      transform: translateX(-50%);
+      background: rgba(10, 20, 32, 0.9);
+      border: var(--border);
+      color: var(--text);
+      padding: 12px 16px;
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms ease, transform 180ms ease;
+      max-width: 90vw;
+      text-align: center;
+      z-index: 10;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, -6px);
+    }
+
+    @media (min-width: 720px) {
+      body { padding: 48px 0; }
+      .content-area { height: calc(100vh - 210px); }
+    }
+  </style>
 </head>
-<body data-page="discovery" data-theme="dark" data-active-view="home">
-  <div class="site-shell">
-    <header class="site-header pad-inline">
-      <div class="site-header__inner">
-        <div class="site-header__primary">
-          <nav class="site-header__nav" aria-label="Primary navigation">
-            <a class="site-header__link" href="profile.html#collectionsPanel" data-nav="lists">
-              <span class="site-header__icon" aria-hidden="true">🎯</span>
-              <span class="site-header__label">My Lists</span>
-            </a>
-            <a class="site-header__link" href="peeruser.html" data-nav="friends">
-              <span class="site-header__icon" aria-hidden="true">🤝</span>
-              <span class="site-header__label">Friends</span>
-            </a>
-          </nav>
-        </div>
-        <div class="site-header__secondary">
-          <div class="site-header__utility">
-            <div class="site-header__quick-actions">
-              <button
-                id="themeToggle"
-                class="btn-theme-toggle"
-                type="button"
-                aria-label="Switch to light theme"
-              data-theme-target="light"
-            >
-              <span class="btn-theme-icon" aria-hidden="true">🌙</span>
-              <span class="btn-theme-label">Dark</span>
-            </button>
-            <button
-              id="notificationBell"
-              class="notification-bell"
-              type="button"
-              aria-haspopup="true"
-              aria-expanded="false"
-              aria-controls="notificationPanel"
-              hidden
-              >
-                <span class="notification-icon" aria-hidden="true">🔔</span>
-                <span id="notificationCount" class="notification-count" hidden>0</span>
-                <span class="sr-only">Open notifications</span>
-              </button>
-            </div>
-            <div class="account-bar" role="navigation" data-account-state="guest">
-              <div class="account-bar__content">
-                <div class="account-bar-actions">
-                  <a id="accountLoginLink" class="account-link" href="login.html">Log in / Sign up</a>
-                </div>
-                <div id="accountProfile" class="account-profile" hidden>
-                  <button
-                    id="accountProfileBtn"
-                    class="account-pill"
-                    type="button"
-                    aria-haspopup="menu"
-                    aria-expanded="false"
-                    aria-controls="accountMenu"
-                  >
-                    <span class="account-avatar" id="accountAvatar" aria-hidden="true">
-                      <span id="accountAvatarInitials" class="account-avatar-initials">GM</span>
-                      <img id="accountAvatarImg" alt="" />
-                    </span>
-                    <span class="account-pill-text">
-                      <span id="accountName" class="account-name">Guest</span>
-                      <span id="accountPillSync" class="account-pill-sub">Cloud sync inactive</span>
-                    </span>
-                    <span class="account-pill-caret" aria-hidden="true">▾</span>
-                  </button>
-                  <ul id="accountMenu" class="account-menu" role="menu" aria-label="Account actions">
-                    <li>
-                      <button class="account-menu-item" type="button" data-action="profile" role="menuitem">
-                        Profile overview
-                      </button>
-                    </li>
-                    <li>
-                      <button class="account-menu-item" type="button" data-action="settings" role="menuitem">
-                        Account settings
-                      </button>
-                    </li>
-                    <li>
-                      <button
-                        class="account-menu-item account-menu-item--danger"
-                        type="button"
-                        data-action="logout"
-                        role="menuitem"
-                      >
-                        Sign out
-                      </button>
-                    </li>
-                  </ul>
-                  <span id="socialActivityIndicator" class="social-activity-indicator" hidden aria-hidden="true"></span>
-                </div>
-              </div>
-            </div>
-        </div>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="brand" aria-label="SmartMovieMatch home">
+        <span>🎬</span> SmartMovieMatch
+      </div>
+      <div class="header-actions">
+        <button class="icon-btn" aria-label="Notifications">🔔</button>
+        <div class="avatar-placeholder" aria-label="User menu">SM</div>
       </div>
     </header>
-    <main class="site-main">
-      <div class="site-main__backdrop" aria-hidden="true"></div>
-      <div class="site-main__glow" aria-hidden="true"></div>
-      <div class="site-main__inner pad-inline">
-        <div class="site-main__grid">
-          <section class="site-main__content">
-            <div class="app pad-inline">
-  <header class="app-header discovery-hero" aria-label="Live discovery overview">
-    <div class="discovery-hero__primary">
-      <p class="discovery-hero__eyebrow">Taste-aware control center</p>
-      <h1 class="discovery-hero__title">Smart Movie Match</h1>
-      <p class="discovery-hero__body">
-        Tell me what you’re into and I’ll hunt for fresh movies online, then tailor the picks
-        to your mood and what you’ve already watched.
-      </p>
-      <div class="discovery-hero__actions">
-        <a class="btn-primary" href="#globalSearchPanel">Dive into search</a>
-        <button type="button" class="btn-ghost" data-sheet-open="filters">Adjust filters</button>
-      </div>
-      <div class="discovery-hero__meta">
-        <span class="pill-context">
-          <span class="pill-dot"></span>
-          No static catalog – everything fetched live
-        </span>
-        <div class="app-top-tabs" role="tablist" aria-label="Discovery spotlight">
-          <button class="tab-chip is-active" type="button" role="tab" aria-selected="true" data-tab-chip>
-            Tonight
-          </button>
-          <button class="tab-chip" type="button" role="tab" aria-selected="false" data-tab-chip>
-            Fresh for you
-          </button>
-          <button class="tab-chip" type="button" role="tab" aria-selected="false" data-tab-chip>
-            Watchlist
-          </button>
-          <button class="tab-chip" type="button" role="tab" aria-selected="false" data-tab-chip>
-            Friends hype
-          </button>
-        </div>
-      </div>
+
+    <div class="top-tabs" data-tabs-for="home" role="tablist" aria-label="Home tabs">
+      <button class="tab-button" data-tab="for-you" aria-controls="home-for-you" aria-selected="true">For You</button>
+      <button class="tab-button" data-tab="with-friends" aria-controls="home-with-friends" aria-selected="false">With Friends</button>
     </div>
-    <div class="discovery-hero__secondary">
-      <article class="discovery-card discovery-card--status">
-        <p class="discovery-card__label">Session pulse</p>
-        <div class="discovery-card__stats">
-          <div>
-            <p class="discovery-card__value">Live</p>
-            <p class="discovery-card__meta">Discovery engine</p>
-          </div>
-          <div>
-            <p class="discovery-card__value">24h</p>
-            <p class="discovery-card__meta">Activity window</p>
-          </div>
-        </div>
-        <p class="discovery-card__helper">Real-time filters blend TMDB, OMDb, and YouTube cues.</p>
-      </article>
-      <article class="discovery-card discovery-card--social" aria-live="polite">
-        <p class="discovery-card__label">Social pulse</p>
-        <div
-          id="socialMiniPreview"
-          class="social-mini-preview"
-          aria-live="polite"
-          aria-hidden="true"
-          hidden
-        >
-          <div class="social-mini-chip">
-            <span class="social-mini-label">Following</span>
-            <span id="socialMiniFollowing" class="social-mini-value">0</span>
-          </div>
-          <div class="social-mini-chip">
-            <span class="social-mini-label">Followers</span>
-            <span id="socialMiniFollowers" class="social-mini-value">0</span>
-          </div>
-          <div class="social-mini-chip">
-            <span class="social-mini-label">Mutual</span>
-            <span id="socialMiniMutual" class="social-mini-value">0</span>
-          </div>
-          <p class="social-mini-hint">Friend stats power inline social context.</p>
-        </div>
-      </article>
+
+    <div class="top-tabs" data-tabs-for="discover" role="tablist" aria-label="Discover tabs">
+      <button class="tab-button" data-tab="movies" aria-controls="discover-movies" aria-selected="true">Movies</button>
+      <button class="tab-button" data-tab="people" aria-controls="discover-people" aria-selected="false">People</button>
+      <button class="tab-button" data-tab="lists" aria-controls="discover-lists" aria-selected="false">Lists</button>
     </div>
-  </header>
 
-    <section
-      id="globalSearchPanel"
-      class="panel global-search-panel pad-inline"
-      aria-label="Global search"
-      data-app-section="home search"
-    >
-      <div class="panel-inner pad-inline">
-        <div class="panel-header pad-inline">
-          <div>
-            <p class="global-search-eyebrow">Search Smart Movie Match</p>
-            <h2 class="panel-title">Find movies, friends, or genres</h2>
-            <p class="panel-subtitle">Type anything you’re curious about and jump to the right spot.</p>
-          </div>
-          <div class="panel-actions">
-            <button
-              type="button"
-              class="icon-button"
-              id="filtersSheetOpen"
-              data-sheet-open="filters"
-            >
-              <span aria-hidden="true">🎛️</span>
-              Filters
-            </button>
-          </div>
-        </div>
-        <form id="globalSearchForm" class="global-search-form" role="search" novalidate>
-          <label class="sr-only" for="globalSearchInput">Search movies, friends, or genres</label>
-          <div class="global-search-input-row">
-            <span class="global-search-icon" aria-hidden="true">🔎</span>
-            <input
-              id="globalSearchInput"
-              class="input-base input-text global-search-input"
-              type="search"
-              name="globalSearch"
-              autocomplete="off"
-              placeholder="Search for “Dune”, @friend, or “sci-fi”"
-              minlength="2"
-              spellcheck="false"
-            />
-            <button type="button" id="globalSearchClear" class="btn-subtle global-search-clear" hidden>
-              Clear
-            </button>
-          </div>
-        </form>
-        <p id="globalSearchStatus" class="global-search-status" role="status" aria-live="polite">
-          Search for a movie title, friend handle, or genre.
-        </p>
-        <div id="globalSearchResults" class="global-search-results" hidden>
-          <section
-            id="globalSearchMoviesSection"
-            class="global-search-section"
-            aria-label="Movie results"
-            hidden
-          >
-            <header class="global-search-section-header">
-              <h3>Movies</h3>
-              <span id="globalSearchMoviesCount" class="global-search-count" aria-live="polite"></span>
-            </header>
-            <ul id="globalSearchMoviesList" class="global-search-list" role="list"></ul>
-            <p id="globalSearchMoviesEmpty" class="global-search-empty" hidden></p>
-          </section>
-          <section
-            id="globalSearchPeopleSection"
-            class="global-search-section"
-            aria-label="Friend results"
-            hidden
-          >
-            <header class="global-search-section-header">
-              <h3>Friends</h3>
-              <span id="globalSearchPeopleCount" class="global-search-count" aria-live="polite"></span>
-            </header>
-            <ul id="globalSearchPeopleList" class="global-search-list" role="list"></ul>
-            <p id="globalSearchPeopleEmpty" class="global-search-empty" hidden></p>
-          </section>
-          <section
-            id="globalSearchGenresSection"
-            class="global-search-section"
-            aria-label="Genre results"
-            hidden
-          >
-            <header class="global-search-section-header">
-              <h3>Genres</h3>
-            </header>
-            <ul id="globalSearchGenresList" class="global-search-chip-list" role="list"></ul>
-          </section>
-        </div>
-      </div>
-    </section>
+    <div class="top-tabs" data-tabs-for="friends" role="tablist" aria-label="Friends tabs">
+      <button class="tab-button" data-tab="feed" aria-controls="friends-feed" aria-selected="true">Feed</button>
+      <button class="tab-button" data-tab="requests" aria-controls="friends-requests" aria-selected="false">Requests</button>
+    </div>
 
-  </header>
+    <div class="top-tabs" data-tabs-for="library" role="tablist" aria-label="Library tabs">
+      <button class="tab-button" data-tab="watchlist" aria-controls="library-watchlist" aria-selected="true">Watchlist</button>
+      <button class="tab-button" data-tab="lists" aria-controls="library-lists" aria-selected="false">Lists</button>
+    </div>
 
-  <main class="app-main">
-    <!-- Preferences -->
-    <section
-      id="preferencesPanel"
-      class="panel panel-sticky pad-inline"
-      data-app-section="home"
-    >
-      <div class="panel-inner pad-inline">
-        <div class="panel-header pad-inline">
-          <div class="pad-inline">
-            <div class="panel-title pad-inline">Your vibe</div>
-            <div class="panel-subtitle pad-inline">Set the vibe and I’ll spin up a fresh batch.</div>
+    <div class="top-tabs" data-tabs-for="profile" role="tablist" aria-label="Profile tabs">
+      <button class="tab-button" data-tab="overview" aria-controls="profile-overview" aria-selected="true">Overview</button>
+      <button class="tab-button" data-tab="diary" aria-controls="profile-diary" aria-selected="false">Diary</button>
+    </div>
+
+    <main>
+      <div class="content-area">
+        <section class="section-panel active" data-section-panel="home">
+          <div class="tab-panel active" data-tab-panel="for-you" id="home-for-you">
+            <article class="card hero-card">
+              <div class="poster" aria-hidden="true"></div>
+              <div>
+                <p class="subtitle">Tonight's Pick</p>
+                <h2>The Midnight Run (2024)</h2>
+                <p>A tight, neon-lit thriller about a courier who discovers the package is a person.</p>
+                <div class="btn-row">
+                  <button class="btn-primary">Play trailer</button>
+                  <button class="btn-ghost">Details</button>
+                </div>
+              </div>
+            </article>
+
+            <article class="card">
+              <div class="card-header">
+                <h3>Recommended for you</h3>
+                <span class="badge">Based on your taste and watchlist</span>
+              </div>
+              <div class="h-scroll" aria-label="Recommended movies">
+                <div class="movie-card">
+                  <div class="poster"></div>
+                  <strong>Night Signal</strong>
+                  <span class="meta">2023 • Sci-fi</span>
+                  <span class="badge">⭐ 8.4</span>
+                </div>
+                <div class="movie-card">
+                  <div class="poster"></div>
+                  <strong>Glass River</strong>
+                  <span class="meta">2022 • Mystery</span>
+                  <span class="badge">⭐ 8.1</span>
+                </div>
+                <div class="movie-card">
+                  <div class="poster"></div>
+                  <strong>Sunset Node</strong>
+                  <span class="meta">2024 • Thriller</span>
+                  <span class="badge">⭐ 8.7</span>
+                </div>
+                <div class="movie-card">
+                  <div class="poster"></div>
+                  <strong>Orbit Club</strong>
+                  <span class="meta">2021 • Adventure</span>
+                  <span class="badge">⭐ 7.9</span>
+                </div>
+              </div>
+            </article>
           </div>
-        </div>
-        <p class="hint-text hint-text--compact">
-          Share a vibe or two and I’ll refresh the feed instantly.
-        </p>
 
-        <form id="prefsForm" class="prefs-form">
-          <div class="prefs-groups pad-inline">
-            <section class="prefs-section prefs-section--presets">
-              <div
-                class="vibe-preset-panel pad-inline"
-                aria-label="Starter vibe presets"
-                data-component="vibe-presets"
-              >
-                <div class="vibe-preset-header pad-inline">
-                  <div class="pad-inline">
-                    <p class="vibe-preset-eyebrow">Need inspiration?</p>
-                    <h3 class="vibe-preset-title">Jump in with a preset</h3>
-                    <p class="vibe-preset-subtitle">
-                      Tap a card to auto-fill genres, then fine-tune below.
-                    </p>
+          <div class="tab-panel" data-tab-panel="with-friends" id="home-with-friends">
+            <article class="card">
+              <div class="card-header">
+                <div>
+                  <p class="subtitle">Plan a movie night</p>
+                  <h3>With friends</h3>
+                </div>
+                <button class="btn-pill">+ Invite</button>
+              </div>
+              <div class="avatar-row" aria-label="Friends list">
+                <div class="avatar-sm">AV</div>
+                <div class="avatar-sm">JD</div>
+                <div class="avatar-sm">MS</div>
+                <div class="avatar-sm">LK</div>
+                <button class="icon-btn" aria-label="Add friend">+</button>
+              </div>
+              <div class="card" style="background: rgba(255,255,255,0.03);">
+                <h4>Group picks</h4>
+                <div class="h-scroll">
+                  <div class="movie-card">
+                    <div class="poster"></div>
+                    <strong>Parallel Lines</strong>
+                    <span class="badge">87% match for your group</span>
                   </div>
-                  <button
-                    type="button"
-                    class="vibe-preset-toggle"
-                    id="vibePresetToggle"
-                    aria-expanded="true"
-                    aria-controls="vibePresetGrid"
-                  >
-                    Hide presets
-                  </button>
-                </div>
-                <div class="vibe-preset-grid pad-inline" role="group" id="vibePresetGrid">
-                  <button
-                    type="button"
-                    class="vibe-preset-card"
-                    data-vibe-preset="cozy-sci-fi"
-                    data-preset-genres="878,12,53"
-                    data-preset-title="Cozy sci-fi night"
-                    data-preset-summary="Hopeful space adventures & low-key thrills"
-                    data-preset-icon="🌌"
-                    aria-pressed="false"
-                  >
-                    <span class="vibe-preset-icon" aria-hidden="true">🌌</span>
-                    <span class="vibe-preset-copy">
-                      <span>Cozy sci-fi night</span>
-                      <span class="vibe-preset-meta">Hopeful space adventures &amp; low-key thrills</span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    class="vibe-preset-card"
-                    data-vibe-preset="feel-good"
-                    data-preset-genres="10751,16,35"
-                    data-preset-title="Feel-good family time"
-                    data-preset-summary="Animated laughs &amp; family comfort picks"
-                    data-preset-icon="🧸"
-                    aria-pressed="false"
-                  >
-                    <span class="vibe-preset-icon" aria-hidden="true">🧸</span>
-                    <span class="vibe-preset-copy">
-                      <span>Feel-good family time</span>
-                      <span class="vibe-preset-meta">Animated laughs &amp; cozy comfort picks</span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    class="vibe-preset-card"
-                    data-vibe-preset="midnight-mystery"
-                    data-preset-genres="9648,53,80"
-                    data-preset-title="Midnight mystery run"
-                    data-preset-summary="Twisty thrillers with noir vibes"
-                    data-preset-icon="🌙"
-                    aria-pressed="false"
-                  >
-                    <span class="vibe-preset-icon" aria-hidden="true">🌙</span>
-                    <span class="vibe-preset-copy">
-                      <span>Midnight mystery run</span>
-                      <span class="vibe-preset-meta">Twisty thrillers with noir vibes</span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    class="vibe-preset-card"
-                    data-vibe-preset="indie-hearts"
-                    data-preset-genres="18,10749,35"
-                    data-preset-title="Indie hearts club"
-                    data-preset-summary="Character dramas &amp; offbeat romances"
-                    data-preset-icon="💖"
-                    aria-pressed="false"
-                  >
-                    <span class="vibe-preset-icon" aria-hidden="true">💖</span>
-                    <span class="vibe-preset-copy">
-                      <span>Indie hearts club</span>
-                      <span class="vibe-preset-meta">Character dramas &amp; offbeat romances</span>
-                    </span>
-                  </button>
+                  <div class="movie-card">
+                    <div class="poster"></div>
+                    <strong>Silent Echo</strong>
+                    <span class="badge">82% match for your group</span>
+                  </div>
+                  <div class="movie-card">
+                    <div class="poster"></div>
+                    <strong>City Loop</strong>
+                    <span class="badge">79% match for your group</span>
+                  </div>
                 </div>
               </div>
-            </section>
-
-          <!-- Genres -->
-            <section class="prefs-section prefs-section--genres" aria-label="Fine-tune genres">
-              <div class="prefs-section-header pad-inline">
-                <p class="prefs-section-eyebrow">Fine-tune genres</p>
-                <h3 class="prefs-section-title">Dial in exactly what you’re craving</h3>
-                <p class="prefs-section-subtitle">Mix and match anything — I’ll balance the picks.</p>
-              </div>
-              <div class="genre-grid pad-inline" role="group" aria-label="Genre preferences">
-              <!-- TMDB genre IDs -->
-              <label class="genre-pill">
-                <input type="checkbox" name="genre" value="28" />
-                <span class="genre-pill-label">
-                  <span class="dot"></span>
-                  Action
-                </span>
-              </label>
-              <label class="genre-pill">
-                <input type="checkbox" name="genre" value="12" />
-                <span class="genre-pill-label">
-                  <span class="dot"></span>
-                  Adventure
-                </span>
-              </label>
-              <label class="genre-pill">
-                <input type="checkbox" name="genre" value="16" />
-                <span class="genre-pill-label">
-                  <span class="dot"></span>
-                  Animation
-                </span>
-              </label>
-              <label class="genre-pill">
-                <input type="checkbox" name="genre" value="35" />
-                <span class="genre-pill-label">
-                  <span class="dot"></span>
-                  Comedy
-                </span>
-              </label>
-              <label class="genre-pill">
-                <input type="checkbox" name="genre" value="80" />
-                <span class="genre-pill-label">
-                  <span class="dot"></span>
-                  Crime
-                </span>
-              </label>
-              <label class="genre-pill">
-                <input type="checkbox" name="genre" value="99" />
-                <span class="genre-pill-label">
-                  <span class="dot"></span>
-                  Documentary
-                </span>
-              </label>
-              <label class="genre-pill">
-                <input type="checkbox" name="genre" value="18" />
-                <span class="genre-pill-label">
-                  <span class="dot"></span>
-                  Drama
-                </span>
-              </label>
-              <label class="genre-pill">
-                <input type="checkbox" name="genre" value="10751" />
-                <span class="genre-pill-label">
-                  <span class="dot"></span>
-                  Family
-                </span>
-              </label>
-              <label class="genre-pill">
-                <input type="checkbox" name="genre" value="14" />
-                <span class="genre-pill-label">
-                  <span class="dot"></span>
-                  Fantasy
-                </span>
-              </label>
-              <label class="genre-pill">
-                <input type="checkbox" name="genre" value="36" />
-                <span class="genre-pill-label">
-                  <span class="dot"></span>
-                  History
-                </span>
-              </label>
-              <label class="genre-pill">
-                <input type="checkbox" name="genre" value="27" />
-                <span class="genre-pill-label">
-                  <span class="dot"></span>
-                  Horror
-                </span>
-              </label>
-              <label class="genre-pill">
-                <input type="checkbox" name="genre" value="10402" />
-                <span class="genre-pill-label">
-                  <span class="dot"></span>
-                  Music
-                </span>
-              </label>
-              <label class="genre-pill">
-                <input type="checkbox" name="genre" value="9648" />
-                <span class="genre-pill-label">
-                  <span class="dot"></span>
-                  Mystery
-                </span>
-              </label>
-              <label class="genre-pill">
-                <input type="checkbox" name="genre" value="10749" />
-                <span class="genre-pill-label">
-                  <span class="dot"></span>
-                  Romance
-                </span>
-              </label>
-              <label class="genre-pill">
-                <input type="checkbox" name="genre" value="878" />
-                <span class="genre-pill-label">
-                  <span class="dot"></span>
-                  Science Fiction
-                </span>
-              </label>
-              <label class="genre-pill">
-                <input type="checkbox" name="genre" value="10770" />
-                <span class="genre-pill-label">
-                  <span class="dot"></span>
-                  TV Movie
-                </span>
-              </label>
-              <label class="genre-pill">
-                <input type="checkbox" name="genre" value="53" />
-                <span class="genre-pill-label">
-                  <span class="dot"></span>
-                  Thriller
-                </span>
-              </label>
-              <label class="genre-pill">
-                <input type="checkbox" name="genre" value="10752" />
-                <span class="genre-pill-label">
-                  <span class="dot"></span>
-                  War
-                </span>
-              </label>
-              <label class="genre-pill">
-                <input type="checkbox" name="genre" value="37" />
-                <span class="genre-pill-label">
-                  <span class="dot"></span>
-                  Western
-                </span>
-              </label>
-              </div>
-            </section>
-
-            <details class="prefs-section prefs-section--advanced">
-              <summary>Advanced filters</summary>
-              <p>Runtime ranges, streaming sources, and crew filters will live here as they roll out.</p>
-            </details>
-
+              <button class="btn-primary" data-action="watch-party" style="width: 100%;">Start watch party</button>
+            </article>
           </div>
-
-
-          <div class="preferences-preview pad-inline" id="preferencesPreview" aria-live="polite"></div>
-
-          <div class="button-row pad-inline">
-            <button type="submit" class="btn-primary">
-              <span>Find movies for me</span>
-              <span aria-hidden="true">🔍</span>
-            </button>
-          </div>
-        </form>
-      </div>
-    </section>
-
-    <!-- Right column: recommendations + collections -->
-    <div class="right-column pad-inline">
-      <section
-        id="recommendationsPanel"
-        class="panel recommendations-panel pad-inline"
-        data-app-section="home"
-      >
-        <div class="panel-inner pad-inline">
-          <div id="syncStatus" class="sync-status pad-inline" role="status" aria-live="polite"></div>
-          <div class="recommendations-header pad-inline">
-            <div class="recommendations-headline pad-inline">
-              <div class="recommendations-title-row pad-inline">
-                <div class="recommendations-title pad-inline" id="recTitle">Recommendations</div>
-                <span class="pill-mini">
-                  <span class="swatch"></span>
-                  IMDb rating • genres • plot • trailer
-                </span>
-              </div>
-              <div class="recommendations-summary-row pad-inline">
-                <span
-                  id="recMetaSummary"
-                  class="recommendations-pill recommendations-pill--meta recommendations-summary-pill"
-                  aria-live="polite"
-                >
-                  Discovery mix • Genres: All • Quick filters off
-                </span>
-                <button
-                  type="button"
-                  id="recFilterReset"
-                  class="recommendations-pill recommendations-pill--action recommendations-pill--clear"
-                  aria-disabled="true"
-                  disabled
-                >
-                  Clear all
-                </button>
-              </div>
-              <div id="recMetaStatus" class="recommendations-meta-status" aria-live="polite">
-                Tune your preferences, then I’ll blend TMDB discovery with fresh OMDb details.
-              </div>
-            </div>
-            <div class="recommendations-actions pad-inline">
-              <button type="button" class="btn-subtle btn-chip btn-chip-muted" id="recNudgeBtn">
-                Shuffle suggestions
-              </button>
-            </div>
-          </div>
-
-        <section
-          id="friendsInlinePanel"
-          class="friends-inline-panel pad-inline"
-          aria-live="polite"
-          aria-hidden="true"
-          hidden
-        >
-          <div class="friends-inline-header">
-            <div class="friends-inline-title">
-              <span aria-hidden="true">✨</span>
-              <span>From your friends</span>
-            </div>
-            <button type="button" id="friendsInlineSeeAll" class="btn-link btn-link-inline">
-              Open notifications
-            </button>
-          </div>
-          <div id="friendsInlineList" class="friends-inline-list" role="list"></div>
-          <p id="friendsInlineEmpty" class="friends-inline-empty">
-            Follow friends to see what they’re watching, reviewing, and planning.
-          </p>
         </section>
 
-        <div class="recommendations-controls pad-inline" role="region" aria-label="Result view preferences">
-            <div class="control-group pad-inline">
-              <label class="control-label" for="recommendationLayout">Layout</label>
-              <div class="segmented-control pad-inline" role="radiogroup" aria-label="Recommendation layout">
-                <button type="button" class="segment" data-layout="grid" aria-pressed="true">Grid</button>
-                <button type="button" class="segment" data-layout="carousel">Carousel</button>
+        <section class="section-panel" data-section-panel="discover">
+          <div class="card" aria-label="Search">
+            <div style="position: relative;">
+              <input type="search" placeholder="Search movies, people, or lists…" style="width: 100%; padding: 12px 14px 12px 38px; border-radius: 12px; border: var(--border); background: rgba(255,255,255,0.04); color: var(--text);">
+              <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted);">🔍</span>
+            </div>
+          </div>
+
+          <div class="tab-panel active" data-tab-panel="movies" id="discover-movies">
+            <article class="card">
+              <div class="pill-row" role="group" aria-label="Movie filters">
+                <button class="btn-pill pill-active" data-filter-group="discover" aria-pressed="true">Popular</button>
+                <button class="btn-pill" data-filter-group="discover" aria-pressed="false">Top rated</button>
+                <button class="btn-pill" data-filter-group="discover" aria-pressed="false">New</button>
+                <button class="btn-pill" data-filter-group="discover" aria-pressed="false">From friends</button>
               </div>
-            </div>
-            <div class="control-group pad-inline">
-              <fieldset class="control-filter-set">
-                <legend class="control-label">Quick filters</legend>
-                <label class="control-chip">
-                  <input type="checkbox" id="filterTopRated" />
-                  <span>IMDb 7+</span>
-                </label>
-                <label class="control-chip">
-                  <input type="checkbox" id="filterStreaming" />
-                  <span>Streamable now</span>
-                </label>
-                <label class="control-chip">
-                  <input type="checkbox" id="filterFresh" />
-                  <span>Released &lt; 2 years</span>
-                </label>
-              </fieldset>
-            </div>
-          </div>
-
-          <div
-            id="recStatus"
-            class="status-row pad-inline"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            <div class="status-primary pad-inline">
-              <span class="status-dot" id="recStatusDot"></span>
-              <span id="recStatusText">
-                No calls made yet. Hit “Find movies for me” to start.
-              </span>
-            </div>
-            <div
-              class="status-progress pad-inline"
-              id="recStatusProgress"
-              role="progressbar"
-              aria-hidden="true"
-              hidden
-            >
-              <span class="status-progress-fill"></span>
-            </div>
-            <span class="status-progress-stage" id="recStatusStage" hidden></span>
-          </div>
-
-          <div id="recError" class="error-text pad-inline" role="alert"></div>
-
-          <div id="recommendationsGrid" class="recommendations-grid pad-inline"></div>
-          <div class="recommendations-actions pad-inline" id="recommendationsActions">
-            <button type="button" class="btn-subtle btn-chip" id="showMoreRecsBtn">Show more</button>
-          </div>
-        </div>
-      </section>
-
-      <section
-        id="collectionsPanel"
-        class="panel collections-panel pad-inline"
-        data-app-section="home"
-      >
-        <div class="panel-inner pad-inline">
-          <div class="panel-header collections-header pad-inline">
-            <div class="pad-inline">
-              <div class="panel-title pad-inline">Your saved lists</div>
-              <div class="panel-subtitle pad-inline">Favorites and watched picks stay close while you explore.</div>
-            </div>
-            <div class="collection-tabs pad-inline" role="tablist">
-              <button
-                type="button"
-                class="collection-tab active"
-                id="favoritesTab"
-                data-target="favorites"
-                role="tab"
-                aria-controls="favoritesView"
-                aria-selected="true"
-              >
-                Favorites
-              </button>
-              <button
-                type="button"
-                class="collection-tab"
-                id="watchedTab"
-                data-target="watched"
-                role="tab"
-                aria-controls="watchedView"
-                aria-selected="false"
-              >
-                Watched
-              </button>
-            </div>
-          </div>
-          <div class="collection-summary pad-inline" id="favoritesSummary"></div>
-          <div class="collection-summary pad-inline" id="watchedSummary"></div>
-          <div class="collection-filters pad-inline" role="region" aria-label="Collection filters">
-            <div class="collection-filter-group pad-inline">
-              <label class="collection-filter-label" for="collectionFilterGenre">Filter by genre</label>
-              <select id="collectionFilterGenre" class="collection-filter-select">
-                <option value="">All</option>
-              </select>
-            </div>
-            <div class="collection-filter-group pad-inline">
-              <label class="collection-filter-label" for="collectionFilterSort">Sort by</label>
-              <select id="collectionFilterSort" class="collection-filter-select">
-                <option value="recent">Recently added</option>
-                <option value="alpha">Alphabetical</option>
-                <option value="rating">IMDb rating</option>
-                <option value="year">Release year</option>
-              </select>
-            </div>
-          </div>
-          <div id="favoritesView" class="collection-view active pad-inline" role="tabpanel" aria-labelledby="favoritesTab">
-            <div id="favoritesList" class="favorites-list pad-inline"></div>
-            <div id="favoritesEmpty" class="empty-state empty-state-card pad-inline">
-              <div class="empty-state-illustration pad-inline" aria-hidden="true">⭐</div>
-              <div class="empty-state-body pad-inline">
-                <h3>Build a favorites lane</h3>
-                <p>Tap the star on any recommendation to stash it for later or share with friends.</p>
-                <div class="empty-state-carousel pad-inline" aria-hidden="true">
-                  <span class="empty-state-chip">Indie rom-com</span>
-                  <span class="empty-state-chip">Cult classic</span>
-                  <span class="empty-state-chip">Feel-good sports</span>
+              <div class="grid-two">
+                <div class="movie-card">
+                  <div class="poster"></div>
+                  <strong>Static Bloom</strong>
+                  <span class="meta">2024 • Drama • ⭐ 8.6</span>
+                  <div class="pill-row">
+                    <span class="btn-pill">Drama</span>
+                    <span class="btn-pill">Indie</span>
+                  </div>
                 </div>
-                <button type="button" class="btn-secondary" data-empty-scroll="#recommendationsPanel">
-                  Browse live recommendations
-                </button>
-              </div>
-            </div>
-          </div>
-          <div id="watchedView" class="collection-view pad-inline" role="tabpanel" aria-labelledby="watchedTab">
-            <div id="watchedList" class="watched-panel-list pad-inline"></div>
-            <div id="watchedEmpty" class="empty-state empty-state-card pad-inline">
-              <div class="empty-state-illustration pad-inline" aria-hidden="true">🎟️</div>
-              <div class="empty-state-body pad-inline">
-                <h3>Keep a watched streak</h3>
-                <p>Mark recommendations as <strong>“I’ve watched this”</strong> so I can bias future batches.</p>
-                <div class="empty-state-carousel pad-inline" aria-hidden="true">
-                  <span class="empty-state-chip">Thriller Friday</span>
-                  <span class="empty-state-chip">Animated matinée</span>
-                  <span class="empty-state-chip">Classic noir</span>
+                <div class="movie-card">
+                  <div class="poster"></div>
+                  <strong>Neon Tide</strong>
+                  <span class="meta">2023 • Sci-fi • ⭐ 8.3</span>
+                  <div class="pill-row">
+                    <span class="btn-pill">Sci-fi</span>
+                    <span class="btn-pill">Thriller</span>
+                  </div>
                 </div>
-                <button type="button" class="btn-subtle" data-empty-scroll="#recommendationsPanel">
-                  See how it works
-                </button>
-              </div>
-            </div>
-            <div class="collection-actions pad-inline">
-              <button type="button" class="btn-subtle btn-subtle-danger" id="clearWatchedBtn">
-                <span>Clear history</span>
-                <span aria-hidden="true">🧹</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section
-        id="socialFirstRunPanel"
-        class="panel social-nudge-panel pad-inline"
-        aria-live="polite"
-        hidden
-
-      >
-        <div class="panel-inner pad-inline">
-          <div id="socialFirstRunCard" class="social-nudge-card pad-inline">
-            <p class="social-nudge-eyebrow">Make it social</p>
-            <h3 class="social-nudge-title">See what your friends loved</h3>
-            <p id="socialFirstRunMessage" class="social-nudge-text">
-              Sign in and follow friends to see which picks they loved (or hated).
-            </p>
-            <div class="social-nudge-stats" role="presentation">
-              <div class="social-nudge-stat">
-                <span class="social-nudge-stat-label">Following</span>
-                <span id="socialNudgeFollowing" class="social-nudge-stat-value">0</span>
-              </div>
-              <div class="social-nudge-stat">
-                <span class="social-nudge-stat-label">Followers</span>
-                <span id="socialNudgeFollowers" class="social-nudge-stat-value">0</span>
-              </div>
-              <div class="social-nudge-stat">
-                <span class="social-nudge-stat-label">Mutual</span>
-                <span id="socialNudgeMutual" class="social-nudge-stat-value">0</span>
-              </div>
-            </div>
-            <button type="button" id="socialFirstRunCta" class="btn-primary social-nudge-cta">
-              Find people to follow
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section
-        id="watchPartyPanel"
-        class="panel watch-party-panel pad-inline"
-        aria-label="Watch party"
-        data-app-section="home activity"
-      >
-        <div class="panel-inner pad-inline">
-          <div class="panel-header pad-inline">
-            <div>
-              <div class="panel-title">Watch party</div>
-              <div class="panel-subtitle">Gather your crew, sync the stream, and chat live.</div>
-            </div>
-            <div class="panel-actions">
-              <button type="button" class="icon-button">
-                <span aria-hidden="true">➕</span>
-                Invite
-              </button>
-            </div>
-          </div>
-          <div class="watch-party-grid">
-            <article class="watch-party-card watch-party-card--lobby" aria-label="Watch party lobby">
-              <header>
-                <p class="pill-context">
-                  <span class="pill-dot" aria-hidden="true"></span>
-                  Lobby open · Starts in 12 min
-                </p>
-                <h3>Blade Runner 2049 · Cozy neon rewatch</h3>
-              </header>
-              <div class="watch-party-meta">
-                <p>Runtime · 2h 44m · Streaming on Hulu</p>
-                <p>Host: <strong>@embertrail</strong> · Private</p>
-              </div>
-              <div class="watch-party-participants" aria-label="Participants">
-                <span class="watch-party-avatar" aria-hidden="true"></span>
-                <span class="watch-party-avatar" aria-hidden="true"></span>
-                <span class="watch-party-avatar" aria-hidden="true"></span>
-                <span class="watch-party-avatar" aria-hidden="true"></span>
-                <span class="watch-party-count">+ 5 more</span>
-              </div>
-              <div class="watch-party-chat" aria-live="polite">
-                <p><strong>@sol</strong> queued a synthwave warm-up playlist.</p>
-                <p><strong>@ari</strong> can host the post-show talkback!</p>
-                <p><strong>You</strong>: grabbing snacks, brb 🍿</p>
-              </div>
-              <div class="watch-party-input">
-                <label class="sr-only" for="watchPartyMessage">Chat message</label>
-                <input id="watchPartyMessage" type="text" placeholder="Drop a message" />
-                <button type="button" class="btn-primary">Ready</button>
+                <div class="movie-card">
+                  <div class="poster"></div>
+                  <strong>Northbound</strong>
+                  <span class="meta">2022 • Adventure • ⭐ 8.1</span>
+                  <div class="pill-row">
+                    <span class="btn-pill">Adventure</span>
+                    <span class="btn-pill">Family</span>
+                  </div>
+                </div>
+                <div class="movie-card">
+                  <div class="poster"></div>
+                  <strong>Echo Lens</strong>
+                  <span class="meta">2024 • Mystery • ⭐ 8.0</span>
+                  <div class="pill-row">
+                    <span class="btn-pill">Mystery</span>
+                    <span class="btn-pill">Noir</span>
+                  </div>
+                </div>
               </div>
             </article>
-            <article class="watch-party-card watch-party-card--live" aria-label="Live party overlay">
-              <div class="pill-context">
-                <span class="pill-dot" aria-hidden="true"></span>
-                Neon noir club · LIVE
+          </div>
+
+          <div class="tab-panel" data-tab-panel="people" id="discover-people">
+            <article class="card">
+              <div class="person-card">
+                <div class="avatar-row">
+                  <div class="avatar-sm">AR</div>
+                  <div>
+                    <strong>Ava Rami</strong>
+                    <p>Actor • Known for: Neon Tide, Quiet Harbor</p>
+                  </div>
+                </div>
               </div>
-              <div class="watch-party-meta">
-                <p>We’re synced on <strong>Prime Video</strong>. Stream controls stay here.</p>
+              <div class="person-card">
+                <div class="avatar-row">
+                  <div class="avatar-sm">DM</div>
+                  <div>
+                    <strong>Dario Moon</strong>
+                    <p>Director • Known for: Static Bloom, Parallel Lines</p>
+                  </div>
+                </div>
               </div>
-              <div class="watch-party-chat">
-                <p><strong>@embertrail</strong>: Pause at the spinner transition?</p>
-                <p><strong>@you</strong>: Locked in. These visuals 😮‍💨</p>
+              <div class="person-card">
+                <div class="avatar-row">
+                  <div class="avatar-sm">SL</div>
+                  <div>
+                    <strong>Samira Lane</strong>
+                    <p>Writer • Known for: City Loop, Echo Lens</p>
+                  </div>
+                </div>
               </div>
-              <div class="watch-party-input">
-                <input type="text" placeholder="Send a quick reaction" />
-                <button type="button" class="btn-secondary">👏</button>
-                <button type="button" class="btn-secondary">🔥</button>
-                <button type="button" class="btn-secondary">😭</button>
-              </div>
-              <button type="button" class="btn-ghost">Leave party</button>
             </article>
           </div>
-        </div>
-      </section>
 
-      <section
-        id="friendsActivityPanel"
-        class="panel friends-activity-panel pad-inline"
-        aria-live="polite"
-        data-app-section="activity"
-      >
-        <div class="panel-inner pad-inline">
-          <div class="panel-header pad-inline">
-            <div class="pad-inline">
-              <div class="panel-title">Friends activity</div>
-              <div class="panel-subtitle">See what your circle is doing in real time.</div>
-            </div>
+          <div class="tab-panel" data-tab-panel="lists" id="discover-lists">
+            <article class="card list-card">
+              <div class="poster-mini-row">
+                <div class="poster-mini"></div>
+                <div class="poster-mini"></div>
+                <div class="poster-mini"></div>
+              </div>
+              <strong>Rainy Night Thrillers</strong>
+              <p class="meta">by @nocturne • 18 movies • Trending</p>
+              <p>Slow-burn suspense with neon palettes and grounded characters.</p>
+            </article>
+            <article class="card list-card">
+              <div class="poster-mini-row">
+                <div class="poster-mini"></div>
+                <div class="poster-mini"></div>
+                <div class="poster-mini"></div>
+                <div class="poster-mini"></div>
+              </div>
+              <strong>From friends: Cozy sci-fi</strong>
+              <p class="meta">by @alex • 12 movies • From friends</p>
+              <p>Optimistic sci-fi worlds that feel like a hug.</p>
+            </article>
           </div>
-          <div id="friendsActivitySignedOut" class="friends-activity-signedout pad-inline">
-            <p>Sign in and follow a few friends to light up this feed.</p>
-            <a class="btn-secondary" href="login.html">Sign in</a>
-          </div>
-          <div
-            id="friendsActivityContent"
-            class="friends-activity-content pad-inline"
-            hidden
-            aria-hidden="true"
-           
-          >
-            <div class="friends-activity-grid">
-              <article class="friends-activity-card" aria-live="polite">
-                <header class="friends-activity-card-header">
-                  <h3>Recently logged by friends</h3>
-                  <p>Your circle’s latest watches and saves.</p>
-                </header>
-                <div id="friendsWatchList" class="friends-activity-list" role="list"></div>
-                <p id="friendsWatchEmpty" class="friends-activity-empty">
-                  Follow friends to see what they’re logging.
-                </p>
-              </article>
-              <article class="friends-activity-card" aria-live="polite">
-                <header class="friends-activity-card-header">
-                  <h3>New lists from people you follow</h3>
-                  <p>Fresh collaborative playlists and watch queues.</p>
-                </header>
-                <div id="friendsListsList" class="friends-activity-list" role="list"></div>
-                <p id="friendsListsEmpty" class="friends-activity-empty">
-                  Collaborative lists from your circle will land here.
-                </p>
-              </article>
-              <article
-                id="friendSuggestionsCard"
-                class="friends-activity-card friends-activity-card--suggestions"
-                aria-live="polite"
-                hidden
-              >
-                <header class="friends-activity-card-header">
-                  <h3>People you might like</h3>
-                  <p>High-overlap movie fans pulled from your vibe signals.</p>
-                </header>
-                <div id="friendSuggestionsList" class="friend-suggestions-list" role="list" hidden></div>
-                <p id="friendSuggestionsEmpty" class="friends-activity-empty">
-                  Follow a few favorites to unlock tailored matches.
-                </p>
-              </article>
-            </div>
-          </div>
-        </div>
-      </section>
+        </section>
 
-    </div>
-  </main>
-          </section>
-          <aside class="site-main__sidebar" aria-label="Live discovery snapshot">
-            <section class="site-sidebar-card">
-              <p class="site-sidebar-card__eyebrow">Session status</p>
-              <h2 class="site-sidebar-card__title">Tonight’s focus</h2>
-              <p class="site-sidebar-card__body">
-                Keep the reel personal — steer the filters, jump to search, or ride the social hype.
-              </p>
-              <div class="site-main__stat-grid">
-                <div class="site-main__stat">
-                  <span class="site-main__stat-value" aria-live="polite">Live</span>
-                  <span class="site-main__stat-label">Discovery engine</span>
-                </div>
-                <div class="site-main__stat">
-                  <span class="site-main__stat-value" aria-live="polite">24h</span>
-                  <span class="site-main__stat-label">Activity window</span>
+        <section class="section-panel" data-section-panel="friends">
+          <div class="tab-panel active" data-tab-panel="feed" id="friends-feed">
+            <article class="card feed-card">
+              <div class="avatar-row">
+                <div class="avatar-sm">JD</div>
+                <div>
+                  <strong>@jordan</strong>
+                  <p>rated ⭐⭐⭐⭐ “Neon Tide” • 3h ago</p>
                 </div>
               </div>
-              <div class="site-main__actions">
-                <button type="button" class="btn-primary site-sidebar-btn" data-sheet-open="filters">
-                  Tune filters
-                </button>
-                <a class="site-sidebar-link" href="#globalSearchPanel">Jump to search</a>
+              <div class="card" style="background: rgba(255,255,255,0.03);">
+                <div class="poster-mini-row">
+                  <div class="poster-mini"></div>
+                  <div>
+                    <strong>Neon Tide</strong>
+                    <p class="meta">2023 • Sci-fi</p>
+                  </div>
+                </div>
               </div>
-            </section>
-            <section class="site-sidebar-card">
-              <p class="site-sidebar-card__eyebrow">Quick cues</p>
-              <ul class="site-main__checklist">
-                <li class="site-main__check-item">
-                  <span class="site-main__check-icon" aria-hidden="true">🌘</span>
+            </article>
+
+            <article class="card feed-card">
+              <div class="avatar-row">
+                <div class="avatar-sm">AV</div>
+                <div>
+                  <strong>@ava</strong>
+                  <p>created a list “Cozy Thrillers” • 6h ago</p>
+                </div>
+              </div>
+              <div class="card" style="background: rgba(255,255,255,0.03);">
+                <strong>Cozy Thrillers</strong>
+                <p class="meta">12 films • comfort suspense</p>
+              </div>
+            </article>
+          </div>
+
+          <div class="tab-panel" data-tab-panel="requests" id="friends-requests">
+            <article class="card request-card">
+              <div class="avatar-row">
+                <div class="avatar-sm">MS</div>
+                <div>
+                  <strong>mara_s</strong>
+                  <p class="meta">2 mutual friends</p>
+                </div>
+              </div>
+              <div class="btn-row">
+                <button class="btn-primary" data-request="friend" data-action="accept">Accept</button>
+                <button class="btn-ghost" data-request="friend" data-action="ignore">Ignore</button>
+              </div>
+            </article>
+            <article class="card request-card">
+              <div class="card-header">
+                <div>
+                  <p class="subtitle">Watch party invite</p>
+                  <h4>City Loop tonight</h4>
+                  <p class="meta">Host: @alex • 8:00 PM</p>
+                </div>
+                <div class="poster-mini"></div>
+              </div>
+              <div class="btn-row">
+                <button class="btn-primary" data-request="party" data-action="join">Join</button>
+                <button class="btn-ghost" data-request="party" data-action="view">View</button>
+              </div>
+            </article>
+            <article class="card request-card">
+              <p class="meta">No more requests right now.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="section-panel" data-section-panel="library">
+          <div class="tab-panel active" data-tab-panel="watchlist" id="library-watchlist">
+            <article class="card">
+              <div class="card-header">
+                <h3>Watchlist</h3>
+                <select aria-label="Sort watchlist" style="background: var(--surface-2); color: var(--text); border: var(--border); border-radius: 10px; padding: 8px 10px;">
+                  <option>Recently added</option>
+                  <option>Release date</option>
+                  <option>A–Z</option>
+                </select>
+              </div>
+              <div class="grid-two">
+                <div class="movie-card">
+                  <div class="poster"></div>
+                  <strong>Blue Static</strong>
+                  <span class="meta">2024 • 1h 52m</span>
+                  <button class="btn-pill" data-watch="blue-static" aria-pressed="false">Mark watched ✓</button>
+                </div>
+                <div class="movie-card">
+                  <div class="poster"></div>
+                  <strong>Quiet Harbor</strong>
+                  <span class="meta">2022 • 1h 48m</span>
+                  <button class="btn-pill" data-watch="quiet-harbor" aria-pressed="false">Mark watched ✓</button>
+                </div>
+                <div class="movie-card">
+                  <div class="poster"></div>
+                  <strong>Signal Fire</strong>
+                  <span class="meta">2023 • 2h 05m</span>
+                  <button class="btn-pill" data-watch="signal-fire" aria-pressed="false">Mark watched ✓</button>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="tab-panel" data-tab-panel="lists" id="library-lists">
+            <button class="btn-primary">Create new list</button>
+            <article class="card list-card">
+              <strong>Weekend double-features</strong>
+              <p class="meta">9 movies • Shared</p>
+              <div class="poster-mini-row">
+                <div class="poster-mini"></div>
+                <div class="poster-mini"></div>
+                <div class="poster-mini"></div>
+              </div>
+              <span class="badge">Shared</span>
+            </article>
+            <article class="card list-card">
+              <strong>Comfort rewatches</strong>
+              <p class="meta">14 movies • Private</p>
+              <div class="poster-mini-row">
+                <div class="poster-mini"></div>
+                <div class="poster-mini"></div>
+                <div class="poster-mini"></div>
+              </div>
+              <span class="badge">Private</span>
+            </article>
+          </div>
+        </section>
+
+        <section class="section-panel" data-section-panel="profile">
+          <div class="tab-panel active" data-tab-panel="overview" id="profile-overview">
+            <article class="card">
+              <div class="avatar-row">
+                <div class="avatar-sm" style="width:56px; height:56px;">SM</div>
+                <div>
+                  <h3>SmartMovieFan</h3>
+                  <p class="meta">@smartmoviefan</p>
+                  <p class="meta">Lover of sci-fi, thrillers, and midnight premieres.</p>
+                </div>
+              </div>
+              <div class="pill-row">
+                <span class="badge">Films 421</span>
+                <span class="badge">Diary entries 186</span>
+                <span class="badge">Followers 892</span>
+                <span class="badge">Following 311</span>
+              </div>
+              <div class="card" style="background: rgba(255,255,255,0.03);">
+                <p class="subtitle">Taste summary</p>
+                <div class="stacked-bar">
+                  <span style="width: 10%; background: #475569;"></span>
+                  <span style="width: 18%; background: #3b82f6;"></span>
+                  <span style="width: 25%; background: #22d3ee;"></span>
+                  <span style="width: 30%; background: #2dd4bf;"></span>
+                  <span style="width: 17%; background: #fbbf24;"></span>
+                </div>
+                <p>You love sci-fi and thrillers. Strong lean toward stylish, character-driven stories.</p>
+              </div>
+              <div class="btn-row">
+                <button class="btn-primary">Edit profile</button>
+                <button class="btn-ghost">Share profile</button>
+              </div>
+            </article>
+          </div>
+
+          <div class="tab-panel" data-tab-panel="diary" id="profile-diary">
+            <article class="card">
+              <div class="pill-row">
+                <button class="btn-pill">Year</button>
+                <button class="btn-pill">Rating</button>
+              </div>
+              <div class="feed-card">
+                <div class="card-header">
                   <div>
-                    <p class="site-main__check-title">Switch moods</p>
-                    <p class="site-main__check-subtitle">Toggle the Tonight / Fresh / Watchlist tabs up top.</p>
+                    <p class="subtitle">Mar 18, 2024</p>
+                    <h4>Static Bloom</h4>
+                    <p class="meta">⭐⭐⭐⭐☆ • "Haunting but warm; loved the score."</p>
                   </div>
-                </li>
-                <li class="site-main__check-item">
-                  <span class="site-main__check-icon" aria-hidden="true">🎛️</span>
+                  <div class="poster-mini"></div>
+                </div>
+              </div>
+              <div class="feed-card">
+                <div class="card-header">
                   <div>
-                    <p class="site-main__check-title">Dial filters</p>
-                    <p class="site-main__check-subtitle">Genre, services, runtimes, and more live inside the sheet.</p>
+                    <p class="subtitle">Mar 12, 2024</p>
+                    <h4>Neon Tide</h4>
+                    <p class="meta">⭐⭐⭐⭐⭐ • "Pure vibe; would watch again."</p>
                   </div>
-                </li>
-                <li class="site-main__check-item">
-                  <span class="site-main__check-icon" aria-hidden="true">✨</span>
-                  <div>
-                    <p class="site-main__check-title">Catch friends hype</p>
-                    <p class="site-main__check-subtitle">Scroll to Activity to see what your circle is buzzing about.</p>
-                  </div>
-                </li>
-              </ul>
-            </section>
-          </aside>
-        </div>
+                  <div class="poster-mini"></div>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
       </div>
     </main>
 
-  <div id="onboardingCoach" class="onboarding-coach pad-inline" role="dialog" aria-modal="true" hidden>
-    <div class="onboarding-card pad-inline">
-      <div class="onboarding-header pad-inline">
-        <div class="onboarding-step pad-inline">Step <span id="onboardingStep">1</span> of 3</div>
-        <button id="onboardingClose" class="onboarding-close" type="button" aria-label="Skip onboarding">✕</button>
-      </div>
-      <div id="onboardingContent" class="onboarding-content pad-inline"></div>
-      <div class="onboarding-actions pad-inline">
-        <button id="onboardingBack" class="btn-subtle" type="button">Back</button>
-        <button id="onboardingNext" class="btn-primary" type="button">Next</button>
-      </div>
-    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+    <nav class="bottom-nav" aria-label="Primary">
+      <button class="bottom-btn" data-section="home" aria-selected="true" aria-controls="home-section">🏠<span>Home</span></button>
+      <button class="bottom-btn" data-section="discover" aria-selected="false" aria-controls="discover-section">🔎<span>Discover</span></button>
+      <button class="bottom-btn" data-section="friends" aria-selected="false" aria-controls="friends-section">👥<span>Friends</span></button>
+      <button class="bottom-btn" data-section="library" aria-selected="false" aria-controls="library-section">🎞️<span>Library</span></button>
+      <button class="bottom-btn" data-section="profile" aria-selected="false" aria-controls="profile-section">😊<span>Profile</span></button>
+    </nav>
   </div>
-
-  <div id="globalToastRegion" class="global-toast-region pad-inline" role="status" aria-live="polite"></div>
-
-  <div id="notificationOverlay" class="notification-overlay" aria-hidden="true" hidden></div>
-
-  <div id="notificationPanel" class="notification-panel pad-inline" role="region" aria-label="Notifications" hidden>
-    <div class="notification-panel-header pad-inline">
-      <span class="notification-panel-title">Notifications</span>
-      <div class="notification-panel-actions">
-        <button id="notificationMarkRead" class="btn-subtle notification-mark-read" type="button">
-          Mark all read
-        </button>
-        <button id="notificationClose" class="notification-close" type="button" aria-label="Close notifications">
-          ✕
-        </button>
-      </div>
-    </div>
-    <div id="notificationList" class="notification-list pad-inline" role="list"></div>
-    <div id="notificationEmpty" class="notification-empty pad-inline">You’re all caught up!</div>
-  </div>
-
-  <div
-    id="filtersSheet"
-    class="filters-sheet"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="filtersSheetTitle"
-    aria-hidden="true"
-    hidden
-  >
-    <div class="filters-sheet__surface">
-      <div class="filters-sheet__header">
-        <div>
-          <p class="global-search-eyebrow">Dial the lineup</p>
-          <h2 id="filtersSheetTitle" class="panel-title">Filters</h2>
-        </div>
-        <button type="button" class="icon-button" id="filtersSheetClose" aria-label="Close filters">
-          ✕
-        </button>
-      </div>
-      <div class="filters-sheet__body">
-        <section class="filter-group">
-          <h3>Sort by</h3>
-          <div class="filter-group__options">
-            <button type="button" class="chip is-active" data-filter-chip>List order</button>
-            <button type="button" class="chip" data-filter-chip>Rating</button>
-            <button type="button" class="chip" data-filter-chip>Release date</button>
-          </div>
-        </section>
-        <section class="filter-group">
-          <h3>Appearance</h3>
-          <div class="filter-group__options">
-            <label class="chip">
-              <input type="checkbox" checked />
-              <span>Fade watched films</span>
-            </label>
-            <label class="chip">
-              <input type="checkbox" />
-              <span>Use custom posters</span>
-            </label>
-          </div>
-        </section>
-        <section class="filter-group">
-          <h3>Content</h3>
-          <div class="filter-group__options">
-            <button type="button" class="chip" data-filter-chip>Year range</button>
-            <button type="button" class="chip" data-filter-chip>Genre</button>
-            <button type="button" class="chip" data-filter-chip>Country</button>
-            <button type="button" class="chip" data-filter-chip>Language</button>
-            <button type="button" class="chip" data-filter-chip>Service</button>
-            <button type="button" class="chip" data-filter-chip>Release type</button>
-            <button type="button" class="chip" data-filter-chip>Length</button>
-            <button type="button" class="chip" data-filter-chip>Film vs TV</button>
-          </div>
-        </section>
-        <section class="filter-group">
-          <h3>Your account</h3>
-          <div class="filter-group__options">
-            <button type="button" class="chip" data-filter-chip>Any status</button>
-            <button type="button" class="chip" data-filter-chip>Only watched</button>
-            <button type="button" class="chip" data-filter-chip>Only unwatched</button>
-            <label class="chip">
-              <input type="checkbox" />
-              <span>Liked only</span>
-            </label>
-          </div>
-        </section>
-      </div>
-      <div class="filters-sheet__footer">
-        <button type="button" class="btn-primary" id="filtersSheetApply">Apply filters</button>
-      </div>
-    </div>
-  </div>
-
-  <div
-    id="movieOverlay"
-    class="movie-overlay"
-    role="dialog"
-    aria-modal="true"
-    aria-hidden="true"
-    aria-labelledby="movieOverlayHeading"
-    hidden
-  >
-    <div class="movie-overlay-panel" role="document">
-      <button id="movieOverlayClose" class="movie-overlay-close" type="button" aria-label="Close movie details">
-        <span aria-hidden="true">✕</span>
-      </button>
-      <h2 id="movieOverlayHeading" class="sr-only">Movie details</h2>
-      <div id="movieOverlayHero" class="movie-overlay-hero"></div>
-      <div id="movieOverlayBody" class="movie-overlay-body"></div>
-    </div>
-  </div>
-
-  <div
-    id="socialProfileOverlay"
-    class="modal-overlay pad-inline"
-    hidden
-    aria-hidden="true"
-  >
-    <div
-      class="modal social-profile-modal pad-inline"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="socialProfileTitle"
-    >
-      <button
-        type="button"
-        class="modal-close"
-        id="socialProfileClose"
-        aria-label="Close profile preview"
-      >
-        ✕
-      </button>
-      <header class="modal-header">
-        <h2 id="socialProfileTitle" class="modal-title">Profile preview</h2>
-        <p id="socialProfileSubtitle" class="modal-subtitle"></p>
-      </header>
-      <div id="socialProfileStatus" class="modal-status pad-inline" role="status" aria-live="polite"></div>
-      <div id="socialProfileBody" class="modal-section social-profile-body pad-inline"></div>
-    </div>
-  </div>
-
-      </div>
-    </div>
-    <footer class="site-footer pad-inline">
-      <div class="site-footer__inner">
-        <p class="site-footer__copy">© SmartMovieMatch — friends-first movie intelligence.</p>
-        <p class="site-footer__note">Powered by Supabase sync + your ever-growing vibe profile.</p>
-      </div>
-    </footer>
-  </div>
-
-  <nav class="bottom-nav" aria-label="Primary navigation">
-    <div class="bottom-nav__inner">
-      <a
-        class="bottom-nav__action"
-        href="index.html"
-        data-nav="home"
-        data-nav-target="#preferencesPanel"
-        data-nav-view="home"
-        aria-current="page"
-      >
-        <span class="bottom-nav__icon" aria-hidden="true">🏠</span>
-        <span class="bottom-nav__label">Home</span>
-      </a>
-      <a
-        class="bottom-nav__action"
-        href="index.html#globalSearchPanel"
-        data-nav="search"
-        data-nav-target="#globalSearchPanel"
-        data-nav-view="search"
-        data-nav-focus="#globalSearchInput"
-      >
-        <span class="bottom-nav__icon" aria-hidden="true">🔎</span>
-        <span class="bottom-nav__label">Search</span>
-      </a>
-      <a
-        class="bottom-nav__action"
-        href="index.html#friendsActivityPanel"
-        data-nav="activity"
-        data-nav-target="#friendsActivityPanel"
-        data-nav-view="activity"
-      >
-        <span class="bottom-nav__icon" aria-hidden="true">✨</span>
-        <span class="bottom-nav__label">Activity</span>
-      </a>
-      <a
-        class="bottom-nav__action"
-        href="profile.html#collectionsPanel"
-        data-nav="lists"
-      >
-        <span class="bottom-nav__icon" aria-hidden="true">🎞️</span>
-        <span class="bottom-nav__label">Lists</span>
-      </a>
-      <a
-        class="bottom-nav__action"
-        href="profile.html"
-        data-nav="profile"
-      >
-        <span class="bottom-nav__icon" aria-hidden="true">👤</span>
-        <span class="bottom-nav__label">Profile</span>
-      </a>
-    </div>
-  </nav>
-
-  <script type="module" src="assets/js/main.js"></script>
-  <script type="module" src="assets/js/custom-fixes.js"></script>
-
+  <script src="app.js"></script>
 </body>
 </html>
-
