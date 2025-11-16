@@ -118,34 +118,80 @@
         <div class="site-main__grid">
           <section class="site-main__content">
             <div class="app pad-inline">
-  <header class="app-header">
-    <div class="app-title-row pad-inline">
-      <h1 class="app-title">
-        🎬 Smart Movie Match
-      </h1>
-      <span class="pill-context">
-        <span class="pill-dot"></span>
-        No static catalog – everything fetched live
-      </span>
+  <header class="app-header discovery-hero" aria-label="Live discovery overview">
+    <div class="discovery-hero__primary">
+      <p class="discovery-hero__eyebrow">Taste-aware control center</p>
+      <h1 class="discovery-hero__title">Smart Movie Match</h1>
+      <p class="discovery-hero__body">
+        Tell me what you’re into and I’ll hunt for fresh movies online, then tailor the picks
+        to your mood and what you’ve already watched.
+      </p>
+      <div class="discovery-hero__actions">
+        <a class="btn-primary" href="#globalSearchPanel">Dive into search</a>
+        <button type="button" class="btn-ghost" data-sheet-open="filters">Adjust filters</button>
+      </div>
+      <div class="discovery-hero__meta">
+        <span class="pill-context">
+          <span class="pill-dot"></span>
+          No static catalog – everything fetched live
+        </span>
+        <div class="app-top-tabs" role="tablist" aria-label="Discovery spotlight">
+          <button class="tab-chip is-active" type="button" role="tab" aria-selected="true" data-tab-chip>
+            Tonight
+          </button>
+          <button class="tab-chip" type="button" role="tab" aria-selected="false" data-tab-chip>
+            Fresh for you
+          </button>
+          <button class="tab-chip" type="button" role="tab" aria-selected="false" data-tab-chip>
+            Watchlist
+          </button>
+          <button class="tab-chip" type="button" role="tab" aria-selected="false" data-tab-chip>
+            Friends hype
+          </button>
+        </div>
+      </div>
     </div>
-    <p class="app-subtitle">
-      Tell me what you’re into and I’ll hunt for fresh movies online, then tailor the picks
-      to your mood and what you’ve already watched.
-    </p>
-    <div class="app-top-tabs pad-inline" role="tablist" aria-label="Discovery spotlight">
-      <button class="tab-chip is-active" type="button" role="tab" aria-selected="true" data-tab-chip>
-        Tonight
-      </button>
-      <button class="tab-chip" type="button" role="tab" aria-selected="false" data-tab-chip>
-        Fresh for you
-      </button>
-      <button class="tab-chip" type="button" role="tab" aria-selected="false" data-tab-chip>
-        Watchlist
-      </button>
-      <button class="tab-chip" type="button" role="tab" aria-selected="false" data-tab-chip>
-        Friends hype
-      </button>
+    <div class="discovery-hero__secondary">
+      <article class="discovery-card discovery-card--status">
+        <p class="discovery-card__label">Session pulse</p>
+        <div class="discovery-card__stats">
+          <div>
+            <p class="discovery-card__value">Live</p>
+            <p class="discovery-card__meta">Discovery engine</p>
+          </div>
+          <div>
+            <p class="discovery-card__value">24h</p>
+            <p class="discovery-card__meta">Activity window</p>
+          </div>
+        </div>
+        <p class="discovery-card__helper">Real-time filters blend TMDB, OMDb, and YouTube cues.</p>
+      </article>
+      <article class="discovery-card discovery-card--social" aria-live="polite">
+        <p class="discovery-card__label">Social pulse</p>
+        <div
+          id="socialMiniPreview"
+          class="social-mini-preview"
+          aria-live="polite"
+          aria-hidden="true"
+          hidden
+        >
+          <div class="social-mini-chip">
+            <span class="social-mini-label">Following</span>
+            <span id="socialMiniFollowing" class="social-mini-value">0</span>
+          </div>
+          <div class="social-mini-chip">
+            <span class="social-mini-label">Followers</span>
+            <span id="socialMiniFollowers" class="social-mini-value">0</span>
+          </div>
+          <div class="social-mini-chip">
+            <span class="social-mini-label">Mutual</span>
+            <span id="socialMiniMutual" class="social-mini-value">0</span>
+          </div>
+          <p class="social-mini-hint">Friend stats power inline social context.</p>
+        </div>
+      </article>
     </div>
+  </header>
 
     <section
       id="globalSearchPanel"
@@ -562,28 +608,6 @@
               </button>
             </div>
           </div>
-
-        <div
-          id="socialMiniPreview"
-          class="social-mini-preview pad-inline"
-          aria-live="polite"
-          aria-hidden="true"
-          hidden
-        >
-          <div class="social-mini-chip">
-            <span class="social-mini-label">Following</span>
-            <span id="socialMiniFollowing" class="social-mini-value">0</span>
-          </div>
-          <div class="social-mini-chip">
-            <span class="social-mini-label">Followers</span>
-            <span id="socialMiniFollowers" class="social-mini-value">0</span>
-          </div>
-          <div class="social-mini-chip">
-            <span class="social-mini-label">Mutual</span>
-            <span id="socialMiniMutual" class="social-mini-value">0</span>
-          </div>
-          <p class="social-mini-hint">Friend stats power the inline context on each card.</p>
-        </div>
 
         <section
           id="friendsInlinePanel"
