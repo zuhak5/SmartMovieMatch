@@ -39,6 +39,11 @@
   --panel-blur: 22px;
   --bottom-nav-height: 4.4rem;
   --bottom-nav-blur: 28px;
+  --layer-base: 0;
+  --layer-sticky: 70;
+  --layer-overlay: 160;
+  --layer-overlay-panel: 170;
+  --layer-toast: 220;
 }
 
 @media (min-width: 640px) {
@@ -322,7 +327,7 @@ a {
   border-end-start-radius: 15px;
   border-bottom-right-radius: 15px;
   top: 0;
-  z-index: 70;
+  z-index: var(--layer-sticky);
   padding-block: clamp(0.55rem, 1.6vw, 1.2rem);
   background: content-box;
   border-bottom: 1px solid rgba(59, 130, 246, 0.28);
@@ -1874,7 +1879,7 @@ body[data-theme="light"] .account-link:hover {
   inset: 0;
   background: rgba(2, 6, 23, 0.45);
   backdrop-filter: blur(4px);
-  z-index: 45;
+  z-index: var(--layer-overlay);
   transition: opacity 220ms ease;
   opacity: 0;
   pointer-events: none;
@@ -1899,7 +1904,7 @@ body[data-theme="light"] .account-link:hover {
   border-radius: 18px;
   box-shadow: 0 24px 48px rgba(8, 12, 28, 0.55);
   padding: 1rem;
-  z-index: 55;
+  z-index: var(--layer-overlay-panel);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1960,7 +1965,7 @@ body[data-theme="light"] .account-link:hover {
 
 .notification-panel.is-visible {
   opacity: 1;
-  z-index: 45;
+  z-index: var(--layer-overlay-panel);
   position-area: x-start;
   transform: translate(var(--notification-panel-translate-x), 0) scale(1);
 }
@@ -2400,7 +2405,7 @@ body.notification-overlay-open {
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  z-index: 20;
+  z-index: var(--layer-overlay);
 }
 
 .modal-overlay[open],
@@ -2424,7 +2429,7 @@ body.notification-overlay-open {
   align-items: flex-start;
   justify-content: center;
   padding: clamp(1rem, 3vw, 3rem);
-  z-index: 120;
+  z-index: var(--layer-overlay);
   opacity: 0;
   pointer-events: none;
   transition: opacity 220ms ease;
@@ -10627,7 +10632,7 @@ body[data-theme="light"] .control-chip input {
     0 6px 20px rgba(2, 6, 23, 0.35);
   backdrop-filter: blur(var(--bottom-nav-blur));
   -webkit-backdrop-filter: blur(var(--bottom-nav-blur));
-  z-index: 70;
+  z-index: var(--layer-sticky);
   isolation: isolate;
 }
 
@@ -11542,7 +11547,7 @@ body[data-theme="light"] .empty-state-card {
       display: flex;
       flex-direction: column;
       gap: 0.75rem;
-      z-index: 200;
+      z-index: var(--layer-toast);
       pointer-events: none;
     }
 
@@ -12357,7 +12362,7 @@ body.auth-body {
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  z-index: 80;
+  z-index: var(--layer-overlay);
   pointer-events: none;
 }
 
