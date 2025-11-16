@@ -10603,35 +10603,6 @@ body[data-theme="light"] .control-chip input {
       color: var(--text-main);
     }
 
-    .community-review-text[data-clamped='true'] {
-      display: -webkit-box;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: 4;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-height: calc(1.5em * 4);
-    }
-
-    .community-review-text[data-clamped='false'] {
-      display: block;
-      max-height: none;
-    }
-
-    .community-capsule-toggle {
-      margin-top: 0.25rem;
-      padding: 0;
-      font-size: 0.78rem;
-      color: var(--accent);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      align-self: flex-start;
-    }
-
-    .community-capsule-toggle:hover,
-    .community-capsule-toggle:focus-visible {
-      color: var(--text-main);
-    }
-
     .community-review-text.is-spoiler {
       transition: filter var(--transition-fast), opacity var(--transition-fast);
     }
