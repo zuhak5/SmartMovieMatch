@@ -3,6 +3,7 @@ const path = require("path");
 const fs = require("fs/promises");
 
 const { fetchWithTimeout } = require("../lib/http-client");
+const { FALLBACK_AVATARS } = require("../lib/fallbackAvatars");
 
 const fetch = (input, init = {}) => fetchWithTimeout(input, { timeoutMs: 15000, ...init });
 
@@ -164,6 +165,14 @@ async function signup(payload) {
     console.warn("Avatar upload skipped:", e && e.message ? e.message : e);
   }
 
+  if (!avatar_url) {
+    const fallbackAvatar = pickFallbackAvatar();
+    if (fallbackAvatar) {
+      avatar_path = `preset:${fallbackAvatar.id}`;
+      avatar_url = fallbackAvatar.imageUrl;
+    }
+  }
+
   const salt = crypto.randomBytes(16).toString("hex");
   const passwordHash = hashPassword(password, salt);
 
@@ -192,6 +201,19 @@ async function signup(payload) {
     status: 201,
     body: { session: toSessionResponse(userRecord, sessionRecord) }
   };
+}
+
+function pickFallbackAvatar() {
+  if (!Array.isArray(FALLBACK_AVATARS) || FALLBACK_AVATARS.length === 0) {
+    return null;
+  }
+  try {
+    const index = crypto.randomInt(0, FALLBACK_AVATARS.length);
+    return FALLBACK_AVATARS[index] || null;
+  } catch (error) {
+    console.warn("Fallback avatar selection failed", error);
+    return null;
+  }
 }
 
 async function login(payload) {
