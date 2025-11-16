@@ -2680,6 +2680,24 @@ body.movie-overlay-open {
   font-weight: 600;
   font-size: 1.4rem;
   color: rgba(248, 250, 252, 0.9);
+  overflow: hidden;
+  position: relative;
+}
+
+.peeruser-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: none;
+}
+
+.peeruser-avatar.has-image {
+  color: transparent;
+  border-color: transparent;
+}
+
+.peeruser-avatar.has-image img {
+  display: block;
 }
 
 .peeruser-hero-text h2 {
@@ -4235,6 +4253,41 @@ body[data-theme="light"] .pill-context {
   gap: 0.75rem;
 }
 
+.social-follow-search-primary {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.social-follow-search-avatar {
+  width: 2.3rem;
+  height: 2.3rem;
+  border-radius: 999px;
+  background: rgba(96, 165, 250, 0.15);
+  color: rgba(226, 232, 240, 0.95);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  position: relative;
+  overflow: hidden;
+}
+
+.social-follow-search-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: none;
+}
+
+.social-follow-search-avatar.has-image {
+  color: transparent;
+}
+
+.social-follow-search-avatar.has-image img {
+  display: block;
+}
+
 .social-follow-search-info {
   flex: 1;
   display: grid;
@@ -5392,7 +5445,40 @@ body[data-theme="light"] .pill-context {
 
 .social-suggestion-identity {
   display: grid;
-  gap: 0.35rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.social-suggestion-avatar {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: rgba(226, 232, 240, 0.9);
+  background: rgba(15, 23, 42, 0.65);
+  overflow: hidden;
+  position: relative;
+}
+
+.social-suggestion-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: none;
+}
+
+.social-suggestion-avatar.has-image {
+  color: transparent;
+  border-color: transparent;
+}
+
+.social-suggestion-avatar.has-image img {
+  display: block;
 }
 
 .social-suggestion-names {
@@ -12741,6 +12827,24 @@ body[data-theme="light"] .onboarding-card {
   align-items: center;
   justify-content: center;
   font-weight: 700;
+  position: relative;
+  overflow: hidden;
+}
+
+.friend-suggestion-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: none;
+}
+
+.friend-suggestion-avatar.has-image {
+  color: transparent;
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.friend-suggestion-avatar.has-image img {
+  display: block;
 }
 
 .friend-suggestion-names {

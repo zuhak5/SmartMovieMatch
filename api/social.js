@@ -732,6 +732,7 @@ async function handleSearchUsers(req, payload) {
         {
           username: entry.profile.username,
           displayName: entry.profile.displayName,
+          avatarUrl: entry.profile.avatarUrl || null,
           tagline: buildProfileTagline(entry.profile),
           sharedInterests: entry.sharedGenres,
           sharedFavorites: entry.sharedFavorites,
@@ -1789,6 +1790,7 @@ async function buildFollowSuggestions({
       addSuggestion({
         username: handle,
         displayName: formatDisplayNameFromHandle(handle),
+        avatarUrl: candidateProfile ? candidateProfile.avatarUrl : null,
         sharedInterests: [],
         sharedFavorites: [],
         sharedWatchHistory,
@@ -1862,6 +1864,7 @@ async function buildFollowSuggestions({
     addSuggestion({
       username: entry.profile.username,
       displayName: entry.profile.displayName,
+      avatarUrl: entry.profile.avatarUrl || null,
       tagline: buildProfileTagline(entry.profile),
       sharedInterests: entry.sharedGenres,
       sharedFavorites: entry.sharedFavorites,
@@ -2075,6 +2078,9 @@ function normalizeSuggestionPayload(entry, { username, followingSet, followersSe
     return null;
   }
   const displayName = entry.displayName ? String(entry.displayName).trim() : formatDisplayNameFromHandle(handle);
+  const avatarUrl = typeof entry.avatarUrl === 'string' && entry.avatarUrl.trim()
+    ? entry.avatarUrl.trim()
+    : null;
   const sharedInterests = Array.isArray(entry.sharedInterests)
     ? entry.sharedInterests.map((value) => normalizeGenreLabel(value)).filter(Boolean)
     : [];
@@ -2132,6 +2138,7 @@ function normalizeSuggestionPayload(entry, { username, followingSet, followersSe
   return {
     username: handle,
     displayName,
+    avatarUrl,
     tagline: entry.tagline ? String(entry.tagline).trim() : '',
     sharedInterests,
     sharedFavorites,
@@ -2294,7 +2301,7 @@ async function fetchAllUserProfiles() {
     const rows = await supabaseFetch('auth_users', {
       query: {
         select:
-          'username,display_name,preferences_snapshot,favorites_list,watched_history,last_login_at,created_at'
+          'username,display_name,preferences_snapshot,favorites_list,watched_history,last_login_at,created_at,avatar_url,avatar_path'
       }
     });
     if (!Array.isArray(rows)) {
@@ -2484,6 +2491,7 @@ function enrichProfileForSuggestions(profile, followerMap) {
     username: profile.username,
     displayName: profile.displayName || formatDisplayNameFromHandle(profile.username),
     preferencesSnapshot: profile.preferencesSnapshot || null,
+    avatarUrl: profile.avatarUrl || null,
     favoritesList,
     favoriteTitleSet,
     favoriteImdbSet,
@@ -2513,11 +2521,19 @@ function mapAuthUserProfile(row) {
     : Array.isArray(row.favoritesList)
     ? row.favoritesList
     : [];
+  const avatarUrl = typeof row.avatar_url === 'string' && row.avatar_url.trim()
+    ? row.avatar_url.trim()
+    : typeof row.avatarUrl === 'string' && row.avatarUrl.trim()
+    ? row.avatarUrl.trim()
+    : null;
+  const avatarPath = row.avatar_path || row.avatarPath || null;
   return {
     username,
     displayName,
     preferencesSnapshot,
     favoritesList,
+    avatarUrl,
+    avatarPath,
     watchedHistory: Array.isArray(row.watched_history)
       ? row.watched_history
       : Array.isArray(row.watchedHistory)
