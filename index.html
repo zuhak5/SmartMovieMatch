@@ -133,84 +133,27 @@
           </div>
           <div class="search-bar">
             <span class="search-icon">🔎</span>
-            <input type="search" placeholder="Search movies, people, or lists…" />
+            <input
+              id="discoverSearch"
+              data-discover-search
+              type="search"
+              placeholder="Search movies, people, or lists…"
+            />
           </div>
           <div class="tab-panel" data-tab-panel="movies">
             <div class="filter-row">
-              <button class="filter-pill is-active">Popular</button>
-              <button class="filter-pill">Top rated</button>
-              <button class="filter-pill">New</button>
-              <button class="filter-pill">From friends</button>
+              <button class="filter-pill is-active" data-filter="popular">Popular</button>
+              <button class="filter-pill" data-filter="top-rated">Top rated</button>
+              <button class="filter-pill" data-filter="new">New</button>
+              <button class="filter-pill" data-filter="friends">From friends</button>
             </div>
-            <div class="section-grid">
-              <article class="card" style="flex-direction: column; align-items: flex-start;">
-                <div class="poster"></div>
-                <div class="stack">
-                  <strong>Afterglow City</strong>
-                  <div class="small-text">2024 · Sci-Fi</div>
-                  <span class="badge rating">4.6</span>
-                </div>
-              </article>
-              <article class="card" style="flex-direction: column; align-items: flex-start;">
-                <div class="poster"></div>
-                <div class="stack">
-                  <strong>The Last Beacon</strong>
-                  <div class="small-text">2023 · Drama</div>
-                  <span class="badge rating">4.2</span>
-                </div>
-              </article>
-              <article class="card" style="flex-direction: column; align-items: flex-start;">
-                <div class="poster"></div>
-                <div class="stack">
-                  <strong>Metro Pulse</strong>
-                  <div class="small-text">2022 · Action</div>
-                  <span class="badge rating">4.0</span>
-                </div>
-              </article>
-            </div>
+            <div class="section-grid" data-grid="discover-movies"></div>
           </div>
           <div class="tab-panel" data-tab-panel="people">
-            <article class="card">
-              <div class="avatar">AL</div>
-              <div class="stack">
-                <strong>Aria Lee</strong>
-                <div class="small-text">Actor · Known for: "Silver Loop", "North Pier"</div>
-                <div class="badge trend">Rising</div>
-              </div>
-            </article>
-            <article class="card">
-              <div class="avatar">DT</div>
-              <div class="stack">
-                <strong>Drew Takahashi</strong>
-                <div class="small-text">Director · Known for: "Neon Harbor", "Skyline"</div>
-              </div>
-            </article>
+            <div class="stack" data-list="discover-people"></div>
           </div>
           <div class="tab-panel" data-tab-panel="lists">
-            <article class="card" style="flex-direction: column; align-items: flex-start;">
-              <div class="list-collage">
-                <div class="mini-poster"></div>
-                <div class="mini-poster"></div>
-                <div class="mini-poster"></div>
-                <div class="mini-poster"></div>
-              </div>
-              <strong>Under-the-radar sci-fi</strong>
-              <div class="small-text">by @cinebyte · 24 movies</div>
-              <p class="small-text">Space thrillers with quiet dread and beautiful visuals.</p>
-              <span class="badge trend">Trending</span>
-            </article>
-            <article class="card" style="flex-direction: column; align-items: flex-start;">
-              <div class="list-collage">
-                <div class="mini-poster"></div>
-                <div class="mini-poster"></div>
-                <div class="mini-poster"></div>
-                <div class="mini-poster"></div>
-              </div>
-              <strong>From your friends</strong>
-              <div class="small-text">by @moviepal · 12 movies</div>
-              <p class="small-text">What your circle is rewatching this month.</p>
-              <span class="badge match">From friends</span>
-            </article>
+            <div class="stack" data-list="discover-lists"></div>
           </div>
         </section>
 
@@ -222,15 +165,15 @@
             </div>
           </div>
           <div class="tab-panel" data-tab-panel="for-you">
-            <article class="card hero-card">
-              <div class="poster"></div>
+            <article class="card hero-card" data-tonight-pick>
+              <div class="poster" data-tonight-pick-poster></div>
               <div class="stack">
                 <div class="badge trend">Tonight's Pick</div>
-                <h3>Midnight Signals (2024)</h3>
-                <p class="small-text">A late-night radio host intercepts a signal from the future and needs your help decoding it.</p>
+                <h3 data-tonight-pick-title>Loading a cinematic pick…</h3>
+                <p class="small-text" data-tonight-pick-overview>We'll grab something atmospheric for you.</p>
                 <div class="action-row">
-                  <button class="btn-primary btn">Play trailer</button>
-                  <button class="btn-ghost btn">Details</button>
+                  <button class="btn-primary btn" data-tonight-pick-trailer>Play trailer</button>
+                  <button class="btn-ghost btn" data-tonight-pick-details>Details</button>
                 </div>
               </div>
             </article>
@@ -238,28 +181,7 @@
               <h3>Recommended for you</h3>
               <span class="small-text">Based on your taste and watchlist.</span>
             </div>
-            <div class="horizontal-scroll">
-              <div class="card" style="flex-direction: column;">
-                <div class="poster"></div>
-                <strong>Signal Drift</strong>
-                <span class="badge rating">4.5</span>
-              </div>
-              <div class="card" style="flex-direction: column;">
-                <div class="poster"></div>
-                <strong>Harbor Lights</strong>
-                <span class="badge rating">4.3</span>
-              </div>
-              <div class="card" style="flex-direction: column;">
-                <div class="poster"></div>
-                <strong>Arcade Bloom</strong>
-                <span class="badge rating">4.1</span>
-              </div>
-              <div class="card" style="flex-direction: column;">
-                <div class="poster"></div>
-                <strong>Paper Planets</strong>
-                <span class="badge rating">4.0</span>
-              </div>
-            </div>
+            <div class="horizontal-scroll" data-row="home-recommendations"></div>
           </div>
           <div class="tab-panel" data-tab-panel="with-friends">
             <h3>Plan a movie night</h3>
@@ -274,25 +196,15 @@
               <h3>Group picks</h3>
               <span class="small-text">Built from everyone’s favorites.</span>
             </div>
-            <div class="card match-card">
-              <div class="poster" style="max-width: 80px;"></div>
-              <div class="stack">
-                <strong>Northbound</strong>
-                <div class="small-text">Adventure · 2023</div>
-                <span class="badge match">87% match</span>
-              </div>
-            </div>
-            <div class="card match-card">
-              <div class="poster" style="max-width: 80px;"></div>
-              <div class="stack">
-                <strong>Wave Length</strong>
-                <div class="small-text">Comedy · 2022</div>
-                <span class="badge match">82% match</span>
-              </div>
-            </div>
+            <div class="stack" data-list="group-picks"></div>
             <div class="action-row" style="margin-top: 14px;">
               <button class="btn-primary btn" style="width: 100%;">Start watch party</button>
             </div>
+            <select class="sort-select" aria-label="Sort watchlist">
+              <option>Recently added</option>
+              <option>Release date</option>
+              <option>A–Z</option>
+            </select>
           </div>
         </section>
 
@@ -464,73 +376,6 @@
     </button>
   </nav>
 
-  <script>
-    const defaultTabs = {
-      friends: "feed",
-      discover: "movies",
-      home: "for-you",
-      library: "watchlist",
-      profile: "overview",
-    };
-
-    const activeTabs = { ...defaultTabs };
-    const sections = document.querySelectorAll("[data-section-panel]");
-    const navButtons = document.querySelectorAll("[data-section-button]");
-    const tabGroups = document.querySelectorAll("[data-section-tabs]");
-
-    function setSection(section) {
-      navButtons.forEach((btn) => {
-        const isActive = btn.dataset.sectionButton === section;
-        btn.classList.toggle("is-active", isActive);
-      });
-
-      sections.forEach((panel) => {
-        const isActive = panel.dataset.sectionPanel === section;
-        panel.classList.toggle("is-active", isActive);
-      });
-
-      tabGroups.forEach((group) => {
-        const isActive = group.dataset.sectionTabs === section;
-        group.classList.toggle("is-active", isActive);
-      });
-
-      setTab(section, activeTabs[section] || defaultTabs[section]);
-    }
-
-    function setTab(section, tab) {
-      activeTabs[section] = tab;
-      const group = document.querySelector(`[data-section-tabs="${section}"]`);
-      const panels = document.querySelectorAll(
-        `[data-section-panel="${section}"] [data-tab-panel]`
-      );
-
-      if (group) {
-        group.querySelectorAll("[data-tab]").forEach((btn) => {
-          const isActive = btn.dataset.tab === tab;
-          btn.classList.toggle("is-active", isActive);
-        });
-      }
-
-      panels.forEach((panel) => {
-        const isActive = panel.dataset.tabPanel === tab;
-        panel.classList.toggle("is-active", isActive);
-      });
-    }
-
-    navButtons.forEach((btn) => {
-      btn.addEventListener("click", () => setSection(btn.dataset.sectionButton));
-    });
-
-    tabGroups.forEach((group) => {
-      group.querySelectorAll("[data-tab]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const section = group.dataset.sectionTabs;
-          setTab(section, btn.dataset.tab);
-        });
-      });
-    });
-
-    setSection("home");
-  </script>
+  <script type="module" src="assets/js/spa-app.js"></script>
 </body>
 </html>
