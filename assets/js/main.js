@@ -6363,6 +6363,15 @@ function wireFollowForm() {
         }
       });
 
+      const identity = document.createElement("div");
+      identity.className = "social-follow-search-primary";
+      const avatar = createAvatarElement({
+        className: "social-follow-search-avatar",
+        initials: computePeerInitials(result.displayName || result.username),
+        imageUrl: result.avatarUrl || "",
+        altText: `${result.displayName || formatSocialDisplayName(result.username)} avatar`
+      });
+      identity.appendChild(avatar);
       const profileTrigger = createProfileButton(result.username, {
         className: "social-profile-trigger",
         ariaLabel: `View profile for ${
@@ -6379,7 +6388,7 @@ function wireFollowForm() {
         handle.textContent = `@${result.username}`;
         profileTrigger.appendChild(name);
         profileTrigger.appendChild(handle);
-        infoButton.appendChild(profileTrigger);
+        identity.appendChild(profileTrigger);
       } else {
         const name = document.createElement("span");
         name.className = "social-follow-name";
@@ -6387,9 +6396,10 @@ function wireFollowForm() {
         const handle = document.createElement("span");
         handle.className = "social-follow-handle";
         handle.textContent = `@${result.username}`;
-        infoButton.appendChild(name);
-        infoButton.appendChild(handle);
+        identity.appendChild(name);
+        identity.appendChild(handle);
       }
+      infoButton.appendChild(identity);
 
       const reasonText = buildSocialSuggestionReason(result);
       if (reasonText) {
@@ -7692,6 +7702,21 @@ function renderDiscoveryFollowSuggestions() {
   });
 }
 
+function createAvatarElement({ className, initials, imageUrl, altText }) {
+  const avatar = document.createElement("span");
+  avatar.className = className || "avatar-circle";
+  avatar.textContent = initials || "SM";
+  if (imageUrl) {
+    const img = document.createElement("img");
+    img.src = imageUrl;
+    img.alt = altText || "";
+    img.loading = "lazy";
+    avatar.appendChild(img);
+    avatar.classList.add("has-image");
+  }
+  return avatar;
+}
+
 function buildFriendSuggestionRow(suggestion) {
   const normalized = canonicalHandle(suggestion && suggestion.username ? suggestion.username : "");
   if (!normalized) {
@@ -7706,9 +7731,12 @@ function buildFriendSuggestionRow(suggestion) {
     ariaLabel: `View profile for ${displayName}`
   });
   if (identityButton) {
-    const avatar = document.createElement("span");
-    avatar.className = "friend-suggestion-avatar";
-    avatar.textContent = computePeerInitials(displayName || normalized);
+    const avatar = createAvatarElement({
+      className: "friend-suggestion-avatar",
+      initials: computePeerInitials(displayName || normalized),
+      imageUrl: suggestion.avatarUrl || "",
+      altText: `${displayName} avatar`
+    });
     identityButton.appendChild(avatar);
     const names = document.createElement("span");
     names.className = "friend-suggestion-names";
@@ -9740,7 +9768,7 @@ function buildPeerHeroSection({ profile, normalized, displayName, isFollowing })
 
   const identity = document.createElement("div");
   identity.className = "peeruser-hero-identity";
-  const avatar = createPeeruserAvatar(displayName, normalized);
+  const avatar = createPeeruserAvatar(displayName, normalized, profile && profile.avatarUrl);
   identity.appendChild(avatar);
   const textBlock = document.createElement("div");
   textBlock.className = "peeruser-hero-text";
@@ -9967,11 +9995,13 @@ function handlePeerSecondaryAction(type, displayName) {
   });
 }
 
-function createPeeruserAvatar(displayName, normalized) {
-  const avatar = document.createElement("div");
-  avatar.className = "peeruser-avatar";
-  avatar.textContent = computePeerInitials(displayName || normalized);
-  return avatar;
+function createPeeruserAvatar(displayName, normalized, imageUrl) {
+  return createAvatarElement({
+    className: "peeruser-avatar",
+    initials: computePeerInitials(displayName || normalized),
+    imageUrl: imageUrl || "",
+    altText: `${displayName || normalized || ""} avatar`
+  });
 }
 
 function computePeerInitials(value) {
@@ -11010,17 +11040,23 @@ function buildSuggestionCard(suggestion, onFollow) {
   const identity = document.createElement("div");
   identity.className = "social-suggestion-identity";
   header.appendChild(identity);
+  const profileLabel = suggestion.displayName || formatSocialDisplayName(suggestion.username);
+  const avatar = createAvatarElement({
+    className: "social-suggestion-avatar",
+    initials: computePeerInitials(profileLabel || suggestion.username),
+    imageUrl: suggestion.avatarUrl || "",
+    altText: `${profileLabel} avatar`
+  });
+  identity.appendChild(avatar);
 
   const nameBlock = createProfileButton(suggestion.username, {
     className: "social-profile-trigger social-suggestion-names",
-    ariaLabel: `View profile for ${
-      suggestion.displayName || formatSocialDisplayName(suggestion.username)
-    }`
+    ariaLabel: `View profile for ${profileLabel}`
   });
   if (nameBlock) {
     const name = document.createElement("span");
     name.className = "social-follow-name";
-    name.textContent = suggestion.displayName || formatSocialDisplayName(suggestion.username);
+    name.textContent = profileLabel;
     const handle = document.createElement("span");
     handle.className = "social-follow-handle";
     handle.textContent = `@${suggestion.username}`;
@@ -11030,7 +11066,7 @@ function buildSuggestionCard(suggestion, onFollow) {
   } else {
     const name = document.createElement("span");
     name.className = "social-follow-name";
-    name.textContent = suggestion.displayName || formatSocialDisplayName(suggestion.username);
+    name.textContent = profileLabel;
     const handle = document.createElement("span");
     handle.className = "social-follow-handle";
     handle.textContent = `@${suggestion.username}`;
