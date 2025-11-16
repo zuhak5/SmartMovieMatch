@@ -2095,6 +2095,7 @@ body[data-theme="light"] .account-link:hover {
   opacity: 0;
   transform: translate(var(--notification-panel-translate-x), -6px) scale(0.98);
   transition: opacity 180ms ease, transform 180ms ease;
+  pointer-events: none;
 }
 
 @media (max-width: 720px) {
@@ -2150,6 +2151,7 @@ body[data-theme="light"] .account-link:hover {
   z-index: 45;
   position-area: x-start;
   transform: translate(var(--notification-panel-translate-x), 0) scale(1);
+  pointer-events: auto;
 }
 
 .notification-panel-header {
