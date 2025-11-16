@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseServer } from '@/lib/supabaseServer'
 import crypto from 'crypto'
+import fallbackAvatars, { FamousAvatar } from '../../lib/fallbackAvatars'
+import { downloadRandomCelebrityAvatar } from '../../lib/tmdbCelebrity'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -35,6 +37,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       avatar_path = path
       const { data: pub } = supabaseServer.storage.from('avatars').getPublicUrl(path)
       avatar_url = pub?.publicUrl ?? null
+    }
+
+    if (!avatar_url) {
+      try {
+        const celebrityAvatar = await downloadRandomCelebrityAvatar()
+        if (celebrityAvatar) {
+          const tmdbPath = `${username}/tmdb-${celebrityAvatar.personId}-${Date.now()}${celebrityAvatar.extension}`
+          const { error: tmdbUploadErr } = await supabaseServer.storage
+            .from('avatars')
+            .upload(tmdbPath, celebrityAvatar.buffer, {
+              contentType: celebrityAvatar.contentType,
+              upsert: false
+            })
+          if (tmdbUploadErr) {
+            console.warn('TMDB avatar upload failed', tmdbUploadErr)
+          } else {
+            avatar_path = tmdbPath
+            const { data: tmdbPub } = supabaseServer.storage.from('avatars').getPublicUrl(tmdbPath)
+            avatar_url = tmdbPub?.publicUrl ?? null
+          }
+        }
+      } catch (error) {
+        console.warn('TMDB celebrity avatar skipped', error)
+      }
+    }
+
+    if (!avatar_url) {
+      const fallbackAvatar = pickFallbackAvatar()
+      if (fallbackAvatar) {
+        avatar_path = `preset:${fallbackAvatar.id}`
+        avatar_url = fallbackAvatar.imageUrl
+      }
     }
 
     const { error: insErr } = await supabaseServer
@@ -72,4 +106,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error(e)
     return res.status(500).json({ error: 'Unexpected error' })
   }
+}
+
+function pickFallbackAvatar(): FamousAvatar | null {
+  if (!Array.isArray(fallbackAvatars) || fallbackAvatars.length === 0) {
+    return null
+  }
+  const index = crypto.randomInt(0, fallbackAvatars.length)
+  return fallbackAvatars[index] ?? null
 }
