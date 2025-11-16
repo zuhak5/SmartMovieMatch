@@ -1,6 +1,9 @@
 const { fetchJson, TIMEOUT_ERROR_NAME } = require('../lib/http-client');
+const { RouteCache } = require('../lib/route-cache');
 
 const YOUTUBE_TIMEOUT_MS = 10000;
+const YOUTUBE_CACHE_CONTROL = 'public, max-age=0, s-maxage=120, stale-while-revalidate=300';
+const youtubeCache = new RouteCache({ ttlMs: 120000, maxEntries: 256 });
 
 module.exports = async (req, res) => {
   try {
@@ -11,6 +14,14 @@ module.exports = async (req, res) => {
     }
 
     const { query } = req;
+    const cacheKey = buildYoutubeCacheKey(query);
+    const cached = youtubeCache.get(cacheKey);
+    if (cached) {
+      res.setHeader('Cache-Control', YOUTUBE_CACHE_CONTROL);
+      res.setHeader('X-Cache', 'YOUTUBE-HIT');
+      res.status(cached.status).json(cached.data);
+      return;
+    }
 
     const baseUrl = 'https://www.googleapis.com/youtube/v3/search';
 
@@ -46,6 +57,9 @@ module.exports = async (req, res) => {
       return;
     }
 
+    youtubeCache.set(cacheKey, { status: result.status, data: result.data });
+    res.setHeader('Cache-Control', YOUTUBE_CACHE_CONTROL);
+    res.setHeader('X-Cache', 'YOUTUBE-MISS');
     res.status(result.status).json(result.data);
   } catch (err) {
     console.error('YouTube proxy error', err);
@@ -56,3 +70,14 @@ module.exports = async (req, res) => {
     res.status(500).json({ error: 'YouTube proxy error' });
   }
 };
+
+function buildYoutubeCacheKey(query = {}) {
+  const entries = Object.entries(query || {})
+    .filter(([key, value]) => key.toLowerCase() !== 'key' && value !== undefined && value !== null && value !== '')
+    .map(([key, value]) => [key.toLowerCase(), String(value)])
+    .sort(([a], [b]) => (a > b ? 1 : a < b ? -1 : 0));
+  if (!entries.length) {
+    return 'youtube::default';
+  }
+  return `youtube::${entries.map(([key, value]) => `${key}=${value}`).join('&')}`;
+}

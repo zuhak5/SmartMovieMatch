@@ -1,6 +1,9 @@
 const { fetchJson, TIMEOUT_ERROR_NAME } = require('../lib/http-client');
+const { RouteCache } = require('../lib/route-cache');
 
 const OMDB_TIMEOUT_MS = 10000;
+const OMDB_CACHE_CONTROL = 'public, max-age=0, s-maxage=300, stale-while-revalidate=600';
+const omdbCache = new RouteCache({ ttlMs: 300000, maxEntries: 256 });
 
 async function proxyOmdbRequest(apiKey, query) {
   const baseUrl = 'https://www.omdbapi.com/';
@@ -50,12 +53,23 @@ module.exports = async (req, res) => {
   }
 
   const { query } = req;
+  const cacheKey = buildOmdbCacheKey(query);
+  const cached = omdbCache.get(cacheKey);
+  if (cached) {
+    res.setHeader('Cache-Control', OMDB_CACHE_CONTROL);
+    res.setHeader('X-Cache', 'OMDB-HIT');
+    res.status(cached.status).json(cached.data);
+    return;
+  }
   let lastError = null;
 
   for (let index = 0; index < apiKeys.length; index += 1) {
     const apiKey = apiKeys[index];
     try {
       const result = await proxyOmdbRequest(apiKey, query);
+      omdbCache.set(cacheKey, { status: result.status, data: result.data });
+      res.setHeader('Cache-Control', OMDB_CACHE_CONTROL);
+      res.setHeader('X-Cache', 'OMDB-MISS');
       res.status(result.status).json(result.data);
       return;
     } catch (err) {
@@ -77,3 +91,15 @@ module.exports = async (req, res) => {
 
   res.status(status).json({ error: 'OMDb proxy error' });
 };
+
+function buildOmdbCacheKey(query = {}) {
+  const entries = Object.entries(query || {})
+    .filter(([key, value]) => key.toLowerCase() !== 'apikey' && value !== undefined && value !== null && value !== '')
+    .map(([key, value]) => [key.toLowerCase(), String(value)])
+    .sort(([a], [b]) => (a > b ? 1 : a < b ? -1 : 0));
+  if (!entries.length) {
+    return 'omdb::default';
+  }
+  const search = entries.map(([key, value]) => `${key}=${value}`).join('&');
+  return `omdb::${search}`;
+}
