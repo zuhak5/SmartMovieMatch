@@ -1534,30 +1534,11 @@ function renderReviewContent(container, review) {
   container.innerHTML = '';
   const previewText = review.capsule || review.body || '';
   const hasPreview = Boolean(previewText);
-  let previewEl = null;
   if (hasPreview) {
-    previewEl = document.createElement('p');
+    const previewEl = document.createElement('p');
     previewEl.className = 'community-review-text';
     previewEl.textContent = previewText;
-    if (shouldClampCapsulePreview(previewText)) {
-      previewEl.dataset.clamped = 'true';
-    }
     container.appendChild(previewEl);
-
-    if (previewEl.dataset.clamped === 'true') {
-      const toggle = document.createElement('button');
-      toggle.type = 'button';
-      toggle.className = 'btn-subtle community-capsule-toggle';
-      toggle.textContent = 'Expand';
-      toggle.setAttribute('aria-expanded', 'false');
-      toggle.addEventListener('click', () => {
-        const isClamped = previewEl.dataset.clamped === 'true';
-        previewEl.dataset.clamped = isClamped ? 'false' : 'true';
-        toggle.textContent = isClamped ? 'Collapse' : 'Expand';
-        toggle.setAttribute('aria-expanded', String(!isClamped));
-      });
-      container.appendChild(toggle);
-    }
   }
   const segments = Array.isArray(review.segments) ? review.segments : [];
   const hasExtended = review.fullText && review.fullText !== previewText && segments.length;
@@ -1588,27 +1569,6 @@ function renderReviewContent(container, review) {
     empty.textContent = 'No written thoughts yet.';
     container.appendChild(empty);
   }
-}
-
-const CAPSULE_PREVIEW_CHAR_LIMIT = 260;
-const CAPSULE_PREVIEW_WORD_LIMIT = 55;
-
-function shouldClampCapsulePreview(text) {
-  if (typeof text !== 'string') {
-    return false;
-  }
-  const normalized = text.trim();
-  if (!normalized) {
-    return false;
-  }
-  if (normalized.length > CAPSULE_PREVIEW_CHAR_LIMIT) {
-    return true;
-  }
-  const words = normalized.split(/\s+/).filter(Boolean);
-  if (words.length > CAPSULE_PREVIEW_WORD_LIMIT) {
-    return true;
-  }
-  return normalized.includes('\n');
 }
 
 function renderReviewSegments(container, segments) {
