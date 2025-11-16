@@ -92,7 +92,10 @@ function serveStatic(req, res, parsed = url.parse(req.url)) {
       return;
     }
 
-    const filePath = path.resolve(ROOT_DIR, `.${candidate}`);
+    // Prefix with "./" so we resolve relative to the project root. Without the
+    // slash the path would become something like ".index.html", which does not
+    // exist on disk and resulted in every static request returning 404.
+    const filePath = path.resolve(ROOT_DIR, `./${candidate}`);
     if (!filePath.startsWith(ROOT_DIR)) {
       res.statusCode = 403;
       applySecurityHeaders(res);
