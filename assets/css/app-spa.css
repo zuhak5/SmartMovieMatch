@@ -77,11 +77,11 @@ textarea {
 }
 
 .brand {
-  display: flex;
+  display: ruby;
   align-items: center;
   gap: 10px;
   font-weight: 700;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.4px;
 }
 
@@ -123,7 +123,7 @@ textarea {
 }
 
 .account-chip.is-visible {
-  display: flex;
+  display: contents;
 }
 
 .account-chip:hover {
