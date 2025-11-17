@@ -59,7 +59,7 @@
 .watch-party-participants-heading {
   font-weight: 700;
   margin-bottom: 8px;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .watch-party-participants-list {
@@ -223,7 +223,7 @@
 
 .conversation-meta {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .conversation-snippet {
@@ -464,7 +464,7 @@ textarea {
 }
 
 .top-message-button .icon {
-  font-size: 17px;
+  font-size: 15px;
   transform: rotate(-12deg);
 }
 
@@ -665,7 +665,7 @@ p {
 
 .poster::after {
   content: "🎬";
-  font-size: 24px;
+  font-size: 22px;
   position: absolute;
   bottom: 10px;
   right: 10px;
@@ -822,13 +822,13 @@ p {
   flex-wrap: wrap;
   gap: 8px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .small-text {
   color: var(--muted);
   content-visibility: hidden;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .grid-avatars {
@@ -865,7 +865,7 @@ p {
   align-items: center;
   gap: 8px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .stat-row {
@@ -909,7 +909,7 @@ p {
   align-items: center;
   gap: 8px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .sort-select {
@@ -1063,7 +1063,7 @@ p {
 
 .sheet-title-group h3 {
   margin: 0;
-  font-size: 22px;
+  font-size: 20px;
 }
 
 .sheet-pill-row {
@@ -1155,7 +1155,7 @@ p {
   background: var(--surface);
   display: grid;
   place-items: center;
-  font-size: 26px;
+  font-size: 24px;
 }
 
 .sheet-preview-text strong {
@@ -1205,7 +1205,7 @@ p {
 }
 
 .sheet-checklist .icon {
-  font-size: 18px;
+  font-size: 16px;
 }
 
 @media (max-width: 960px) {
@@ -1235,7 +1235,7 @@ p {
 }
 
 .sheet-status-chip .icon {
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .sheet-layout {
@@ -1495,7 +1495,7 @@ p {
 }
 
 .sheet-status-chip .icon {
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .sheet-layout {
@@ -1654,7 +1654,7 @@ p {
   background: var(--surface);
   display: grid;
   place-items: center;
-  font-size: 26px;
+  font-size: 24px;
 }
 
 .sheet-preview-text strong {
@@ -1704,7 +1704,7 @@ p {
 }
 
 .sheet-checklist .icon {
-  font-size: 18px;
+  font-size: 16px;
 }
 
 @media (max-width: 960px) {
@@ -1757,7 +1757,7 @@ p {
   }
 
   .sheet-title-group h3 {
-    font-size: 20px;
+    font-size: 18px;
   }
 
   .sheet-section {
@@ -1807,7 +1807,7 @@ p {
   background: var(--surface);
   display: grid;
   place-items: center;
-  font-size: 26px;
+  font-size: 24px;
 }
 
 .sheet-preview-text strong {
@@ -1857,7 +1857,7 @@ p {
 }
 
 .sheet-checklist .icon {
-  font-size: 18px;
+  font-size: 16px;
 }
 
 @media (max-width: 960px) {
@@ -1905,7 +1905,7 @@ p {
   }
 
   .sheet-title-group h3 {
-    font-size: 20px;
+    font-size: 18px;
   }
 
   .sheet-section {
@@ -2085,7 +2085,7 @@ p {
 }
 
 .nav-btn .icon {
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .nav-btn.is-active {
