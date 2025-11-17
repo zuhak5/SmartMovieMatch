@@ -93,13 +93,13 @@ Each item is a task for Codex (or any other assistant) to implement.
 
 ## Social graph: following, friends, requests (SOC)
 
-- [ ] **SOC-001 – Make follow/friend buttons functional**
+- [x] **SOC-001 – Make follow/friend buttons functional**
   - Description: Replace static follow/friend UI with real actions:
     - “Follow” sends a follow request (or direct follow) using `user_follows`.
     - “Unfollow” / “Cancel request” updates/deletes the row.
   - Files: Friend cards in `index.html`, list rendering in SPA.
   - Backend: `user_follows` with RLS so users can only manage relationships they are part of.
-  - DONE: _…_
+  DONE 2025-11-17T07:13Z – Wired the Discover people tab to social follow suggestions with live follow/unfollow buttons updating Supabase-backed relationships.
 
 - [ ] **SOC-002 – Live follower/following counts**
   - Description: Pull follower/following counts from `user_follows` instead of fixed numbers in the profile header.

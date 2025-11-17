@@ -14,7 +14,12 @@ import {
   persistPreferencesRemote,
   updateProfile
 } from "./auth.js";
-import { initSocialFeatures, subscribeToSocialOverview } from "./social.js";
+import {
+  initSocialFeatures,
+  subscribeToSocialOverview,
+  followUserByUsername,
+  unfollowUserByUsername
+} from "./social.js";
 
 const defaultTabs = {
   friends: "feed",
@@ -57,6 +62,7 @@ const state = {
   recommendationSeed: Math.random(),
   homeRecommendations: [],
   discoverPeople: [],
+  peopleSearchActive: false,
   discoverLists: [],
   session: loadSession(),
   socialOverview: null,
@@ -280,6 +286,11 @@ function initialsFromName(name = "") {
     .slice(0, 2)
     .toUpperCase();
   return letters || "👤";
+}
+
+function canonicalHandle(value = "") {
+  if (typeof value !== "string") return "";
+  return value.replace(/^@/, "").trim().toLowerCase();
 }
 
 function sanitizeProfileText(value, maxLength = 200) {
@@ -601,16 +612,78 @@ function renderDiscoverMovies(movies = []) {
   });
 }
 
-function renderPeople(people = []) {
+function renderPeople(people = [], { source = "tmdb" } = {}) {
   if (!discoverPeopleList) return;
   discoverPeopleList.innerHTML = "";
   if (!people.length) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.textContent = "No people found yet.";
+    empty.textContent = source === "social"
+      ? "Invite friends or search by handle to start following people."
+      : "No people found yet.";
     discoverPeopleList.append(empty);
     return;
   }
+
+  if (source === "social") {
+    people.forEach((person) => {
+      const handle = canonicalHandle(person?.username);
+      if (!handle) return;
+      const card = document.createElement("article");
+      card.className = "card";
+
+      const avatar = document.createElement("div");
+      avatar.className = "avatar";
+      avatar.textContent = initialsFromName(person.displayName || handle);
+
+      const stack = document.createElement("div");
+      stack.className = "stack";
+      const name = document.createElement("strong");
+      name.textContent = person.displayName || `@${handle}`;
+      const handleLine = document.createElement("div");
+      handleLine.className = "small-text muted";
+      handleLine.textContent = `@${handle}`;
+      const meta = document.createElement("div");
+      meta.className = "small-text";
+      meta.textContent = person.tagline || buildSocialSuggestionSummary(person);
+      const overlaps = buildSocialSuggestionSummary(person, { detailed: true });
+      const overlapLine = document.createElement("div");
+      overlapLine.className = "small-text muted";
+      overlapLine.textContent = overlaps || "Let them know what you’re watching.";
+
+      const badgeRow = document.createElement("div");
+      badgeRow.className = "action-row";
+      const badges = [];
+      if (person.followsYou) {
+        badges.push("Follows you");
+      }
+      const mutualCount = Array.isArray(person.mutualFollowers) ? person.mutualFollowers.length : 0;
+      if (mutualCount) {
+        badges.push(`${mutualCount} mutual`);
+      }
+      badges.forEach((label) => {
+        const pill = document.createElement("span");
+        pill.className = "badge";
+        pill.textContent = label;
+        badgeRow.append(pill);
+      });
+      if (!badgeRow.childElementCount) {
+        badgeRow.classList.add("muted");
+        badgeRow.textContent = "Smart Movie Match member";
+      }
+
+      const actions = document.createElement("div");
+      actions.className = "action-row";
+      const followBtn = createFollowButton(handle);
+      actions.append(followBtn);
+
+      stack.append(name, handleLine, meta, overlapLine, badgeRow, actions);
+      card.append(avatar, stack);
+      discoverPeopleList.append(card);
+    });
+    return;
+  }
+
   people.forEach((person) => {
     const card = document.createElement("article");
     card.className = "card";
@@ -645,6 +718,129 @@ function renderPeople(people = []) {
     card.append(avatar, stack);
     discoverPeopleList.append(card);
   });
+}
+
+function buildSocialSuggestionSummary(person, { detailed = false } = {}) {
+  if (!person) return "";
+  const parts = [];
+  const sharedInterests = Array.isArray(person.sharedInterests)
+    ? person.sharedInterests.filter(Boolean)
+    : [];
+  const sharedFavorites = Array.isArray(person.sharedFavorites)
+    ? person.sharedFavorites.filter(Boolean)
+    : [];
+  const sharedWatchHistory = Array.isArray(person.sharedWatchHistory)
+    ? person.sharedWatchHistory.filter(Boolean)
+    : [];
+  const sharedWatchParties = Array.isArray(person.sharedWatchParties)
+    ? person.sharedWatchParties.filter(Boolean)
+    : [];
+  const mutualCount = Array.isArray(person.mutualFollowers) ? person.mutualFollowers.length : 0;
+
+  if (sharedInterests.length) {
+    parts.push(`Into ${sharedInterests.slice(0, 2).join(", ")}`);
+  }
+  if (sharedFavorites.length) {
+    parts.push(`Favorites overlap on ${sharedFavorites.slice(0, 2).join(", ")}`);
+  }
+  if (detailed && sharedWatchHistory.length) {
+    parts.push(`Recently watched ${sharedWatchHistory.slice(0, 2).join(", ")}`);
+  }
+  if (detailed && sharedWatchParties.length) {
+    parts.push(sharedWatchParties[0]);
+  }
+  if (mutualCount) {
+    parts.push(`${mutualCount} mutual ${mutualCount === 1 ? "follow" : "follows"}`);
+  }
+
+  return parts.join(" • ");
+}
+
+function getFollowingHandles() {
+  const handles = Array.isArray(state.socialOverview?.following)
+    ? state.socialOverview.following
+    : [];
+  return handles.map((handle) => canonicalHandle(handle)).filter(Boolean);
+}
+
+function isFollowingUser(handle) {
+  const normalized = canonicalHandle(handle);
+  if (!normalized) return false;
+  return getFollowingHandles().includes(normalized);
+}
+
+function updateLocalFollowingCache(handle, shouldFollow) {
+  const normalized = canonicalHandle(handle);
+  if (!normalized || !state.socialOverview) return;
+  const next = new Set(getFollowingHandles());
+  if (shouldFollow) {
+    next.add(normalized);
+  } else {
+    next.delete(normalized);
+  }
+  state.socialOverview.following = Array.from(next);
+  if (state.socialOverview.counts) {
+    state.socialOverview.counts.following = next.size;
+  }
+}
+
+function createFollowButton(handle) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "btn btn-secondary";
+
+  const setLabel = (loading = false) => {
+    const following = isFollowingUser(handle);
+    if (loading) {
+      button.textContent = following ? "Updating…" : "Following…";
+    } else {
+      button.textContent = following ? "Unfollow" : "Follow";
+    }
+    button.className = following ? "btn btn-ghost" : "btn btn-secondary";
+    button.disabled = loading;
+  };
+
+  setLabel();
+
+  button.addEventListener("click", async () => {
+    if (!hasActiveSession()) {
+      openAuthOverlay("login");
+      return;
+    }
+    const currentlyFollowing = isFollowingUser(handle);
+    setLabel(true);
+    try {
+      if (currentlyFollowing) {
+        await unfollowUserByUsername(handle);
+        updateLocalFollowingCache(handle, false);
+      } else {
+        await followUserByUsername(handle);
+        updateLocalFollowingCache(handle, true);
+      }
+      renderProfileOverview();
+    } catch (error) {
+      console.warn("Follow toggle failed", error);
+    } finally {
+      setLabel(false);
+    }
+  });
+
+  return button;
+}
+
+function renderPeopleSection() {
+  if (state.peopleSearchActive) {
+    renderPeople(state.discoverPeople, { source: "tmdb" });
+    return;
+  }
+  const suggestions = Array.isArray(state.socialOverview?.suggestions)
+    ? state.socialOverview.suggestions
+    : [];
+  if (hasActiveSession() && suggestions.length) {
+    renderPeople(suggestions, { source: "social" });
+    return;
+  }
+  renderPeople(state.discoverPeople, { source: "tmdb" });
 }
 
 function renderListCards(lists = []) {
@@ -730,15 +926,17 @@ async function loadDiscover(filter = "popular") {
 }
 
 async function loadTrendingPeople(query = "") {
+  state.peopleSearchActive = Boolean(query && query.length >= 3);
   const searchPath = query && query.length >= 3 ? "search/person" : "trending/person/week";
   const params = query && query.length >= 3 ? { query, include_adult: "false" } : { page: 1 };
   try {
     const data = await fetchFromTmdb(searchPath, params);
     state.discoverPeople = Array.isArray(data?.results) ? data.results.slice(0, 6) : [];
-    renderPeople(state.discoverPeople);
+    renderPeopleSection();
   } catch (error) {
     console.warn("people fetch failed", error);
-    renderPeople([]);
+    state.discoverPeople = [];
+    renderPeopleSection();
   }
 }
 
@@ -933,6 +1131,7 @@ function renderGroupPicks(items = []) {
 function handleDiscoverSearchInput(value) {
   const query = value.trim();
   if (!query || query.length < 3) {
+    state.peopleSearchActive = false;
     loadDiscover(state.discoverFilter);
     loadTrendingPeople();
     if (state.homeRecommendations.length) {
@@ -941,10 +1140,12 @@ function handleDiscoverSearchInput(value) {
     return;
   }
 
+  state.peopleSearchActive = true;
   loadDiscoverSearch(query);
 }
 
 async function loadDiscoverSearch(query) {
+  state.peopleSearchActive = true;
   try {
     const [movies, people] = await Promise.all([
       fetchFromTmdb("search/movie", { query, include_adult: "false" }),
@@ -955,9 +1156,11 @@ async function loadDiscoverSearch(query) {
     const listSource = movieResults.length ? movieResults : state.homeRecommendations.map((item) => item.tmdb);
     renderListCards(buildListsFromMovies(listSource));
     state.discoverPeople = Array.isArray(people?.results) ? people.results.slice(0, 6) : [];
-    renderPeople(state.discoverPeople);
+    renderPeopleSection();
   } catch (error) {
     console.warn("search failed", error);
+    state.discoverPeople = [];
+    renderPeopleSection();
   }
 }
 
@@ -1643,6 +1846,7 @@ function init() {
   subscribeToSocialOverview((overview) => {
     state.socialOverview = overview;
     renderProfileOverview();
+    renderPeopleSection();
   });
   subscribeToSession((session) => {
     updateAccountUi(session);
