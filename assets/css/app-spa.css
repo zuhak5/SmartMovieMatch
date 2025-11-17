@@ -280,7 +280,6 @@ textarea {
 }
 
 .tab-panel.is-active {
-  justify-items: anchor-center;
   display: block;
 }
 
