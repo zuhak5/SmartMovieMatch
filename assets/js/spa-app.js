@@ -14,13 +14,7 @@ import {
   persistPreferencesRemote,
   updateProfile
 } from "./auth.js";
-import {
-  followUserByUsername,
-  initSocialFeatures,
-  subscribeToFollowing,
-  subscribeToSocialOverview,
-  unfollowUserByUsername
-} from "./social.js";
+import { initSocialFeatures, subscribeToSocialOverview } from "./social.js";
 
 const defaultTabs = {
   friends: "feed",
@@ -65,7 +59,6 @@ const state = {
   discoverPeople: [],
   discoverLists: [],
   session: loadSession(),
-  following: [],
   socialOverview: null,
   accountMenuOpen: false,
   authMode: "login",
@@ -111,8 +104,6 @@ const discoverSearchInput = document.querySelector("[data-discover-search]");
 const discoverGrid = document.querySelector('[data-grid="discover-movies"]');
 const discoverPeopleList = document.querySelector('[data-list="discover-people"]');
 const discoverListCards = document.querySelector('[data-list="discover-lists"]');
-const friendSuggestionsList = document.querySelector('[data-friend-suggestions]');
-const friendSuggestionsEmpty = document.querySelector('[data-friend-suggestions-empty]');
 const homeRecommendationsRow = document.querySelector('[data-row="home-recommendations"]');
 const tonightPickCard = document.querySelector("[data-tonight-pick]");
 const groupPicksList = document.querySelector('[data-list="group-picks"]');
@@ -653,143 +644,6 @@ function renderPeople(people = []) {
     stack.append(name, meta);
     card.append(avatar, stack);
     discoverPeopleList.append(card);
-  });
-}
-
-function initialsFromName(name, fallback = "?") {
-  if (!name) return fallback;
-  const letters = name
-    .split(" ")
-    .map((part) => part.trim()[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("");
-  return letters || fallback;
-}
-
-function buildFollowButton(username) {
-  const normalized = typeof username === "string" ? username.trim().toLowerCase() : "";
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "btn btn-primary";
-
-  const syncLabel = () => {
-    const isFollowing = state.following.includes(normalized);
-    button.dataset.following = isFollowing ? "true" : "false";
-    button.textContent = isFollowing ? "Following" : "Follow";
-    button.classList.toggle("btn-ghost", isFollowing);
-    button.classList.toggle("btn-primary", !isFollowing);
-  };
-
-  syncLabel();
-
-  button.addEventListener("click", async () => {
-    if (!hasActiveSession()) {
-      setAuthStatus("Sign in to follow people.", "error");
-      openAuthOverlay("login");
-      return;
-    }
-    if (button.disabled || !normalized) return;
-    const currentlyFollowing = button.dataset.following === "true";
-    button.disabled = true;
-    button.classList.add("is-loading");
-    button.textContent = currentlyFollowing ? "Unfollowing…" : "Following…";
-    try {
-      if (currentlyFollowing) {
-        await unfollowUserByUsername(normalized);
-      } else {
-        await followUserByUsername(normalized);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to update follow status.";
-      setAuthStatus(message, "error");
-    } finally {
-      button.disabled = false;
-      button.classList.remove("is-loading");
-      syncLabel();
-    }
-  });
-
-  return button;
-}
-
-function renderFriendSuggestions() {
-  if (!friendSuggestionsList || !friendSuggestionsEmpty) return;
-  const suggestions = Array.isArray(state.socialOverview?.suggestions)
-    ? state.socialOverview.suggestions
-    : [];
-  friendSuggestionsList.innerHTML = "";
-
-  if (!hasActiveSession()) {
-    friendSuggestionsList.hidden = true;
-    friendSuggestionsEmpty.hidden = false;
-    friendSuggestionsEmpty.textContent = "Sign in to see friend suggestions and follow new people.";
-    return;
-  }
-
-  friendSuggestionsList.hidden = false;
-
-  if (!suggestions.length) {
-    friendSuggestionsEmpty.hidden = false;
-    friendSuggestionsEmpty.textContent = "No friend suggestions yet. Check back soon.";
-    return;
-  }
-
-  friendSuggestionsEmpty.hidden = true;
-
-  suggestions.forEach((suggestion) => {
-    const card = document.createElement("div");
-    card.className = "card";
-
-    const avatar = document.createElement("div");
-    avatar.className = "avatar";
-    avatar.textContent = initialsFromName(suggestion.displayName || suggestion.username, "👥");
-
-    const stack = document.createElement("div");
-    stack.className = "stack";
-
-    const metaRow = document.createElement("div");
-    metaRow.className = "meta-row";
-    const name = document.createElement("strong");
-    name.textContent = suggestion.displayName || suggestion.username || "New friend";
-    metaRow.append(name);
-    if (suggestion.followsYou) {
-      const badge = document.createElement("span");
-      badge.className = "badge";
-      badge.textContent = "Follows you";
-      metaRow.append(badge);
-    }
-
-    const handle = document.createElement("div");
-    handle.className = "small-text";
-    handle.textContent = suggestion.username ? `@${suggestion.username}` : "Suggested";
-
-    const tagline = document.createElement("div");
-    tagline.className = "small-text";
-    tagline.textContent =
-      suggestion.tagline ||
-      suggestion.reason ||
-      (suggestion.sharedInterests?.length
-        ? `You both like ${suggestion.sharedInterests.slice(0, 2).join(", ")}`
-        : "Good match for your taste.");
-
-    stack.append(metaRow, handle, tagline);
-
-    if (suggestion.mutualFollowers?.length) {
-      const mutual = document.createElement("div");
-      mutual.className = "small-text";
-      const count = suggestion.mutualFollowers.length;
-      mutual.textContent = `${count} mutual ${count === 1 ? "friend" : "friends"}`;
-      stack.append(mutual);
-    }
-
-    const actions = document.createElement("div");
-    actions.className = "action-row";
-    actions.append(buildFollowButton(suggestion.username));
-
-    stack.append(actions);
-    card.append(avatar, stack);
-    friendSuggestionsList.append(card);
   });
 }
 
@@ -1789,11 +1643,6 @@ function init() {
   subscribeToSocialOverview((overview) => {
     state.socialOverview = overview;
     renderProfileOverview();
-    renderFriendSuggestions();
-  });
-  subscribeToFollowing((following) => {
-    state.following = following.map((handle) => String(handle || "").toLowerCase());
-    renderFriendSuggestions();
   });
   subscribeToSession((session) => {
     updateAccountUi(session);
@@ -1801,7 +1650,6 @@ function init() {
       closeAuthOverlay();
     }
     maybeOpenOnboarding();
-    renderFriendSuggestions();
   });
   initSocialFeatures();
   attachListeners();
