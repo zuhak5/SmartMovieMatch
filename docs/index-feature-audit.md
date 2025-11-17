@@ -101,11 +101,11 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Backend: `user_follows` with RLS so users can only manage relationships they are part of.
   DONE 2025-11-17T07:13Z – Wired the Discover people tab to social follow suggestions with live follow/unfollow buttons updating Supabase-backed relationships.
 
-- [ ] **SOC-002 – Live follower/following counts**
+- [x] **SOC-002 – Live follower/following counts**
   - Description: Pull follower/following counts from `user_follows` instead of fixed numbers in the profile header.
   - Files: Profile header render code.
   - Backend: `user_follows`.
-  - DONE: _…_
+  DONE 2025-11-17T07:39Z – Added Supabase-backed follow counts from `user_follows` so the profile header reflects live follower and following totals.
 
 - [ ] **SOC-003 – Friend feed based on social graph**
   - Description: Replace static friend feed items with:
