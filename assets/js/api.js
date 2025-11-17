@@ -1,7 +1,12 @@
 import { API_ROUTES } from "./config.js";
 
-async function fetchJson(url, { signal } = {}) {
-  const response = await fetch(url, { signal });
+async function fetchJson(url, { signal, headers, method = "GET", body } = {}) {
+  const response = await fetch(url, {
+    method,
+    signal,
+    headers,
+    body
+  });
   if (!response.ok) {
     throw new Error(`Request failed with status ${response.status} for ${url}`);
   }
@@ -42,4 +47,31 @@ export async function fetchFromYoutube(params = {}, { signal } = {}) {
     searchParams.append(key, value);
   });
   return fetchJson(`${API_ROUTES.youtube}?${searchParams.toString()}`, { signal });
+}
+
+export async function fetchFromSearch(params = {}, { signal, token } = {}) {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") {
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        searchParams.append(key, item);
+      });
+      return;
+    }
+    searchParams.append(key, value);
+  });
+
+  const headers = token
+    ? {
+        Authorization: `Bearer ${token}`
+      }
+    : undefined;
+
+  return fetchJson(`${API_ROUTES.search}?${searchParams.toString()}`, {
+    signal,
+    headers
+  });
 }
