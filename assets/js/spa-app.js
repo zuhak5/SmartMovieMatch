@@ -18,7 +18,6 @@ import {
   followUserByUsername,
   initSocialFeatures,
   subscribeToFollowing,
-  subscribeToNotifications,
   subscribeToSocialOverview,
   unfollowUserByUsername
 } from "./social.js";
@@ -68,7 +67,6 @@ const state = {
   session: loadSession(),
   following: [],
   socialOverview: null,
-  notifications: [],
   accountMenuOpen: false,
   authMode: "login",
   authSubmitting: false,
@@ -115,9 +113,6 @@ const discoverPeopleList = document.querySelector('[data-list="discover-people"]
 const discoverListCards = document.querySelector('[data-list="discover-lists"]');
 const friendSuggestionsList = document.querySelector('[data-friend-suggestions]');
 const friendSuggestionsEmpty = document.querySelector('[data-friend-suggestions-empty]');
-const friendsFeedList = document.querySelector('[data-friends-feed]');
-const friendsFeedEmpty = document.querySelector('[data-friends-feed-empty]');
-const friendsFeedSignedOut = document.querySelector('[data-friends-feed-signed-out]');
 const homeRecommendationsRow = document.querySelector('[data-row="home-recommendations"]');
 const tonightPickCard = document.querySelector("[data-tonight-pick]");
 const groupPicksList = document.querySelector('[data-list="group-picks"]');
@@ -795,175 +790,6 @@ function renderFriendSuggestions() {
     stack.append(actions);
     card.append(avatar, stack);
     friendSuggestionsList.append(card);
-  });
-}
-
-const FRIEND_FEED_TYPES = new Set([
-  "friend_review",
-  "friend_watchlist",
-  "friend_favorite",
-  "watch_party",
-  "watch_party_update"
-]);
-
-function formatTimeAgo(timestamp) {
-  if (!timestamp) return "Just now";
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) return "Just now";
-  const diffSeconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
-  if (diffSeconds < 60) return "Just now";
-  const diffMinutes = Math.floor(diffSeconds / 60);
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
-  const diffWeeks = Math.floor(diffDays / 7);
-  if (diffWeeks < 5) return `${diffWeeks}w ago`;
-  const diffMonths = Math.floor(diffDays / 30);
-  if (diffMonths < 12) return `${diffMonths}mo ago`;
-  const diffYears = Math.floor(diffDays / 365);
-  return `${diffYears}y ago`;
-}
-
-function describeFriendFeedEntry(entry) {
-  const title = entry.movieTitle ? `“${entry.movieTitle}”` : "a movie";
-  switch (entry.type) {
-    case "friend_review":
-      return `Posted a new review for ${title}.`;
-    case "friend_watchlist":
-      return `Added ${title} to their watchlist.`;
-    case "friend_favorite":
-      return `Marked ${title} as a favorite.`;
-    case "watch_party":
-      return `Scheduled a watch party for ${title}.`;
-    case "watch_party_update":
-      return `Updated a watch party for ${title}.`;
-    default:
-      return entry.message || "Shared new activity.";
-  }
-}
-
-function formatFriendFeedMeta(entry) {
-  switch (entry.type) {
-    case "friend_review":
-      return "Review";
-    case "friend_watchlist":
-      return "Watchlist";
-    case "friend_favorite":
-      return "Favorite";
-    case "watch_party":
-    case "watch_party_update":
-      return "Watch party";
-    default:
-      return "Activity";
-  }
-}
-
-function createFeedEntryId() {
-  return `feed-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function buildFriendFeedEntries(notifications = []) {
-  const entries = Array.isArray(notifications) ? notifications : [];
-  return entries
-    .filter((entry) => entry && FRIEND_FEED_TYPES.has(entry.type))
-    .map((entry) => ({
-      id: entry.id || createFeedEntryId(),
-      actor: entry.actor || "A friend",
-      movieTitle: entry.movieTitle || "",
-      message: entry.message || "",
-      type: entry.type || "activity",
-      createdAt: entry.createdAt || null
-    }))
-    .sort((a, b) => {
-      const aTime = Date.parse(a.createdAt || "") || 0;
-      const bTime = Date.parse(b.createdAt || "") || 0;
-      return bTime - aTime;
-    })
-    .slice(0, 12);
-}
-
-function renderFriendFeed(notifications = state.notifications) {
-  if (!friendsFeedList || !friendsFeedEmpty || !friendsFeedSignedOut) return;
-
-  const isSignedIn = hasActiveSession();
-  friendsFeedSignedOut.hidden = isSignedIn;
-
-  if (!isSignedIn) {
-    friendsFeedList.innerHTML = "";
-    friendsFeedList.hidden = true;
-    friendsFeedEmpty.hidden = true;
-    return;
-  }
-
-  const entries = buildFriendFeedEntries(notifications);
-  friendsFeedList.innerHTML = "";
-
-  if (!entries.length) {
-    friendsFeedList.hidden = true;
-    friendsFeedEmpty.hidden = false;
-    const hasFollows = Array.isArray(state.following) && state.following.length > 0;
-    friendsFeedEmpty.textContent = hasFollows
-      ? "No recent diary entries or reviews from friends yet."
-      : "Follow people to see diary entries, reviews, and favorites roll in.";
-    return;
-  }
-
-  friendsFeedEmpty.hidden = true;
-  friendsFeedList.hidden = false;
-
-  entries.forEach((entry) => {
-    const card = document.createElement("article");
-    card.className = "card";
-
-    const avatar = document.createElement("div");
-    avatar.className = "avatar";
-    avatar.textContent = initialsFromName(entry.actor, "🎬");
-
-    const stack = document.createElement("div");
-    stack.className = "stack";
-
-    const metaRow = document.createElement("div");
-    metaRow.className = "meta-row";
-    const name = document.createElement("strong");
-    name.textContent = entry.actor || "A friend";
-    const time = document.createElement("span");
-    time.className = "small-text";
-    time.textContent = formatTimeAgo(entry.createdAt);
-    metaRow.append(name, time);
-
-    const message = document.createElement("p");
-    const friendlyMessage = entry.message && entry.message.trim()
-      ? entry.message.trim()
-      : describeFriendFeedEntry(entry);
-    message.textContent = friendlyMessage;
-
-    stack.append(metaRow, message);
-
-    if (entry.movieTitle) {
-      const movieCard = document.createElement("div");
-      movieCard.className = "card";
-
-      const poster = document.createElement("div");
-      poster.className = "poster";
-      poster.textContent = "🎬";
-
-      const movieStack = document.createElement("div");
-      movieStack.className = "stack";
-      const title = document.createElement("strong");
-      title.textContent = entry.movieTitle;
-      const meta = document.createElement("div");
-      meta.className = "small-text";
-      meta.textContent = formatFriendFeedMeta(entry);
-      movieStack.append(title, meta);
-
-      movieCard.append(poster, movieStack);
-      stack.append(movieCard);
-    }
-
-    card.append(avatar, stack);
-    friendsFeedList.append(card);
   });
 }
 
@@ -1969,10 +1795,6 @@ function init() {
     state.following = following.map((handle) => String(handle || "").toLowerCase());
     renderFriendSuggestions();
   });
-  subscribeToNotifications((payload) => {
-    state.notifications = Array.isArray(payload?.notifications) ? payload.notifications : [];
-    renderFriendFeed();
-  });
   subscribeToSession((session) => {
     updateAccountUi(session);
     if (session && session.token) {
@@ -1980,7 +1802,6 @@ function init() {
     }
     maybeOpenOnboarding();
     renderFriendSuggestions();
-    renderFriendFeed();
   });
   initSocialFeatures();
   attachListeners();
@@ -1988,7 +1809,6 @@ function init() {
   loadDiscover(state.discoverFilter);
   loadTrendingPeople();
   loadHomeRecommendations();
-  renderFriendFeed();
 }
 
 init();
