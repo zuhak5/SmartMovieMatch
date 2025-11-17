@@ -73,12 +73,12 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Backend: `auth_users`, `user_profiles`, `user_follows`.
   DONE 2025-11-17T03:32Z – Wired profile card to session data and live social overview counts; handles avatar initials, handle, bio/location fallbacks, and follower/following stats in the SPA.
 
- - [x] **PROF-002 – Profile editing UI**
+- [x] **PROF-002 – Profile editing UI**
   - Description: Add an “Edit profile” panel where the user can update:
     - display name, bio, location, website, favorite genres/decades, profile visibility (`is_private`).
   - Files: Profile modal / panel components.
   - Backend: `user_profiles`, `auth_users.is_private`, RLS so only the owner can update.
-  - DONE 2025-11-17T03:38Z – Added profile editor overlay with editable bio, location, website, favorites, privacy toggle, and display name sync to auth.
+  DONE 2025-11-17T03:38Z – Added profile editor overlay with editable bio, location, website, favorites, privacy toggle, and display name sync to auth.
 
 - [x] **PROF-003 – Onboarding wizard**
   - Description: First-time users see a 2–3 step wizard:
@@ -87,7 +87,7 @@ Each item is a task for Codex (or any other assistant) to implement.
     - Step 3: Optional: import ratings or connect external services (stub).
   - Files: New onboarding view + routing, local storage flag to avoid showing after completion.
   - Backend: `user_profiles`, `user_streaming_profiles`, `import_jobs` (future).
-  - DONE 2025-11-17T04:28Z – Added a three-step onboarding overlay that syncs taste, streaming providers, and import intent to preferences with a per-user completion flag.
+  DONE 2025-11-17T04:28Z – Added a three-step onboarding overlay that syncs taste, streaming providers, and import intent to preferences with a per-user completion flag.
 
 ---
 
@@ -184,7 +184,7 @@ Each item is a task for Codex (or any other assistant) to implement.
     - Optionally store extras in `metadata` (e.g., why it was favorited).
   - Files: Card component, detail page button.
   - Backend: `user_favorites`.
-  - DONE 2025-05-07T00:00Z – Added favorite toggles on trending cards with session-backed sync and a library favorites panel.
+  DONE 2025-05-07T00:00Z – Added favorite toggles on trending cards with session-backed sync and a library favorites panel.
 
 - [x] **LIST-003 – Personal tags per user**
   - Description: Allow users to create personal tags and tag movies.
@@ -202,7 +202,7 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Description: Display provider badges on movie cards using `streaming_providers` and `movie_availability`.
   - Files: Movie card component, filters UI.
   - Backend: `streaming_providers`, `movie_availability`.
-  - DONE 2025-11-18T00:00Z – Added streaming provider registry with availability badges on discover and trending cards backed by Supabase availability rows.
+  DONE 2025-11-18T00:00Z – Added streaming provider registry with availability badges on discover and trending cards backed by Supabase availability rows.
 
 - [x] **STRM-002 – “Where I can watch” filter**
   - Description: Add filters (and onboarding step) for the user’s subscribed services.
@@ -210,7 +210,7 @@ Each item is a task for Codex (or any other assistant) to implement.
     - Filter discovery results to those providers.
   - Files: Onboarding, filter panel in search/discover view.
   - Backend: `user_streaming_profiles`, `movie_availability`.
-  - DONE 2025-11-18T00:00Z – Added onboarding-backed provider sync to user streaming profiles plus a “Where I can watch” discover filter powered by the user’s saved providers.
+  DONE 2025-11-18T00:00Z – Added onboarding-backed provider sync to user streaming profiles plus a “Where I can watch” discover filter powered by the user’s saved providers.
 
 ---
 
@@ -229,7 +229,7 @@ Each item is a task for Codex (or any other assistant) to implement.
     - Use `watch_party_participants` for joins and presence.
   - Files: Party detail view, participants sidebar.
   - Backend: `watch_parties`, `watch_party_participants`.
-  - DONE 2025-11-17T08:26Z – Added join action plus presence-aware participant roster for watch parties, syncing host and attendee presence with the invite lobby.
+  DONE 2025-11-17T08:26Z – Added join action plus presence-aware participant roster for watch parties, syncing host and attendee presence with the invite lobby.
 
 - [x] **PARTY-003 – In-party chat**
   - Description: Implement a simple chat box inside the watch-party view.
@@ -237,7 +237,7 @@ Each item is a task for Codex (or any other assistant) to implement.
     - Visible only to hosts and participants as enforced by RLS.
   - Files: Party chat panel component.
   - Backend: `watch_party_messages`.
-  - DONE 2025-11-17T08:45Z – Added authenticated watch-party chat with live message history, host/participant gating, and Supabase-backed persistence for lobby conversations.
+  DONE 2025-11-17T08:45Z – Added authenticated watch-party chat with live message history, host/participant gating, and Supabase-backed persistence for lobby conversations.
 
 ---
 
@@ -257,7 +257,7 @@ Each item is a task for Codex (or any other assistant) to implement.
     - Allow sending new messages, writing to `user_messages`.
   - Files: Conversation page or modal.
   - Backend: `user_messages`, `user_conversation_members`.
-  - DONE 2025-11-17T09:45Z – Added inbox thread view with live message history and sending powered by conversation membership checks.
+  DONE 2025-11-17T09:45Z – Added inbox thread view with live message history and sending powered by conversation membership checks.
 
 - [x] **DM-003 – Start conversation from profile**
   - Description: Add a “Message” button on user profiles.
@@ -283,7 +283,7 @@ Each item is a task for Codex (or any other assistant) to implement.
     - Use metadata to capture context (movie id, source action).
   - Files: Centralized logging helper in SPA.
   - Backend: `user_activity`.
-  - DONE 2025-11-17T10:24Z – Added telemetry API and SPA logging helper that records follows, reviews, and discovery searches into `user_activity` with contextual metadata.
+  DONE 2025-11-17T10:24Z – Added telemetry API and SPA logging helper that records follows, reviews, and discovery searches into `user_activity` with contextual metadata.
 
 ---
 
@@ -294,14 +294,14 @@ Each item is a task for Codex (or any other assistant) to implement.
     - UI limits (max items per list), feature flags (enable watch parties, DMs).
   - Files: App bootstrap, config context/provider.
   - Backend: `app_config`.
-  - DONE 2025-11-17T10:24Z – Added config endpoint plus SPA provider to load `app_config` on startup, applying feature flags and list limits across discovery and home views.
+  DONE 2025-11-17T10:24Z – Added config endpoint plus SPA provider to load `app_config` on startup, applying feature flags and list limits across discovery and home views.
 
 - [x] **CONF-002 – Experiments & variants**
   - Description: Use `experiments` + `experiment_assignments` to:
     - Decide which layout or algorithm to use per user.
   - Files: Feature-flag helper, experiment switch points (e.g. home page layout).
   - Backend: `experiments`, `experiment_assignments`.
-  - DONE 2025-11-17T10:24Z – SPA now fetches experiment assignments from Supabase and switches the home recommendations layout based on the `home_recs_layout` variant.
+  DONE 2025-11-17T10:24Z – SPA now fetches experiment assignments from Supabase and switches the home recommendations layout based on the `home_recs_layout` variant.
 
 ---
 
@@ -328,7 +328,7 @@ Each item is a task for Codex (or any other assistant) to implement.
     - Logs search, click, and view events into `search_queries`, `recommendation_events`, and `user_activity` as appropriate.
   - Files: `analytics.js` (or equivalent), called from UI components.
   - Backend: `search_queries`, `recommendation_events`, `user_activity`.
-  - DONE 2025-11-17T10:24Z – Added `analytics.js` telemetry helper and server endpoint to persist search and recommendation events (stored in `user_activity` until `recommendation_events` exists) plus contextual metadata.
+  DONE 2025-11-17T10:24Z – Added `analytics.js` telemetry helper and server endpoint to persist search and recommendation events (stored in `user_activity` until `recommendation_events` exists) plus contextual metadata.
 
 ---
 
