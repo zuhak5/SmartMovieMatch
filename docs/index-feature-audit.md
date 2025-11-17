@@ -1,4 +1,4 @@
-# SmartMovieMatch – Feature TODO Index for Codex
+# Smart Movie Match – Feature TODO Index for Codex
 
 This file is the **source of truth for feature work on `index.html` and the SPA**.
 Each item is a task for Codex (or any other assistant) to implement.
