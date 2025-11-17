@@ -485,32 +485,70 @@
             </div>
           </div>
           <div class="tab-panel" data-tab-panel="diary">
-            <div class="filter-row" style="margin-top: 0;">
-              <button class="filter-pill is-active">Year</button>
-              <button class="filter-pill">Rating</button>
-            </div>
-            <div class="card diary-row">
-              <div class="poster"></div>
+            <form class="card" data-diary-form>
               <div class="stack">
                 <div class="label-row">
-                  <span class="small-text">Mar 04</span>
-                  <span class="badge rating">⭐⭐⭐⭐</span>
+                  <h4 style="margin: 0;">Log a movie</h4>
+                  <span class="badge">Diary</span>
                 </div>
-                <strong>Paper Suns</strong>
-                <p class="small-text">Gentle, hopeful, and beautifully lit.</p>
-              </div>
-            </div>
-            <div class="card diary-row">
-              <div class="poster"></div>
-              <div class="stack">
-                <div class="label-row">
-                  <span class="small-text">Feb 26</span>
-                  <span class="badge rating">⭐⭐⭐</span>
+                <div class="input-grid">
+                  <label class="input-group">
+                    <span>Search movie</span>
+                    <input type="search" placeholder="E.g., Past Lives" data-diary-search />
+                  </label>
+                  <label class="input-group">
+                    <span>Date watched</span>
+                    <input type="date" data-diary-date />
+                  </label>
+                  <label class="input-group">
+                    <span>Rating</span>
+                    <input type="number" min="0" max="10" step="0.5" inputmode="decimal" data-diary-rating />
+                  </label>
+                  <label class="input-group">
+                    <span>Tags</span>
+                    <input type="text" placeholder="comma-separated" data-diary-tags />
+                  </label>
+                  <label class="input-group">
+                    <span>Rewatch #</span>
+                    <input type="number" min="1" step="1" value="1" inputmode="numeric" data-diary-rewatch />
+                  </label>
+                  <label class="input-group">
+                    <span>Visibility</span>
+                    <select data-diary-visibility>
+                      <option value="public">Public</option>
+                      <option value="friends">Friends</option>
+                      <option value="private">Private</option>
+                    </select>
+                  </label>
+                  <label class="input-group">
+                    <span>Source</span>
+                    <select data-diary-source>
+                      <option value="theater">Theater</option>
+                      <option value="streaming">Streaming</option>
+                      <option value="disc">Blu-ray / DVD</option>
+                      <option value="download">Download</option>
+                    </select>
+                  </label>
+                  <label class="input-group">
+                    <span>Device</span>
+                    <select data-diary-device>
+                      <option value="tv">TV</option>
+                      <option value="laptop">Laptop</option>
+                      <option value="tablet">Tablet</option>
+                      <option value="mobile">Phone</option>
+                    </select>
+                  </label>
                 </div>
-                <strong>Night Market</strong>
-                <p class="small-text">Loved the soundtrack, pacing was slow.</p>
+                <div class="diary-search-results" data-diary-search-results></div>
+                <p class="small-text" data-diary-selected>Search to choose a movie to log.</p>
+                <div class="action-row" style="margin-top: 4px;">
+                  <button class="btn btn-primary" type="submit" data-diary-submit>Save diary entry</button>
+                  <p class="small-text auth-hint" style="margin: 0;" data-diary-status></p>
+                </div>
               </div>
-            </div>
+            </form>
+            <div class="stack" data-diary-list></div>
+            <div class="empty-state" data-diary-empty>Sign in and log a movie to start your diary.</div>
           </div>
         </section>
       </main>
