@@ -36,14 +36,14 @@ Each item is a task for Codex (or any other assistant) to implement.
 
 ## Authentication & session (AUTH)
 
-- [ ] **AUTH-001 – Session-aware navbar and auth state**
+- [x] **AUTH-001 – Session-aware navbar and auth state**
   - Description: Replace the static profile icons in `index.html` with session-aware UI using Supabase auth.
     - When logged out: show “Sign in / Sign up” as one button CTA.
     - When logged in: show avatar, username, and a dropdown menu (Profile, Settings, Logout).
   - Files: `index.html`, `assets/js/spa-app.js` (or equivalent SPA entry).
   - Backend: `auth_users`, `auth_sessions`, `user_sessions`.
   - Notes for Codex: Use `supabase.auth.getUser()` (or current client API) to drive initial state and subscribe to auth changes.
-  - DONE: _(Codex will fill once implemented)_
+  - DONE 2025-11-17T02:39Z – Added session-aware navbar with auth CTA, user dropdown, and logout/profile shortcuts that respond to auth session changes.
 
 - [ ] **AUTH-002 – Real login/logout flows**
   - Description: Wire login and logout actions to Supabase auth instead of mock handlers.
