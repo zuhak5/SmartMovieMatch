@@ -1,4 +1,11 @@
-import { fetchFromSearch, fetchFromTmdb, fetchTrendingMovies, fetchStreamingProviders } from "./api.js";
+import {
+  OfflineApiError,
+  fetchFromSearch,
+  fetchFromTmdb,
+  fetchTrendingMovies,
+  fetchStreamingProviders,
+  isApiOffline
+} from "./api.js";
 import {
   discoverCandidateMovies,
   scoreAndSelectCandidates,
@@ -3715,6 +3722,15 @@ async function loadTrendingMovies(timeWindow = state.trendingWindow) {
   state.trendingError = "";
   renderTrendingMovies(state.trendingMovies);
 
+  if (isApiOffline()) {
+    state.trendingMovies = FALLBACK_TRENDING_MOVIES;
+    state.trendingError = "Showing offline trending picks while we reconnect.";
+    state.trendingLoading = false;
+    renderTrendingMovies(state.trendingMovies);
+    renderTrendingStatus();
+    return;
+  }
+
   const controller = new AbortController();
   state.trendingAbort = controller;
 
@@ -3771,6 +3787,9 @@ async function loadHomeRecommendations() {
   state.recommendationsAbort = controller;
 
   try {
+    if (isApiOffline()) {
+      throw new OfflineApiError("API offline; using fallback recommendations");
+    }
     const candidates = await discoverCandidateMovies(
       {
         mood: "any",
@@ -3784,6 +3803,9 @@ async function loadHomeRecommendations() {
     const maxRecs = getUiLimit("ui.home.maxRecommendations", 10);
     const scored = scoreAndSelectCandidates(candidates, { maxCount: maxRecs }, []);
     const enriched = await fetchOmdbForCandidates(scored, { signal: controller.signal });
+    if (!enriched.length) {
+      throw new OfflineApiError("No recommendations generated from offline data");
+    }
     state.homeRecommendations = enriched;
     renderHomeRecommendations(enriched);
     renderGroupPicks(enriched.slice(0, getUiLimit("ui.home.groupPicks", 3)));

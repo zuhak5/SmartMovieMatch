@@ -1,4 +1,11 @@
-import { fetchFromOmdb, fetchFromTmdb, fetchFromYoutube } from "./api.js";
+import {
+  OfflineApiError,
+  fetchFromOmdb,
+  fetchFromTmdb,
+  fetchFromYoutube,
+  isApiOffline,
+  isOfflineError
+} from "./api.js";
 import { TMDB_GENRES } from "./config.js";
 import {
   computeWatchedGenreWeights,
@@ -98,6 +105,12 @@ function isAbortError(error) {
     !!error &&
     (error.name === ABORT_ERROR_NAME || (typeof error.code === "number" && error.code === 20))
   );
+}
+
+function ensureRecoverable(error) {
+  if (isAbortError(error) || isOfflineError(error)) {
+    throw error;
+  }
 }
 
 function throwIfAborted(signal) {
@@ -242,9 +255,7 @@ export async function discoverCandidateMovies(options = {}, { signal } = {}) {
       });
     }
   } catch (error) {
-    if (isAbortError(error)) {
-      throw error;
-    }
+    ensureRecoverable(error);
     console.warn("TMDB discover error:", error);
   }
 
@@ -263,9 +274,7 @@ export async function discoverCandidateMovies(options = {}, { signal } = {}) {
           fetchOptions
         );
       } catch (error) {
-        if (isAbortError(error)) {
-          throw error;
-        }
+        ensureRecoverable(error);
         console.warn("TMDB search error for favorite", chunk, error);
         return;
       }
@@ -304,9 +313,7 @@ export async function discoverCandidateMovies(options = {}, { signal } = {}) {
               });
             }
           } catch (error) {
-            if (isAbortError(error)) {
-              throw error;
-            }
+            ensureRecoverable(error);
             console.warn(
               "TMDB recommendations error for",
               referenceTitle,
@@ -332,9 +339,7 @@ export async function discoverCandidateMovies(options = {}, { signal } = {}) {
               });
             }
           } catch (error) {
-            if (isAbortError(error)) {
-              throw error;
-            }
+            ensureRecoverable(error);
             console.warn("TMDB similar error for", referenceTitle, error);
           }
         })()
@@ -358,11 +363,13 @@ export async function discoverCandidateMovies(options = {}, { signal } = {}) {
         });
       }
     } catch (error) {
-      if (isAbortError(error)) {
-        throw error;
-      }
+      ensureRecoverable(error);
       console.warn("TMDB trending error:", error);
     }
+  }
+
+  if (isApiOffline() && candidateMap.size === 0) {
+    throw new OfflineApiError("API offline; using fallback recommendations");
   }
 
   return Array.from(candidateMap.values());
