@@ -1,5 +1,5 @@
 import { TMDB_GENRES } from "./config.js";
-import { fetchFromTmdb } from "./api.js";
+import { fetchFromSearch, fetchFromTmdb } from "./api.js";
 import {
   loadSession,
   subscribeToSession,
@@ -1900,25 +1900,47 @@ function setupGlobalSearch() {
       resetSection();
       setStatus(`Searching for “${trimmed}”…`, "loading");
 
-      const moviesPromise = fetchFromTmdb(
-        "search/movie",
-        { query: trimmed, include_adult: "false" },
-        { signal: movieAbortController.signal }
-      )
-        .then((data) => {
-          const results = Array.isArray(data?.results) ? data.results : [];
-          const limited = results.slice(0, GLOBAL_SEARCH_MAX_MOVIES);
+      const moviesPromise = Promise.all([
+        fetchFromSearch(
+          { q: trimmed, limit: GLOBAL_SEARCH_MAX_MOVIES },
+          { signal: movieAbortController.signal, token: state.session?.token }
+        ).catch((error) => {
+          if (isAbortError(error)) {
+            throw error;
+          }
+          console.warn("Global search app search error", error);
+          return { movies: [] };
+        }),
+        fetchFromTmdb(
+          "search/movie",
+          { query: trimmed, include_adult: "false" },
+          { signal: movieAbortController.signal }
+        ).catch((error) => {
+          if (isAbortError(error)) {
+            throw error;
+          }
+          console.warn("Global search TMDB error", error);
+          return null;
+        })
+      ])
+        .then(([searchPayload, tmdbPayload]) => {
+          const searchMovies = Array.isArray(searchPayload?.movies) ? searchPayload.movies : [];
+          const tmdbResults = Array.isArray(tmdbPayload?.results) ? tmdbPayload.results : [];
+          const tmdbTotal =
+            typeof tmdbPayload?.total_results === "number" ? tmdbPayload.total_results : tmdbResults.length;
+
+          const merged = mergeGlobalSearchMovies(searchMovies, tmdbResults, GLOBAL_SEARCH_MAX_MOVIES);
           return {
-            entries: limited,
-            total: typeof data?.total_results === "number" ? data.total_results : limited.length,
-            message: limited.length ? "" : "No movie matches yet."
+            entries: merged,
+            total: Math.max(tmdbTotal, merged.length),
+            message: merged.length ? "" : "No movie matches yet."
           };
         })
         .catch((error) => {
           if (isAbortError(error)) {
             return { entries: [], total: 0, message: "" };
           }
-          console.warn("Global search movie error", error);
+          console.warn("Global search combined error", error);
           return {
             entries: [],
             total: 0,
@@ -2026,6 +2048,53 @@ function setupGlobalSearch() {
   };
 }
 
+function mergeGlobalSearchMovies(searchMovies = [], tmdbResults = [], limit = GLOBAL_SEARCH_MAX_MOVIES) {
+  const remainingTmdb = new Map();
+  tmdbResults.forEach((movie) => {
+    if (movie && movie.id) {
+      remainingTmdb.set(String(movie.id), movie);
+    }
+  });
+
+  const merged = [];
+
+  searchMovies.forEach((movie) => {
+    const normalized = normalizeSearchMovieForGlobal(movie);
+    const normalizedId = normalized.tmdbId ? String(normalized.tmdbId) : null;
+    const match = normalizedId ? remainingTmdb.get(normalizedId) : null;
+    if (match) {
+      merged.push({ ...match, ...normalized });
+      remainingTmdb.delete(normalizedId);
+    } else if (normalized.id || normalized.title) {
+      merged.push(normalized);
+    }
+  });
+
+  remainingTmdb.forEach((movie) => merged.push(movie));
+
+  return merged.slice(0, limit);
+}
+
+function normalizeSearchMovieForGlobal(movie = {}) {
+  const tmdbId = movie.tmdbId || movie.tmdb_id || null;
+  const releaseYear = movie.releaseYear || movie.year || null;
+  const releaseDate = movie.release_date || (releaseYear ? `${releaseYear}-01-01` : "");
+  const genres = Array.isArray(movie.genres) ? movie.genres : [];
+  return {
+    id: tmdbId || movie.imdbId || movie.id || null,
+    tmdbId: tmdbId || null,
+    imdbId: movie.imdbId || null,
+    title: movie.title || movie.name || "",
+    original_title: movie.originalTitle || movie.original_title || movie.title || "",
+    release_date: releaseDate,
+    overview: movie.synopsis || movie.overview || "",
+    genre_names: genres,
+    poster_path: movie.poster_path || movie.posterUrl || null,
+    original_language: movie.original_language || movie.language || "",
+    vote_average: typeof movie.averageRating === "number" ? movie.averageRating : movie.vote_average
+  };
+}
+
 function renderGlobalSearchMovies(elements, payload, query) {
   const { section, list, count, empty } = elements;
   if (!section || !list) {
@@ -2129,9 +2198,9 @@ function createGlobalSearchMovieItem(movie, query) {
   item.className = "global-search-item";
   const title = document.createElement("p");
   title.className = "global-search-item-title";
-  const label = movie?.title || movie?.original_title || movie?.name || "Untitled";
+  const label = movie?.title || movie?.original_title || movie?.name || movie?.originalTitle || "Untitled";
   title.textContent = label;
-  const releaseYear = (movie?.release_date || movie?.first_air_date || "").slice(0, 4);
+  const releaseYear = formatGlobalSearchYear(movie);
   if (releaseYear) {
     const year = document.createElement("span");
     year.textContent = releaseYear;
@@ -2140,20 +2209,21 @@ function createGlobalSearchMovieItem(movie, query) {
   item.appendChild(title);
 
   const metaParts = [];
-  if (typeof movie?.vote_average === "number" && movie.vote_average > 0) {
-    metaParts.push(`${movie.vote_average.toFixed(1)} ★`);
+  const rating =
+    typeof movie?.vote_average === "number" && movie.vote_average > 0
+      ? movie.vote_average
+      : typeof movie?.averageRating === "number" && movie.averageRating > 0
+        ? movie.averageRating
+        : null;
+  if (rating) {
+    metaParts.push(`${rating.toFixed(1)} ★`);
   }
   if (movie?.original_language) {
     metaParts.push(movie.original_language.toUpperCase());
   }
-  if (Array.isArray(movie?.genre_ids) && movie.genre_ids.length) {
-    const genreLabels = movie.genre_ids
-      .map((id) => TMDB_GENRES[id] || null)
-      .filter(Boolean)
-      .slice(0, 2);
-    if (genreLabels.length) {
-      metaParts.push(genreLabels.join(" / "));
-    }
+  const genreLabel = formatGlobalSearchGenres(movie);
+  if (genreLabel) {
+    metaParts.push(genreLabel);
   }
   if (metaParts.length) {
     const meta = document.createElement("p");
@@ -2162,7 +2232,7 @@ function createGlobalSearchMovieItem(movie, query) {
     item.appendChild(meta);
   }
 
-  const overview = (movie?.overview || "").trim();
+  const overview = (movie?.overview || movie?.synopsis || "").trim();
   if (overview) {
     const summary = document.createElement("p");
     summary.className = "global-search-item-description";
@@ -2184,8 +2254,9 @@ function createGlobalSearchMovieItem(movie, query) {
   link.target = "_blank";
   link.rel = "noreferrer noopener";
   link.textContent = "View on TMDB";
-  if (movie?.id) {
-    link.href = `https://www.themoviedb.org/movie/${movie.id}`;
+  const tmdbId = movie?.id || movie?.tmdbId || movie?.tmdb_id;
+  if (tmdbId) {
+    link.href = `https://www.themoviedb.org/movie/${tmdbId}`;
   } else {
     const fallback = label || query || "movie";
     link.href = `https://www.themoviedb.org/search?query=${encodeURIComponent(fallback)}`;
@@ -2194,6 +2265,39 @@ function createGlobalSearchMovieItem(movie, query) {
 
   item.appendChild(actions);
   return item;
+}
+
+function formatGlobalSearchYear(movie = {}) {
+  const releaseDate = movie.release_date || movie.first_air_date || "";
+  if (releaseDate) {
+    return releaseDate.slice(0, 4);
+  }
+  if (typeof movie.releaseYear === "number") {
+    return String(movie.releaseYear);
+  }
+  if (typeof movie.year === "number") {
+    return String(movie.year);
+  }
+  return "";
+}
+
+function formatGlobalSearchGenres(movie = {}) {
+  if (Array.isArray(movie.genre_ids) && movie.genre_ids.length) {
+    const genreLabels = movie.genre_ids
+      .map((id) => TMDB_GENRES[id] || null)
+      .filter(Boolean)
+      .slice(0, 2);
+    if (genreLabels.length) {
+      return genreLabels.join(" / ");
+    }
+  }
+  if (Array.isArray(movie.genre_names) && movie.genre_names.length) {
+    return movie.genre_names.slice(0, 2).join(" / ");
+  }
+  if (Array.isArray(movie.genres) && movie.genres.length) {
+    return movie.genres.slice(0, 2).join(" / ");
+  }
+  return "";
 }
 
 function createGlobalSearchPersonItem(person) {
