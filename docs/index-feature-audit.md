@@ -133,12 +133,12 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Backend: `search_queries` + RLS policies so users only see their own logs.
   DONE 2025-05-07T00:00Z – Added Supabase logging for discover searches (including filter metadata and session context) alongside SPA telemetry.
 
-- [ ] **SRCH-003 – “Trending now” powered by `trending_movies`**
+- [x] **SRCH-003 – “Trending now” powered by `trending_movies`**
   - Description: Replace hardcoded “trending” section with data pulled from `trending_movies` joined to `movies`.
     - Support at least one window, e.g. `time_window = 'weekly'`.
   - Files: Explore/discover section UI.
   - Backend: `trending_movies`, `movies`.
-  - DONE: _…_
+  DONE 2025-11-17T10:50Z – Added Discover “Trending now” row driven by Supabase `trending_movies` with weekly/daily/monthly window selector, server API join to `movies`, and public RLS-backed schema entries.
 
 ---
 

@@ -2,7 +2,8 @@ export const API_ROUTES = {
   tmdb: "/api/tmdb",
   omdb: "/api/omdb",
   youtube: "/api/youtube",
-  search: "/api/search"
+  search: "/api/search",
+  trending: "/api/trending"
 };
 
 export const TMDB_GENRES = {

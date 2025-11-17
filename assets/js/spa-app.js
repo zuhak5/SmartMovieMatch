@@ -1,4 +1,4 @@
-import { fetchFromSearch, fetchFromTmdb } from "./api.js";
+import { fetchFromSearch, fetchFromTmdb, fetchTrendingMovies } from "./api.js";
 import {
   discoverCandidateMovies,
   scoreAndSelectCandidates,
@@ -78,9 +78,14 @@ const state = {
   activeSection: "home",
   discoverFilter: "popular",
   discoverAbort: null,
+  trendingAbort: null,
   recommendationsAbort: null,
   recommendationSeed: Math.random(),
   homeRecommendations: [],
+  trendingMovies: [],
+  trendingWindow: "weekly",
+  trendingLoading: false,
+  trendingError: "",
   discoverPeople: [],
   peopleSearchActive: false,
   discoverLists: [],
@@ -223,6 +228,9 @@ const discoverSearchInput = document.querySelector("[data-discover-search]");
 const discoverGrid = document.querySelector('[data-grid="discover-movies"]');
 const discoverPeopleList = document.querySelector('[data-list="discover-people"]');
 const discoverListCards = document.querySelector('[data-list="discover-lists"]');
+const trendingRow = document.querySelector('[data-row="discover-trending"]');
+const trendingStatus = document.querySelector('[data-trending-status]');
+const trendingWindowSelect = document.querySelector('[data-trending-window]');
 const homeRecommendationsRow = document.querySelector('[data-row="home-recommendations"]');
 const tonightPickCard = document.querySelector("[data-tonight-pick]");
 const groupPicksList = document.querySelector('[data-list="group-picks"]');
@@ -992,6 +1000,98 @@ function renderDiscoverMovies(movies = []) {
   });
 }
 
+function renderTrendingStatus() {
+  if (!trendingStatus) return;
+  trendingStatus.textContent = "";
+  trendingStatus.classList.add("muted");
+
+  if (state.trendingLoading) {
+    trendingStatus.textContent = "Loading trending movies…";
+    return;
+  }
+
+  if (state.trendingError) {
+    trendingStatus.textContent = state.trendingError;
+    return;
+  }
+
+  if (!state.trendingMovies.length) {
+    trendingStatus.textContent = "No trending movies for this window yet.";
+    return;
+  }
+
+  const label =
+    state.trendingWindow === "daily"
+      ? "today"
+      : state.trendingWindow === "monthly"
+      ? "this month"
+      : "this week";
+  trendingStatus.textContent = `Trending ${label} from community activity.`;
+}
+
+function renderTrendingMovies(movies = []) {
+  if (!trendingRow) return;
+  trendingRow.innerHTML = "";
+
+  const normalized = movies.map(normalizeDiscoverMovie).filter(Boolean);
+
+  if (state.trendingLoading) {
+    const loading = document.createElement("div");
+    loading.className = "small-text muted";
+    loading.textContent = "Loading trending movies…";
+    trendingRow.append(loading);
+    renderTrendingStatus();
+    return;
+  }
+
+  if (!normalized.length) {
+    const empty = document.createElement("div");
+    empty.className = "small-text muted";
+    empty.textContent = state.trendingError || "No trending picks right now.";
+    trendingRow.append(empty);
+    renderTrendingStatus();
+    return;
+  }
+
+  normalized.forEach((movie, index) => {
+    const card = document.createElement("div");
+    card.className = "card match-card";
+    card.appendChild(createPoster(movie.posterUrl));
+
+    const stack = document.createElement("div");
+    stack.className = "stack";
+    const title = document.createElement("strong");
+    title.textContent = movie.title;
+    const meta = document.createElement("div");
+    meta.className = "small-text";
+    const year = movie.releaseYear ? String(movie.releaseYear) : "";
+    meta.textContent = [year, formatGenres(movie.genres)].filter(Boolean).join(" · ");
+
+    const badgeRow = document.createElement("div");
+    badgeRow.className = "action-row";
+    const rankBadge = document.createElement("span");
+    rankBadge.className = "badge trend";
+    const rankValue = movie.rank || index + 1;
+    rankBadge.textContent = rankValue ? `#${rankValue}` : "Trending";
+    const statBadge = document.createElement("span");
+    statBadge.className = "badge rating";
+    if (movie.stats?.watchCount) {
+      statBadge.textContent = `${movie.stats.watchCount} logs`;
+    } else if (movie.stats?.favorites) {
+      statBadge.textContent = `${movie.stats.favorites} favorites`;
+    } else {
+      statBadge.textContent = movie.trendScore ? `${movie.trendScore.toFixed(1)} score` : "Buzzing";
+    }
+
+    badgeRow.append(rankBadge, statBadge);
+    stack.append(title, meta, badgeRow);
+    card.append(stack);
+    trendingRow.append(card);
+  });
+
+  renderTrendingStatus();
+}
+
 function normalizeDiscoverMovie(movie = {}) {
   if (!movie || typeof movie !== "object") {
     return null;
@@ -1020,6 +1120,10 @@ function normalizeDiscoverMovie(movie = {}) {
   const watchCount = Number.isFinite(Number(stats.watchCount)) ? Number(stats.watchCount) : 0;
   const favorites = Number.isFinite(Number(stats.favorites)) ? Number(stats.favorites) : 0;
   const reviews = Number.isFinite(Number(stats.reviews)) ? Number(stats.reviews) : 0;
+  const rank = Number.isFinite(Number(movie.rank)) ? Number(movie.rank) : null;
+  const trendScoreCandidate = movie.trendScore ?? movie.trend_score;
+  const trendScore = Number.isFinite(Number(trendScoreCandidate)) ? Number(trendScoreCandidate) : null;
+  const timeWindow = movie.timeWindow || movie.time_window || null;
 
   return {
     title: movie.title || movie.original_title || movie.name || "Untitled",
@@ -1030,7 +1134,11 @@ function normalizeDiscoverMovie(movie = {}) {
     watchCount,
     favorites,
     reviews,
-    synopsis: movie.synopsis || movie.overview || ""
+    synopsis: movie.synopsis || movie.overview || "",
+    stats: { watchCount, favorites, reviews },
+    rank,
+    trendScore,
+    timeWindow
   };
 }
 
@@ -2070,6 +2178,43 @@ async function loadTrendingPeople(query = "") {
   }
 }
 
+async function loadTrendingMovies(timeWindow = state.trendingWindow) {
+  if (state.trendingAbort) {
+    state.trendingAbort.abort();
+  }
+
+  state.trendingWindow = timeWindow || "weekly";
+  state.trendingLoading = true;
+  state.trendingError = "";
+  renderTrendingMovies(state.trendingMovies);
+
+  const controller = new AbortController();
+  state.trendingAbort = controller;
+
+  try {
+    const data = await fetchTrendingMovies(
+      {
+        time_window: state.trendingWindow,
+        limit: getUiLimit("ui.discover.trendingCount", 8)
+      },
+      { signal: controller.signal }
+    );
+
+    state.trendingMovies = Array.isArray(data?.movies) ? data.movies : [];
+    renderTrendingMovies(state.trendingMovies);
+  } catch (error) {
+    if (error.name === "AbortError") return;
+    console.warn("trending fetch failed", error);
+    state.trendingMovies = [];
+    state.trendingError = "Unable to load trending movies.";
+    renderTrendingMovies([]);
+  } finally {
+    state.trendingAbort = null;
+    state.trendingLoading = false;
+    renderTrendingStatus();
+  }
+}
+
 function buildListsFromMovies(movies = []) {
   const cleanMovies = (movies || []).filter(Boolean);
   if (!cleanMovies.length) return [];
@@ -2863,6 +3008,12 @@ function attachListeners() {
     });
   });
 
+  if (trendingWindowSelect) {
+    trendingWindowSelect.addEventListener("change", (event) => {
+      loadTrendingMovies(event.target.value || "weekly");
+    });
+  }
+
   if (discoverSearchInput) {
     let handle;
     discoverSearchInput.addEventListener("input", (event) => {
@@ -3096,6 +3247,7 @@ function init() {
   attachListeners();
   refreshAppConfig();
   setSection("home");
+  loadTrendingMovies(state.trendingWindow);
   loadDiscover(state.discoverFilter);
   loadTrendingPeople();
   loadHomeRecommendations();

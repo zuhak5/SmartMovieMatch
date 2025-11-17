@@ -87,6 +87,32 @@ create table IF NOT EXISTS public.movies (
     )
   )
 ) TABLESPACE pg_default;
+
+create table IF NOT EXISTS public.trending_movies (
+  id uuid not null default gen_random_uuid (),
+  movie_imdb_id text not null,
+  time_window text not null default 'weekly'::text,
+  rank integer null,
+  trend_score numeric(10, 4) null,
+  captured_at timestamp with time zone not null default timezone ('utc'::text, now()),
+  context jsonb null,
+  constraint trending_movies_pkey primary key (id),
+  constraint trending_movies_movie_imdb_id_fkey foreign KEY (movie_imdb_id) references movies (imdb_id) on delete CASCADE,
+  constraint trending_movies_time_window_check check (
+    (
+      time_window = any (
+        array[
+          'daily'::text,
+          'weekly'::text,
+          'monthly'::text
+        ]
+      )
+    )
+  )
+) TABLESPACE pg_default;
+
+create unique INDEX IF not exists trending_movies_window_movie_idx on public.trending_movies using btree (time_window, movie_imdb_id) TABLESPACE pg_default;
+create index IF not exists trending_movies_rank_idx on public.trending_movies using btree (time_window, rank, trend_score) TABLESPACE pg_default;
 create table IF NOT EXISTS public.review_comments (
   id uuid not null default gen_random_uuid (),
   review_id uuid not null,
@@ -1472,6 +1498,16 @@ drop policy if exists "Movies are readable by everyone" on public.movies;
 
 create policy "Movies are readable by everyone"
   on public.movies
+  for select
+  to anon, authenticated
+  using ( true );
+
+alter table public.trending_movies enable row level security;
+
+drop policy if exists "Trending movies are readable by everyone" on public.trending_movies;
+
+create policy "Trending movies are readable by everyone"
+  on public.trending_movies
   for select
   to anon, authenticated
   using ( true );
