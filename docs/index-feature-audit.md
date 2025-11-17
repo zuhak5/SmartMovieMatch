@@ -259,12 +259,12 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Backend: `user_messages`, `user_conversation_members`.
   - DONE 2025-11-17T09:45Z – Added inbox thread view with live message history and sending powered by conversation membership checks.
 
-- [ ] **DM-003 – Start conversation from profile**
+- [x] **DM-003 – Start conversation from profile**
   - Description: Add a “Message” button on user profiles.
     - Creates or reuses a 1:1 `user_conversations` row and opens it.
   - Files: Profile header, quick action section.
   - Backend: `user_conversations`, `user_conversation_members`.
-  - DONE: _…_
+  DONE 2025-11-17T09:56Z – Added profile message CTA and people-list action that start or reuse 1:1 chats then open the inbox with the conversation preloaded.
 
 ---
 

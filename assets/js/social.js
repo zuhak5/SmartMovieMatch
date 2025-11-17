@@ -376,6 +376,23 @@ export async function listConversationsRemote() {
   return conversations;
 }
 
+export async function startDirectConversationRemote(username, { reuseExisting = true } = {}) {
+  const normalized = canonicalUsername(username);
+  if (!normalized) {
+    throw new Error('Choose a profile to message first.');
+  }
+  const payload = { username: normalized };
+  if (reuseExisting !== undefined) {
+    payload.reuseExisting = reuseExisting !== false;
+  }
+  const response = await callSocial('startConversation', payload);
+  const conversation = normalizeConversationSummary(response?.conversation);
+  if (!conversation) {
+    throw new Error('Unable to open that conversation right now.');
+  }
+  return conversation;
+}
+
 export async function listConversationMessagesRemote(conversationId) {
   const trimmed = normalizeConversationId(conversationId);
   if (!trimmed) {
