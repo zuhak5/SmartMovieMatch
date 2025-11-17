@@ -5,6 +5,7 @@ import {
   fetchOmdbForCandidates
 } from "./recommendations.js";
 import { TMDB_GENRES } from "./config.js";
+import { initAuthUI } from "./auth-ui.js";
 
 const defaultTabs = {
   friends: "feed",
@@ -30,6 +31,7 @@ const navButtons = document.querySelectorAll("[data-section-button]");
 const sections = document.querySelectorAll("[data-section-panel]");
 const tabGroups = document.querySelectorAll("[data-section-tabs]");
 const discoverSearchInput = document.querySelector("[data-discover-search]");
+const authSlot = document.querySelector("[data-auth-slot]");
 const discoverGrid = document.querySelector('[data-grid="discover-movies"]');
 const discoverPeopleList = document.querySelector('[data-list="discover-people"]');
 const discoverListCards = document.querySelector('[data-list="discover-lists"]');
@@ -530,6 +532,7 @@ function attachListeners() {
 }
 
 function init() {
+  initAuthUI(authSlot);
   attachListeners();
   setSection("home");
   loadDiscover(state.discoverFilter);
