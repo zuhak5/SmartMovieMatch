@@ -158,13 +158,13 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Backend: `watch_diary.rewatch_number`.
   DONE 2025-11-17T11:25Z – Added “Log rewatch” buttons on diary entries that increment `rewatch_number`, reuse movie metadata, and save a fresh diary row with current date.
 
-- [ ] **DIARY-003 – Reviews with engagement counters**
+- [x] **DIARY-003 – Reviews with engagement counters**
   - Description: Wire review creation UI to `movie_reviews`, including:
     - headline, body, rating, visibility, tags.
     - Update `likes_count` and `comments_count` from `review_likes` and `review_comments` when rendering.
   - Files: Review form, movie detail review list.
   - Backend: `movie_reviews`, `review_likes`, `review_comments`.
-  - DONE: _…_
+  DONE 2025-11-17T11:32Z – Captured Supabase-backed headlines, tags, and visibility in the review form, persisted review metadata, and surfaced like/comment counters from review_likes and review_comments with new UI badges.
 
 ---
 

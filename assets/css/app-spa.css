@@ -2321,6 +2321,37 @@ p {
   }
 }
 
+/* Community reviews & engagement */
+.community-review-headline {
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.community-review-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.community-review-tag {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.community-meta-count {
+  color: var(--muted);
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 @keyframes fade {
   from {
     opacity: 0;
