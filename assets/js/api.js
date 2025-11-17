@@ -43,3 +43,19 @@ export async function fetchFromYoutube(params = {}, { signal } = {}) {
   });
   return fetchJson(`${API_ROUTES.youtube}?${searchParams.toString()}`, { signal });
 }
+
+export async function searchMovies(params = {}, { signal } = {}) {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    if (Array.isArray(value)) {
+      if (value.length === 0) return;
+      searchParams.append(key, value.join(","));
+      return;
+    }
+    searchParams.append(key, value);
+  });
+
+  const query = searchParams.toString();
+  return fetchJson(query ? `/api/search?${query}` : "/api/search", { signal });
+}
