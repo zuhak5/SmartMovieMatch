@@ -364,6 +364,10 @@ export async function respondWatchPartyRemote({ partyId, response, note }) {
   return callSocial('respondWatchParty', { partyId, response, note });
 }
 
+export async function joinWatchPartyRemote({ partyId, note }) {
+  return callSocial('joinWatchParty', { partyId, note });
+}
+
 export async function voteCollaborativeItemRemote({ listId, tmdbId, vote }) {
   return callSocial('voteCollaborativeItem', { listId, tmdbId, vote });
 }
@@ -3578,7 +3582,17 @@ function normalizeWatchPartySummary(entry) {
     createdAt: entry.createdAt || null,
     note: entry.note || '',
     response: entry.response || 'pending',
-    invitees: Array.isArray(entry.invitees) ? entry.invitees.slice() : []
+    invitees: Array.isArray(entry.invitees) ? entry.invitees.slice() : [],
+    participants: Array.isArray(entry.participants)
+      ? entry.participants.map((participant) => ({
+          username: participant.username,
+          role: participant.role || 'guest',
+          joinedAt: participant.joinedAt || null,
+          lastActiveAt: participant.lastActiveAt || null,
+          isKicked: Boolean(participant.isKicked),
+          metadata: participant.metadata && typeof participant.metadata === 'object' ? participant.metadata : {}
+        }))
+      : []
   };
 }
 
@@ -3699,6 +3713,15 @@ function cloneCollaborativeState(collabState) {
                   ...invite,
                   bringing: typeof invite.bringing === 'string' ? invite.bringing : ''
                 }))
+              : [],
+            participants: Array.isArray(entry.participants)
+              ? entry.participants.map((participant) => ({
+                  ...participant,
+                  metadata:
+                    participant && typeof participant.metadata === 'object' && participant.metadata
+                      ? { ...participant.metadata }
+                      : {}
+                }))
               : []
           }))
         : [],
@@ -3710,6 +3733,15 @@ function cloneCollaborativeState(collabState) {
               ? entry.invitees.map((invite) => ({
                   ...invite,
                   bringing: typeof invite.bringing === 'string' ? invite.bringing : ''
+                }))
+              : [],
+            participants: Array.isArray(entry.participants)
+              ? entry.participants.map((participant) => ({
+                  ...participant,
+                  metadata:
+                    participant && typeof participant.metadata === 'object' && participant.metadata
+                      ? { ...participant.metadata }
+                      : {}
                 }))
               : []
           }))

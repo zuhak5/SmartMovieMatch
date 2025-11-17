@@ -224,12 +224,12 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Backend: `watch_parties` with RLS for host ownership.
   - DONE: _…_
 
-- [ ] **PARTY-002 – Join & participants list**
+- [x] **PARTY-002 – Join & participants list**
   - Description: Allow users to join an existing party and see who is attending.
     - Use `watch_party_participants` for joins and presence.
   - Files: Party detail view, participants sidebar.
   - Backend: `watch_parties`, `watch_party_participants`.
-  - DONE: _…_
+  - DONE 2025-11-17T08:26Z – Added join action plus presence-aware participant roster for watch parties, syncing host and attendee presence with the invite lobby.
 
 - [ ] **PARTY-003 – In-party chat**
   - Description: Implement a simple chat box inside the watch-party view.

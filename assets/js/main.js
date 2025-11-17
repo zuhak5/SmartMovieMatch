@@ -39,6 +39,7 @@ import {
   respondCollaboratorInviteRemote,
   scheduleWatchPartyRemote,
   respondWatchPartyRemote,
+  joinWatchPartyRemote,
   voteCollaborativeItemRemote,
   postCollaborativeNoteRemote,
   subscribeToCollaborativeState,
@@ -8765,6 +8766,10 @@ function buildWatchPartyCard(entry, mode) {
   card.className = "watch-party-card";
   card.dataset.mode = mode;
   const invitees = Array.isArray(entry.invitees) ? entry.invitees : [];
+  const participants = Array.isArray(entry.participants) ? entry.participants : [];
+  const participantHandles = new Set(
+    participants.map((participant) => canonicalHandle(participant.username)).filter(Boolean)
+  );
 
   const header = document.createElement("header");
   header.className = "watch-party-card-header";
@@ -8813,17 +8818,27 @@ function buildWatchPartyCard(entry, mode) {
   }
 
   const username = state.session && state.session.username ? canonicalHandle(state.session.username) : null;
+  const isParticipant = username ? participantHandles.has(username) : false;
   const myInvite = invitees.find((invite) => canonicalHandle(invite.username) === username);
-  if (mode === "upcoming" && username && entry.host !== username && myInvite) {
+  if (mode === "upcoming" && username && entry.host !== username && (myInvite || isParticipant)) {
     const response = document.createElement("p");
     response.className = "watch-party-response";
-    response.textContent = `You responded: ${formatPartyResponse(myInvite.response)}`;
+    if (isParticipant && (!myInvite || normalizePartyResponse(myInvite.response) !== "accept")) {
+      response.textContent = "You joined this watch party.";
+    } else if (myInvite) {
+      response.textContent = `You responded: ${formatPartyResponse(myInvite.response)}`;
+    }
     card.appendChild(response);
   }
 
-  const lobby = buildWatchPartyLobby(entry);
+  const lobby = buildWatchPartyLobby(entry, participants);
   if (lobby) {
     card.appendChild(lobby);
+  }
+
+  const participantList = buildWatchPartyParticipants(entry);
+  if (participantList) {
+    card.appendChild(participantList);
   }
 
   if (mode === "upcoming") {
@@ -8882,25 +8897,59 @@ function buildWatchPartyCard(entry, mode) {
     card.appendChild(actions);
   }
 
+  if (mode === "upcoming" && username && entry.host !== username && !isParticipant) {
+    const joinActions = document.createElement("div");
+    joinActions.className = "watch-party-actions";
+    const joinBtn = document.createElement("button");
+    joinBtn.type = "button";
+    joinBtn.className = "btn-primary";
+    joinBtn.textContent = "Join party";
+    joinBtn.addEventListener("click", () => {
+      playUiClick();
+      handleWatchPartyJoinAction(entry.id, joinBtn, joinActions);
+    });
+    joinActions.appendChild(joinBtn);
+    card.appendChild(joinActions);
+  }
+
   return card;
 }
 
-function buildWatchPartyLobby(entry) {
+function buildWatchPartyLobby(entry, participants = []) {
   const invitees = Array.isArray(entry && entry.invitees) ? entry.invitees : [];
-  if (!invitees.length) {
+  const participantList = Array.isArray(participants) ? participants : [];
+  if (!invitees.length && !participantList.length) {
     return null;
   }
   const lobby = document.createElement("div");
   lobby.className = "watch-party-lobby";
   const statusWrap = document.createElement("div");
   statusWrap.className = "watch-party-lobby-status";
+  const presenceMap = getPresenceOverviewMap();
+  const participantHandles = new Set(
+    participantList.map((participant) => canonicalHandle(participant.username)).filter(Boolean)
+  );
   const groups = [
-    { key: "accept", label: "Going", dataset: "going" },
+    { key: "going", label: "Going", dataset: "going" },
     { key: "maybe", label: "Maybe", dataset: "maybe" },
     { key: "pending", label: "Waiting", dataset: "waiting" }
   ];
   groups.forEach((group) => {
-    const members = invitees.filter((invite) => normalizePartyResponse(invite.response) === group.key);
+    let members = [];
+    if (group.key === "going") {
+      members = participantList.length
+        ? participantList
+        : invitees.filter((invite) => normalizePartyResponse(invite.response) === "accept");
+    } else {
+      members = invitees.filter((invite) => {
+        const normalized = normalizePartyResponse(invite.response);
+        const handle = canonicalHandle(invite.username);
+        if (!handle || participantHandles.has(handle)) {
+          return false;
+        }
+        return normalized === group.key;
+      });
+    }
     if (!members.length) {
       return;
     }
@@ -8920,9 +8969,27 @@ function buildWatchPartyLobby(entry) {
       const chip = document.createElement("span");
       chip.className = "watch-party-lobby-chip";
       chip.dataset.state = group.dataset;
-      chip.textContent = formatSocialDisplayName(member.username);
-      if (member.bringing) {
-        chip.title = member.bringing;
+      const normalized = canonicalHandle(member.username);
+      const presence = normalized ? presenceMap[normalized] : null;
+      if (presence && presence.state) {
+        chip.dataset.presence = presence.state;
+      }
+      const link = createProfileButton(member.username, {
+        className: "social-profile-link",
+        label: formatSocialDisplayName(member.username),
+        stopPropagation: true
+      });
+      if (link) {
+        chip.appendChild(link);
+      } else {
+        chip.textContent = formatSocialDisplayName(member.username);
+      }
+      const bringing = member.metadata?.bringing || member.bringing;
+      if (bringing) {
+        const vibe = document.createElement("span");
+        vibe.className = "watch-party-lobby-note";
+        vibe.textContent = bringing;
+        chip.appendChild(vibe);
       }
       chips.appendChild(chip);
     });
@@ -8937,6 +9004,73 @@ function buildWatchPartyLobby(entry) {
     lobby.appendChild(vibeRow);
   }
   return lobby.childNodes.length ? lobby : null;
+}
+
+function buildWatchPartyParticipants(entry) {
+  const participants = Array.isArray(entry && entry.participants)
+    ? entry.participants.filter((participant) => participant && participant.username)
+    : [];
+  if (!participants.length) {
+    return null;
+  }
+  const presenceMap = getPresenceOverviewMap();
+  const container = document.createElement("div");
+  container.className = "watch-party-participants";
+  const heading = document.createElement("div");
+  heading.className = "watch-party-participants-heading";
+  heading.textContent = `Participants (${participants.length})`;
+  container.appendChild(heading);
+  const list = document.createElement("div");
+  list.className = "watch-party-participants-list";
+  participants
+    .slice()
+    .sort((a, b) => {
+      if (a.role === "host" && b.role !== "host") {
+        return -1;
+      }
+      if (b.role === "host" && a.role !== "host") {
+        return 1;
+      }
+      const aTime = toTimestamp(a.joinedAt || a.lastActiveAt);
+      const bTime = toTimestamp(b.joinedAt || b.lastActiveAt);
+      return bTime - aTime;
+    })
+    .forEach((participant) => {
+      const handle = canonicalHandle(participant.username);
+      if (!handle) {
+        return;
+      }
+      const row = document.createElement("div");
+      row.className = "watch-party-participant";
+      const presence = presenceMap[handle];
+      if (presence && presence.state) {
+        row.dataset.presence = presence.state;
+      }
+      const profileLink = createProfileButton(handle, {
+        className: "social-profile-link",
+        label: formatSocialDisplayName(handle),
+        stopPropagation: true
+      });
+      if (profileLink) {
+        row.appendChild(profileLink);
+      } else {
+        const name = document.createElement("span");
+        name.textContent = formatSocialDisplayName(handle);
+        row.appendChild(name);
+      }
+      const role = document.createElement("span");
+      role.className = "watch-party-participant-role";
+      role.textContent = participant.role === "host" ? "Host" : "Guest";
+      row.appendChild(role);
+      const timing = document.createElement("span");
+      timing.className = "watch-party-participant-meta";
+      const timestamp = participant.lastActiveAt || participant.joinedAt;
+      timing.textContent = timestamp ? `Active ${formatTimeAgo(timestamp)}` : "Active recently";
+      row.appendChild(timing);
+      list.appendChild(row);
+    });
+  container.appendChild(list);
+  return container;
 }
 
 function buildWatchPartyBringingRow(invitees) {
@@ -9093,6 +9227,31 @@ async function handleWatchPartyResponseAction(partyId, response, button, actionG
   } catch (error) {
     setCollabStatus(
       error instanceof Error ? error.message : "Couldn’t update your RSVP right now.",
+      "error"
+    );
+  } finally {
+    buttons.forEach((btn) => {
+      btn.disabled = false;
+    });
+  }
+}
+
+async function handleWatchPartyJoinAction(partyId, button, actionGroup) {
+  if (!partyId) {
+    return;
+  }
+  const buttons = actionGroup ? Array.from(actionGroup.querySelectorAll("button")) : [button];
+  buttons.forEach((btn) => {
+    btn.disabled = true;
+  });
+  setCollabStatus("Joining watch party…", "loading");
+  try {
+    await joinWatchPartyRemote({ partyId });
+    setCollabStatus("You’re in!", "success");
+    await refreshCollaborativeState();
+  } catch (error) {
+    setCollabStatus(
+      error instanceof Error ? error.message : "Couldn’t join that watch party right now.",
       "error"
     );
   } finally {
