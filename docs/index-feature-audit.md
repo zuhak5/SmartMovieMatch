@@ -1,53 +1,343 @@
-# index.html feature activation audit
+# SmartMovieMatch – Feature TODO Index for Codex
 
-## Overview
-This audit walks through `index.html` and the connected SPA script to highlight UI features that are currently static or missing the logic needed to activate them. Each item notes where the UI appears and what wiring would be required to make it functional.
+This file is the **source of truth for feature work on `index.html` and the SPA**.
+Each item is a task for Codex (or any other assistant) to implement.
 
-## Authentication
-- The top bar only shows notification and profile icons; there are no sign-up, login, or logout entry points, and no authentication modals or routes are referenced in the SPA script. Add visible authentication controls plus handlers that integrate with the chosen auth backend (e.g., Supabase session checks, login/signup forms, and logout).【F:index.html†L15-L27】【F:assets/js/spa-app.js†L489-L518】
-- Profile details (name, handle, stats) are hardcoded. Replace these placeholders with data from the authenticated user and guard the profile view when no session is present.【F:index.html†L275-L350】
+## How to use this TODO list
 
-## Following, friends, and requests
-- Friend feed items and request cards render static people; buttons such as “Accept,” “Ignore,” “Join,” and “View” do not have event bindings. Implement handlers to send follow/accept/decline actions to the backend, update local UI state, and refresh counts after completion.【F:index.html†L61-L124】【F:assets/js/spa-app.js†L489-L518】
-- Follower/following counts in the profile overview are fixed numbers with no follow/unfollow controls. Add follow buttons on user cards and hook the counters to live data from the social graph service.【F:index.html†L285-L320】
+- Each task is written as a Markdown checkbox: `- [ ] TASK-ID – short title`.
+- When a task is implemented, Codex should:
+  1. Change `[ ]` → `[x]`.
+  2. Append a `DONE` line with timestamp and a short summary, e.g.:
 
-## Search and discovery
-- The discover search input and filter pills are already wired to TMDB queries through `spa-app.js`, providing movie, people, and list rendering. Ensure API keys and rate limits are configured for production and consider adding empty-state guidance when third-party calls fail.【F:index.html†L134-L158】【F:assets/js/spa-app.js†L233-L487】
-- Search results currently generate derived list cards locally; if curated lists should be persisted or shareable, add endpoints to fetch and store list data instead of building them from search results only.【F:assets/js/spa-app.js†L281-L333】
+     `DONE 2025-11-17T14:32Z – Implemented session-aware navbar using Supabase auth; added logout and profile menu.`
 
-## Notifications and invites
-- The notification bell in the top bar is a static icon with no dropdown, badge count, or fetch logic. Add a notifications panel plus polling or server-push wiring to load alerts and mark them read.【F:index.html†L23-L27】【F:assets/js/spa-app.js†L489-L518】
-- Watch-party invites and other alerts in the Friends section are static cards; accepting or joining does not trigger any workflow. Connect these buttons to invitation APIs and update the UI after the action completes.【F:index.html†L100-L124】
+- If a task is partially complete, keep it as `[ ]` and add a `NOTE` line under it.
 
-## Watchlist, lists, and diary actions
-- Watchlist items show “Mark watched” buttons that have no click handling. Add persistence to mark titles watched and refresh the watchlist view when toggled.【F:index.html†L223-L246】
-- The “+ Create new list” control is purely presentational. Attach it to a list-creation flow (modal/form) and update the lists panel with the new entry on success.【F:index.html†L247-L271】
-- Diary rows and list collages are hardcoded; integrate them with actual diary/list data tied to the signed-in user to keep them current.【F:index.html†L247-L350】
+---
 
-## Miscellaneous interactive gaps
-- The “Start watch party” CTA and “Add friend” pill in the Home section have no behavior. Wire these to real watch-party creation and friend-invite flows, updating the group picks list when participants change.【F:index.html†L186-L208】
-- Profile “Edit profile” and “Share profile” buttons are non-functional; connect them to editing dialogs and share links tied to the user’s handle or ID.【F:index.html†L281-L320】
+## Legend
 
-## Additional enhancement opportunities
-- The Home and Library sort dropdowns are static UI only. Connect them to real sorting/filtering of watchlist items and recommendations so users can quickly re-order content by recency, release date, or name.【F:index.html†L200-L221】
-- Personalization is session-randomized via an in-memory seed and generic request parameters. Persist per-user recommendation seeds and allow tastes/genres to influence `discoverCandidateMovies` inputs so the “Tonight’s Pick,” home carousel, and group picks reflect individual profiles instead of changing on every reload.【F:assets/js/spa-app.js†L17-L27】【F:assets/js/spa-app.js†L302-L327】
-- Network failures in discovery and search are silently swallowed or shown as empty states. Add visible error toasts, retry controls, and skeleton loaders across discover filters and search so users understand when TMDB calls fail rather than seeing blank grids.【F:assets/js/spa-app.js†L233-L279】【F:assets/js/spa-app.js†L472-L487】
-- Navigation, tab, and search state resets on each page load. Cache the last active section/tab and the last successful search query in local storage (or user settings) during `init()` to restore context when a user returns.【F:assets/js/spa-app.js†L9-L27】【F:assets/js/spa-app.js†L521-L527】
+- `AUTH-*`  – Authentication & session
+- `PROF-*`  – Profiles & onboarding
+- `SOC-*`   – Following, friends, social graph
+- `SRCH-*`  – Search & discovery
+- `DIARY-*` – Watch diary & reviews
+- `LIST-*`  – Lists, tags, and favorites
+- `STRM-*`  – Streaming providers & availability
+- `PARTY-*` – Watch parties
+- `DM-*`    – Direct messages & conversations
+- `NOTIF-*` – Notifications & activity
+- `CONF-*`  – App config & experiments
+- `RLS-*`   – Supabase RLS & security
+- `ANALYT-*`– Analytics, logging, and search telemetry
 
-## Insights from `assets/js`
-- A richer SPA already lives in `assets/js/main.js`, wiring authentication, social graph actions, notifications, collaborative lists, and watch parties; however, `index.html` only loads the lightweight `spa-app.js`, leaving these capabilities idle. Port the necessary DOM and switch the entry script (or adapt `spa-app.js`) so the existing full-featured controllers run on the homepage instead of remaining unused.【F:index.html†L379-L379】【F:assets/js/main.js†L1-L46】【F:assets/js/main.js†L994-L1058】
-- Full auth/session management exists in `assets/js/auth.js` (register/login/logout, profile updates, sync of preferences/watched/favorites), but no sign-in UI or handlers are present on `index.html`. Hook the top bar/account areas to these methods or embed the standalone auth page flows so sign-up/login/logout become real rather than static icons.【F:assets/js/auth.js†L23-L120】【F:assets/js/auth.js†L200-L280】
-- Social features—follow/unfollow, notifications, presence, collaborative lists, and watch-party scheduling—are already implemented in `assets/js/social.js` and initialized from `main.js`, yet no UI in `index.html` calls them. Add data attributes and handlers that call these APIs so buttons like “Add friend,” request cards, and notification bells reflect real backend state.【F:assets/js/social.js†L4-L120】【F:assets/js/social.js†L248-L308】【F:assets/js/main.js†L994-L1058】
+---
 
-## Insights from `/api`, `/data`, `/lib`, `/pages/api`, and Supabase schema
-- The Node auth API (`/api/auth.js`) already supports signup/login/session, preference syncing, watched/favorites syncing, profile updates, password resets, and avatar uploads with Supabase Storage; when Supabase env vars are missing it silently falls back to local JSON storage. Wire `index.html` auth UI to these endpoints and ensure production uses the Supabase-backed path instead of the empty local store.【F:api/auth.js†L1-L97】【F:api/auth.js†L225-L314】
-- The social API (`/api/social.js`) exposes live notifications/streaming plus follow/unfollow/block, reviews with reactions/comments, user search, collaborative lists, watch-party scheduling, and presence updates—yet `index.html` never calls it. Hook friend buttons, review UI, and notification bell to these actions so server responses drive the UI instead of static cards.【F:api/social.js†L1-L129】【F:api/social.js†L147-L231】
-- `data/auth-users.json` and `data/social.json` are empty seed stores used when Supabase is absent; until real services are wired, auth, follows, reviews, notifications, and watch parties will always return empty results. Populate via Supabase or provide seed data so UI state persists across reloads.【F:data/auth-users.json†L1-L4】【F:data/social.json†L1-L11】
-- The Next.js `/pages/api/signup.ts` route inserts new users and avatars into Supabase tables/storage using server credentials. If `index.html` keeps the static form, mirror its submission to this endpoint (or consolidate with `/api/auth.js`) so signup actually creates users and sessions instead of being a no-op.【F:pages/api/signup.ts†L1-L87】
-- Supabase helpers in `/lib/supabaseServer.ts` require `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`; without them server operations warn/fail. Validate env setup in deployments so avatar uploads and table writes succeed.【F:lib/supabaseServer.ts†L1-L10】
-- The Supabase schema defines rich tables for follows, notifications, reviews/likes/comments, collaborative lists, watch diary entries, favorites, and activity streams. Map each dormant UI control (follow buttons, watch diary rows, notifications badge, collaborative lists) to these tables so user actions persist server-side instead of being static placeholders.【F:supabase/migrations/supabase_tables_schema.sql†L1-L92】【F:supabase/migrations/supabase_tables_schema.sql†L165-L241】
+## Authentication & session (AUTH)
 
-## Final gap sweep and enhancement ideas
-- Social-login buttons on the dedicated auth page still show “coming soon.” Implement provider-backed sign-in (or hide these options) so onboarding flows don’t dead-end for users expecting Google/Apple/etc. paths, and reuse the same handling for any auth entry points added to `index.html`.【F:assets/js/auth-page.js†L259-L337】
-- TMDB is the only discovery source currently wired into `index.html`, but backend proxies already exist for OMDb metadata and YouTube trailers with caching and timeout handling. Add these providers to improve fallback robustness (e.g., ratings/plots when TMDB fails) and to surface trailers on title detail views, while ensuring the required API keys are configured.【F:api/omdb.js†L1-L105】【F:api/youtube.js†L1-L83】
-- Supabase exposes `user_activity` and review/comment tables that could power an activity feed or richer review threads, yet `index.html` lacks any surface for them. Add an activity/review module to the Home or Profile sections to highlight new follows, diary logs, reviews, and comments so the social graph feels alive instead of static cards.【F:supabase/migrations/supabase_tables_schema.sql†L29-L157】
+- [ ] **AUTH-001 – Session-aware navbar and auth state**
+  - Description: Replace the static notification/profile icons in `index.html` with session-aware UI using Supabase auth.
+    - When logged out: show “Sign in / Sign up” CTA and hide profile-only navigation.
+    - When logged in: show avatar, username, and a dropdown menu (Profile, Settings, Logout).
+  - Files: `index.html`, `assets/js/spa-app.js` (or equivalent SPA entry).
+  - Backend: `auth_users`, `auth_sessions`, `user_sessions`.
+  - Notes for Codex: Use `supabase.auth.getUser()` (or current client API) to drive initial state and subscribe to auth changes.
+  - DONE: _(Codex will fill once implemented)_
+
+- [ ] **AUTH-002 – Real login/logout flows**
+  - Description: Wire login and logout actions to Supabase auth instead of mock handlers.
+    - Submit credentials to Supabase.
+    - On success: store session token, refresh UI, redirect to main feed.
+    - On logout: clear local session, navigate to logged-out landing state.
+  - Files: `assets/js/spa-app.js`, any auth modal components, `index.html`.
+  - Backend: `auth_users`, `auth_sessions`, RLS on user-owned data.
+  - DONE: _…_
+
+- [ ] **AUTH-003 – Enforce auth for protected views**
+  - Description: Guard pages that require a logged-in user (feed, diary, lists, watch parties).
+    - If no active session, redirect to login or show an inline login prompt.
+  - Files: SPA router / view-switcher, `assets/js/spa-app.js`.
+  - Backend: Depends on Supabase RLS; rely on 401/403 to hide remote data if needed.
+  - DONE: _…_
+
+---
+
+## Profiles & onboarding (PROF)
+
+- [ ] **PROF-001 – Dynamic profile header**
+  - Description: Replace hardcoded profile details (name, handle, stats) with data from Supabase.
+    - Use `auth_users` and `user_profiles` to populate display name, handle, avatar, location, and bio.
+    - Show follower/following counts from `user_follows`.
+  - Files: `index.html` profile section, `assets/js/spa-app.js`.
+  - Backend: `auth_users`, `user_profiles`, `user_follows`.
+  - DONE: _…_
+
+- [ ] **PROF-002 – Profile editing UI**
+  - Description: Add an “Edit profile” panel where the user can update:
+    - display name, bio, location, website, favorite genres/decades, profile visibility (`is_private`).
+  - Files: Profile modal / panel components.
+  - Backend: `user_profiles`, `auth_users.is_private`, RLS so only the owner can update.
+  - DONE: _…_
+
+- [ ] **PROF-003 – Onboarding wizard**
+  - Description: First-time users see a 2–3 step wizard:
+    - Step 1: Choose preferred genres / decades → store in `user_profiles.favorite_genres` & `favorite_decades`.
+    - Step 2: Pick streaming providers → store in `user_streaming_profiles`.
+    - Step 3: Optional: import ratings or connect external services (stub).
+  - Files: New onboarding view + routing, local storage flag to avoid showing after completion.
+  - Backend: `user_profiles`, `user_streaming_profiles`, `import_jobs` (future).
+  - DONE: _…_
+
+---
+
+## Social graph: following, friends, requests (SOC)
+
+- [ ] **SOC-001 – Make follow/friend buttons functional**
+  - Description: Replace static follow/friend UI with real actions:
+    - “Follow” sends a follow request (or direct follow) using `user_follows`.
+    - “Unfollow” / “Cancel request” updates/deletes the row.
+  - Files: Friend cards in `index.html`, list rendering in SPA.
+  - Backend: `user_follows` with RLS so users can only manage relationships they are part of.
+  - DONE: _…_
+
+- [ ] **SOC-002 – Live follower/following counts**
+  - Description: Pull follower/following counts from `user_follows` instead of fixed numbers in the profile header.
+  - Files: Profile header render code.
+  - Backend: `user_follows`.
+  - DONE: _…_
+
+- [ ] **SOC-003 – Friend feed based on social graph**
+  - Description: Replace static friend feed items with:
+    - Recent diary entries and reviews from people the user follows (`watch_diary`, `movie_reviews`).
+  - Files: Home/feed view rendering.
+  - Backend: `watch_diary`, `movie_reviews`, `user_follows`, visibility logic aligned with RLS.
+  - DONE: _…_
+
+---
+
+## Search & discovery (SRCH)
+
+- [ ] **SRCH-001 – Wire search input to Supabase**
+  - Description: Use the discover search input and filter pills to query Supabase instead of local mocks.
+    - Text query → `movies` (title, original_title).
+    - Filters → genres, year, streaming provider, etc.
+  - Files: Search bar handler in SPA, cards list component.
+  - Backend: `movies`, `movie_genres`, `genres`, `search_queries` for telemetry.
+  - DONE: _…_
+
+- [ ] **SRCH-002 – Save search queries for analytics**
+  - Description: On each search, insert a row into `search_queries`:
+    - `username` (if logged in), `query`, `filters`, `results_count`, `client_context`.
+  - Files: Search handler.
+  - Backend: `search_queries` + RLS policies so users only see their own logs.
+  - DONE: _…_
+
+- [ ] **SRCH-003 – “Trending now” powered by `trending_movies`**
+  - Description: Replace hardcoded “trending” section with data pulled from `trending_movies` joined to `movies`.
+    - Support at least one window, e.g. `time_window = 'weekly'`.
+  - Files: Explore/discover section UI.
+  - Backend: `trending_movies`, `movies`.
+  - DONE: _…_
+
+---
+
+## Watch diary & reviews (DIARY)
+
+- [ ] **DIARY-001 – Persist watch diary entries**
+  - Description: Replace any local mock watch history with Supabase-backed `watch_diary` rows.
+    - Support `watched_on`, `rating`, `tags`, `rewatch_number`, `source`, `device`.
+  - Files: Diary entry creation UI, diary list view.
+  - Backend: `watch_diary` with RLS so only the owner can mutate and visibility is respected for readers.
+  - DONE: _…_
+
+- [ ] **DIARY-002 – Rewatch support**
+  - Description: When rewatching a movie from the diary or detail page:
+    - Increment `rewatch_number` and create a new diary entry or update existing, per UX decision.
+  - Files: Movie detail actions, diary item actions.
+  - Backend: `watch_diary.rewatch_number`.
+  - DONE: _…_
+
+- [ ] **DIARY-003 – Reviews with engagement counters**
+  - Description: Wire review creation UI to `movie_reviews`, including:
+    - headline, body, rating, visibility, tags.
+    - Update `likes_count` and `comments_count` from `review_likes` and `review_comments` when rendering.
+  - Files: Review form, movie detail review list.
+  - Backend: `movie_reviews`, `review_likes`, `review_comments`.
+  - DONE: _…_
+
+---
+
+## Lists, favorites, and tags (LIST)
+
+- [ ] **LIST-001 – User-defined lists**
+  - Description: Make custom lists functional with Supabase:
+    - Create/update/delete lists in `user_lists` (including `kind`, `is_collaborative`).
+    - Add/remove movies via `user_list_items`.
+  - Files: Lists sidebar, list detail view.
+  - Backend: `user_lists`, `user_list_items`.
+  - DONE: _…_
+
+- [ ] **LIST-002 – Favorites / “heart” button backed by DB**
+  - Description: Hook the favorite/heart icon on movie cards to `user_favorites`.
+    - Clicking toggles a row in `user_favorites`.
+    - Optionally store extras in `metadata` (e.g., why it was favorited).
+  - Files: Card component, detail page button.
+  - Backend: `user_favorites`.
+  - DONE: _…_
+
+- [ ] **LIST-003 – Personal tags per user**
+  - Description: Allow users to create personal tags and tag movies.
+    - Manage tag definitions via `user_tags`.
+    - Attach tags to movies via `user_tagged_movies`.
+  - Files: Tag editor UI on movie detail page, filter chips in list views.
+  - Backend: `user_tags`, `user_tagged_movies`.
+  - DONE: _…_
+
+---
+
+## Streaming providers & availability (STRM)
+
+- [ ] **STRM-001 – Streaming provider registry in UI**
+  - Description: Display provider badges on movie cards using `streaming_providers` and `movie_availability`.
+  - Files: Movie card component, filters UI.
+  - Backend: `streaming_providers`, `movie_availability`.
+  - DONE: _…_
+
+- [ ] **STRM-002 – “Where I can watch” filter**
+  - Description: Add filters (and onboarding step) for the user’s subscribed services.
+    - Store user choices in `user_streaming_profiles`.
+    - Filter discovery results to those providers.
+  - Files: Onboarding, filter panel in search/discover view.
+  - Backend: `user_streaming_profiles`, `movie_availability`.
+  - DONE: _…_
+
+---
+
+## Watch parties (PARTY)
+
+- [ ] **PARTY-001 – Create watch party flow**
+  - Description: Implement UI to create a watch party from a movie detail page:
+    - Fields: title, description, scheduled time, visibility (public/friends/invite-only).
+    - Save to `watch_parties`.
+  - Files: Movie detail actions, party creation modal.
+  - Backend: `watch_parties` with RLS for host ownership.
+  - DONE: _…_
+
+- [ ] **PARTY-002 – Join & participants list**
+  - Description: Allow users to join an existing party and see who is attending.
+    - Use `watch_party_participants` for joins and presence.
+  - Files: Party detail view, participants sidebar.
+  - Backend: `watch_parties`, `watch_party_participants`.
+  - DONE: _…_
+
+- [ ] **PARTY-003 – In-party chat**
+  - Description: Implement a simple chat box inside the watch-party view.
+    - Messages stored in `watch_party_messages`.
+    - Visible only to hosts and participants as enforced by RLS.
+  - Files: Party chat panel component.
+  - Backend: `watch_party_messages`.
+  - DONE: _…_
+
+---
+
+## Direct messages & conversations (DM)
+
+- [ ] **DM-001 – Conversation list UI**
+  - Description: Add a “Messages” section with a list of conversations:
+    - Data from `user_conversations` joined with `user_conversation_members`.
+    - Show last message preview and `last_message_at`.
+  - Files: Messages sidebar / drawer.
+  - Backend: `user_conversations`, `user_conversation_members`.
+  - DONE: _…_
+
+- [ ] **DM-002 – Conversation detail & sending messages**
+  - Description: Implement a conversation view:
+    - List messages from `user_messages`.
+    - Allow sending new messages, writing to `user_messages`.
+  - Files: Conversation page or modal.
+  - Backend: `user_messages`, `user_conversation_members`.
+  - DONE: _…_
+
+- [ ] **DM-003 – Start conversation from profile**
+  - Description: Add a “Message” button on user profiles.
+    - Creates or reuses a 1:1 `user_conversations` row and opens it.
+  - Files: Profile header, quick action section.
+  - Backend: `user_conversations`, `user_conversation_members`.
+  - DONE: _…_
+
+---
+
+## Notifications & activity (NOTIF)
+
+- [ ] **NOTIF-001 – Notification dropdown wired to DB**
+  - Description: Replace static notification icon/menu with data from `user_notifications`.
+    - Show unread count badge.
+    - Mark notifications as read on click (update `is_read`, `read_at`).
+  - Files: Navbar notification bell/menu.
+  - Backend: `user_notifications`.
+  - DONE: _…_
+
+- [ ] **NOTIF-002 – Activity log for user actions**
+  - Description: Log key SPA actions to `user_activity` (e.g. follow, review, diary entry).
+    - Use metadata to capture context (movie id, source action).
+  - Files: Centralized logging helper in SPA.
+  - Backend: `user_activity`.
+  - DONE: _…_
+
+---
+
+## App config & experiments (CONF)
+
+- [ ] **CONF-001 – Remote app config wiring**
+  - Description: Fetch `app_config` on app startup to control:
+    - UI limits (max items per list), feature flags (enable watch parties, DMs).
+  - Files: App bootstrap, config context/provider.
+  - Backend: `app_config`.
+  - DONE: _…_
+
+- [ ] **CONF-002 – Experiments & variants**
+  - Description: Use `experiments` + `experiment_assignments` to:
+    - Decide which layout or algorithm to use per user.
+  - Files: Feature-flag helper, experiment switch points (e.g. home page layout).
+  - Backend: `experiments`, `experiment_assignments`.
+  - DONE: _…_
+
+---
+
+## RLS, security & Supabase integration (RLS / ANALYT)
+
+- [ ] **RLS-001 – Confirm frontend respects RLS boundaries**
+  - Description: For all data fetching, ensure:
+    - Only use `select/insert/update/delete` on tables where RLS rules are defined for client.
+    - Treat 401/403 responses as “not allowed” and hide the corresponding UI safely.
+  - Files: Supabase client wrapper, data hooks/services.
+  - Backend: All RLS-protected tables (diary, reviews, lists, parties, DMs, etc.).
+  - DONE: _…_
+
+- [ ] **RLS-002 – Anonymous vs authenticated access**
+  - Description: Ensure public-only views (e.g. movie catalog, basic discovery) use:
+    - Public policies on `movies`, `streaming_providers`, `experiments`, etc.
+    - Authenticated views use the user token to access private tables.
+  - Files: Data access layer.
+  - Backend: `movies`, `streaming_providers`, `experiments`, `app_config`, etc.
+  - DONE: _…_
+
+- [ ] **ANALYT-001 – Central telemetry helper**
+  - Description: Create a small SPA module that:
+    - Logs search, click, and view events into `search_queries`, `recommendation_events`, and `user_activity` as appropriate.
+  - Files: `analytics.js` (or equivalent), called from UI components.
+  - Backend: `search_queries`, `recommendation_events`, `user_activity`.
+  - DONE: _…_
+
+---
+
+## Supabase schema → upcoming features mapping (reference)
+
+> NOTE: This is a **reference section**, not a checklist.  
+> The tasks above already cover how these tables should be used.  
+> Keep this section to help future contributors map schema → features.
+
+(This section intentionally mirrors the mapping you already added earlier; it
+can be kept as-is, or replaced with the more detailed mapping in your schema
+file if you prefer to avoid duplication.)
