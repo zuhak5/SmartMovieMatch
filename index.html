@@ -315,6 +315,9 @@
                 <div class="small-text" data-profile-location>
                   Location unknown
                 </div>
+                <div class="small-text" data-profile-website>
+                  Website not added
+                </div>
                 <div class="stat-row">
                   <div class="stat">
                     <div class="small-text">Films</div>
@@ -345,7 +348,7 @@
                   <p class="small-text">You love sci-fi and thrillers.</p>
                 </div>
                 <div class="action-row">
-                  <button class="btn-primary btn">Edit profile</button>
+                  <button class="btn-primary btn" data-profile-edit-open>Edit profile</button>
                   <button class="btn-ghost btn">Share profile</button>
                 </div>
               </div>
@@ -381,6 +384,66 @@
           </div>
         </section>
       </main>
+    </div>
+  </div>
+
+  <div class="sheet-overlay" data-profile-editor hidden>
+    <div class="sheet-dialog" role="dialog" aria-modal="true" aria-labelledby="profileEditorTitle">
+      <div class="sheet-header">
+        <div>
+          <p class="small-text">Profile</p>
+          <h3 id="profileEditorTitle">Edit your profile</h3>
+          <p class="small-text" data-profile-editor-status></p>
+        </div>
+        <button class="icon-circle close-circle" type="button" aria-label="Close profile editor" data-profile-editor-close>
+          ✕
+        </button>
+      </div>
+      <form class="stack" data-profile-editor-form>
+        <label class="input-group">
+          <span>Display name</span>
+          <input type="text" name="displayName" maxlength="120" autocomplete="name" data-profile-editor-display-name />
+        </label>
+        <label class="input-group">
+          <span>Bio</span>
+          <textarea name="bio" rows="3" maxlength="280" data-profile-editor-bio
+            placeholder="Tell people about your tastes and go-to genres."></textarea>
+        </label>
+        <div class="grid-2">
+          <label class="input-group">
+            <span>Location</span>
+            <input type="text" name="location" maxlength="120" autocomplete="address-level2"
+              data-profile-editor-location />
+          </label>
+          <label class="input-group">
+            <span>Website</span>
+            <input type="url" name="website" maxlength="200" placeholder="https://example.com"
+              data-profile-editor-website />
+          </label>
+        </div>
+        <div class="stack tight">
+          <div class="label-row" style="justify-content: space-between; align-items: center;">
+            <span class="small-text">Favorite genres</span>
+            <span class="small-text" data-profile-genre-count>0 selected</span>
+          </div>
+          <div class="chip-grid" data-profile-genre-options></div>
+        </div>
+        <div class="stack tight">
+          <div class="label-row" style="justify-content: space-between; align-items: center;">
+            <span class="small-text">Favorite decades</span>
+            <span class="small-text" data-profile-decade-count>0 selected</span>
+          </div>
+          <div class="chip-grid" data-profile-decade-options></div>
+        </div>
+        <label class="checkbox-row">
+          <input type="checkbox" name="isPrivate" data-profile-editor-private />
+          <span>Make my profile private</span>
+        </label>
+        <div class="action-row" style="justify-content: flex-end;">
+          <button type="button" class="btn-ghost btn" data-profile-editor-cancel>Cancel</button>
+          <button type="submit" class="btn-primary btn" data-profile-editor-submit>Save profile</button>
+        </div>
+      </form>
     </div>
   </div>
 
