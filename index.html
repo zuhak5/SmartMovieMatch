@@ -20,9 +20,29 @@
             <div class="small-text">Cinema energy, mobile-first</div>
           </div>
         </div>
-        <div class="top-actions">
-          <div class="icon-circle" aria-label="Notifications">🔔</div>
-          <div class="icon-circle" aria-label="Profile">👤</div>
+        <div class="top-actions" data-auth-shell>
+          <button class="btn btn-primary top-auth-btn" type="button" data-auth-open>
+            Sign in / Sign up
+          </button>
+          <div
+            class="account-chip"
+            role="button"
+            tabindex="0"
+            aria-expanded="false"
+            data-account-toggle
+          >
+            <div class="avatar chip-avatar" aria-hidden="true" data-account-avatar>👤</div>
+            <div class="stack">
+              <strong class="account-name" data-account-name>Guest</strong>
+              <span class="small-text account-handle" data-account-handle>@guest</span>
+            </div>
+            <span class="chevron" aria-hidden="true">▾</span>
+          </div>
+          <div class="account-menu" data-account-menu>
+            <button type="button" data-account-profile>Profile</button>
+            <button type="button" data-account-settings>Settings</button>
+            <button type="button" data-account-logout>Logout</button>
+          </div>
         </div>
       </header>
 
@@ -350,6 +370,56 @@
           </div>
         </section>
       </main>
+    </div>
+  </div>
+
+  <div class="auth-overlay" data-auth-overlay hidden>
+    <div class="auth-dialog" role="dialog" aria-modal="true" aria-labelledby="authDialogTitle">
+      <div class="auth-dialog-header">
+        <div>
+          <p class="small-text auth-dialog-eyebrow">Welcome back</p>
+          <h3 id="authDialogTitle" data-auth-title>Sign in to Smart Movie Match</h3>
+        </div>
+        <button
+          class="icon-circle close-circle"
+          type="button"
+          aria-label="Close authentication modal"
+          data-auth-close
+        >
+          ✕
+        </button>
+      </div>
+      <div class="auth-mode-toggle" role="tablist" aria-label="Authentication mode">
+        <button
+          class="auth-mode-btn is-active"
+          type="button"
+          role="tab"
+          aria-selected="true"
+          data-auth-mode="login"
+        >
+          Sign in
+        </button>
+        <button class="auth-mode-btn" type="button" role="tab" aria-selected="false" data-auth-mode="signup">
+          Sign up
+        </button>
+      </div>
+      <form class="auth-form" data-auth-form>
+        <label class="input-group">
+          <span>Username</span>
+          <input type="text" name="username" autocomplete="username" required data-auth-username />
+        </label>
+        <label class="input-group" data-auth-display-name-row>
+          <span>Display name</span>
+          <input type="text" name="displayName" autocomplete="name" data-auth-display-name />
+        </label>
+        <label class="input-group">
+          <span>Password</span>
+          <input type="password" name="password" autocomplete="current-password" required data-auth-password />
+        </label>
+        <button class="btn btn-primary full-width" type="submit" data-auth-submit>Continue</button>
+        <p class="small-text auth-hint">We create a Supabase-backed session and keep you signed in on this device.</p>
+      </form>
+      <div class="auth-status" role="status" aria-live="polite" data-auth-status></div>
     </div>
   </div>
 

@@ -5,6 +5,13 @@ import {
   fetchOmdbForCandidates
 } from "./recommendations.js";
 import { TMDB_GENRES } from "./config.js";
+import {
+  loadSession,
+  loginUser,
+  logoutSession,
+  registerUser,
+  subscribeToSession
+} from "./auth.js";
 
 const defaultTabs = {
   friends: "feed",
@@ -23,7 +30,11 @@ const state = {
   recommendationSeed: Math.random(),
   homeRecommendations: [],
   discoverPeople: [],
-  discoverLists: []
+  discoverLists: [],
+  session: loadSession(),
+  accountMenuOpen: false,
+  authMode: "login",
+  authSubmitting: false
 };
 
 const navButtons = document.querySelectorAll("[data-section-button]");
@@ -36,6 +47,26 @@ const discoverListCards = document.querySelector('[data-list="discover-lists"]')
 const homeRecommendationsRow = document.querySelector('[data-row="home-recommendations"]');
 const tonightPickCard = document.querySelector("[data-tonight-pick]");
 const groupPicksList = document.querySelector('[data-list="group-picks"]');
+const authOverlay = document.querySelector("[data-auth-overlay]");
+const authForm = document.querySelector("[data-auth-form]");
+const authStatus = document.querySelector("[data-auth-status]");
+const authUsernameInput = document.querySelector("[data-auth-username]");
+const authPasswordInput = document.querySelector("[data-auth-password]");
+const authDisplayNameRow = document.querySelector("[data-auth-display-name-row]");
+const authDisplayNameInput = document.querySelector("[data-auth-display-name]");
+const authModeButtons = document.querySelectorAll("[data-auth-mode]");
+const authTitle = document.querySelector("[data-auth-title]");
+const authOpenButton = document.querySelector("[data-auth-open]");
+const authCloseButton = document.querySelector("[data-auth-close]");
+const authSubmitButton = document.querySelector("[data-auth-submit]");
+const accountMenu = document.querySelector("[data-account-menu]");
+const accountToggle = document.querySelector("[data-account-toggle]");
+const accountName = document.querySelector("[data-account-name]");
+const accountHandle = document.querySelector("[data-account-handle]");
+const accountAvatar = document.querySelector("[data-account-avatar]");
+const accountLogoutButton = document.querySelector("[data-account-logout]");
+const accountProfileButton = document.querySelector("[data-account-profile]");
+const accountSettingsButton = document.querySelector("[data-account-settings]");
 
 function setSection(section) {
   state.activeSection = section;
@@ -94,6 +125,121 @@ function formatGenres(ids = []) {
     .filter(Boolean)
     .slice(0, 2);
   return names.join(" · ");
+}
+
+function initialsFromName(name = "") {
+  if (!name) return "👤";
+  const letters = name
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  return letters || "👤";
+}
+
+function setAuthStatus(message, variant = "info") {
+  if (!authStatus) return;
+  authStatus.textContent = message || "";
+  authStatus.classList.remove("error", "success");
+  if (variant === "error") {
+    authStatus.classList.add("error");
+  }
+  if (variant === "success") {
+    authStatus.classList.add("success");
+  }
+}
+
+function setAuthMode(mode) {
+  state.authMode = mode === "signup" ? "signup" : "login";
+  authModeButtons.forEach((btn) => {
+    const isActive = btn.dataset.authMode === state.authMode;
+    btn.classList.toggle("is-active", isActive);
+    btn.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+  if (authDisplayNameRow) {
+    authDisplayNameRow.classList.toggle("is-hidden", state.authMode !== "signup");
+  }
+  if (authTitle) {
+    authTitle.textContent =
+      state.authMode === "signup"
+        ? "Create your Smart Movie Match account"
+        : "Sign in to Smart Movie Match";
+  }
+  if (authPasswordInput) {
+    authPasswordInput.autocomplete =
+      state.authMode === "signup" ? "new-password" : "current-password";
+  }
+}
+
+function openAuthOverlay(mode = state.authMode) {
+  setAuthMode(mode);
+  setAuthStatus("");
+  state.authSubmitting = false;
+  if (authOverlay) {
+    authOverlay.hidden = false;
+    authOverlay.classList.add("is-visible");
+  }
+  if (authUsernameInput) {
+    authUsernameInput.focus();
+  }
+}
+
+function closeAuthOverlay() {
+  if (!authOverlay) return;
+  authOverlay.classList.remove("is-visible");
+  authOverlay.hidden = true;
+}
+
+function toggleAccountMenu(forceOpen = null) {
+  if (!state.session || !state.session.token) return;
+  const next = forceOpen === null ? !state.accountMenuOpen : Boolean(forceOpen);
+  state.accountMenuOpen = next;
+  if (accountMenu) {
+    accountMenu.classList.toggle("is-open", next);
+  }
+  if (accountToggle) {
+    accountToggle.setAttribute("aria-expanded", next ? "true" : "false");
+  }
+}
+
+function updateAccountUi(session) {
+  state.session = session || null;
+  const hasSession = Boolean(state.session && state.session.token);
+  if (authOpenButton) {
+    authOpenButton.classList.toggle("is-hidden", hasSession);
+  }
+  if (accountToggle) {
+    accountToggle.classList.toggle("is-visible", hasSession);
+    accountToggle.setAttribute("aria-expanded", hasSession && state.accountMenuOpen ? "true" : "false");
+  }
+  if (accountMenu && !hasSession) {
+    accountMenu.classList.remove("is-open");
+    state.accountMenuOpen = false;
+  }
+  if (accountName) {
+    accountName.textContent = hasSession
+      ? state.session.displayName || state.session.username
+      : "Guest";
+  }
+  if (accountHandle) {
+    accountHandle.textContent = hasSession && state.session.username
+      ? `@${state.session.username}`
+      : "@guest";
+  }
+  if (accountAvatar) {
+    accountAvatar.style.backgroundImage = "";
+    if (hasSession && state.session.avatarUrl) {
+      accountAvatar.style.backgroundImage = `url(${state.session.avatarUrl})`;
+      accountAvatar.textContent = "";
+    } else {
+      accountAvatar.textContent = initialsFromName(
+        hasSession
+          ? state.session.displayName || state.session.username
+          : "Guest"
+      );
+    }
+  }
 }
 
 function renderDiscoverMovies(movies = []) {
@@ -497,6 +643,74 @@ async function loadDiscoverSearch(query) {
   }
 }
 
+async function handleAuthSubmit(event) {
+  if (event) {
+    event.preventDefault();
+  }
+  if (!authUsernameInput || !authPasswordInput) return;
+  if (state.authSubmitting) return;
+
+  const username = authUsernameInput.value ? authUsernameInput.value.trim() : "";
+  const password = authPasswordInput.value || "";
+  const displayName =
+    authDisplayNameInput && authDisplayNameInput.value
+      ? authDisplayNameInput.value.trim()
+      : "";
+
+  if (!username || !password) {
+    setAuthStatus("Enter your username and password.", "error");
+    return;
+  }
+
+  state.authSubmitting = true;
+  if (authSubmitButton) {
+    authSubmitButton.setAttribute("disabled", "true");
+  }
+  setAuthStatus(
+    state.authMode === "signup" ? "Creating your account…" : "Signing you in…"
+  );
+
+  try {
+    const session =
+      state.authMode === "signup"
+        ? await registerUser({ username, password, name: displayName })
+        : await loginUser({ username, password });
+    setAuthStatus("You're signed in!", "success");
+    closeAuthOverlay();
+    updateAccountUi(session);
+  } catch (error) {
+    const message =
+      (error && error.message) ||
+      "Unable to complete the request. Please try again.";
+    setAuthStatus(message, "error");
+  } finally {
+    state.authSubmitting = false;
+    if (authSubmitButton) {
+      authSubmitButton.removeAttribute("disabled");
+    }
+  }
+}
+
+function handleOutsideClick(event) {
+  if (state.accountMenuOpen && accountMenu && accountToggle) {
+    const target = event.target;
+    if (!accountMenu.contains(target) && !accountToggle.contains(target)) {
+      toggleAccountMenu(false);
+    }
+  }
+}
+
+function handleEscape(event) {
+  if (event.key === "Escape") {
+    if (state.accountMenuOpen) {
+      toggleAccountMenu(false);
+    }
+    if (authOverlay && !authOverlay.hidden) {
+      closeAuthOverlay();
+    }
+  }
+}
+
 function attachListeners() {
   navButtons.forEach((btn) => {
     btn.addEventListener("click", () => setSection(btn.dataset.sectionButton));
@@ -527,9 +741,77 @@ function attachListeners() {
       handle = window.setTimeout(() => handleDiscoverSearchInput(value), 240);
     });
   }
+
+  authModeButtons.forEach((btn) => {
+    btn.addEventListener("click", () => setAuthMode(btn.dataset.authMode));
+  });
+
+  if (authOpenButton) {
+    authOpenButton.addEventListener("click", () => openAuthOverlay("login"));
+  }
+
+  if (authCloseButton) {
+    authCloseButton.addEventListener("click", closeAuthOverlay);
+  }
+
+  if (authOverlay) {
+    authOverlay.addEventListener("click", (event) => {
+      if (event.target === authOverlay) {
+        closeAuthOverlay();
+      }
+    });
+  }
+
+  if (authForm) {
+    authForm.addEventListener("submit", handleAuthSubmit);
+  }
+
+  if (accountToggle) {
+    accountToggle.addEventListener("click", () => toggleAccountMenu());
+    accountToggle.addEventListener("keydown", (event) => {
+      if (event.key === " " || event.key === "Enter") {
+        event.preventDefault();
+        toggleAccountMenu();
+      }
+    });
+  }
+
+  if (accountLogoutButton) {
+    accountLogoutButton.addEventListener("click", () => {
+      logoutSession();
+      toggleAccountMenu(false);
+      updateAccountUi(null);
+    });
+  }
+
+  if (accountProfileButton) {
+    accountProfileButton.addEventListener("click", () => {
+      setSection("profile");
+      toggleAccountMenu(false);
+    });
+  }
+
+  if (accountSettingsButton) {
+    accountSettingsButton.addEventListener("click", () => {
+      setSection("profile");
+      setTab("profile", "overview");
+      toggleAccountMenu(false);
+    });
+  }
+
+  document.addEventListener("click", handleOutsideClick);
+  document.addEventListener("keydown", handleEscape);
 }
 
 function init() {
+  setAuthMode(state.authMode);
+  updateAccountUi(state.session);
+  subscribeToSession((session) => {
+    updateAccountUi(session);
+    if (session && session.token) {
+      closeAuthOverlay();
+    }
+  });
   attachListeners();
   setSection("home");
   loadDiscover(state.discoverFilter);

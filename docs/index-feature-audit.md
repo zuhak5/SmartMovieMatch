@@ -36,23 +36,23 @@ Each item is a task for Codex (or any other assistant) to implement.
 
 ## Authentication & session (AUTH)
 
-- [ ] **AUTH-001 – Session-aware navbar and auth state**
+- [x] **AUTH-001 – Session-aware navbar and auth state**
   - Description: Replace the static notification/profile icons in `index.html` with session-aware UI using Supabase auth.
     - When logged out: show “Sign in / Sign up” CTA.
     - When logged in: show avatar, username, and a dropdown menu (Profile, Settings, Logout).
   - Files: `index.html`, `assets/js/spa-app.js` (or equivalent SPA entry).
   - Backend: `auth_users`, `auth_sessions`, `user_sessions`.
   - Notes for Codex: Use `supabase.auth.getUser()` (or current client API) to drive initial state and subscribe to auth changes.
-  - DONE: _(Codex will fill once implemented)_
+  DONE 2025-11-17T03:11Z – Added session-aware header with Supabase-backed auth modal; avatar dropdown reflects live auth state and exposes profile/settings/logout actions.
 
-- [ ] **AUTH-002 – Real login/logout flows**
+- [x] **AUTH-002 – Real login/logout flows**
   - Description: Wire login and logout actions to Supabase auth instead of mock handlers.
     - Submit credentials to Supabase.
     - On success: store session token, refresh UI, redirect to main feed.
     - On logout: clear local session, navigate to logged-out landing state.
   - Files: `assets/js/spa-app.js`, any auth modal components, `index.html`.
   - Backend: `auth_users`, `auth_sessions`, RLS on user-owned data.
-  - DONE: _…_
+  DONE 2025-11-17T03:11Z – Added inline sign-in/sign-up modal backed by the auth API; successful auth persists Supabase sessions, refreshes SPA state, and logout clears stored tokens with UI reset.
 
 - [ ] **AUTH-003 – Enforce auth for protected views**
   - Description: Guard pages that require a logged-in user (feed, diary, lists, watch parties).
