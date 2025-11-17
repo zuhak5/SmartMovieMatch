@@ -118,13 +118,13 @@ Each item is a task for Codex (or any other assistant) to implement.
 
 ## Search & discovery (SRCH)
 
-- [x] **SRCH-001 – Wire search input to Supabase**
+- [ ] **SRCH-001 – Wire search input to Supabase**
   - Description: Use the discover search input and filter pills to query Supabase instead of local mocks.
     - Text query → `movies` (title, original_title).
     - Filters → genres, year, streaming provider, etc.
   - Files: Search bar handler in SPA, cards list component.
   - Backend: `movies`, `movie_genres`, `genres`, `search_queries` for telemetry.
-  DONE 2025-11-17T05:02Z – Added Supabase-backed discover search API with SPA wiring, handling query/genre/provider filters and rendering Supabase movie metadata in cards.
+  - DONE: _…_
 
 - [ ] **SRCH-002 – Save search queries for analytics**
   - Description: On each search, insert a row into `search_queries`:
