@@ -307,21 +307,21 @@ Each item is a task for Codex (or any other assistant) to implement.
 
 ## RLS, security & Supabase integration (RLS / ANALYT)
 
-- [ ] **RLS-001 – Confirm frontend respects RLS boundaries**
+- [x] **RLS-001 – Confirm frontend respects RLS boundaries**
   - Description: For all data fetching, ensure:
     - Only use `select/insert/update/delete` on tables where RLS rules are defined for client.
     - Treat 401/403 responses as “not allowed” and hide the corresponding UI safely.
   - Files: Supabase client wrapper, data hooks/services.
   - Backend: All RLS-protected tables (diary, reviews, lists, parties, DMs, etc.).
-  - DONE: _…_
+  DONE 2025-11-17T10:59Z – Added authorization-aware social API errors that clear protected state, stop polling/streams, and surface clear access messaging instead of leaking restricted UI.
 
-- [ ] **RLS-002 – Anonymous vs authenticated access**
+- [x] **RLS-002 – Anonymous vs authenticated access**
   - Description: Ensure public-only views (e.g. movie catalog, basic discovery) use:
     - Public policies on `movies`, `streaming_providers`, `experiments`, etc.
     - Authenticated views use the user token to access private tables.
   - Files: Data access layer.
   - Backend: `movies`, `streaming_providers`, `experiments`, `app_config`, etc.
-  - DONE: _…_
+  DONE 2025-11-17T10:59Z – Hardened config fetching to fall back to public defaults when unauthenticated and require a bearer token for personalized experiments.
 
 - [x] **ANALYT-001 – Central telemetry helper**
   - Description: Create a small SPA module that:
