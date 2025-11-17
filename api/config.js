@@ -1,12 +1,8 @@
-const fs = require('fs/promises');
-const path = require('path');
 const { createSupabaseAdminClient } = require('../lib/supabase-admin');
-
-const AUTH_STORE_PATH = path.join(__dirname, '..', 'data', 'auth-users.json');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const USING_LOCAL_STORE = !(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+const CONFIG_SERVICE_CONFIGURED = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 
 const DEFAULT_CONFIG = {
   'ui.home.maxRecommendations': 10,
@@ -44,7 +40,7 @@ module.exports = async (req, res) => {
 };
 
 async function loadAppConfig() {
-  if (USING_LOCAL_STORE) {
+  if (!CONFIG_SERVICE_CONFIGURED) {
     return { ...DEFAULT_CONFIG };
   }
 
@@ -67,11 +63,7 @@ async function loadAppConfig() {
 
 async function loadExperiments(username) {
   const base = { experiments: [], assignments: {} };
-  if (!username && USING_LOCAL_STORE) {
-    return base;
-  }
-
-  if (USING_LOCAL_STORE) {
+  if (!CONFIG_SERVICE_CONFIGURED) {
     return base;
   }
 
@@ -102,20 +94,8 @@ async function loadExperiments(username) {
 }
 
 async function resolveUsername(token) {
-  if (!token) {
+  if (!token || !CONFIG_SERVICE_CONFIGURED) {
     return null;
-  }
-
-  if (USING_LOCAL_STORE) {
-    try {
-      const text = await fs.readFile(AUTH_STORE_PATH, 'utf8');
-      const parsed = JSON.parse(text);
-      const sessions = Array.isArray(parsed.sessions) ? parsed.sessions : [];
-      const sessionRow = sessions.find((session) => session && session.token === token);
-      return sessionRow ? sessionRow.username || null : null;
-    } catch (error) {
-      return null;
-    }
   }
 
   try {

@@ -62,6 +62,11 @@ module.exports = async (req, res) => {
     return;
   }
 
+  if (!AUTH_SERVICE_CONFIGURED) {
+    res.status(503).json({ error: "Auth service is not configured" });
+    return;
+  }
+
   let payload = req.body;
   if (!payload || typeof payload !== "object") {
     try {

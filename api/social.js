@@ -54,6 +54,11 @@ let presenceCleanupTimer = null;
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
 
+  if (!(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY)) {
+    res.status(503).json({ error: 'Social service is not configured' });
+    return;
+  }
+
   if (req.method === 'GET') {
     try {
       await handleStreamRequest(req, res);
