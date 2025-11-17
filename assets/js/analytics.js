@@ -1,6 +1,7 @@
+import { API_ROUTES } from './config.js';
 import { loadSession, subscribeToSession } from './auth.js';
 
-const TELEMETRY_ENDPOINT = '/api/telemetry';
+const TELEMETRY_ENDPOINT = API_ROUTES.telemetry;
 
 let currentSession = loadSession();
 const subscribers = new Set();

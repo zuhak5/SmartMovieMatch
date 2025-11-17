@@ -1,6 +1,8 @@
+import { API_ROUTES } from "./config.js";
+
 const AUTH_STORAGE_KEY = "smartMovieMatch.auth";
 const AUTH_SESSION_COOKIE_KEY = "smartMovieMatch.auth";
-const AUTH_ENDPOINT = "/api/auth";
+const AUTH_ENDPOINT = API_ROUTES.auth;
 
 class AuthRequestError extends Error {
   constructor(message, status = 0, cause) {
