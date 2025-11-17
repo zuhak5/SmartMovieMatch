@@ -175,6 +175,9 @@ module.exports = async (req, res) => {
       case 'respondWatchParty':
         result = await handleRespondWatchParty(req, payload);
         break;
+      case 'joinWatchParty':
+        result = await handleJoinWatchParty(req, payload);
+        break;
       case 'updatePresence':
         result = await handleUpdatePresence(req, payload);
         break;
@@ -1391,6 +1394,16 @@ async function handleScheduleWatchParty(req, payload) {
     scheduledFor: when.toISOString(),
     note,
     invitees: invitees.map((username) => ({ username, response: 'pending', bringing: '' })),
+    participants: [
+      {
+        username: user.username,
+        role: 'host',
+        joinedAt: timestamp,
+        lastActiveAt: timestamp,
+        isKicked: false,
+        metadata: {}
+      }
+    ],
     createdAt: timestamp
   };
   store.watchParties.push(party);
@@ -1433,6 +1446,7 @@ async function handleRespondWatchParty(req, payload) {
   if (!party) {
     throw new HttpError(404, 'Watch party not found.');
   }
+  ensurePartyParticipants(party);
   if (party.host === user.username) {
     party.note = typeof payload.note === 'string' ? payload.note.trim() : party.note || '';
     if (payload.scheduledFor) {
@@ -1454,6 +1468,60 @@ async function handleRespondWatchParty(req, payload) {
   const bringingRaw = typeof payload.bringing === 'string' ? payload.bringing.trim() : '';
   if (invite) {
     invite.bringing = bringingRaw ? bringingRaw.slice(0, 80) : '';
+  }
+  if (decision === 'decline') {
+    removePartyParticipant(party, user.username);
+  } else {
+    upsertPartyParticipant(party, user.username, decision === 'accept' ? 'guest' : 'waiting', {
+      bringing: bringingRaw ? bringingRaw.slice(0, 80) : undefined
+    });
+  }
+  await writeSocialStore(store);
+  if (party.host !== user.username) {
+    await enqueueNotification({
+      username: party.host,
+      type: 'watch_party_update',
+      actor: user.username,
+      movie: { title: party.movieTitle }
+    });
+  }
+  return {
+    body: {
+      ok: true,
+      party: formatWatchPartyForUser(party, user.username)
+    }
+  };
+}
+
+async function handleJoinWatchParty(req, payload) {
+  const { user } = await authenticate(req, payload);
+  if (!usingLocalStore()) {
+    throw new HttpError(501, 'Watch parties are not yet available with remote storage.');
+  }
+  const partyId = typeof payload.partyId === 'string' ? payload.partyId.trim() : '';
+  if (!partyId) {
+    throw new HttpError(400, 'Missing watch party identifier.');
+  }
+  const bringRaw = typeof payload.note === 'string' ? payload.note.trim() : '';
+  const store = await readSocialStore();
+  const party = store.watchParties.find((entry) => entry.id === partyId);
+  if (!party) {
+    throw new HttpError(404, 'Watch party not found.');
+  }
+  ensurePartyParticipants(party);
+  const existingParticipant = party.participants.find((entry) => entry.username === user.username);
+  if (existingParticipant && existingParticipant.isKicked) {
+    throw new HttpError(403, 'You can no longer join this watch party.');
+  }
+  upsertPartyParticipant(party, user.username, party.host === user.username ? 'host' : 'guest', {
+    bringing: bringRaw ? bringRaw.slice(0, 80) : undefined
+  });
+  const hasInvite = Array.isArray(party.invitees)
+    ? party.invitees.some((entry) => canonicalUsername(entry.username) === user.username)
+    : false;
+  if (!hasInvite) {
+    party.invitees = Array.isArray(party.invitees) ? party.invitees : [];
+    party.invitees.push({ username: user.username, response: 'accept', bringing: bringRaw.slice(0, 80) });
   }
   await writeSocialStore(store);
   if (party.host !== user.username) {
@@ -2464,6 +2532,15 @@ function buildWatchPartyIndex(entries) {
         addPartyParticipation(participationMap, handle, partyId);
       }
     });
+    if (Array.isArray(party.participants)) {
+      party.participants.forEach((participant) => {
+        const handle = canonicalUsername(participant && participant.username ? participant.username : '');
+        if (!handle) {
+          return;
+        }
+        addPartyParticipation(participationMap, handle, partyId);
+      });
+    }
   });
   return { participationMap, partyDetailMap };
 }
@@ -3804,10 +3881,19 @@ function formatWatchPartyForUser(party, username) {
     return null;
   }
   const canonical = canonicalUsername(username);
+  ensurePartyParticipants(party);
   const invite = Array.isArray(party.invitees)
     ? party.invitees.find((entry) => canonicalUsername(entry.username) === canonical)
     : null;
-  const response = invite ? invite.response || 'pending' : party.host === canonical ? 'host' : 'none';
+  const participant = party.participants.find((entry) => canonicalUsername(entry.username) === canonical);
+  let response = 'none';
+  if (participant) {
+    response = participant.role === 'waiting' ? 'maybe' : participant.role === 'host' ? 'host' : 'joined';
+  } else if (invite) {
+    response = invite.response || 'pending';
+  } else if (party.host === canonical) {
+    response = 'host';
+  }
   return {
     id: party.id,
     host: party.host,
@@ -3826,6 +3912,9 @@ function formatWatchPartyForUser(party, username) {
           response: entry.response || 'pending',
           bringing: typeof entry.bringing === 'string' ? entry.bringing : ''
         }))
+      : [],
+    participants: Array.isArray(party.participants)
+      ? party.participants.map(formatWatchPartyParticipant).filter(Boolean)
       : []
   };
 }
@@ -3842,13 +3931,108 @@ function listWatchPartySummary(store, username) {
     if (!formatted) {
       return;
     }
-    if (party.host === canonical || (formatted.response && formatted.response !== 'pending' && formatted.response !== 'none')) {
+    if (party.host === canonical || isUpcomingPartyResponse(formatted.response)) {
       upcoming.push(formatted);
     } else if (formatted.response === 'pending') {
       invites.push(formatted);
     }
   });
   return { upcoming, invites };
+}
+
+function isUpcomingPartyResponse(response) {
+  const normalized = typeof response === 'string' ? response.trim().toLowerCase() : '';
+  if (!normalized) {
+    return false;
+  }
+  return ['host', 'joined', 'accept', 'accepted', 'attending', 'yes', 'maybe'].includes(normalized);
+}
+
+function ensurePartyParticipants(party) {
+  if (!party) {
+    return;
+  }
+  if (!Array.isArray(party.participants)) {
+    party.participants = [];
+  }
+  const canonicalHost = canonicalUsername(party.host || '');
+  const hostPresent = party.participants.some(
+    (entry) => entry && canonicalUsername(entry.username) === canonicalHost
+  );
+  if (!hostPresent && canonicalHost) {
+    const now = new Date().toISOString();
+    party.participants.unshift({
+      username: canonicalHost,
+      role: 'host',
+      joinedAt: party.createdAt || now,
+      lastActiveAt: now,
+      isKicked: false,
+      metadata: {}
+    });
+  }
+}
+
+function upsertPartyParticipant(party, username, role = 'guest', metadata = {}) {
+  if (!party || !username) {
+    return;
+  }
+  ensurePartyParticipants(party);
+  const canonical = canonicalUsername(username);
+  if (!canonical) {
+    return;
+  }
+  const now = new Date().toISOString();
+  const existing = party.participants.find((entry) => canonicalUsername(entry.username) === canonical);
+  if (existing) {
+    existing.role = role || existing.role || 'guest';
+    existing.lastActiveAt = now;
+    existing.isKicked = false;
+    existing.metadata = {
+      ...(existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
+      ...(metadata && typeof metadata === 'object' ? metadata : {})
+    };
+    if (!existing.joinedAt) {
+      existing.joinedAt = now;
+    }
+    return;
+  }
+  party.participants.push({
+    username: canonical,
+    role: role || 'guest',
+    joinedAt: now,
+    lastActiveAt: now,
+    isKicked: false,
+    metadata: metadata && typeof metadata === 'object' ? metadata : {}
+  });
+}
+
+function removePartyParticipant(party, username) {
+  if (!party || !username || !Array.isArray(party.participants)) {
+    return;
+  }
+  const canonical = canonicalUsername(username);
+  party.participants = party.participants.filter((entry) => canonicalUsername(entry.username) !== canonical);
+  if (party.host === canonical && !party.participants.length) {
+    ensurePartyParticipants(party);
+  }
+}
+
+function formatWatchPartyParticipant(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+  const username = canonicalUsername(entry.username);
+  if (!username) {
+    return null;
+  }
+  return {
+    username,
+    role: entry.role || 'guest',
+    joinedAt: entry.joinedAt || null,
+    lastActiveAt: entry.lastActiveAt || null,
+    isKicked: Boolean(entry.isKicked),
+    metadata: entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {}
+  };
 }
 
 function recordPresence(username, { state, movie, statusPreset, source }) {
