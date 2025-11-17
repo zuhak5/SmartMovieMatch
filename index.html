@@ -20,9 +20,26 @@
             <div class="small-text">Cinema energy, mobile-first</div>
           </div>
         </div>
-        <div class="top-actions">
-          <div class="icon-circle" aria-label="Notifications">🔔</div>
-          <div class="icon-circle" aria-label="Profile">👤</div>
+        <div class="top-actions" data-auth-shell>
+          <div class="auth-signed-out" data-auth-signed-out>
+            <button class="btn-ghost btn" data-auth-signin>Sign in</button>
+            <button class="btn-primary btn" data-auth-signup>Sign up</button>
+          </div>
+          <div class="auth-signed-in" data-auth-signed-in>
+            <button class="auth-user-btn" data-auth-toggle aria-haspopup="true" aria-expanded="false">
+              <div class="avatar is-compact" data-auth-avatar>🙂</div>
+              <div class="stack">
+                <strong data-auth-username>Loading…</strong>
+                <span class="small-text">View profile</span>
+              </div>
+              <span aria-hidden="true">▾</span>
+            </button>
+            <div class="auth-menu" data-auth-menu>
+              <button type="button" data-auth-profile>Profile</button>
+              <button type="button" data-auth-settings>Settings</button>
+              <button type="button" data-auth-logout>Logout</button>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -44,7 +61,13 @@
           <button class="tab-button" data-tab="watchlist" role="tab">Watchlist</button>
           <button class="tab-button" data-tab="lists" role="tab">Lists</button>
         </div>
-        <div class="tab-group" data-section-tabs="profile" role="tablist" aria-label="Profile tabs">
+        <div
+          class="tab-group"
+          data-section-tabs="profile"
+          data-auth-required
+          role="tablist"
+          aria-label="Profile tabs"
+        >
           <button class="tab-button" data-tab="overview" role="tab">Overview</button>
           <button class="tab-button" data-tab="diary" role="tab">Diary</button>
         </div>
@@ -271,7 +294,7 @@
           </div>
         </section>
 
-        <section class="section-panel" data-section-panel="profile">
+        <section class="section-panel" data-section-panel="profile" data-auth-required>
           <div class="panel-heading">
             <div>
               <h2>Profile</h2>
@@ -370,7 +393,7 @@
       <span class="icon">🎞️</span>
       <span class="label">Library</span>
     </button>
-    <button class="nav-btn" data-section-button="profile">
+    <button class="nav-btn" data-section-button="profile" data-auth-required>
       <span class="icon">🙂</span>
       <span class="label">Profile</span>
     </button>

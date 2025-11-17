@@ -5,6 +5,13 @@ import {
   fetchOmdbForCandidates
 } from "./recommendations.js";
 import { TMDB_GENRES } from "./config.js";
+import {
+  loadSession,
+  loginUser,
+  logoutSession,
+  registerUser,
+  subscribeToSession
+} from "./auth.js";
 
 const defaultTabs = {
   friends: "feed",
@@ -23,7 +30,9 @@ const state = {
   recommendationSeed: Math.random(),
   homeRecommendations: [],
   discoverPeople: [],
-  discoverLists: []
+  discoverLists: [],
+  session: loadSession(),
+  authMenuOpen: false
 };
 
 const navButtons = document.querySelectorAll("[data-section-button]");
@@ -36,6 +45,19 @@ const discoverListCards = document.querySelector('[data-list="discover-lists"]')
 const homeRecommendationsRow = document.querySelector('[data-row="home-recommendations"]');
 const tonightPickCard = document.querySelector("[data-tonight-pick]");
 const groupPicksList = document.querySelector('[data-list="group-picks"]');
+const authShell = document.querySelector("[data-auth-shell]");
+const authSignedOut = document.querySelector("[data-auth-signed-out]");
+const authSignedIn = document.querySelector("[data-auth-signed-in]");
+const authUsername = document.querySelector("[data-auth-username]");
+const authAvatar = document.querySelector("[data-auth-avatar]");
+const authMenu = document.querySelector("[data-auth-menu]");
+const authToggle = document.querySelector("[data-auth-toggle]");
+const authSignInBtn = document.querySelector("[data-auth-signin]");
+const authSignUpBtn = document.querySelector("[data-auth-signup]");
+const authLogoutBtn = document.querySelector("[data-auth-logout]");
+const authProfileBtn = document.querySelector("[data-auth-profile]");
+const authSettingsBtn = document.querySelector("[data-auth-settings]");
+const authRequiredNodes = document.querySelectorAll("[data-auth-required]");
 
 function setSection(section) {
   state.activeSection = section;
@@ -86,6 +108,73 @@ function createPoster(url) {
     poster.style.backgroundPosition = "center";
   }
   return poster;
+}
+
+function initialsFromName(name) {
+  if (!name) return "🙂";
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function toggleAuthMenu(forceOpen = null) {
+  if (!authMenu || !authToggle) return;
+  const nextState = forceOpen === null ? !state.authMenuOpen : Boolean(forceOpen);
+  state.authMenuOpen = nextState;
+  authMenu.classList.toggle("is-open", nextState);
+  authToggle.setAttribute("aria-expanded", nextState ? "true" : "false");
+}
+
+function updateAuthGuards(hasSession) {
+  authRequiredNodes.forEach((node) => {
+    node.classList.toggle("is-hidden", !hasSession);
+  });
+
+  if (!hasSession && state.activeSection === "profile") {
+    setSection("home");
+  }
+}
+
+function renderAuthState(session) {
+  const hasSession = Boolean(session && session.token);
+  if (authSignedOut) {
+    authSignedOut.classList.toggle("is-active", !hasSession);
+  }
+  if (authSignedIn) {
+    authSignedIn.classList.toggle("is-active", hasSession);
+  }
+  updateAuthGuards(hasSession);
+
+  if (!hasSession) {
+    toggleAuthMenu(false);
+    if (authUsername) {
+      authUsername.textContent = "Guest";
+    }
+    if (authAvatar) {
+      authAvatar.textContent = "🙂";
+      authAvatar.style.backgroundImage = "none";
+    }
+    return;
+  }
+
+  if (authUsername) {
+    authUsername.textContent = session.displayName || session.username;
+  }
+  if (authAvatar) {
+    const initials = initialsFromName(session.displayName || session.username);
+    authAvatar.textContent = initials;
+    if (session.avatarUrl) {
+      authAvatar.style.backgroundImage = `url(${session.avatarUrl})`;
+      authAvatar.style.backgroundSize = "cover";
+      authAvatar.style.backgroundPosition = "center";
+    } else {
+      authAvatar.style.backgroundImage = "none";
+    }
+  }
 }
 
 function formatGenres(ids = []) {
@@ -486,6 +575,80 @@ async function loadDiscoverSearch(query) {
   }
 }
 
+async function handleAuthPrompt(mode) {
+  const username = window.prompt(
+    mode === "signup"
+      ? "Choose a username to create your Smart Movie Match account"
+      : "Enter your username"
+  );
+  const password = window.prompt(
+    mode === "signup" ? "Create a password" : "Enter your password"
+  );
+  if (!username || !password) return;
+
+  try {
+    if (mode === "signup") {
+      await registerUser({ username, password });
+    } else {
+      await loginUser({ username, password });
+    }
+  } catch (error) {
+    const message = error && error.message ? error.message : "Unable to authenticate.";
+    window.alert(message);
+  }
+}
+
+function attachAuthListeners() {
+  if (authToggle) {
+    authToggle.addEventListener("click", () => toggleAuthMenu());
+  }
+  if (authSignInBtn) {
+    authSignInBtn.addEventListener("click", () => handleAuthPrompt("signin"));
+  }
+  if (authSignUpBtn) {
+    authSignUpBtn.addEventListener("click", () => handleAuthPrompt("signup"));
+  }
+  if (authLogoutBtn) {
+    authLogoutBtn.addEventListener("click", () => {
+      logoutSession();
+      toggleAuthMenu(false);
+    });
+  }
+  if (authProfileBtn) {
+    authProfileBtn.addEventListener("click", () => {
+      setSection("profile");
+      toggleAuthMenu(false);
+    });
+  }
+  if (authSettingsBtn) {
+    authSettingsBtn.addEventListener("click", () => {
+      window.alert("Settings coming soon.");
+      toggleAuthMenu(false);
+    });
+  }
+
+  document.addEventListener("click", (event) => {
+    if (!state.authMenuOpen || !authShell) return;
+    if (authShell.contains(event.target)) return;
+    toggleAuthMenu(false);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      toggleAuthMenu(false);
+    }
+  });
+}
+
+function initAuth() {
+  renderAuthState(state.session);
+  subscribeToSession((session) => {
+    state.session = session;
+    renderAuthState(session);
+  });
+  attachAuthListeners();
+}
+
 function attachListeners() {
   navButtons.forEach((btn) => {
     btn.addEventListener("click", () => setSection(btn.dataset.sectionButton));
@@ -519,6 +682,7 @@ function attachListeners() {
 }
 
 function init() {
+  initAuth();
   attachListeners();
   setSection("home");
   loadDiscover(state.discoverFilter);
