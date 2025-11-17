@@ -103,20 +103,26 @@ export async function refreshAppConfig() {
 
   try {
     const response = await fetch(CONFIG_ENDPOINT, { headers });
-    if (!response.ok) {
-      throw new Error('Request failed');
+    if (response.status === 401 || response.status === 403) {
+      state.config = { ...DEFAULT_CONFIG };
+      state.experiments = { experiments: [], assignments: {} };
+      state.error = 'Sign in to load personalized configuration and experiments.';
+    } else {
+      if (!response.ok) {
+        throw new Error('Request failed');
+      }
+      const payload = await response.json();
+      const config = payload && typeof payload.config === 'object' ? payload.config : {};
+      const experiments = payload && typeof payload.experiments === 'object'
+        ? payload.experiments
+        : { experiments: [], assignments: {} };
+      state.config = { ...DEFAULT_CONFIG, ...config };
+      state.experiments = {
+        experiments: Array.isArray(experiments.experiments) ? experiments.experiments : [],
+        assignments: experiments.assignments || {}
+      };
+      state.error = '';
     }
-    const payload = await response.json();
-    const config = payload && typeof payload.config === 'object' ? payload.config : {};
-    const experiments = payload && typeof payload.experiments === 'object'
-      ? payload.experiments
-      : { experiments: [], assignments: {} };
-    state.config = { ...DEFAULT_CONFIG, ...config };
-    state.experiments = {
-      experiments: Array.isArray(experiments.experiments) ? experiments.experiments : [],
-      assignments: experiments.assignments || {}
-    };
-    state.error = '';
   } catch (error) {
     state.error = 'Unable to load remote config.';
   } finally {

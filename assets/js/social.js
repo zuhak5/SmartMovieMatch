@@ -23,6 +23,15 @@ const REVIEW_SORT_OPTIONS = [
 const DEFAULT_REVIEW_SORT = 'newest';
 const MUTED_USERS_STORAGE_KEY = 'smm.social-muted.v1';
 
+class AuthorizationError extends Error {
+  constructor(message, status, action) {
+    super(message);
+    this.name = 'AuthorizationError';
+    this.status = status;
+    this.action = action;
+  }
+}
+
 function loadMutedUsersFromStorage() {
   if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
     return [];
@@ -123,6 +132,114 @@ const socialOverviewSubscribers = new Set();
 const collaborativeSubscribers = new Set();
 const presenceStatusSubscribers = new Set();
 const mutedSubscribers = new Set();
+
+export function isAuthorizationError(error) {
+  return (
+    error instanceof AuthorizationError ||
+    (error && (error.status === 401 || error.status === 403))
+  );
+}
+
+function buildAuthorizationMessage(status, action, data) {
+  if (status === 401) {
+    return 'Sign in to use social features.';
+  }
+  if (status === 403) {
+    if (action && String(action).includes('WatchParty')) {
+      return 'Only invited participants can access this watch party feature.';
+    }
+    if (action && String(action).includes('Conversation')) {
+      return 'You can only open conversations you are a member of.';
+    }
+    if (action && String(action).includes('Collaborative')) {
+      return 'You need edit access to collaborate on this list.';
+    }
+    return 'You do not have permission to perform that action.';
+  }
+  const apiMessage = data && data.error ? data.error : '';
+  return typeof apiMessage === 'string' && apiMessage.trim()
+    ? apiMessage.trim()
+    : 'Social request failed.';
+}
+
+function buildAuthorizationError(response, data, action) {
+  const status = response && typeof response.status === 'number' ? response.status : 0;
+  const error = new AuthorizationError(buildAuthorizationMessage(status, action, data), status, action);
+  error.data = data || null;
+  return error;
+}
+
+function clearScopedAuthorizationState(scope) {
+  switch (scope) {
+    case 'following':
+      state.following = [];
+      state.followingLoaded = false;
+      state.followingLoading = false;
+      state.socialOverview = createDefaultSocialOverview();
+      notifyFollowingSubscribers();
+      notifySocialOverviewSubscribers();
+      break;
+    case 'notifications':
+      state.notifications = [];
+      state.notificationsLoaded = false;
+      state.notificationsLoading = false;
+      state.notificationSeen.clear();
+      notifyNotificationSubscribers();
+      stopNotificationPolling();
+      stopNotificationStream();
+      break;
+    case 'friend-feed':
+      state.friendFeed = [];
+      state.friendFeedLoaded = false;
+      state.friendFeedLoading = false;
+      notifyFriendFeedSubscribers();
+      break;
+    case 'collaboration':
+      state.collabState = {
+        lists: { owned: [], shared: [], invites: [] },
+        watchParties: { upcoming: [], invites: [] }
+      };
+      notifyCollaborativeSubscribers();
+      if (state.socialOverview && typeof state.socialOverview === 'object') {
+        state.socialOverview.collaborations = { owned: 0, shared: 0, invites: 0 };
+        notifySocialOverviewSubscribers();
+      }
+      break;
+    case 'presence':
+      stopPresenceTicker();
+      break;
+    default:
+      break;
+  }
+}
+
+function clearAuthorizationState() {
+  clearScopedAuthorizationState('following');
+  clearScopedAuthorizationState('notifications');
+  clearScopedAuthorizationState('friend-feed');
+  clearScopedAuthorizationState('collaboration');
+  clearScopedAuthorizationState('presence');
+}
+
+function handleAuthorizationError(error, { scope = null, silent = false } = {}) {
+  if (!isAuthorizationError(error)) {
+    return false;
+  }
+
+  if (error.status === 401) {
+    clearAuthorizationState();
+  } else if (scope) {
+    clearScopedAuthorizationState(scope);
+  }
+
+  if (!silent) {
+    queueToast(buildAuthorizationMessage(error.status, error.action, error.data), {
+      variant: 'warning'
+    });
+  }
+
+  return true;
+}
 
 function persistMutedUsers(handles) {
   if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
@@ -896,6 +1013,9 @@ export async function acknowledgeNotifications() {
     const response = await callSocial('ackNotifications');
     applyNotificationPayload(response);
   } catch (error) {
+    if (handleAuthorizationError(error, { scope: 'notifications', silent: true })) {
+      return;
+    }
     console.warn('Failed to acknowledge notifications', error);
   }
 }
@@ -911,6 +1031,9 @@ export async function recordLibraryActivity(action, movie) {
   try {
     await callSocial('recordLibraryAction', { action, movie: payload });
   } catch (error) {
+    if (handleAuthorizationError(error, { silent: true })) {
+      return;
+    }
     console.warn('Failed to record library activity', error);
   }
 }
@@ -3032,6 +3155,9 @@ async function loadFollowing(force = false) {
     notifyFollowingSubscribers();
     notifySocialOverviewSubscribers();
   } catch (error) {
+    if (handleAuthorizationError(error, { scope: 'following', silent: true })) {
+      return;
+    }
     console.warn('Failed to load following list', error);
   } finally {
     state.followingLoading = false;
@@ -3112,6 +3238,9 @@ async function loadNotifications(force = false) {
     const response = await callSocial('listNotifications');
     applyNotificationPayload(response);
   } catch (error) {
+    if (handleAuthorizationError(error, { scope: 'notifications', silent: true })) {
+      return;
+    }
     console.warn('Failed to load notifications', error);
   } finally {
     state.notificationsLoading = false;
@@ -3165,6 +3294,9 @@ async function loadFriendFeed(force = false) {
     const response = await callSocial('listFriendFeed');
     applyFriendFeedPayload(response);
   } catch (error) {
+    if (handleAuthorizationError(error, { scope: 'friend-feed', silent: true })) {
+      return;
+    }
     console.warn('Failed to load friend feed', error);
   } finally {
     state.friendFeedLoading = false;
@@ -3371,7 +3503,11 @@ async function pingPresence(stateLabel = 'online', options = {}) {
   try {
     await callSocial('updatePresence', payload);
   } catch (error) {
-    if (!options.silent) {
+    const handled = handleAuthorizationError(error, {
+      scope: 'presence',
+      silent: options.silent !== false
+    });
+    if (!options.silent && !handled) {
       throw error;
     }
   }
@@ -3399,6 +3535,9 @@ async function loadCollaborativeState() {
     notifySocialOverviewSubscribers();
     notifyCollaborativeSubscribers();
   } catch (error) {
+    if (handleAuthorizationError(error, { scope: 'collaboration', silent: true })) {
+      return;
+    }
     console.warn('Failed to load collaborative state', error);
   }
 }
@@ -4043,6 +4182,9 @@ async function callSocial(action, payload = {}) {
     data = null;
   }
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw buildAuthorizationError(response, data, action);
+    }
     const message = data && data.error ? data.error : 'Social request failed.';
     throw new Error(message);
   }
