@@ -544,6 +544,7 @@ p {
 
 .small-text {
   color: var(--muted);
+  display: none;
   font-size: 13px;
 }
 
