@@ -1,16 +1,78 @@
 import { API_ROUTES } from "./config.js";
 
-async function fetchJson(url, { signal, headers, method = "GET", body } = {}) {
-  const response = await fetch(url, {
-    method,
-    signal,
-    headers,
-    body
-  });
-  if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status} for ${url}`);
+const REQUEST_TIMEOUT_MS = 12000;
+
+function buildAbortSignal(signal, timeoutMs = REQUEST_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const cleanups = [];
+
+  if (signal) {
+    if (signal.aborted) {
+      controller.abort(signal.reason);
+    } else {
+      const abortHandler = () => controller.abort(signal.reason);
+      signal.addEventListener("abort", abortHandler);
+      cleanups.push(() => signal.removeEventListener("abort", abortHandler));
+    }
   }
-  return response.json();
+
+  if (Number.isFinite(timeoutMs) && timeoutMs > 0) {
+    const timeoutId = window.setTimeout(() => {
+      controller.abort(new DOMException("Request timed out", "AbortError"));
+    }, timeoutMs);
+    cleanups.push(() => window.clearTimeout(timeoutId));
+  }
+
+  return { signal: controller.signal, cleanup: () => cleanups.forEach((fn) => fn()) };
+}
+
+async function fetchJson(url, { signal, headers = {}, method = "GET", body, timeoutMs } = {}) {
+  const { signal: combinedSignal, cleanup } = buildAbortSignal(signal, timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      method,
+      signal: combinedSignal,
+      headers: { Accept: "application/json", ...headers },
+      body
+    });
+
+    let parsedBody = null;
+    let responseText = "";
+    try {
+      parsedBody = await response.clone().json();
+    } catch (_) {
+      try {
+        responseText = await response.clone().text();
+      } catch (_) {
+        responseText = "";
+      }
+    }
+
+    if (!response.ok) {
+      const detail =
+        (parsedBody && typeof parsedBody.message === "string" && parsedBody.message.trim()) ||
+        (typeof responseText === "string" ? responseText.trim() : "") ||
+        response.statusText;
+      const error = new Error(
+        detail ? `Request failed (${response.status}): ${detail}` : `Request failed with status ${response.status}`
+      );
+      error.status = response.status;
+      throw error;
+    }
+
+    if (parsedBody !== null) {
+      return parsedBody;
+    }
+
+    if (responseText) {
+      return { message: responseText };
+    }
+
+    return {};
+  } finally {
+    cleanup();
+  }
 }
 
 export async function fetchFromTmdb(path, params = {}, { signal } = {}) {
