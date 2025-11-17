@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MovieCard Component Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../assets/css/app-spa.css" />
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        background: radial-gradient(circle at 10% 20%, rgba(139, 92, 246, 0.32), transparent 35%),
+          radial-gradient(circle at 80% 0%, rgba(59, 130, 246, 0.28), transparent 30%),
+          radial-gradient(circle at 50% 80%, rgba(16, 185, 129, 0.24), transparent 35%),
+          #0b1021;
+        color: #e5e7eb;
+        min-height: 100vh;
+        margin: 0;
+        padding: 32px 20px 40px;
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .demo-shell {
+        max-width: 1180px;
+        margin: 0 auto;
+        display: grid;
+        gap: 18px;
+      }
+      .demo-header h1 {
+        margin: 0;
+        font-size: clamp(1.8rem, 3vw, 2.2rem);
+      }
+      .demo-header p {
+        margin: 6px 0 0;
+        color: #cbd5e1;
+      }
+      .demo-section {
+        display: grid;
+        gap: 12px;
+      }
+      .demo-section h2 {
+        margin: 0;
+      }
+      .demo-grid-note {
+        color: #cbd5e1;
+        font-size: 0.95rem;
+      }
+      .single-card-wrapper {
+        max-width: 260px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="demo-shell">
+      <header class="demo-header">
+        <p class="eyebrow">UI Component</p>
+        <h1>MovieCard</h1>
+        <p>
+          Compact, glassy cards for dense movie grids. Icons and labels clearly show
+          watchlist, like, and watched states on both desktop hover and touch devices.
+        </p>
+      </header>
+
+      <section class="demo-section" aria-labelledby="single-card-heading">
+        <div>
+          <h2 id="single-card-heading">Single card example</h2>
+          <p class="demo-grid-note">Pass props and callbacks to render any movie and handle user actions.</p>
+        </div>
+        <div class="single-card-wrapper" id="single-card"></div>
+      </section>
+
+      <section class="demo-section" aria-labelledby="grid-heading">
+        <div>
+          <h2 id="grid-heading">Responsive grid</h2>
+          <p class="demo-grid-note">
+            Auto-fit layout targets 2–4 cards per row on desktop and 2–3 on mobile with a compact footprint.
+          </p>
+        </div>
+        <div class="movie-card-grid" id="card-grid"></div>
+      </section>
+    </main>
+
+    <script type="module">
+      import { createMovieCard } from "../assets/js/movie-card.js";
+
+      const handleToggle = (label) => (nextState) => {
+        console.info(`${label} toggled:`, nextState);
+      };
+
+      const singleCard = createMovieCard({
+        title: "Arcadia Nights",
+        year: "2024",
+        posterUrl: "https://image.tmdb.org/t/p/w500/1httn8iK5wWzMMzvDTzbo2uiSUp.jpg",
+        imdbScore: "8.3/10",
+        rtScore: "92%",
+        liked: true,
+        inWatchlist: true,
+        watched: false,
+        onToggleLike: handleToggle("Like"),
+        onToggleWatchlist: handleToggle("Watchlist"),
+        onToggleWatched: handleToggle("Watched")
+      });
+      document.getElementById("single-card").appendChild(singleCard);
+
+      const gridMovies = [
+        {
+          title: "Lunar Echoes",
+          year: "2023",
+          posterUrl: "https://image.tmdb.org/t/p/w500/3H0eh6mVXKr1ZU0OqFczTx9Ty8c.jpg",
+          imdbScore: "8.1/10",
+          rtScore: "90%",
+          liked: false,
+          inWatchlist: true,
+          watched: true
+        },
+        {
+          title: "Neon Tide",
+          year: "2022",
+          posterUrl: "https://image.tmdb.org/t/p/w500/lnA2n8D0Z1x6iJZR5SAdPZ9qxpY.jpg",
+          imdbScore: "7.8/10",
+          rtScore: "86%",
+          liked: true,
+          inWatchlist: false,
+          watched: false
+        },
+        {
+          title: "Signal Horizon",
+          year: "2024",
+          posterUrl: "https://image.tmdb.org/t/p/w500/3PurOOcC3vWb3s2T0yZZMgbkWGT.jpg",
+          imdbScore: "8.7/10",
+          rtScore: "95%",
+          liked: true,
+          inWatchlist: true,
+          watched: true
+        },
+        {
+          title: "Glass Ember",
+          year: "2021",
+          posterUrl: "https://image.tmdb.org/t/p/w500/uuNJX9KHpqLwFpC18JNpXHbdDgB.jpg",
+          imdbScore: "7.5/10",
+          rtScore: "82%",
+          liked: false,
+          inWatchlist: false,
+          watched: false
+        },
+        {
+          title: "Atlas Bloom",
+          year: "2020",
+          posterUrl: "https://image.tmdb.org/t/p/w500/2v9FVVBUrrkW2m3QOcYkuhq9A3S.jpg",
+          imdbScore: "8.0/10",
+          rtScore: "88%",
+          liked: true,
+          inWatchlist: false,
+          watched: true
+        }
+      ];
+
+      const gridContainer = document.getElementById("card-grid");
+      gridMovies.forEach((movie) => {
+        const card = createMovieCard({
+          ...movie,
+          onToggleLike: handleToggle(`${movie.title} like`),
+          onToggleWatchlist: handleToggle(`${movie.title} watchlist`),
+          onToggleWatched: handleToggle(`${movie.title} watched`)
+        });
+        gridContainer.appendChild(card);
+      });
+    </script>
+  </body>
+</html>
