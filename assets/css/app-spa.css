@@ -287,11 +287,10 @@ p {
 .lead {
   color: var(--muted);
   line-height: 1.6;
-}
-.card + .card {
-  margin-top: 12px;
+
 }
 .card {
+  margin-top: 12px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -300,6 +299,7 @@ p {
   display: flex;
   gap: 12px;
   transition: transform 0.2s ease, border-color 0.2s ease;
+
 }
 
 .card:hover {
