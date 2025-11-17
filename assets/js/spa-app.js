@@ -22,6 +22,8 @@ import {
   subscribeToCollaborativeState,
   refreshCollaborativeState,
   listConversationsRemote,
+  listConversationMessagesRemote,
+  postConversationMessageRemote,
   joinWatchPartyRemote,
   listWatchPartyMessagesRemote,
   postWatchPartyMessageRemote
@@ -96,6 +98,10 @@ const state = {
   conversationsLoaded: false,
   conversationsLoading: false,
   conversationsError: "",
+  conversationMessages: new Map(),
+  conversationMessagesLoading: null,
+  conversationMessagesError: "",
+  conversationMessageSending: false,
   activeConversationId: null,
   activeWatchParty: null,
   watchPartyMessages: [],
@@ -157,6 +163,11 @@ const conversationThread = document.querySelector('[data-conversation-thread]');
 const conversationPreviewTitle = document.querySelector('[data-conversation-preview-title]');
 const conversationPreviewMeta = document.querySelector('[data-conversation-preview-meta]');
 const conversationPreviewBody = document.querySelector('[data-conversation-preview-body]');
+const conversationMessages = document.querySelector('[data-conversation-messages]');
+const conversationThreadStatus = document.querySelector('[data-conversation-thread-status]');
+const conversationForm = document.querySelector('[data-conversation-form]');
+const conversationInput = document.querySelector('[data-conversation-input]');
+const conversationSendButton = document.querySelector('[data-conversation-send]');
 const authOverlay = document.querySelector("[data-auth-overlay]");
 const authForm = document.querySelector("[data-auth-form]");
 const authStatus = document.querySelector("[data-auth-status]");
@@ -1244,6 +1255,10 @@ function resetConversationsState() {
   state.conversationsLoaded = false;
   state.conversationsLoading = false;
   state.conversationsError = "";
+  state.conversationMessages = new Map();
+  state.conversationMessagesLoading = null;
+  state.conversationMessagesError = "";
+  state.conversationMessageSending = false;
   state.activeConversationId = null;
   renderConversationList();
 }
@@ -1348,12 +1363,83 @@ function renderConversationList() {
   renderConversationPreview();
 }
 
+function getConversationMessages(conversationId) {
+  if (!conversationId) return [];
+  return state.conversationMessages.get(conversationId) || [];
+}
+
+function renderConversationMessages(conversation) {
+  if (!conversationMessages) return;
+  conversationMessages.innerHTML = "";
+
+  const isLoading = state.conversationMessagesLoading === conversation.id;
+  const statusMessage = state.conversationMessagesError
+    ? state.conversationMessagesError
+    : isLoading
+    ? "Loading messages…"
+    : "";
+  if (conversationThreadStatus) {
+    conversationThreadStatus.textContent = statusMessage;
+    conversationThreadStatus.classList.toggle("error", Boolean(state.conversationMessagesError));
+  }
+
+  if (isLoading) {
+    const loading = document.createElement("div");
+    loading.className = "small-text muted";
+    loading.textContent = "Loading messages…";
+    conversationMessages.append(loading);
+    return;
+  }
+
+  if (state.conversationMessagesError) {
+    const error = document.createElement("div");
+    error.className = "small-text error";
+    error.textContent = state.conversationMessagesError;
+    conversationMessages.append(error);
+    return;
+  }
+
+  const messages = getConversationMessages(conversation.id);
+  if (!messages.length) {
+    const empty = document.createElement("div");
+    empty.className = "small-text muted";
+    empty.textContent = "No messages yet. Start the conversation.";
+    conversationMessages.append(empty);
+    return;
+  }
+
+  messages.forEach((message) => {
+    const row = document.createElement("div");
+    row.className = "conversation-message";
+    if (state.session && canonicalHandle(state.session.username) === canonicalHandle(message.senderUsername)) {
+      row.classList.add("is-self");
+    }
+    const meta = document.createElement("div");
+    meta.className = "conversation-message-meta";
+    const author = canonicalHandle(message.senderUsername);
+    const timestamp = message.createdAt ? formatRelativeTimestamp(message.createdAt) : "Just now";
+    meta.textContent = `@${author} · ${timestamp}`;
+    const body = document.createElement("div");
+    body.className = "conversation-message-body";
+    body.textContent = message.body || "";
+    row.append(meta, body);
+    conversationMessages.append(row);
+  });
+}
+
 function renderConversationPreview() {
   if (!conversationPreview || !conversationPlaceholder || !conversationThread) return;
   const conversation = state.conversations.find((entry) => entry.id === state.activeConversationId);
   if (!conversation) {
     conversationPlaceholder.hidden = false;
     conversationThread.hidden = true;
+    if (conversationMessages) {
+      conversationMessages.innerHTML = "";
+    }
+    if (conversationThreadStatus) {
+      conversationThreadStatus.textContent = "";
+      conversationThreadStatus.classList.remove("error");
+    }
     return;
   }
 
@@ -1378,11 +1464,114 @@ function renderConversationPreview() {
   if (conversationPreviewBody) {
     conversationPreviewBody.textContent = getConversationPreviewSnippet(conversation);
   }
+
+  renderConversationMessages(conversation);
+
+  const disableInputs = !hasActiveSession() || state.conversationMessageSending;
+  if (conversationInput) {
+    conversationInput.disabled = disableInputs;
+  }
+  if (conversationSendButton) {
+    conversationSendButton.disabled = disableInputs;
+  }
 }
 
 function setActiveConversation(conversationId) {
   state.activeConversationId = conversationId || null;
+  state.conversationMessagesError = "";
   renderConversationList();
+  if (state.activeConversationId) {
+    loadConversationMessages(state.activeConversationId);
+  }
+}
+
+async function loadConversationMessages(conversationId = state.activeConversationId, force = false) {
+  const targetId = conversationId || state.activeConversationId;
+  if (!targetId || state.conversationMessagesLoading === targetId) {
+    return;
+  }
+  if (!hasActiveSession()) {
+    state.conversationMessagesError = "Sign in to view messages.";
+    renderConversationPreview();
+    return;
+  }
+  if (!force && state.conversationMessages.has(targetId)) {
+    renderConversationPreview();
+    return;
+  }
+  state.conversationMessagesLoading = targetId;
+  state.conversationMessagesError = "";
+  renderConversationPreview();
+  try {
+    const messages = await listConversationMessagesRemote(targetId);
+    state.conversationMessages.set(targetId, messages);
+  } catch (error) {
+    state.conversationMessagesError = error.message || "Unable to load messages.";
+  } finally {
+    state.conversationMessagesLoading = null;
+    renderConversationPreview();
+  }
+}
+
+async function handleConversationMessageSubmit(event) {
+  if (event) {
+    event.preventDefault();
+  }
+  if (!state.activeConversationId) {
+    state.conversationMessagesError = "Select a conversation first.";
+    renderConversationPreview();
+    return;
+  }
+  if (!hasActiveSession()) {
+    openAuthOverlay("login");
+    return;
+  }
+  const body = conversationInput ? conversationInput.value.trim() : "";
+  if (!body) {
+    if (conversationInput) {
+      conversationInput.focus();
+    }
+    return;
+  }
+
+  state.conversationMessageSending = true;
+  state.conversationMessagesError = "";
+  if (conversationInput) {
+    conversationInput.disabled = true;
+  }
+  if (conversationSendButton) {
+    conversationSendButton.disabled = true;
+  }
+  renderConversationPreview();
+
+  try {
+    const sent = await postConversationMessageRemote({
+      conversationId: state.activeConversationId,
+      body
+    });
+    const existing = getConversationMessages(state.activeConversationId);
+    const merged = [...existing, sent].sort(
+      (a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+    );
+    state.conversationMessages.set(state.activeConversationId, merged);
+    if (conversationInput) {
+      conversationInput.value = "";
+    }
+    const lastMessageAt = sent.createdAt || new Date().toISOString();
+    state.conversations = state.conversations
+      .map((conversation) =>
+        conversation.id === state.activeConversationId
+          ? { ...conversation, lastMessage: sent, lastMessageAt }
+          : conversation
+      )
+      .sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
+    renderConversationList();
+  } catch (error) {
+    state.conversationMessagesError = error.message || "Unable to send message.";
+  } finally {
+    state.conversationMessageSending = false;
+    renderConversationPreview();
+  }
 }
 
 async function loadConversations(force = false) {
@@ -1405,6 +1594,9 @@ async function loadConversations(force = false) {
     }
     if (!state.activeConversationId && conversations.length) {
       state.activeConversationId = conversations[0].id;
+    }
+    if (state.activeConversationId) {
+      loadConversationMessages(state.activeConversationId, true);
     }
   } catch (error) {
     state.conversationsError = error.message || "Unable to load conversations.";
@@ -2359,6 +2551,10 @@ function attachListeners() {
     onboardingImportOptions.forEach((input) => {
       input.addEventListener("change", () => readOnboardingSelections());
     });
+  }
+
+  if (conversationForm) {
+    conversationForm.addEventListener("submit", handleConversationMessageSubmit);
   }
 
   if (watchPartyForm) {

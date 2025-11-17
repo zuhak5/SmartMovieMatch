@@ -376,6 +376,40 @@ export async function listConversationsRemote() {
   return conversations;
 }
 
+export async function listConversationMessagesRemote(conversationId) {
+  const trimmed = normalizeConversationId(conversationId);
+  if (!trimmed) {
+    throw new Error('Choose a conversation first.');
+  }
+  const response = await callSocial('listConversationMessages', { conversationId: trimmed });
+  const messages = Array.isArray(response?.messages)
+    ? response.messages.map(normalizeConversationMessage).filter(Boolean)
+    : [];
+  return messages.sort(
+    (a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+  );
+}
+
+export async function postConversationMessageRemote({ conversationId, body }) {
+  const trimmed = normalizeConversationId(conversationId);
+  const messageBody = typeof body === 'string' ? body.trim() : '';
+  if (!trimmed) {
+    throw new Error('Choose a conversation first.');
+  }
+  if (!messageBody) {
+    throw new Error('Type a message before sending.');
+  }
+  const response = await callSocial('postConversationMessage', {
+    conversationId: trimmed,
+    body: messageBody
+  });
+  const message = normalizeConversationMessage(response?.message);
+  if (!message) {
+    throw new Error('Unable to send that message right now.');
+  }
+  return message;
+}
+
 export async function listWatchPartyMessagesRemote({ partyId }) {
   const trimmed = typeof partyId === 'string' ? partyId.trim() : '';
   if (!trimmed) {
@@ -3851,10 +3885,12 @@ function normalizeConversationMessage(entry) {
   if (!entry || typeof entry !== 'object') {
     return null;
   }
+  const conversationId = normalizeConversationId(entry.conversationId || entry.conversation_id || entry.conversationid);
   const sender = canonicalUsername(entry.senderUsername || entry.sender_username || entry.username || '');
   const body = typeof entry.body === 'string' ? entry.body : '';
   return {
     id: entry.id || entry.messageId || null,
+    conversationId,
     senderUsername: sender,
     body,
     messageType: entry.messageType || entry.message_type || 'text',
