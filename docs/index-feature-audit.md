@@ -270,13 +270,13 @@ Each item is a task for Codex (or any other assistant) to implement.
 
 ## Notifications & activity (NOTIF)
 
-- [ ] **NOTIF-001 – Notification dropdown wired to DB**
+- [x] **NOTIF-001 – Notification dropdown wired to DB**
   - Description: Replace static notification icon/menu with data from `user_notifications`.
     - Show unread count badge.
     - Mark notifications as read on click (update `is_read`, `read_at`).
   - Files: Navbar notification bell/menu.
   - Backend: `user_notifications`.
-  - DONE: _…_
+  DONE 2025-11-17T10:03Z – Added Supabase-backed notification bell with unread badge, dropdown list, click-to-mark-read and mark-all controls wired to the social API stream.
 
 - [ ] **NOTIF-002 – Activity log for user actions**
   - Description: Log key SPA actions to `user_activity` (e.g. follow, review, diary entry).
