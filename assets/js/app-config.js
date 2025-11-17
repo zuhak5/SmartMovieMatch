@@ -8,6 +8,7 @@ const DEFAULT_CONFIG = {
   'ui.home.groupPicks': 3,
   'ui.discover.maxMovies': 12,
   'ui.discover.maxPeople': 6,
+  'ui.discover.trendingCount': 8,
   'feature.watchParties.enabled': true,
   'feature.messages.enabled': true,
   'feature.notifications.enabled': true

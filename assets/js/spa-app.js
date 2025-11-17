@@ -218,6 +218,25 @@ function applyFeatureFlags() {
     }
   }
 
+  const notificationsEnabled = getFeatureFlag("feature.notifications.enabled", true);
+  if (notificationButton) {
+    notificationButton.disabled = !notificationsEnabled;
+    notificationButton.classList.toggle("is-disabled", !notificationsEnabled);
+    notificationButton.setAttribute("aria-hidden", notificationsEnabled ? "false" : "true");
+    if (!notificationsEnabled) {
+      closeNotificationMenu();
+    }
+  }
+  if (notificationMenu) {
+    notificationMenu.toggleAttribute("hidden", !notificationsEnabled);
+  }
+  if (notificationDot) {
+    notificationDot.toggleAttribute("hidden", !notificationsEnabled);
+  }
+  if (notificationCount) {
+    notificationCount.toggleAttribute("hidden", !notificationsEnabled);
+  }
+
   toggleSectionAvailability("messages", getFeatureFlag("feature.messages.enabled", true));
 }
 
@@ -333,11 +352,6 @@ const conversationThreadStatus = document.querySelector('[data-conversation-thre
 const conversationForm = document.querySelector('[data-conversation-form]');
 const conversationInput = document.querySelector('[data-conversation-input]');
 const conversationSendButton = document.querySelector('[data-conversation-send]');
-
-subscribeToConfig((configState) => {
-  state.appConfig = configState;
-  applyFeatureFlags();
-});
 const diaryForm = document.querySelector('[data-diary-form]');
 const diaryList = document.querySelector('[data-diary-list]');
 const diaryEmpty = document.querySelector('[data-diary-empty]');
@@ -468,6 +482,11 @@ const movieDetailPartyWhen = document.querySelector('[data-movie-detail-party-wh
 const movieDetailPartyTitle = document.querySelector('[data-movie-detail-party-title]');
 const movieDetailPartyVisibility = document.querySelector('[data-movie-detail-party-visibility]');
 const movieDetailPartyNote = document.querySelector('[data-movie-detail-party-note]');
+
+subscribeToConfig((configState) => {
+  state.appConfig = configState;
+  applyFeatureFlags();
+});
 
 function hasActiveSession() {
   return Boolean(state.session && state.session.token);
