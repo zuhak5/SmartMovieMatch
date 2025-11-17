@@ -24,6 +24,7 @@ import {
   listConversationsRemote,
   listConversationMessagesRemote,
   postConversationMessageRemote,
+  startDirectConversationRemote,
   joinWatchPartyRemote,
   listWatchPartyMessagesRemote,
   postWatchPartyMessageRemote
@@ -102,6 +103,7 @@ const state = {
   conversationMessagesLoading: null,
   conversationMessagesError: "",
   conversationMessageSending: false,
+  profileContextHandle: "",
   activeConversationId: null,
   activeWatchParty: null,
   watchPartyMessages: [],
@@ -215,6 +217,7 @@ const profileDecadeCount = document.querySelector("[data-profile-decade-count]")
 const profileEditOpenButton = document.querySelector("[data-profile-edit-open]");
 const profileEditCloseButton = document.querySelector("[data-profile-editor-close]");
 const profileEditCancelButton = document.querySelector("[data-profile-editor-cancel]");
+const profileMessageButton = document.querySelector("[data-profile-message]");
 const onboardingOverlay = document.querySelector("[data-onboarding]");
 const onboardingSteps = document.querySelectorAll("[data-onboarding-step]");
 const onboardingProgress = document.querySelector("[data-onboarding-progress]");
@@ -597,6 +600,16 @@ function renderProfileOverview() {
     }
   };
 
+  state.profileContextHandle = canonicalHandle(profile.handle || "");
+  if (profileMessageButton) {
+    const isSelfProfile =
+      Boolean(state.session && canonicalHandle(state.session.username) === state.profileContextHandle);
+    profileMessageButton.hidden = !hasSession;
+    profileMessageButton.disabled = !state.profileContextHandle;
+    profileMessageButton.textContent = isSelfProfile ? "Message yourself" : "Message";
+    profileMessageButton.dataset.profileHandle = state.profileContextHandle;
+  }
+
   if (profileName) {
     profileName.textContent = profile.name;
   }
@@ -734,7 +747,8 @@ function renderPeople(people = [], { source = "tmdb" } = {}) {
       const actions = document.createElement("div");
       actions.className = "action-row";
       const followBtn = createFollowButton(handle);
-      actions.append(followBtn);
+      const messageBtn = createMessageButton(handle);
+      actions.append(followBtn, messageBtn);
 
       stack.append(name, handleLine, meta, overlapLine, badgeRow, actions);
       card.append(avatar, stack);
@@ -882,6 +896,34 @@ function createFollowButton(handle) {
     } finally {
       setLabel(false);
     }
+  });
+
+  return button;
+}
+
+function createMessageButton(handle, { label = "Message" } = {}) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "btn btn-primary";
+  button.textContent = label;
+
+  const normalized = canonicalHandle(handle);
+  if (!normalized) {
+    button.disabled = true;
+    return button;
+  }
+
+  const setLoading = (loading = false) => {
+    button.disabled = loading;
+    button.textContent = loading ? "Opening…" : label;
+  };
+
+  button.addEventListener("click", async (event) => {
+    event.preventDefault();
+    if (button.disabled) return;
+    setLoading(true);
+    await startConversationWithHandle(normalized);
+    setLoading(false);
   });
 
   return button;
@@ -1263,6 +1305,26 @@ function resetConversationsState() {
   renderConversationList();
 }
 
+function setConversationStatusMessage(message, { isError = false } = {}) {
+  if (!conversationStatus) return;
+  conversationStatus.textContent = message || "";
+  conversationStatus.classList.toggle("error", Boolean(isError));
+}
+
+function upsertConversation(conversation) {
+  if (!conversation || !conversation.id) return;
+  const existingIndex = state.conversations.findIndex((entry) => entry.id === conversation.id);
+  const merged =
+    existingIndex >= 0
+      ? { ...state.conversations[existingIndex], ...conversation }
+      : conversation;
+  const remaining = state.conversations.filter((entry) => entry.id !== conversation.id);
+  state.conversations = [merged, ...remaining].sort(
+    (a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0)
+  );
+  state.conversationsLoaded = true;
+}
+
 function getConversationTitle(conversation) {
   if (!conversation) return "Direct messages";
   if (conversation.title) return conversation.title;
@@ -1300,6 +1362,7 @@ function renderConversationList() {
   conversationList.innerHTML = "";
   if (conversationStatus) {
     conversationStatus.textContent = "";
+    conversationStatus.classList.remove("error");
   }
 
   if (state.conversationsLoading) {
@@ -1482,6 +1545,31 @@ function setActiveConversation(conversationId) {
   renderConversationList();
   if (state.activeConversationId) {
     loadConversationMessages(state.activeConversationId);
+  }
+}
+
+async function startConversationWithHandle(handle) {
+  const normalized = canonicalHandle(handle);
+  if (!normalized) {
+    setConversationStatusMessage("Choose someone to message first.", { isError: true });
+    return;
+  }
+  if (!hasActiveSession()) {
+    promptForAuth("messages", "inbox");
+    return;
+  }
+  setConversationStatusMessage(`Opening chat with @${normalized}…`);
+  try {
+    const conversation = await startDirectConversationRemote(normalized);
+    upsertConversation(conversation);
+    state.activeConversationId = conversation.id;
+    setSection("messages");
+    setTab("messages", "inbox");
+    renderConversationList();
+    await loadConversationMessages(conversation.id, true);
+    setConversationStatusMessage("");
+  } catch (error) {
+    setConversationStatusMessage(error.message || "Unable to start that conversation.", { isError: true });
   }
 }
 
@@ -2489,6 +2577,16 @@ function attachListeners() {
 
   if (profileEditCancelButton) {
     profileEditCancelButton.addEventListener("click", closeProfileEditor);
+  }
+
+  if (profileMessageButton) {
+    profileMessageButton.addEventListener("click", () => {
+      const targetHandle =
+        (profileMessageButton.dataset && profileMessageButton.dataset.profileHandle) ||
+        state.profileContextHandle ||
+        "";
+      startConversationWithHandle(targetHandle);
+    });
   }
 
   if (profileEditForm) {
