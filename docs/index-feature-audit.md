@@ -151,12 +151,12 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Backend: `watch_diary` with RLS so only the owner can mutate and visibility is respected for readers.
   DONE 2025-11-17T11:17Z – Added Supabase-backed diary form and list with movie search, tag/source/device metadata, and insert logic wired to `watch_diary`.
 
-- [ ] **DIARY-002 – Rewatch support**
+- [x] **DIARY-002 – Rewatch support**
   - Description: When rewatching a movie from the diary or detail page:
     - Increment `rewatch_number` and create a new diary entry or update existing, per UX decision.
   - Files: Movie detail actions, diary item actions.
   - Backend: `watch_diary.rewatch_number`.
-  - DONE: _…_
+  DONE 2025-11-17T11:25Z – Added “Log rewatch” buttons on diary entries that increment `rewatch_number`, reuse movie metadata, and save a fresh diary row with current date.
 
 - [ ] **DIARY-003 – Reviews with engagement counters**
   - Description: Wire review creation UI to `movie_reviews`, including:
