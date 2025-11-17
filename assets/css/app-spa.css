@@ -1472,6 +1472,20 @@ p {
   height: 100%;
 }
 
+.horizontal-scroll.movie-card-row {
+  grid-auto-columns: 190px;
+}
+
+@media (min-width: 640px) {
+  .horizontal-scroll.movie-card-row {
+    grid-auto-columns: 210px;
+  }
+}
+
+.horizontal-scroll.movie-card-row .movie-card {
+  height: 100%;
+}
+
 .hero-card {
   display: grid;
   grid-template-columns: 120px 1fr;

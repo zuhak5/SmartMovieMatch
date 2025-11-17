@@ -19,6 +19,7 @@ import {
   subscribeToConfig
 } from "./app-config.js";
 import { TMDB_GENRES } from "./config.js";
+import { createMovieCard as createGlassMovieCard } from "./movie-card.js";
 import {
   loadSession,
   loginUser,
@@ -602,6 +603,85 @@ function createPoster(url) {
     poster.style.backgroundPosition = "center";
   }
   return poster;
+}
+
+function buildGlassMovieCard(normalized, options = {}) {
+  if (!normalized || !normalized.title) return null;
+
+  const imdbScore = normalized.rating ? `${normalized.rating.toFixed(1)}/10` : "";
+  const rtScore = normalized.watchCount
+    ? `${normalized.watchCount} logs`
+    : normalized.trendScore
+    ? `${normalized.trendScore.toFixed(1)} buzz`
+    : "";
+
+  const card = createGlassMovieCard({
+    posterUrl: normalized.posterUrl || "",
+    title: normalized.title,
+    year: normalized.releaseYear || "",
+    imdbScore,
+    rtScore,
+    inWatchlist: Boolean(options.inWatchlist),
+    liked: isFavoriteMovie(normalized),
+    watched: Boolean(options.watched),
+    onToggleWatchlist: async (isInWatchlist) => {
+      if (typeof options.onWatchlist === "function") {
+        const next = await options.onWatchlist(isInWatchlist, card);
+        if (typeof next === "boolean" && typeof card.setState === "function") {
+          card.setState({ inWatchlist: next });
+        }
+      }
+    },
+    onToggleLike: async (isLiked) => {
+      const result = await toggleFavorite(normalized);
+      if (typeof card.setState === "function" && typeof result === "boolean" && result !== isLiked) {
+        card.setState({ liked: result });
+      }
+    },
+    onToggleWatched: (isWatched) => {
+      if (typeof options.onWatched === "function") {
+        options.onWatched(isWatched, card);
+      }
+    }
+  });
+
+  card.dataset.tmdbId = normalized.tmdbId ? String(normalized.tmdbId) : "";
+  card.dataset.imdbId = normalized.imdbId || "";
+  card.dataset.title = normalized.title ? normalized.title.trim().toLowerCase() : "";
+
+  card.addEventListener("click", (event) => {
+    if (event.target.closest(".movie-card__action-btn")) return;
+    if (typeof options.onOpen === "function") {
+      options.onOpen(normalized, card);
+    }
+  });
+
+  return card;
+}
+
+function decorateMovieCard(card, { meta, chips = [], tagRow } = {}) {
+  const body = card?.querySelector(".movie-card__body");
+  const actions = card?.querySelector(".movie-card__actions");
+  if (!body || !actions) return;
+
+  if (meta) {
+    const metaRow = document.createElement("small");
+    metaRow.className = "microcopy";
+    metaRow.textContent = meta;
+    body.insertBefore(metaRow, actions);
+  }
+
+  if (Array.isArray(chips) && chips.length) {
+    const chipRow = document.createElement("div");
+    chipRow.className = "movie-card__ratings";
+    chips.forEach((chip) => chip && chipRow.append(chip));
+    body.insertBefore(chipRow, actions);
+  }
+
+  if (tagRow) {
+    tagRow.classList.add("microcopy");
+    body.insertBefore(tagRow, actions);
+  }
 }
 
 function formatGenres(genres = []) {
@@ -1550,76 +1630,25 @@ function renderDiscoverMovies(movies = []) {
   movies.forEach((movie) => {
     const normalized = normalizeDiscoverMovie(movie);
     if (!normalized) return;
+    const card = buildGlassMovieCard(normalized, {
+      onOpen: (movieDetail) => openMovieDetail(movieDetail),
+      onWatchlist: async (isInWatchlist) => {
+        if (!isInWatchlist) return false;
+        if (!hasActiveSession()) return false;
+        await handleAddMovieToList(normalized);
+        return true;
+      }
+    });
 
-    const card = document.createElement("article");
-    card.className = "card";
-    card.style.flexDirection = "column";
-    card.style.alignItems = "flex-start";
-
-    card.appendChild(createPoster(normalized.posterUrl));
-
-    const stack = document.createElement("div");
-    stack.className = "stack";
-    const title = document.createElement("strong");
-    title.textContent = normalized.title;
-    const meta = document.createElement("div");
-    meta.className = "small-text";
-    const year = normalized.releaseYear ? String(normalized.releaseYear) : "";
-    const genres = formatGenres(normalized.genres);
-    meta.textContent = [year, genres].filter(Boolean).join(" · ");
-    const providerRow = document.createElement("div");
-    providerRow.className = "badge-row";
+    if (!card) return;
+    const meta = [normalized.releaseYear ? String(normalized.releaseYear) : "", formatGenres(normalized.genres)]
+      .filter(Boolean)
+      .join(" • ");
     const providerBadges = (normalized.streamingProviders || [])
       .slice(0, 4)
       .map((provider) => createProviderBadge(provider));
-    providerBadges.forEach((badge) => providerRow.append(badge));
-    const rating = document.createElement("span");
-    rating.className = "badge rating";
-    rating.textContent = normalized.rating
-      ? normalized.rating.toFixed(1)
-      : normalized.watchCount
-      ? `${normalized.watchCount} logs`
-      : "N/A";
-
-    const actions = document.createElement("div");
-    actions.className = "action-row";
-    actions.append(rating);
-
-    if (hasActiveSession()) {
-      const detailButton = document.createElement("button");
-      detailButton.type = "button";
-      detailButton.className = "btn-ghost btn";
-      detailButton.textContent = "Details";
-      detailButton.addEventListener("click", () => openMovieDetail(normalized));
-      actions.append(detailButton);
-
-      const saveButton = document.createElement("button");
-      saveButton.type = "button";
-      saveButton.className = "btn-ghost btn";
-      saveButton.textContent = "Save to list";
-      saveButton.addEventListener("click", async () => {
-        saveButton.disabled = true;
-        saveButton.textContent = "Saving…";
-        await handleAddMovieToList(normalized);
-        saveButton.textContent = "Saved";
-        window.setTimeout(() => {
-          saveButton.textContent = "Save to list";
-          saveButton.disabled = false;
-        }, 900);
-      });
-      actions.append(saveButton);
-    }
-
-    stack.append(title, meta);
-    if (providerBadges.length) {
-      stack.append(providerRow);
-    }
     const tagRow = renderMovieTagRow(normalized);
-    if (tagRow) {
-      stack.append(tagRow);
-    }
-    stack.append(actions);
-    card.append(stack);
+    decorateMovieCard(card, { meta, chips: providerBadges, tagRow });
     discoverGrid.append(card);
   });
 }
@@ -1929,27 +1958,24 @@ function renderTrendingMovies(movies = []) {
   }
 
   normalized.forEach((movie, index) => {
-    const card = document.createElement("div");
-    card.className = "card match-card";
-    card.appendChild(createPoster(movie.posterUrl));
+    const card = buildGlassMovieCard(movie, {
+      onOpen: (movieDetail) => openMovieDetail(movieDetail),
+      onWatchlist: async (isInWatchlist) => {
+        if (!isInWatchlist) return false;
+        if (!hasActiveSession()) return false;
+        await handleAddMovieToList(movie);
+        return true;
+      }
+    });
 
-    const stack = document.createElement("div");
-    stack.className = "stack";
-    const title = document.createElement("strong");
-    title.textContent = movie.title;
-    const meta = document.createElement("div");
-    meta.className = "small-text";
-    const year = movie.releaseYear ? String(movie.releaseYear) : "";
-    meta.textContent = [year, formatGenres(movie.genres)].filter(Boolean).join(" · ");
-    const providerRow = document.createElement("div");
-    providerRow.className = "badge-row";
+    if (!card) return;
     const providerBadges = (movie.streamingProviders || [])
       .slice(0, 4)
       .map((provider) => createProviderBadge(provider));
-    providerBadges.forEach((badge) => providerRow.append(badge));
 
-    const badgeRow = document.createElement("div");
-    badgeRow.className = "action-row";
+    const meta = [movie.releaseYear ? String(movie.releaseYear) : "", formatGenres(movie.genres)]
+      .filter(Boolean)
+      .join(" • ");
     const rankBadge = document.createElement("span");
     rankBadge.className = "badge trend";
     const rankValue = movie.rank || index + 1;
@@ -1964,18 +1990,7 @@ function renderTrendingMovies(movies = []) {
       statBadge.textContent = movie.trendScore ? `${movie.trendScore.toFixed(1)} score` : "Buzzing";
     }
 
-    badgeRow.append(rankBadge, statBadge);
-    const favoriteToggle = createFavoriteToggleButton(movie);
-    const actions = document.createElement("div");
-    actions.className = "action-row";
-    actions.append(favoriteToggle);
-
-    stack.append(title, meta);
-    if (providerBadges.length) {
-      stack.append(providerRow);
-    }
-    stack.append(badgeRow, actions);
-    card.append(stack);
+    decorateMovieCard(card, { meta, chips: [rankBadge, statBadge, ...providerBadges] });
     trendingRow.append(card);
   });
 
@@ -3938,36 +3953,39 @@ function renderHomeRecommendations(items = []) {
   homeRecommendationsRow.dataset.layout = layoutVariant;
 
   visibleItems.forEach((item) => {
-    const card = document.createElement("article");
-    card.className = "card media-card";
-
     const posterUrl = item.tmdb?.poster_path
       ? `https://image.tmdb.org/t/p/w342${item.tmdb.poster_path}`
       : item.omdb?.Poster && item.omdb.Poster !== "N/A"
       ? item.omdb.Poster
       : "";
+    const year = item.omdb?.Year || (item.tmdb?.release_date || "").slice(0, 4);
+    const normalized = {
+      tmdbId: item.tmdb?.id || null,
+      imdbId: item.omdb?.imdbID || null,
+      title: item.omdb?.Title || item.tmdb?.title || "Untitled",
+      posterUrl,
+      releaseYear: year,
+      genres: Array.isArray(item.tmdb?.genre_ids) ? item.tmdb.genre_ids : [],
+      rating: typeof item.tmdb?.vote_average === "number" ? item.tmdb.vote_average : null
+    };
 
-    const posterFrame = document.createElement("div");
-    posterFrame.className = "poster-frame";
-    posterFrame.appendChild(createPoster(posterUrl));
+    const card = buildGlassMovieCard(normalized, {
+      onOpen: (movieDetail) => openMovieDetail(movieDetail),
+      onWatchlist: async (isInWatchlist) => {
+        if (!isInWatchlist) return false;
+        if (!hasActiveSession()) return false;
+        await handleAddMovieToList(normalized);
+        return true;
+      }
+    });
+
+    if (!card) return;
+    const tmdbScore = item.tmdb?.vote_average;
     const badge = document.createElement("span");
     badge.className = "badge rating poster-badge";
-    const tmdbScore = item.tmdb?.vote_average;
     badge.textContent = tmdbScore ? tmdbScore.toFixed(1) : "New";
-    posterFrame.appendChild(badge);
-
-    const stack = document.createElement("div");
-    stack.className = "stack tight";
-    const title = document.createElement("strong");
-    title.textContent = item.omdb?.Title || item.tmdb?.title || "Untitled";
-    const meta = document.createElement("div");
-    meta.className = "small-text";
-    const year = item.omdb?.Year || (item.tmdb?.release_date || "").slice(0, 4);
-    const genres = formatGenres(item.tmdb?.genre_ids || []);
-    meta.textContent = [genres, year].filter(Boolean).join(" · ");
-
-    stack.append(title, meta);
-    card.append(posterFrame, stack);
+    const meta = [formatGenres(normalized.genres), year].filter(Boolean).join(" • ");
+    decorateMovieCard(card, { meta, chips: [badge] });
     homeRecommendationsRow.append(card);
   });
 }
@@ -4029,29 +4047,38 @@ function renderGroupPicks(items = []) {
   }
 
   items.forEach((item, index) => {
-    const card = document.createElement("div");
-    card.className = "card match-card";
     const posterUrl = item.tmdb?.poster_path
-      ? `https://image.tmdb.org/t/p/w185${item.tmdb.poster_path}`
+      ? `https://image.tmdb.org/t/p/w342${item.tmdb.poster_path}`
       : item.omdb?.Poster && item.omdb.Poster !== "N/A"
       ? item.omdb.Poster
       : "";
-    card.appendChild(createPoster(posterUrl));
-
-    const stack = document.createElement("div");
-    stack.className = "stack";
-    const title = document.createElement("strong");
-    title.textContent = item.omdb?.Title || item.tmdb?.title || "Untitled";
-    const meta = document.createElement("div");
-    meta.className = "small-text";
-    const genres = formatGenres(item.tmdb?.genre_ids || []);
     const year = item.omdb?.Year || (item.tmdb?.release_date || "").slice(0, 4);
-    meta.textContent = [genres, year].filter(Boolean).join(" · ");
+    const normalized = {
+      tmdbId: item.tmdb?.id || null,
+      imdbId: item.omdb?.imdbID || null,
+      title: item.omdb?.Title || item.tmdb?.title || "Untitled",
+      posterUrl,
+      releaseYear: year,
+      genres: Array.isArray(item.tmdb?.genre_ids) ? item.tmdb.genre_ids : [],
+      rating: typeof item.tmdb?.vote_average === "number" ? item.tmdb.vote_average : null
+    };
+
+    const card = buildGlassMovieCard(normalized, {
+      onOpen: (movieDetail) => openMovieDetail(movieDetail),
+      onWatchlist: async (isInWatchlist) => {
+        if (!isInWatchlist) return false;
+        if (!hasActiveSession()) return false;
+        await handleAddMovieToList(normalized);
+        return true;
+      }
+    });
+
+    if (!card) return;
     const badge = document.createElement("span");
     badge.className = "badge match";
     badge.textContent = `${82 + index * 4}% match`;
-    stack.append(title, meta, badge);
-    card.append(stack);
+    const meta = [formatGenres(normalized.genres), year].filter(Boolean).join(" · ");
+    decorateMovieCard(card, { meta, chips: [badge] });
     groupPicksList.append(card);
   });
 }

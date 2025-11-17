@@ -124,7 +124,8 @@ export function createMovieCard(props = {}) {
   };
 
   if (watchlistBtn) {
-    watchlistBtn.addEventListener("click", () => {
+    watchlistBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
       state.inWatchlist = !state.inWatchlist;
       refresh();
       onToggleWatchlist(state.inWatchlist, card);
@@ -132,7 +133,8 @@ export function createMovieCard(props = {}) {
   }
 
   if (likeBtn) {
-    likeBtn.addEventListener("click", () => {
+    likeBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
       state.liked = !state.liked;
       refresh();
       onToggleLike(state.liked, card);
@@ -140,12 +142,25 @@ export function createMovieCard(props = {}) {
   }
 
   if (watchedBtn) {
-    watchedBtn.addEventListener("click", () => {
+    watchedBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
       state.watched = !state.watched;
       refresh();
       onToggleWatched(state.watched, card);
     });
   }
+
+  card.setState = (nextState = {}) => {
+    state.inWatchlist = typeof nextState.inWatchlist === "boolean" ? nextState.inWatchlist : state.inWatchlist;
+    state.liked = typeof nextState.liked === "boolean" ? nextState.liked : state.liked;
+    state.watched = typeof nextState.watched === "boolean" ? nextState.watched : state.watched;
+    refresh();
+  };
+
+  card.addEventListener("movie-card:set-state", (event) => {
+    const detail = (event && event.detail) || {};
+    card.setState(detail);
+  });
 
   refresh();
   return card;
