@@ -280,6 +280,7 @@ textarea {
 }
 
 .tab-panel.is-active {
+  justify-items: anchor-center;
   display: block;
 }
 
@@ -460,6 +461,7 @@ p {
 
 .filter-row {
   display: flex;
+  font-size: x-small;
   flex-wrap: wrap;
   gap: 8px;
   margin: 10px 0 16px;
