@@ -3720,6 +3720,7 @@ async function loadTrendingMovies(timeWindow = state.trendingWindow) {
   state.trendingWindow = timeWindow || "weekly";
   state.trendingLoading = true;
   state.trendingError = "";
+  renderTrendingStatus();
   renderTrendingMovies(state.trendingMovies);
 
   if (isApiOffline()) {
@@ -3744,16 +3745,15 @@ async function loadTrendingMovies(timeWindow = state.trendingWindow) {
     );
 
     state.trendingMovies = Array.isArray(data?.movies) ? data.movies : [];
-    renderTrendingMovies(state.trendingMovies);
   } catch (error) {
     if (error.name === "AbortError") return;
     console.warn("trending fetch failed", error);
     state.trendingMovies = FALLBACK_TRENDING_MOVIES;
     state.trendingError = "Showing offline trending picks while we reconnect.";
-    renderTrendingMovies(state.trendingMovies);
   } finally {
     state.trendingAbort = null;
     state.trendingLoading = false;
+    renderTrendingMovies(state.trendingMovies);
     renderTrendingStatus();
   }
 }
