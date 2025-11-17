@@ -107,12 +107,12 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Backend: `user_follows`.
   DONE 2025-11-17T07:39Z – Added Supabase-backed follow counts from `user_follows` so the profile header reflects live follower and following totals.
 
-- [ ] **SOC-003 – Friend feed based on social graph**
+- [x] **SOC-003 – Friend feed based on social graph**
   - Description: Replace static friend feed items with:
     - Recent diary entries and reviews from people the user follows (`watch_diary`, `movie_reviews`).
   - Files: Home/feed view rendering.
   - Backend: `watch_diary`, `movie_reviews`, `user_follows`, visibility logic aligned with RLS.
-  - DONE: _…_
+  DONE 2025-11-17T07:57Z – Added Supabase-backed friend feed that pulls diary entries and reviews from followed users with privacy-aware filtering and a refreshed inline highlights UI.
 
 ---
 

@@ -30,6 +30,8 @@ import {
   getSocialOverviewSnapshot,
   subscribeToNotifications,
   acknowledgeNotifications,
+  subscribeToFriendFeed,
+  getFriendFeedSnapshot,
   recordLibraryActivity,
   refreshCollaborativeState,
   createCollaborativeListRemote,
@@ -135,6 +137,7 @@ const state = {
   accountMenuOpen: false,
   notificationPanelOpen: false,
   notifications: [],
+  friendFeed: getFriendFeedSnapshot().entries,
   notificationFocusTarget: null,
   accountAvatarPreviewUrl: null,
   accountRemoveAvatar: false,
@@ -197,6 +200,7 @@ let profileCalloutSnapshot = {
 let profileCalloutPulseTimer = null;
 let unsubscribeFollowing = null;
 let unsubscribeNotifications = null;
+let unsubscribeFriendFeed = null;
 let unsubscribeSocialOverview = null;
 let unsubscribeCollaborative = null;
 let unsubscribePresenceStatus = null;
@@ -5544,6 +5548,16 @@ function setupSocialFeatures() {
   unsubscribeNotifications = subscribeToNotifications((payload) => {
     renderNotificationCenter(payload);
   });
+  if (unsubscribeFriendFeed) {
+    unsubscribeFriendFeed();
+  }
+  unsubscribeFriendFeed = subscribeToFriendFeed((payload) => {
+    state.friendFeed = Array.isArray(payload.entries) ? payload.entries : [];
+    renderFriendsActivityFeed();
+    renderFriendsInlineHighlights();
+  });
+  const friendFeedSnapshot = getFriendFeedSnapshot();
+  state.friendFeed = Array.isArray(friendFeedSnapshot.entries) ? friendFeedSnapshot.entries : [];
   renderFriendsActivityFeed();
 }
 
@@ -6859,19 +6873,18 @@ function renderFriendsActivityFeed() {
     content.setAttribute("aria-hidden", "false");
     content.style.display = "";
   }
-  renderFriendWatchActivity(buildFriendWatchActivityEntries());
+  renderFriendWatchActivity(buildFriendWatchActivityEntries(state.friendFeed));
   renderFriendListActivity(buildCollaborativeListActivityEntries());
   renderDiscoveryFollowSuggestions();
   renderFriendsInlineHighlights();
 }
 
-function buildFriendWatchActivityEntries(limit = 4) {
-  if (!Array.isArray(state.notifications) || !state.notifications.length) {
+function buildFriendWatchActivityEntries(source = [], limit = 4) {
+  if (!Array.isArray(source) || !source.length) {
     return [];
   }
-  const allowed = new Set(["friend_watchlist", "friend_favorite", "friend_review"]);
-  return state.notifications
-    .filter((entry) => entry && allowed.has(entry.type) && entry.actor)
+  return source
+    .filter((entry) => entry && entry.username)
     .sort((a, b) => {
       const aTime = Date.parse(a && a.createdAt ? a.createdAt : "") || 0;
       const bTime = Date.parse(b && b.createdAt ? b.createdAt : "") || 0;
@@ -6880,16 +6893,13 @@ function buildFriendWatchActivityEntries(limit = 4) {
     .slice(0, limit)
     .map((entry) => ({
       id: entry.id,
-      username: entry.actor,
+      username: entry.username,
       movieTitle: entry.movieTitle || "",
-      type: entry.type || "friend_watchlist",
+      type: entry.type === "review" ? "friend_review" : "friend_diary",
       createdAt: entry.createdAt || null,
-      metaLabel:
-        entry.type === "friend_favorite"
-          ? "Favorite"
-          : entry.type === "friend_review"
-          ? "Review"
-          : "Watch log"
+      rating: typeof entry.rating === "number" ? entry.rating : null,
+      capsule: entry.capsule || "",
+      metaLabel: entry.type === "review" ? "Review" : "Diary entry"
     }));
 }
 
@@ -6942,6 +6952,12 @@ function renderFriendWatchActivity(entries) {
     const action = document.createElement("span");
     action.textContent = ` ${formatFriendActivityAction(entry)}`;
     text.appendChild(action);
+    if (entry.capsule) {
+      const snippet = document.createElement("span");
+      snippet.className = "friends-activity-snippet";
+      snippet.textContent = ` — ${entry.capsule}`;
+      text.appendChild(snippet);
+    }
     row.appendChild(text);
     const meta = document.createElement("div");
     meta.className = "friends-activity-meta";
@@ -7132,51 +7148,39 @@ function renderFriendsInlineHighlights() {
 }
 
 function buildInlineFriendHighlightEntries(limit = 3) {
-  if (!Array.isArray(state.notifications) || !state.notifications.length) {
+  if (!Array.isArray(state.friendFeed) || !state.friendFeed.length) {
     return [];
   }
-  return state.notifications
-    .filter((note) => note && getNotificationCategory(note) === "social")
+  return state.friendFeed
+    .filter((entry) => entry && entry.username)
     .sort((a, b) => {
       const aTime = Date.parse(a && a.createdAt ? a.createdAt : "") || 0;
       const bTime = Date.parse(b && b.createdAt ? b.createdAt : "") || 0;
       return bTime - aTime;
     })
     .slice(0, limit)
-    .map((note) => ({
-      id: note.id || `${note.type || "note"}-${note.createdAt || Date.now()}`,
-      icon: getNotificationIcon(note.type),
-      text: formatInlineNotificationMessage(note),
-      timestamp: formatNotificationTimestamp(note.createdAt),
-      action: getNotificationActionConfig(note)
+    .map((entry) => ({
+      id: entry.id || `${entry.type || "feed"}-${entry.createdAt || Date.now()}`,
+      icon: entry.type === "review" ? "📝" : "🎬",
+      text: formatInlineFriendFeedMessage(entry),
+      timestamp: formatNotificationTimestamp(entry.createdAt),
+      action: null
     }));
 }
 
-function formatInlineNotificationMessage(note) {
-  if (!note) {
+function formatInlineFriendFeedMessage(entry) {
+  if (!entry) {
     return "Friend activity update.";
   }
-  const rawMessage = typeof note.message === "string" ? note.message.trim() : "";
-  const actorHandle = typeof note.actor === "string" ? note.actor.trim() : "";
-  if (!rawMessage) {
-    if (actorHandle) {
-      const label = formatSocialDisplayName(actorHandle);
-      return label ? `${label} has new activity.` : "Friend activity update.";
-    }
-    return "Friend activity update.";
+  const actorHandle = typeof entry.username === "string" ? entry.username.trim() : "";
+  const actorLabel = actorHandle ? formatSocialDisplayName(actorHandle) : "A friend";
+  const title = entry.movieTitle ? `“${entry.movieTitle}”` : "a movie";
+  if (entry.type === "review") {
+    const rating = Number.isFinite(entry.rating) ? ` (${entry.rating}/10)` : "";
+    return `${actorLabel} reviewed ${title}${rating}`;
   }
-  if (actorHandle) {
-    const display = formatSocialDisplayName(actorHandle);
-    if (display) {
-      const lowerMessage = rawMessage.toLowerCase();
-      const lowerHandle = actorHandle.toLowerCase();
-      const index = lowerMessage.indexOf(lowerHandle);
-      if (index >= 0) {
-        return `${rawMessage.slice(0, index)}${display}${rawMessage.slice(index + actorHandle.length)}`;
-      }
-    }
-  }
-  return rawMessage;
+  const rating = Number.isFinite(entry.rating) ? ` • ${entry.rating}/10` : "";
+  return `${actorLabel} logged ${title}${rating}`;
 }
 
 function createInlineNotificationAction(config) {
@@ -7196,13 +7200,12 @@ function createInlineNotificationAction(config) {
 
 function formatFriendActivityAction(entry) {
   const movie = entry.movieTitle ? `“${entry.movieTitle}”` : "a movie";
-  if (entry.type === "friend_favorite") {
-    return `added ${movie} to favorites`;
-  }
   if (entry.type === "friend_review") {
-    return `reviewed ${movie}`;
+    const ratingLabel = Number.isFinite(entry.rating) ? ` (${entry.rating}/10)` : "";
+    return `reviewed ${movie}${ratingLabel}`;
   }
-  return `logged ${movie}`;
+  const ratingLabel = Number.isFinite(entry.rating) ? ` • ${entry.rating}/10` : "";
+  return `logged ${movie}${ratingLabel}`;
 }
 
 function getPresenceOverviewMap(overview = state.socialOverview || getSocialOverviewSnapshot()) {

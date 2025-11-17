@@ -121,6 +121,9 @@ module.exports = async (req, res) => {
       case 'listNotifications':
         result = await handleListNotifications(req, payload);
         break;
+      case 'listFriendFeed':
+        result = await handleListFriendFeed(req, payload);
+        break;
       case 'ackNotifications':
         result = await handleAcknowledgeNotifications(req, payload);
         break;
@@ -632,6 +635,31 @@ async function handleListNotifications(req, payload) {
   const limit = Number(payload.limit) || 50;
   const response = await listNotifications(user.username, { limit });
   return { body: response };
+}
+
+async function handleListFriendFeed(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const limit = Math.min(typeof payload.limit === 'number' && payload.limit > 0 ? payload.limit : 24, 50);
+  const following = await listFollowing(user.username);
+  const actors = Array.from(new Set([user.username, ...following].map((handle) => canonicalUsername(handle)).filter(Boolean)));
+  if (!actors.length) {
+    return { status: 200, body: { entries: [] } };
+  }
+
+  try {
+    const entries = usingLocalStore()
+      ? await buildLocalFriendFeed(actors, limit)
+      : await buildRemoteFriendFeed(actors, limit);
+    return { status: 200, body: { entries } };
+  } catch (error) {
+    if (!usingLocalStore()) {
+      enableLocalFallback('loading friend feed', error);
+      const entries = await buildLocalFriendFeed(actors, limit);
+      return { status: 200, body: { entries } };
+    }
+    console.warn('Friend feed error', error);
+    return { status: 500, body: { error: 'Unable to load friend feed.' } };
+  }
 }
 
 async function handleAcknowledgeNotifications(req, payload) {
@@ -3197,6 +3225,130 @@ async function recordLibraryActivity({ username, action, movie }) {
   );
 }
 
+async function buildLocalFriendFeed(usernames, limit = 24) {
+  const store = await readSocialStore();
+  const reviews = Array.isArray(store.reviews) ? store.reviews : [];
+  const allowed = new Set(usernames.map((name) => canonicalUsername(name)));
+  const entries = reviews
+    .filter((review) => allowed.has(canonicalUsername(review.username)))
+    .filter((review) => normalizeReviewVisibility(review.visibility) !== 'private')
+    .map((review) => {
+      const capsule = review.capsule
+        ? String(review.capsule)
+        : buildCapsuleFromSegments(parseReviewSegments(review.body || ''), review.body || '');
+      return {
+        id: `review-${review.id || randomUUID()}`,
+        username: review.username,
+        type: 'review',
+        movieTitle: review.movieTitle || '',
+        rating: typeof review.rating === 'number' ? review.rating : null,
+        capsule,
+        createdAt: review.createdAt || review.updatedAt || null
+      };
+    });
+  return entries
+    .sort((a, b) => normalizeTimestamp(b.createdAt) - normalizeTimestamp(a.createdAt))
+    .slice(0, limit);
+}
+
+async function buildRemoteFriendFeed(usernames, limit = 24) {
+  const inFilter = formatSupabaseIn(usernames);
+  if (!inFilter) {
+    return [];
+  }
+
+  let diaryRows = [];
+  let reviewRows = [];
+  try {
+    diaryRows = await supabaseFetch('watch_diary', {
+      query: {
+        select:
+          'id,username,watched_on,visibility,rating,movie_imdb_id,review_id,created_at,' +
+          'movie:movies(title,tmdb_id,poster_url,release_year),' +
+          'review:movie_reviews(id,body,rating,created_at,visibility)',
+        username: inFilter,
+        visibility: 'in.(public,friends)',
+        order: 'watched_on.desc',
+        limit
+      }
+    });
+  } catch (error) {
+    console.warn('Diary fetch failed', error);
+  }
+
+  try {
+    reviewRows = await supabaseFetch('movie_reviews', {
+      query: {
+        select: 'id,username,movie_imdb_id,rating,visibility,created_at,body,movie:movies(title,tmdb_id,poster_url,release_year)',
+        username: inFilter,
+        visibility: 'in.(public,friends)',
+        order: 'created_at.desc',
+        limit
+      }
+    });
+  } catch (error) {
+    console.warn('Review fetch failed', error);
+  }
+
+  const entries = [];
+  (Array.isArray(reviewRows) ? reviewRows : []).forEach((row) => {
+    if (!row || row.visibility === 'private') {
+      return;
+    }
+    const capsule = extractReviewCapsule(row.body);
+    entries.push({
+      id: `review-${row.id || randomUUID()}`,
+      username: row.username,
+      type: 'review',
+      movieTitle: row.movie && row.movie.title ? row.movie.title : '',
+      rating: typeof row.rating === 'number' ? row.rating : Number(row.rating) || null,
+      capsule,
+      createdAt: row.created_at || null
+    });
+  });
+
+  (Array.isArray(diaryRows) ? diaryRows : []).forEach((row) => {
+    if (!row || row.visibility === 'private') {
+      return;
+    }
+    const reviewCapsule = row.review ? extractReviewCapsule(row.review.body) : '';
+    const ratingValue =
+      typeof row.rating === 'number'
+        ? row.rating
+        : row.review && typeof row.review.rating === 'number'
+        ? row.review.rating
+        : Number(row.rating) || Number(row.review && row.review.rating) || null;
+    entries.push({
+      id: `diary-${row.id || randomUUID()}`,
+      username: row.username,
+      type: 'diary',
+      movieTitle: row.movie && row.movie.title ? row.movie.title : '',
+      rating: ratingValue,
+      capsule: reviewCapsule,
+      createdAt: row.watched_on || row.created_at || null
+    });
+  });
+
+  return entries
+    .sort((a, b) => normalizeTimestamp(b.createdAt) - normalizeTimestamp(a.createdAt))
+    .slice(0, limit);
+}
+
+function extractReviewCapsule(body) {
+  if (!body) {
+    return '';
+  }
+  return buildCapsuleFromSegments(parseReviewSegments(body), body) || '';
+}
+
+function normalizeTimestamp(value) {
+  if (!value) {
+    return 0;
+  }
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : 0;
+}
+
 async function resolveMentionTargets(body, actor) {
   if (!body) {
     return [];
@@ -4413,6 +4565,15 @@ function canonicalUsername(username) {
     return '';
   }
   return username.trim().toLowerCase();
+}
+
+function formatSupabaseIn(values = []) {
+  const cleaned = Array.from(new Set(values.map((value) => canonicalUsername(value)).filter(Boolean)));
+  if (!cleaned.length) {
+    return '';
+  }
+  const escaped = cleaned.map((value) => `"${value.replace(/"/g, '\\"')}"`);
+  return `in.(${escaped.join(',')})`;
 }
 
 function formatDisplayNameFromHandle(handle) {
