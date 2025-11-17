@@ -181,14 +181,6 @@ const state = {
   diarySearchResults: [],
   diarySearchAbort: null,
   diarySubmitting: false,
-  movieDetail: {
-    open: false,
-    movie: null,
-    status: "",
-    submitting: false,
-    tagInput: "",
-    partySubmitting: false
-  },
   appConfig: {
     config: {},
     experiments: { experiments: [], assignments: {} },
@@ -483,20 +475,6 @@ const onboardingGenreCount = document.querySelector("[data-onboarding-genre-coun
 const onboardingDecadeCount = document.querySelector("[data-onboarding-decade-count]");
 const onboardingProviderCount = document.querySelector("[data-onboarding-provider-count]");
 const onboardingImportOptions = document.querySelectorAll("[data-onboarding-import]");
-const movieDetailOverlay = document.querySelector('[data-movie-detail]');
-const movieDetailClose = document.querySelector('[data-movie-detail-close]');
-const movieDetailTitle = document.querySelector('[data-movie-detail-title]');
-const movieDetailMeta = document.querySelector('[data-movie-detail-meta]');
-const movieDetailProviders = document.querySelector('[data-movie-detail-providers]');
-const movieDetailTags = document.querySelector('[data-movie-detail-tags]');
-const movieDetailTagForm = document.querySelector('[data-movie-detail-tag-form]');
-const movieDetailTagInput = document.querySelector('[data-movie-detail-tag-input]');
-const movieDetailStatus = document.querySelector('[data-movie-detail-status]');
-const movieDetailPartyForm = document.querySelector('[data-movie-detail-party-form]');
-const movieDetailPartyWhen = document.querySelector('[data-movie-detail-party-when]');
-const movieDetailPartyTitle = document.querySelector('[data-movie-detail-party-title]');
-const movieDetailPartyVisibility = document.querySelector('[data-movie-detail-party-visibility]');
-const movieDetailPartyNote = document.querySelector('[data-movie-detail-party-note]');
 
 subscribeToConfig((configState) => {
   state.appConfig = configState;
@@ -648,13 +626,6 @@ function buildGlassMovieCard(normalized, options = {}) {
   card.dataset.tmdbId = normalized.tmdbId ? String(normalized.tmdbId) : "";
   card.dataset.imdbId = normalized.imdbId || "";
   card.dataset.title = normalized.title ? normalized.title.trim().toLowerCase() : "";
-
-  card.addEventListener("click", (event) => {
-    if (event.target.closest(".movie-card__action-btn")) return;
-    if (typeof options.onOpen === "function") {
-      options.onOpen(normalized, card);
-    }
-  });
 
   return card;
 }
@@ -1645,7 +1616,6 @@ function renderDiscoverMovies(movies = []) {
     const normalized = normalizeDiscoverMovie(movie);
     if (!normalized) return;
     const card = buildGlassMovieCard(normalized, {
-      onOpen: (movieDetail) => openMovieDetail(movieDetail),
       onWatchlist: async (isInWatchlist) => {
         if (!isInWatchlist) return false;
         if (!hasActiveSession()) return false;
@@ -1665,257 +1635,6 @@ function renderDiscoverMovies(movies = []) {
     decorateMovieCard(card, { meta, chips: providerBadges, tagRow });
     discoverGrid.append(card);
   });
-}
-
-function normalizeMovieDetail(movie) {
-  if (!movie || typeof movie !== "object") return null;
-  const tmdbId = movie.tmdbId || movie.tmdbID || movie.id || null;
-  const title = movie.title || movie.movieTitle || "";
-  if (!tmdbId || !title) return null;
-  const releaseYear = movie.releaseYear || movie.year || null;
-  const genres = Array.isArray(movie.genres) ? movie.genres : [];
-  const streamingProviders = Array.isArray(movie.streamingProviders)
-    ? movie.streamingProviders
-    : Array.isArray(movie.providers)
-      ? movie.providers
-      : [];
-  return {
-    tmdbId: tmdbId,
-    imdbId: movie.imdbId || movie.imdbID || null,
-    title,
-    releaseYear,
-    genres,
-    streamingProviders
-  };
-}
-
-function setMovieDetailStatus(message, tone = "") {
-  state.movieDetail.status = message || "";
-  if (!movieDetailStatus) return;
-  movieDetailStatus.textContent = state.movieDetail.status;
-  movieDetailStatus.className = "small-text";
-  if (tone === "error") {
-    movieDetailStatus.classList.add("error-text");
-  } else if (tone === "success") {
-    movieDetailStatus.classList.add("success-text");
-  } else if (tone === "loading") {
-    movieDetailStatus.classList.add("muted");
-  }
-}
-
-function isTagAppliedToMovie(tagId, movie) {
-  if (!tagId) return false;
-  return getTagsForMovie(movie).some((entry) => entry.tagId === tagId);
-}
-
-function renderMovieDetail() {
-  if (!movieDetailOverlay) return;
-  if (!state.movieDetail.open || !state.movieDetail.movie) {
-    movieDetailOverlay.hidden = true;
-    return;
-  }
-  movieDetailOverlay.hidden = false;
-  const movie = state.movieDetail.movie;
-  if (movieDetailTitle) {
-    movieDetailTitle.textContent = movie.title;
-  }
-  if (movieDetailMeta) {
-    const year = movie.releaseYear ? String(movie.releaseYear) : "";
-    const genreText = formatGenres(movie.genres || []);
-    movieDetailMeta.textContent = [year, genreText].filter(Boolean).join(" • ");
-  }
-  if (movieDetailProviders) {
-    movieDetailProviders.innerHTML = "";
-    (movie.streamingProviders || []).forEach((provider) => {
-      const badge = createProviderBadge(provider);
-      movieDetailProviders.append(badge);
-    });
-  }
-  if (movieDetailTagInput && state.movieDetail.tagInput !== undefined) {
-    movieDetailTagInput.value = state.movieDetail.tagInput;
-  }
-  if (movieDetailTags) {
-    movieDetailTags.innerHTML = "";
-    if (!hasActiveSession()) {
-      const hint = document.createElement("p");
-      hint.className = "small-text muted";
-      hint.textContent = "Sign in to add personal tags.";
-      movieDetailTags.append(hint);
-    } else if (!state.userTags.length) {
-      const hint = document.createElement("p");
-      hint.className = "small-text muted";
-      hint.textContent = state.userTagsLoading ? "Loading tags…" : "Add your first tag to get started.";
-      movieDetailTags.append(hint);
-    } else {
-      state.userTags.forEach((tag) => {
-        const pill = document.createElement("button");
-        pill.type = "button";
-        pill.className = "pill";
-        pill.dataset.movieTagId = tag.id;
-        pill.textContent = `#${tag.label}`;
-        if (isTagAppliedToMovie(tag.id, movie)) {
-          pill.dataset.active = "true";
-        }
-        movieDetailTags.append(pill);
-      });
-    }
-  }
-  if (movieDetailPartyTitle && !movieDetailPartyTitle.value) {
-    movieDetailPartyTitle.value = `Watch “${movie.title}” together`;
-  }
-  setMovieDetailStatus(state.movieDetail.status);
-}
-
-function openMovieDetail(movie) {
-  const normalized = normalizeMovieDetail(movie);
-  if (!normalized) {
-    setListItemStatus("Unable to load details for that movie.", "error");
-    return;
-  }
-  state.movieDetail = {
-    ...state.movieDetail,
-    open: true,
-    movie: normalized,
-    status: "",
-    submitting: false,
-    tagInput: "",
-    partySubmitting: false
-  };
-  renderMovieDetail();
-  if (!state.userTagsLoading && !state.userTags.length) {
-    loadUserTags();
-  }
-}
-
-function closeMovieDetail() {
-  state.movieDetail = {
-    ...state.movieDetail,
-    open: false,
-    movie: null,
-    status: "",
-    tagInput: "",
-    submitting: false,
-    partySubmitting: false
-  };
-  if (movieDetailOverlay) {
-    movieDetailOverlay.hidden = true;
-  }
-}
-
-async function toggleMovieTag(tagId) {
-  if (!state.movieDetail.movie || !tagId) return;
-  if (!hasActiveSession()) {
-    openAuthOverlay("login");
-    return;
-  }
-  const already = isTagAppliedToMovie(tagId, state.movieDetail.movie);
-  setMovieDetailStatus(already ? "Removing tag…" : "Saving tag…", "loading");
-  try {
-    const result = already
-      ? await untagMovieRemote({ tagId, movie: state.movieDetail.movie })
-      : await tagMovieRemote({ tagId, movie: state.movieDetail.movie });
-    setUserTagData(result);
-    setMovieDetailStatus(already ? "Removed tag." : "Tagged movie.", "success");
-  } catch (error) {
-    setMovieDetailStatus(error instanceof Error ? error.message : "Could not update tag.", "error");
-  }
-}
-
-async function handleMovieDetailTagSubmit(event) {
-  event.preventDefault();
-  if (!hasActiveSession()) {
-    openAuthOverlay("login");
-    return;
-  }
-  const label = movieDetailTagInput ? movieDetailTagInput.value.trim() : "";
-  if (!label) {
-    setMovieDetailStatus("Add a tag name first.", "error");
-    return;
-  }
-  state.movieDetail.submitting = true;
-  setMovieDetailStatus("Saving tag…", "loading");
-  if (movieDetailTagInput) {
-    movieDetailTagInput.disabled = true;
-  }
-  try {
-    const result = await upsertUserTagRemote({ label });
-    setUserTagData(result);
-    const createdId = result?.tag?.id;
-    state.movieDetail.tagInput = "";
-    if (createdId && state.movieDetail.movie && !isTagAppliedToMovie(createdId, state.movieDetail.movie)) {
-      const tagged = await tagMovieRemote({ tagId: createdId, movie: state.movieDetail.movie });
-      setUserTagData(tagged);
-    }
-    setMovieDetailStatus("Tag saved.", "success");
-  } catch (error) {
-    setMovieDetailStatus(error instanceof Error ? error.message : "Unable to save that tag.", "error");
-  } finally {
-    state.movieDetail.submitting = false;
-    if (movieDetailTagInput) {
-      movieDetailTagInput.disabled = false;
-      movieDetailTagInput.value = state.movieDetail.tagInput;
-      movieDetailTagInput.focus();
-    }
-  }
-}
-
-function handleMovieDetailTagClick(event) {
-  const target = event.target.closest('[data-movie-tag-id]');
-  if (!target) return;
-  const tagId = target.dataset.movieTagId;
-  toggleMovieTag(tagId);
-}
-
-async function handleMovieDetailPartySubmit(event) {
-  event.preventDefault();
-  if (!hasActiveSession()) {
-    openAuthOverlay("login");
-    return;
-  }
-  if (!state.movieDetail.movie) {
-    setMovieDetailStatus("Select a movie first.", "error");
-    return;
-  }
-  const whenRaw = movieDetailPartyWhen ? movieDetailPartyWhen.value.trim() : "";
-  if (!whenRaw) {
-    setMovieDetailStatus("Choose a start time for your watch party.", "error");
-    return;
-  }
-  const whenDate = new Date(whenRaw);
-  if (Number.isNaN(whenDate.getTime())) {
-    setMovieDetailStatus("Enter a valid date and time.", "error");
-    return;
-  }
-  const visibility = movieDetailPartyVisibility ? movieDetailPartyVisibility.value : "friends";
-  const note = movieDetailPartyNote ? movieDetailPartyNote.value.trim() : "";
-  const title = movieDetailPartyTitle ? movieDetailPartyTitle.value.trim() : state.movieDetail.movie.title;
-  state.movieDetail.partySubmitting = true;
-  setMovieDetailStatus("Scheduling watch party…", "loading");
-  try {
-    await scheduleWatchPartyRemote({
-      movie: {
-        title: state.movieDetail.movie.title,
-        tmdbId: state.movieDetail.movie.tmdbId,
-        imdbId: state.movieDetail.movie.imdbId || null
-      },
-      scheduledFor: whenDate.toISOString(),
-      note: note || title,
-      visibility
-    });
-    setMovieDetailStatus("Watch party scheduled!", "success");
-    if (movieDetailPartyForm) {
-      movieDetailPartyForm.reset();
-    }
-    await refreshCollaborativeState();
-  } catch (error) {
-    setMovieDetailStatus(
-      error instanceof Error ? error.message : "Could not schedule that watch party right now.",
-      "error"
-    );
-  } finally {
-    state.movieDetail.partySubmitting = false;
-    renderMovieDetail();
-  }
 }
 
 function renderTrendingStatus() {
@@ -1973,7 +1692,6 @@ function renderTrendingMovies(movies = []) {
 
   normalized.forEach((movie, index) => {
     const card = buildGlassMovieCard(movie, {
-      onOpen: (movieDetail) => openMovieDetail(movieDetail),
       onWatchlist: async (isInWatchlist) => {
         if (!isInWatchlist) return false;
         if (!hasActiveSession()) return false;
@@ -2707,18 +2425,6 @@ function renderListItems(items = []) {
 
     const actions = document.createElement("div");
     actions.className = "inline-actions";
-    const tagBtn = document.createElement("button");
-    tagBtn.type = "button";
-    tagBtn.className = "btn-ghost btn";
-    tagBtn.textContent = "Tags";
-    tagBtn.addEventListener("click", () => {
-      if (!hasActiveSession()) {
-        setListItemStatus("Sign in to manage tags.", "error");
-        openAuthOverlay("login");
-        return;
-      }
-      openMovieDetail(item.movie);
-    });
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
     removeBtn.className = "btn-ghost btn";
@@ -2726,7 +2432,7 @@ function renderListItems(items = []) {
     removeBtn.addEventListener("click", async () => {
       await handleRemoveListItem(item.movie?.imdbId);
     });
-    actions.append(tagBtn, removeBtn);
+    actions.append(removeBtn);
 
     const tagRow = renderMovieTagRow(item.movie);
     stack.append(title, meta);
@@ -4021,7 +3727,6 @@ function renderHomeRecommendations(items = []) {
     };
 
     const card = buildGlassMovieCard(normalized, {
-      onOpen: (movieDetail) => openMovieDetail(movieDetail),
       onWatchlist: async (isInWatchlist) => {
         if (!isInWatchlist) return false;
         if (!hasActiveSession()) return false;
@@ -4115,7 +3820,6 @@ function renderGroupPicks(items = []) {
     };
 
     const card = buildGlassMovieCard(normalized, {
-      onOpen: (movieDetail) => openMovieDetail(movieDetail),
       onWatchlist: async (isInWatchlist) => {
         if (!isInWatchlist) return false;
         if (!hasActiveSession()) return false;
@@ -4858,9 +4562,6 @@ function handleOutsideClick(event) {
   if (state.onboardingOpen && onboardingOverlay && event.target === onboardingOverlay) {
     closeOnboarding();
   }
-  if (state.movieDetail.open && movieDetailOverlay && event.target === movieDetailOverlay) {
-    closeMovieDetail();
-  }
   if (state.notificationMenuOpen && notificationMenu && notificationButton) {
     const insideNotificationUi =
       eventPathIncludes(event, notificationMenu) || eventPathIncludes(event, notificationButton);
@@ -4886,9 +4587,6 @@ function handleEscape(event) {
     }
     if (state.onboardingOpen) {
       closeOnboarding();
-    }
-    if (state.movieDetail.open) {
-      closeMovieDetail();
     }
   }
 }
@@ -5220,19 +4918,6 @@ function attachListeners() {
 
   if (listTagFilters) {
     listTagFilters.addEventListener("click", handleListTagFilterClick);
-  }
-
-  if (movieDetailClose) {
-    movieDetailClose.addEventListener("click", closeMovieDetail);
-  }
-  if (movieDetailTags) {
-    movieDetailTags.addEventListener("click", handleMovieDetailTagClick);
-  }
-  if (movieDetailTagForm) {
-    movieDetailTagForm.addEventListener("submit", handleMovieDetailTagSubmit);
-  }
-  if (movieDetailPartyForm) {
-    movieDetailPartyForm.addEventListener("submit", handleMovieDetailPartySubmit);
   }
 
   attachDocumentHandlers();
