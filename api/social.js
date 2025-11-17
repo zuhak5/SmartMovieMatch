@@ -178,6 +178,12 @@ module.exports = async (req, res) => {
       case 'joinWatchParty':
         result = await handleJoinWatchParty(req, payload);
         break;
+      case 'listWatchPartyMessages':
+        result = await handleListWatchPartyMessages(req, payload);
+        break;
+      case 'postWatchPartyMessage':
+        result = await handlePostWatchPartyMessage(req, payload);
+        break;
       case 'updatePresence':
         result = await handleUpdatePresence(req, payload);
         break;
@@ -1538,6 +1544,136 @@ async function handleJoinWatchParty(req, payload) {
       party: formatWatchPartyForUser(party, user.username)
     }
   };
+}
+
+async function handleListWatchPartyMessages(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const partyId = typeof payload.partyId === 'string' ? payload.partyId.trim() : '';
+  if (!partyId) {
+    throw new HttpError(400, 'Choose a watch party first.');
+  }
+
+  if (usingLocalStore()) {
+    const store = await readSocialStore();
+    const party = store.watchParties.find((entry) => entry.id === partyId);
+    if (!party) {
+      throw new HttpError(404, 'Watch party not found.');
+    }
+    ensurePartyParticipants(party);
+    if (!isPartyParticipant(party, user.username)) {
+      throw new HttpError(403, 'Only hosts and participants can view party chat.');
+    }
+    const messages = Array.isArray(store.watchPartyMessages)
+      ? store.watchPartyMessages
+          .filter((entry) => entry.partyId === partyId)
+          .map(formatWatchPartyMessage)
+          .filter(Boolean)
+          .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      : [];
+    return { body: { ok: true, messages } };
+  }
+
+  const party = await assertWatchPartyAccessSupabase(partyId, user.username);
+  if (!party) {
+    throw new HttpError(404, 'Watch party not found.');
+  }
+  const rows = await supabaseFetch('watch_party_messages', {
+    query: {
+      select: 'id,party_id,username,body,message_type,metadata,created_at',
+      party_id: `eq.${partyId}`,
+      order: 'created_at.asc'
+    }
+  });
+  const messages = Array.isArray(rows)
+    ? rows
+        .map((row) => ({
+          id: row.id || randomUUID(),
+          partyId: row.party_id || partyId,
+          username: canonicalUsername(row.username),
+          body: row.body || '',
+          messageType: row.message_type || 'chat',
+          metadata: row.metadata && typeof row.metadata === 'object' ? row.metadata : {},
+          createdAt: row.created_at || null
+        }))
+        .filter((entry) => entry.username && entry.body)
+    : [];
+  return { body: { ok: true, messages } };
+}
+
+async function handlePostWatchPartyMessage(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const partyId = typeof payload.partyId === 'string' ? payload.partyId.trim() : '';
+  const bodyRaw = typeof payload.body === 'string' ? payload.body.trim() : '';
+  if (!partyId) {
+    throw new HttpError(400, 'Choose a watch party first.');
+  }
+  if (!bodyRaw) {
+    throw new HttpError(400, 'Type a message before sending.');
+  }
+  const body = bodyRaw.slice(0, 500);
+
+  if (usingLocalStore()) {
+    const store = await readSocialStore();
+    const party = store.watchParties.find((entry) => entry.id === partyId);
+    if (!party) {
+      throw new HttpError(404, 'Watch party not found.');
+    }
+    ensurePartyParticipants(party);
+    if (!isPartyParticipant(party, user.username)) {
+      throw new HttpError(403, 'Only hosts and participants can send messages.');
+    }
+    const timestamp = new Date().toISOString();
+    const message = {
+      id: randomUUID(),
+      partyId,
+      username: canonicalUsername(user.username),
+      body,
+      messageType: 'chat',
+      metadata: {},
+      createdAt: timestamp
+    };
+    store.watchPartyMessages = Array.isArray(store.watchPartyMessages)
+      ? store.watchPartyMessages
+      : [];
+    store.watchPartyMessages.push(message);
+    party.updatedAt = timestamp;
+    await writeSocialStore(store);
+    return { body: { ok: true, message: formatWatchPartyMessage(message) } };
+  }
+
+  await assertWatchPartyAccessSupabase(partyId, user.username);
+  const rows = await supabaseFetch('watch_party_messages', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: {
+      party_id: partyId,
+      username: canonicalUsername(user.username),
+      body,
+      message_type: 'chat',
+      metadata: {}
+    }
+  });
+  const inserted = Array.isArray(rows) && rows.length ? rows[0] : null;
+  const message = inserted
+    ? {
+        id: inserted.id || randomUUID(),
+        partyId: inserted.party_id || partyId,
+        username: canonicalUsername(inserted.username),
+        body: inserted.body || body,
+        messageType: inserted.message_type || 'chat',
+        metadata: inserted.metadata && typeof inserted.metadata === 'object' ? inserted.metadata : {},
+        createdAt: inserted.created_at || new Date().toISOString()
+      }
+    : {
+        id: randomUUID(),
+        partyId,
+        username: canonicalUsername(user.username),
+        body,
+        messageType: 'chat',
+        metadata: {},
+        createdAt: new Date().toISOString()
+      };
+  return { body: { ok: true, message } };
 }
 
 async function handleUpdatePresence(req, payload) {
@@ -3972,6 +4108,16 @@ function ensurePartyParticipants(party) {
   }
 }
 
+function isPartyParticipant(party, username) {
+  if (!party || !username || !Array.isArray(party.participants)) {
+    return false;
+  }
+  const canonical = canonicalUsername(username);
+  return party.participants.some(
+    (entry) => canonicalUsername(entry.username) === canonical && !entry.isKicked
+  );
+}
+
 function upsertPartyParticipant(party, username, role = 'guest', metadata = {}) {
   if (!party || !username) {
     return;
@@ -4033,6 +4179,64 @@ function formatWatchPartyParticipant(entry) {
     isKicked: Boolean(entry.isKicked),
     metadata: entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {}
   };
+}
+
+function formatWatchPartyMessage(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+  const id = entry.id || randomUUID();
+  const username = canonicalUsername(entry.username);
+  const body = typeof entry.body === 'string' ? entry.body : '';
+  if (!username || !body) {
+    return null;
+  }
+  return {
+    id,
+    partyId: entry.partyId || entry.party_id || null,
+    username,
+    body,
+    messageType: entry.messageType || entry.message_type || 'chat',
+    metadata: entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {},
+    createdAt: entry.createdAt || entry.created_at || null
+  };
+}
+
+async function assertWatchPartyAccessSupabase(partyId, username) {
+  const normalizedParty = typeof partyId === 'string' ? partyId.trim() : '';
+  const normalizedUser = canonicalUsername(username);
+  if (!normalizedParty || !normalizedUser) {
+    throw new HttpError(400, 'Missing watch party details.');
+  }
+  const partyRows = await supabaseFetch('watch_parties', {
+    query: {
+      select: 'id,host_username',
+      id: `eq.${normalizedParty}`,
+      limit: '1'
+    }
+  });
+  const party = Array.isArray(partyRows) && partyRows.length ? partyRows[0] : null;
+  if (!party) {
+    throw new HttpError(404, 'Watch party not found.');
+  }
+  if (canonicalUsername(party.host_username) === normalizedUser) {
+    return party;
+  }
+  const participantRows = await supabaseFetch('watch_party_participants', {
+    query: {
+      select: 'username,is_kicked',
+      party_id: `eq.${normalizedParty}`,
+      username: `eq.${normalizedUser}`,
+      limit: '1'
+    }
+  });
+  const participant = Array.isArray(participantRows) && participantRows.length
+    ? participantRows[0]
+    : null;
+  if (!participant || participant.is_kicked) {
+    throw new HttpError(403, 'You do not have access to this watch party.');
+  }
+  return party;
 }
 
 function recordPresence(username, { state, movie, statusPreset, source }) {
@@ -4909,7 +5113,10 @@ async function readSocialStore() {
       reviewComments: Array.isArray(parsed.reviewComments) ? parsed.reviewComments.slice() : [],
       reviewReactions: Array.isArray(parsed.reviewReactions) ? parsed.reviewReactions.slice() : [],
       collabLists: Array.isArray(parsed.collabLists) ? parsed.collabLists.slice() : [],
-      watchParties: Array.isArray(parsed.watchParties) ? parsed.watchParties.slice() : []
+      watchParties: Array.isArray(parsed.watchParties) ? parsed.watchParties.slice() : [],
+      watchPartyMessages: Array.isArray(parsed.watchPartyMessages)
+        ? parsed.watchPartyMessages.slice()
+        : []
     };
   } catch (error) {
     return {
@@ -4921,7 +5128,8 @@ async function readSocialStore() {
       reviewComments: [],
       reviewReactions: [],
       collabLists: [],
-      watchParties: []
+      watchParties: [],
+      watchPartyMessages: []
     };
   }
 }
@@ -4937,7 +5145,10 @@ async function writeSocialStore(store) {
       reviewComments: Array.isArray(store.reviewComments) ? store.reviewComments : [],
       reviewReactions: Array.isArray(store.reviewReactions) ? store.reviewReactions : [],
       collabLists: Array.isArray(store.collabLists) ? store.collabLists : [],
-      watchParties: Array.isArray(store.watchParties) ? store.watchParties : []
+      watchParties: Array.isArray(store.watchParties) ? store.watchParties : [],
+      watchPartyMessages: Array.isArray(store.watchPartyMessages)
+        ? store.watchPartyMessages
+        : []
     },
     null,
     2

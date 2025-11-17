@@ -89,6 +89,76 @@
   font-size: 12px;
 }
 
+.watch-party-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.watch-party-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.watch-party-meta {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.watch-party-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.watch-party-chat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.watch-party-messages {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.watch-party-message {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.watch-party-message-meta {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.watch-party-status[data-variant="loading"] {
+  color: var(--warning);
+}
+
+.watch-party-status[data-variant="error"] {
+  color: var(--danger);
+}
+
+.watch-party-status[data-variant="success"] {
+  color: var(--success);
+}
+
 * {
   box-sizing: border-box;
 }

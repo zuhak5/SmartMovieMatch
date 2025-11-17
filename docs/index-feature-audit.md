@@ -231,13 +231,13 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Backend: `watch_parties`, `watch_party_participants`.
   - DONE 2025-11-17T08:26Z – Added join action plus presence-aware participant roster for watch parties, syncing host and attendee presence with the invite lobby.
 
-- [ ] **PARTY-003 – In-party chat**
+- [x] **PARTY-003 – In-party chat**
   - Description: Implement a simple chat box inside the watch-party view.
     - Messages stored in `watch_party_messages`.
     - Visible only to hosts and participants as enforced by RLS.
   - Files: Party chat panel component.
   - Backend: `watch_party_messages`.
-  - DONE: _…_
+  - DONE 2025-11-17T08:45Z – Added authenticated watch-party chat with live message history, host/participant gating, and Supabase-backed persistence for lobby conversations.
 
 ---
 
