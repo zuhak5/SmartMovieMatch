@@ -288,7 +288,9 @@ p {
   color: var(--muted);
   line-height: 1.6;
 }
-
+.card + .card {
+  margin-top: 12px;
+}
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
