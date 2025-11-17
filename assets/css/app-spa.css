@@ -1775,7 +1775,7 @@ p {
 
 .bottom-nav {
   position: fixed;
-  bottom: 3px;
+  bottom: 0px;
   left: 50%;
   transform: translateX(-50%);
   width: min(100%, 420px);
