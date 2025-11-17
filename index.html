@@ -458,6 +458,8 @@
                   <button class="btn-ghost btn" type="button" data-list-delete>Delete</button>
                 </div>
               </div>
+              <div class="pill-row" data-list-tag-filters></div>
+              <p class="small-text muted" data-list-tag-status></p>
               <form class="stack" data-list-edit-form hidden>
                 <label class="field">
                   <span class="small-text muted">Name</span>
@@ -884,6 +886,54 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div class="overlay" data-movie-detail hidden>
+    <div class="overlay-content card" style="max-width: 560px;">
+      <div class="panel-heading" style="align-items: flex-start;">
+        <div>
+          <h3 data-movie-detail-title>Movie</h3>
+          <p class="small-text" data-movie-detail-meta></p>
+          <div class="badge-row" data-movie-detail-providers></div>
+        </div>
+        <button class="btn-ghost btn" type="button" data-movie-detail-close>Close</button>
+      </div>
+      <div class="pill-row" data-movie-detail-tags></div>
+      <form class="inline-actions" data-movie-detail-tag-form>
+        <input
+          class="input-base input-text"
+          type="text"
+          placeholder="Add a personal tag (press enter)"
+          data-movie-detail-tag-input
+        />
+        <button class="btn btn-primary" type="submit">Add tag</button>
+      </form>
+      <div class="divider"></div>
+      <form class="stack" data-movie-detail-party-form>
+        <label class="field">
+          <span class="small-text muted">Party title</span>
+          <input class="input-base input-text" type="text" data-movie-detail-party-title />
+        </label>
+        <label class="field">
+          <span class="small-text muted">Description</span>
+          <input class="input-base input-text" type="text" data-movie-detail-party-note />
+        </label>
+        <label class="field">
+          <span class="small-text muted">Start time</span>
+          <input class="input-base" type="datetime-local" data-movie-detail-party-when />
+        </label>
+        <label class="field">
+          <span class="small-text muted">Visibility</span>
+          <select data-movie-detail-party-visibility>
+            <option value="friends">Friends</option>
+            <option value="invite-only">Invite-only</option>
+            <option value="public">Public</option>
+          </select>
+        </label>
+        <button class="btn btn-primary" type="submit">Schedule watch party</button>
+      </form>
+      <p class="small-text" data-movie-detail-status></p>
     </div>
   </div>
 

@@ -158,6 +158,21 @@ module.exports = async (req, res) => {
       case 'removeUserListItem':
         result = await handleRemoveUserListItem(req, payload);
         break;
+      case 'listUserTags':
+        result = await handleListUserTags(req, payload);
+        break;
+      case 'upsertUserTag':
+        result = await handleUpsertUserTag(req, payload);
+        break;
+      case 'deleteUserTag':
+        result = await handleDeleteUserTag(req, payload);
+        break;
+      case 'tagMovie':
+        result = await handleTagMovie(req, payload);
+        break;
+      case 'untagMovie':
+        result = await handleUntagMovie(req, payload);
+        break;
       case 'searchUsers':
         result = await handleSearchUsers(req, payload);
         break;
@@ -962,6 +977,139 @@ async function handleRemoveUserListItem(req, payload) {
   return { body: { items } };
 }
 
+async function handleListUserTags(req, payload) {
+  const { user } = await authenticate(req, payload);
+  if (!usingLocalStore()) {
+    throw new HttpError(501, 'Personal tags are only available in local demo mode for now.');
+  }
+  const store = await readSocialStore();
+  return { body: formatUserTagsResponse(store, user.username) };
+}
+
+async function handleUpsertUserTag(req, payload) {
+  const { user } = await authenticate(req, payload);
+  if (!usingLocalStore()) {
+    throw new HttpError(501, 'Personal tags are only available in local demo mode for now.');
+  }
+  const label = sanitizeTagLabel(payload.label);
+  if (!label) {
+    throw new HttpError(400, 'Add a short tag name first.');
+  }
+  const tagId = normalizeUuid(payload.tagId || payload.tag_id || '');
+  const username = canonicalUsername(user.username);
+  const store = await readSocialStore();
+  const existingTags = listUserTagsForUser(store, username);
+  const duplicate = existingTags.find((entry) => entry.label.toLowerCase() === label.toLowerCase());
+  const now = new Date().toISOString();
+  let tag;
+  if (tagId) {
+    tag = existingTags.find((entry) => entry.id === tagId);
+    if (!tag) {
+      throw new HttpError(404, 'Could not find that tag.');
+    }
+    tag.label = label;
+  } else if (duplicate) {
+    tag = duplicate;
+  } else {
+    tag = { id: randomUUID(), username, label, createdAt: now };
+    store.userTags.push(tag);
+  }
+  tag.updatedAt = now;
+  await writeSocialStore(store);
+  return { body: { ...formatUserTagsResponse(store, username), tag: formatUserTag(tag, store, username) } };
+}
+
+async function handleDeleteUserTag(req, payload) {
+  const { user } = await authenticate(req, payload);
+  if (!usingLocalStore()) {
+    throw new HttpError(501, 'Personal tags are only available in local demo mode for now.');
+  }
+  const tagId = normalizeUuid(payload.tagId || payload.tag_id || '');
+  if (!tagId) {
+    throw new HttpError(400, 'Choose a tag to delete.');
+  }
+  const username = canonicalUsername(user.username);
+  const store = await readSocialStore();
+  const existingTags = listUserTagsForUser(store, username);
+  const tag = existingTags.find((entry) => entry.id === tagId);
+  if (!tag) {
+    throw new HttpError(404, 'Could not find that tag.');
+  }
+  store.userTags = store.userTags.filter((entry) => entry.id !== tagId);
+  store.userTaggedMovies = Array.isArray(store.userTaggedMovies)
+    ? store.userTaggedMovies.filter((entry) => entry.tagId !== tagId || entry.username !== username)
+    : [];
+  await writeSocialStore(store);
+  return { body: formatUserTagsResponse(store, username) };
+}
+
+async function handleTagMovie(req, payload) {
+  const { user } = await authenticate(req, payload);
+  if (!usingLocalStore()) {
+    throw new HttpError(501, 'Personal tags are only available in local demo mode for now.');
+  }
+  const tagId = normalizeUuid(payload.tagId || payload.tag_id || '');
+  if (!tagId) {
+    throw new HttpError(400, 'Choose a tag before saving.');
+  }
+  const movie = normalizeMovieInput(payload.movie);
+  if (!movie || !movie.tmdbId || !movie.title) {
+    throw new HttpError(400, 'Missing movie identifiers.');
+  }
+  const username = canonicalUsername(user.username);
+  const store = await readSocialStore();
+  const tag = listUserTagsForUser(store, username).find((entry) => entry.id === tagId);
+  if (!tag) {
+    throw new HttpError(404, 'That tag does not belong to your profile.');
+  }
+  const resolved = await resolveMovieIdentifiers(movie);
+  await ensureMovieRecord(resolved);
+  const key = buildMovieKey(resolved);
+  if (!key) {
+    throw new HttpError(400, 'Unable to resolve movie identifiers.');
+  }
+  const now = new Date().toISOString();
+  store.userTaggedMovies = Array.isArray(store.userTaggedMovies) ? store.userTaggedMovies : [];
+  const already = store.userTaggedMovies.find(
+    (entry) => entry.username === username && entry.tagId === tagId && buildMovieKey(entry) === key
+  );
+  if (!already) {
+    store.userTaggedMovies.push({
+      id: randomUUID(),
+      username,
+      tagId,
+      tmdbId: resolved.tmdbId,
+      imdbId: resolved.imdbId || null,
+      movieTitle: resolved.title,
+      createdAt: now
+    });
+  }
+  await writeSocialStore(store);
+  return { body: formatUserTagsResponse(store, username) };
+}
+
+async function handleUntagMovie(req, payload) {
+  const { user } = await authenticate(req, payload);
+  if (!usingLocalStore()) {
+    throw new HttpError(501, 'Personal tags are only available in local demo mode for now.');
+  }
+  const tagId = normalizeUuid(payload.tagId || payload.tag_id || '');
+  const movie = normalizeMovieInput(payload.movie);
+  if (!tagId || !movie || !movie.tmdbId || !movie.title) {
+    throw new HttpError(400, 'Missing tag or movie identifiers.');
+  }
+  const username = canonicalUsername(user.username);
+  const store = await readSocialStore();
+  const key = buildMovieKey(movie);
+  store.userTaggedMovies = Array.isArray(store.userTaggedMovies)
+    ? store.userTaggedMovies.filter(
+        (entry) => !(entry.username === username && entry.tagId === tagId && buildMovieKey(entry) === key)
+      )
+    : [];
+  await writeSocialStore(store);
+  return { body: formatUserTagsResponse(store, username) };
+}
+
 function buildListUpdatePayload(payload) {
   const updates = {};
   if (typeof payload.name === 'string' && payload.name.trim()) {
@@ -1035,6 +1183,89 @@ function buildListItemMetadata(movie, metadata = {}) {
     poster_url: posterUrl,
     tmdbId: movie.tmdbId || movie.tmdb_id || movie.tmdbID || base.tmdbId || null
   };
+}
+
+function sanitizeTagLabel(label) {
+  if (typeof label !== 'string') {
+    return '';
+  }
+  return label.trim().slice(0, 40);
+}
+
+function buildMovieKey(movie) {
+  if (!movie || typeof movie !== 'object') {
+    return '';
+  }
+  const imdbId = movie.imdbId || movie.imdb_id || null;
+  if (imdbId) {
+    return String(imdbId).trim().toLowerCase();
+  }
+  const tmdbId = movie.tmdbId || movie.tmdb_id || movie.tmdbID || null;
+  return tmdbId ? String(tmdbId).trim() : '';
+}
+
+function listUserTagsForUser(store, username) {
+  const canonical = canonicalUsername(username);
+  if (!canonical) {
+    return [];
+  }
+  return Array.isArray(store.userTags)
+    ? store.userTags
+        .filter((entry) => canonicalUsername(entry.username) === canonical)
+        .map((entry) => ({ ...entry }))
+    : [];
+}
+
+function listTaggedMoviesForUser(store, username) {
+  const canonical = canonicalUsername(username);
+  if (!canonical) {
+    return [];
+  }
+  return Array.isArray(store.userTaggedMovies)
+    ? store.userTaggedMovies
+        .filter((entry) => canonicalUsername(entry.username) === canonical)
+        .map((entry) => ({ ...entry }))
+    : [];
+}
+
+function formatUserTag(tag, store, username) {
+  if (!tag) {
+    return null;
+  }
+  const usageCount = Array.isArray(store.userTaggedMovies)
+    ? store.userTaggedMovies.filter(
+        (entry) => canonicalUsername(entry.username) === canonicalUsername(username) && entry.tagId === tag.id
+      ).length
+    : 0;
+  return {
+    id: tag.id,
+    label: tag.label || '',
+    createdAt: tag.createdAt || null,
+    updatedAt: tag.updatedAt || tag.createdAt || null,
+    usageCount
+  };
+}
+
+function formatTaggedMovie(entry) {
+  if (!entry) {
+    return null;
+  }
+  return {
+    id: entry.id,
+    tagId: entry.tagId,
+    imdbId: entry.imdbId || null,
+    tmdbId: entry.tmdbId || null,
+    movieTitle: entry.movieTitle || '',
+    createdAt: entry.createdAt || null
+  };
+}
+
+function formatUserTagsResponse(store, username) {
+  const tags = listUserTagsForUser(store, username).map((tag) => formatUserTag(tag, store, username)).filter(Boolean);
+  const taggedMovies = listTaggedMoviesForUser(store, username)
+    .map((entry) => formatTaggedMovie(entry))
+    .filter(Boolean);
+  return { tags, taggedMovies };
 }
 
 function normalizeUuid(value) {
@@ -2080,6 +2311,7 @@ async function handleScheduleWatchParty(req, payload) {
     throw new HttpError(400, 'Enter a valid watch party date.');
   }
   const note = typeof payload.note === 'string' ? payload.note.trim() : '';
+  const visibility = normalizePartyVisibility(payload.visibility);
   const invitees = Array.isArray(payload.invitees)
     ? Array.from(new Set(payload.invitees.map((entry) => canonicalUsername(entry)).filter(Boolean)))
     : [];
@@ -2093,6 +2325,7 @@ async function handleScheduleWatchParty(req, payload) {
     movieTitle: resolvedMovie.title,
     scheduledFor: when.toISOString(),
     note,
+    visibility,
     invitees: invitees.map((username) => ({ username, response: 'pending', bringing: '' })),
     participants: [
       {
@@ -5028,6 +5261,7 @@ function formatWatchPartyForUser(party, username) {
   return {
     id: party.id,
     host: party.host,
+    visibility: normalizePartyVisibility(party.visibility),
     movie: {
       title: party.movieTitle || '',
       tmdbId: party.movieTmdbId || null,
@@ -5077,6 +5311,17 @@ function isUpcomingPartyResponse(response) {
     return false;
   }
   return ['host', 'joined', 'accept', 'accepted', 'attending', 'yes', 'maybe'].includes(normalized);
+}
+
+function normalizePartyVisibility(value) {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (normalized === 'public') {
+    return 'public';
+  }
+  if (normalized.startsWith('invite') || normalized === 'private') {
+    return 'invite-only';
+  }
+  return 'friends';
 }
 
 function ensurePartyParticipants(party) {
@@ -6508,7 +6753,9 @@ async function readSocialStore() {
         : [],
       userMessages: Array.isArray(parsed.userMessages) ? parsed.userMessages.slice() : [],
       userLists: Array.isArray(parsed.userLists) ? parsed.userLists.slice() : [],
-      userListItems: Array.isArray(parsed.userListItems) ? parsed.userListItems.slice() : []
+      userListItems: Array.isArray(parsed.userListItems) ? parsed.userListItems.slice() : [],
+      userTags: Array.isArray(parsed.userTags) ? parsed.userTags.slice() : [],
+      userTaggedMovies: Array.isArray(parsed.userTaggedMovies) ? parsed.userTaggedMovies.slice() : []
     };
   } catch (error) {
     return {
@@ -6527,7 +6774,9 @@ async function readSocialStore() {
       userConversationMembers: [],
       userMessages: [],
       userLists: [],
-      userListItems: []
+      userListItems: [],
+      userTags: [],
+      userTaggedMovies: []
     };
   }
 }
@@ -6554,7 +6803,9 @@ async function writeSocialStore(store) {
         : [],
       userMessages: Array.isArray(store.userMessages) ? store.userMessages : [],
       userLists: Array.isArray(store.userLists) ? store.userLists : [],
-      userListItems: Array.isArray(store.userListItems) ? store.userListItems : []
+      userListItems: Array.isArray(store.userListItems) ? store.userListItems : [],
+      userTags: Array.isArray(store.userTags) ? store.userTags : [],
+      userTaggedMovies: Array.isArray(store.userTaggedMovies) ? store.userTaggedMovies : []
     },
     null,
     2
