@@ -20,9 +20,30 @@
             <div class="small-text">Cinema energy, mobile-first</div>
           </div>
         </div>
-        <div class="top-actions">
-          <div class="icon-circle" aria-label="Notifications">🔔</div>
-          <div class="icon-circle" aria-label="Profile">👤</div>
+        <div class="top-actions" data-auth-shell>
+          <button class="icon-circle" type="button" aria-label="Notifications" data-notification-button>🔔</button>
+          <button class="btn btn-primary auth-cta" type="button" data-auth-cta>Sign in / Sign up</button>
+          <div class="user-menu" data-user-menu hidden>
+            <button
+              class="user-chip"
+              type="button"
+              data-user-menu-toggle
+              aria-expanded="false"
+              aria-haspopup="menu"
+            >
+              <div class="avatar avatar-small" data-user-avatar>👤</div>
+              <div class="user-chip-text">
+                <span class="user-chip-name" data-user-name>Loading…</span>
+                <span class="user-chip-meta" data-user-meta>Signed in</span>
+              </div>
+              <span aria-hidden="true">▾</span>
+            </button>
+            <div class="user-dropdown" data-user-dropdown role="menu">
+              <button class="dropdown-item" type="button" data-menu-item="profile">Profile</button>
+              <button class="dropdown-item" type="button" data-menu-item="settings">Settings</button>
+              <button class="dropdown-item" type="button" data-menu-item="logout">Logout</button>
+            </div>
+          </div>
         </div>
       </header>
 
