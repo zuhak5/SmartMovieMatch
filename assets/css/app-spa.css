@@ -44,7 +44,7 @@ textarea {
 }
 
 .app-shell {
-  display: flex;
+  display: contents;
   justify-content: center;
   min-height: 100vh;
   padding: 12px;
@@ -77,10 +77,11 @@ textarea {
 }
 
 .brand {
-  display: flex;
+  display: -webkit-inline-box;
   align-items: center;
   gap: 10px;
   font-weight: 700;
+  font-size: small;
   letter-spacing: 0.4px;
 }
 
@@ -122,7 +123,7 @@ textarea {
 }
 
 .account-chip.is-visible {
-  display: flex;
+  display: contents;
 }
 
 .account-chip:hover {
