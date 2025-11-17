@@ -73,12 +73,12 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Backend: `auth_users`, `user_profiles`, `user_follows`.
   DONE 2025-11-17T03:32Z – Wired profile card to session data and live social overview counts; handles avatar initials, handle, bio/location fallbacks, and follower/following stats in the SPA.
 
-- [ ] **PROF-002 – Profile editing UI**
+ - [x] **PROF-002 – Profile editing UI**
   - Description: Add an “Edit profile” panel where the user can update:
     - display name, bio, location, website, favorite genres/decades, profile visibility (`is_private`).
   - Files: Profile modal / panel components.
   - Backend: `user_profiles`, `auth_users.is_private`, RLS so only the owner can update.
-  - DONE: _…_
+  - DONE 2025-11-17T03:38Z – Added profile editor overlay with editable bio, location, website, favorites, privacy toggle, and display name sync to auth.
 
 - [ ] **PROF-003 – Onboarding wizard**
   - Description: First-time users see a 2–3 step wizard:

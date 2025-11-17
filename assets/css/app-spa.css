@@ -649,6 +649,41 @@ p {
   display: none !important;
 }
 
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(4, 6, 15, 0.7);
+  z-index: 32;
+}
+
+.sheet-overlay.is-visible {
+  display: flex;
+}
+
+.sheet-overlay[hidden] {
+  display: none !important;
+}
+
+.sheet-dialog {
+  width: min(92vw, 720px);
+  background: linear-gradient(180deg, rgba(19, 26, 47, 0.98), rgba(19, 26, 47, 0.92));
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+
+.sheet-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .auth-dialog {
   width: min(90vw, 440px);
   background: linear-gradient(180deg, rgba(19, 26, 47, 0.98), rgba(19, 26, 47, 0.92));
@@ -697,6 +732,42 @@ p {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.chip-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.chip-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.chip-option input {
+  accent-color: var(--accent);
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
 }
 
 .input-group {

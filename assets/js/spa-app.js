@@ -10,7 +10,9 @@ import {
   loginUser,
   logoutSession,
   registerUser,
-  subscribeToSession
+  subscribeToSession,
+  persistPreferencesRemote,
+  updateProfile
 } from "./auth.js";
 import { initSocialFeatures, subscribeToSocialOverview } from "./social.js";
 
@@ -21,6 +23,16 @@ const defaultTabs = {
   library: "watchlist",
   profile: "overview"
 };
+
+const FAVORITE_DECADE_OPTIONS = [
+  "1960s",
+  "1970s",
+  "1980s",
+  "1990s",
+  "2000s",
+  "2010s",
+  "2020s"
+];
 
 const state = {
   activeTabs: { ...defaultTabs },
@@ -36,7 +48,9 @@ const state = {
   socialOverview: null,
   accountMenuOpen: false,
   authMode: "login",
-  authSubmitting: false
+  authSubmitting: false,
+  profileEditorOpen: false,
+  profileEditorSaving: false
 };
 
 const authRequiredViews = [
@@ -93,6 +107,7 @@ const profileName = document.querySelector("[data-profile-name]");
 const profileHandle = document.querySelector("[data-profile-handle]");
 const profileBio = document.querySelector("[data-profile-bio]");
 const profileLocation = document.querySelector("[data-profile-location]");
+const profileWebsite = document.querySelector("[data-profile-website]");
 const profileAvatar = document.querySelector("[data-profile-avatar]");
 const profileStats = {
   films: document.querySelector('[data-profile-stat="films"]'),
@@ -100,6 +115,21 @@ const profileStats = {
   followers: document.querySelector('[data-profile-stat="followers"]'),
   following: document.querySelector('[data-profile-stat="following"]')
 };
+const profileEditOverlay = document.querySelector("[data-profile-editor]");
+const profileEditForm = document.querySelector("[data-profile-editor-form]");
+const profileEditStatus = document.querySelector("[data-profile-editor-status]");
+const profileEditDisplayName = document.querySelector("[data-profile-editor-display-name]");
+const profileEditBio = document.querySelector("[data-profile-editor-bio]");
+const profileEditLocation = document.querySelector("[data-profile-editor-location]");
+const profileEditWebsite = document.querySelector("[data-profile-editor-website]");
+const profileEditPrivate = document.querySelector("[data-profile-editor-private]");
+const profileGenreOptions = document.querySelector("[data-profile-genre-options]");
+const profileDecadeOptions = document.querySelector("[data-profile-decade-options]");
+const profileGenreCount = document.querySelector("[data-profile-genre-count]");
+const profileDecadeCount = document.querySelector("[data-profile-decade-count]");
+const profileEditOpenButton = document.querySelector("[data-profile-edit-open]");
+const profileEditCloseButton = document.querySelector("[data-profile-editor-close]");
+const profileEditCancelButton = document.querySelector("[data-profile-editor-cancel]");
 
 function hasActiveSession() {
   return Boolean(state.session && state.session.token);
@@ -213,6 +243,46 @@ function initialsFromName(name = "") {
   return letters || "👤";
 }
 
+function sanitizeProfileText(value, maxLength = 200) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.trim().slice(0, maxLength);
+}
+
+function normalizeWebsite(value) {
+  const trimmed = sanitizeProfileText(value || "", 200);
+  if (!trimmed) return "";
+  const normalized = trimmed.startsWith("http") ? trimmed : `https://${trimmed}`;
+  try {
+    const url = new URL(normalized);
+    return url.toString();
+  } catch (error) {
+    return "";
+  }
+}
+
+function uniqueStringList(list, maxItems = 12, maxLength = 60) {
+  if (!Array.isArray(list)) return [];
+  const seen = new Set();
+  const result = [];
+  list.forEach((value) => {
+    if (typeof value !== "string" && typeof value !== "number") return;
+    const normalized = String(value).trim();
+    if (!normalized || normalized.length > maxLength || seen.has(normalized)) return;
+    seen.add(normalized);
+    if (result.length < maxItems) {
+      result.push(normalized);
+    }
+  });
+  return result;
+}
+
+function arraysEqual(a = [], b = []) {
+  if (a.length !== b.length) return false;
+  return a.every((value, index) => value === b[index]);
+}
+
 function setAuthStatus(message, variant = "info") {
   if (!authStatus) return;
   authStatus.textContent = message || "";
@@ -222,6 +292,22 @@ function setAuthStatus(message, variant = "info") {
   }
   if (variant === "success") {
     authStatus.classList.add("success");
+  }
+}
+
+function renderWebsiteLink(element, url, fallbackText = "Website not added") {
+  if (!element) return;
+  element.innerHTML = "";
+  const normalized = typeof url === "string" ? url.trim() : "";
+  if (normalized) {
+    const link = document.createElement("a");
+    link.href = normalized;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = normalized.replace(/^https?:\/\//i, "");
+    element.append(link);
+  } else {
+    element.textContent = fallbackText;
   }
 }
 
@@ -325,25 +411,24 @@ function updateAccountUi(session) {
 
 function renderProfileOverview() {
   const hasSession = Boolean(state.session && state.session.token);
+  const preferences = (state.session && state.session.preferencesSnapshot) || {};
+  const profilePrefs = preferences.profile || {};
+  const bio = sanitizeProfileText(profilePrefs.bio || "", 280);
+  const location = sanitizeProfileText(profilePrefs.location || "", 120);
+  const website = typeof profilePrefs.website === "string" ? profilePrefs.website : "";
   const profile = {
     name: hasSession
       ? state.session.displayName || state.session.username
       : "Guest",
     handle: hasSession && state.session.username ? `@${state.session.username}` : "@guest",
     bio:
-      (state.session &&
-        state.session.preferencesSnapshot &&
-        state.session.preferencesSnapshot.profile &&
-        state.session.preferencesSnapshot.profile.bio) ||
+      bio ||
       (hasSession
         ? "Add a short bio so friends know your vibe."
         : "Sign in to add a bio and location for your profile."),
-    location:
-      (state.session &&
-        state.session.preferencesSnapshot &&
-        state.session.preferencesSnapshot.profile &&
-        state.session.preferencesSnapshot.profile.location) ||
-      (hasSession ? "Location not set" : "Location unknown"),
+    location: location || (hasSession ? "Location not set" : "Location unknown"),
+    website: website || "",
+    isPrivate: Boolean(profilePrefs.isPrivate),
     avatarUrl: hasSession && state.session.avatarUrl ? state.session.avatarUrl : null,
     stats: {
       films:
@@ -380,6 +465,10 @@ function renderProfileOverview() {
   }
   if (profileLocation) {
     profileLocation.textContent = profile.location;
+  }
+  if (profileWebsite) {
+    const fallback = profile.isPrivate ? "Profile is private" : "Website not added";
+    renderWebsiteLink(profileWebsite, profile.website, fallback);
   }
   if (profileAvatar) {
     profileAvatar.style.backgroundImage = "";
@@ -847,12 +936,204 @@ async function handleAuthSubmit(event) {
   }
 }
 
+function setProfileEditorStatus(message, variant = "info") {
+  if (!profileEditStatus) return;
+  profileEditStatus.textContent = message || "";
+  profileEditStatus.classList.remove("error", "success");
+  if (variant === "error") {
+    profileEditStatus.classList.add("error");
+  }
+  if (variant === "success") {
+    profileEditStatus.classList.add("success");
+  }
+}
+
+function buildChipOptions(host, entries = []) {
+  if (!host) return;
+  host.innerHTML = "";
+  entries.forEach(({ value, label }) => {
+    const option = document.createElement("label");
+    option.className = "chip-option";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.value = value;
+    const text = document.createElement("span");
+    text.textContent = label;
+    option.append(input, text);
+    host.append(option);
+  });
+}
+
+function ensureProfileOptionChips() {
+  if (profileGenreOptions && !profileGenreOptions.dataset.built) {
+    const genres = Object.entries(TMDB_GENRES)
+      .map(([key, label]) => ({ value: String(key), label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+    buildChipOptions(profileGenreOptions, genres);
+    profileGenreOptions.dataset.built = "true";
+  }
+  if (profileDecadeOptions && !profileDecadeOptions.dataset.built) {
+    const decades = FAVORITE_DECADE_OPTIONS.map((label) => ({ value: label, label }));
+    buildChipOptions(profileDecadeOptions, decades);
+    profileDecadeOptions.dataset.built = "true";
+  }
+}
+
+function setSelectedOptions(host, selectedValues = []) {
+  if (!host) return;
+  const selected = new Set(uniqueStringList(selectedValues));
+  const inputs = host.querySelectorAll('input[type="checkbox"]');
+  inputs.forEach((input) => {
+    input.checked = selected.has(input.value);
+  });
+}
+
+function getSelectedOptionValues(host) {
+  if (!host) return [];
+  const inputs = host.querySelectorAll('input[type="checkbox"]:checked');
+  return uniqueStringList(Array.from(inputs).map((input) => input.value));
+}
+
+function updateProfileEditorCounts() {
+  if (profileGenreCount && profileGenreOptions) {
+    const count = profileGenreOptions.querySelectorAll('input[type="checkbox"]:checked').length;
+    profileGenreCount.textContent = `${count} selected`;
+  }
+  if (profileDecadeCount && profileDecadeOptions) {
+    const count = profileDecadeOptions.querySelectorAll('input[type="checkbox"]:checked').length;
+    profileDecadeCount.textContent = `${count} selected`;
+  }
+}
+
+function populateProfileEditor() {
+  ensureProfileOptionChips();
+  const profilePrefs =
+    (state.session && state.session.preferencesSnapshot && state.session.preferencesSnapshot.profile) || {};
+  if (profileEditDisplayName) {
+    profileEditDisplayName.value =
+      (state.session && (state.session.displayName || state.session.username)) || "";
+  }
+  if (profileEditBio) {
+    profileEditBio.value = profilePrefs.bio || "";
+  }
+  if (profileEditLocation) {
+    profileEditLocation.value = profilePrefs.location || "";
+  }
+  if (profileEditWebsite) {
+    profileEditWebsite.value = profilePrefs.website || "";
+  }
+  if (profileEditPrivate) {
+    profileEditPrivate.checked = Boolean(profilePrefs.isPrivate);
+  }
+
+  const favoriteGenres = profilePrefs.favoriteGenres || [];
+  const favoriteDecades = profilePrefs.favoriteDecades || [];
+  setSelectedOptions(profileGenreOptions, favoriteGenres);
+  setSelectedOptions(profileDecadeOptions, favoriteDecades);
+  updateProfileEditorCounts();
+  setProfileEditorStatus("", "info");
+}
+
+function toggleProfileEditor(open) {
+  const shouldOpen = open === undefined ? !state.profileEditorOpen : open;
+  state.profileEditorOpen = shouldOpen;
+  if (!profileEditOverlay) return;
+  if (shouldOpen) {
+    profileEditOverlay.hidden = false;
+    profileEditOverlay.classList.add("is-visible");
+    populateProfileEditor();
+    if (profileEditDisplayName) {
+      window.setTimeout(() => profileEditDisplayName.focus(), 30);
+    }
+  } else {
+    profileEditOverlay.classList.remove("is-visible");
+    profileEditOverlay.hidden = true;
+    state.profileEditorSaving = false;
+    setProfileEditorStatus("", "info");
+  }
+}
+
+function closeProfileEditor() {
+  toggleProfileEditor(false);
+}
+
+async function handleProfileEditorSubmit(event) {
+  event.preventDefault();
+  if (state.profileEditorSaving) return;
+  if (!hasActiveSession()) {
+    closeProfileEditor();
+    promptForAuth("profile", "overview");
+    return;
+  }
+
+  const desiredName = sanitizeProfileText(
+    (profileEditDisplayName && profileEditDisplayName.value) || "",
+    120
+  );
+  const bio = sanitizeProfileText(profileEditBio && profileEditBio.value, 280);
+  const location = sanitizeProfileText(profileEditLocation && profileEditLocation.value, 120);
+  const website = normalizeWebsite(profileEditWebsite && profileEditWebsite.value);
+  const isPrivate = profileEditPrivate ? Boolean(profileEditPrivate.checked) : false;
+  const favoriteGenres = getSelectedOptionValues(profileGenreOptions);
+  const favoriteDecades = getSelectedOptionValues(profileDecadeOptions);
+
+  const nextProfilePrefs = {
+    bio,
+    location,
+    website,
+    favoriteGenres,
+    favoriteDecades,
+    isPrivate
+  };
+
+  state.profileEditorSaving = true;
+  setProfileEditorStatus("Saving profile…");
+
+  try {
+    let workingSession = state.session;
+    if (desiredName && workingSession && desiredName !== workingSession.displayName) {
+      workingSession = await updateProfile({ displayName: desiredName });
+    }
+
+    const existingSnapshot = (workingSession && workingSession.preferencesSnapshot) || {};
+    const existingProfile = existingSnapshot.profile || {};
+    const mergedProfile = { ...existingProfile, ...nextProfilePrefs };
+    mergedProfile.favoriteGenres = uniqueStringList(mergedProfile.favoriteGenres || []);
+    mergedProfile.favoriteDecades = uniqueStringList(
+      mergedProfile.favoriteDecades || [],
+      FAVORITE_DECADE_OPTIONS.length,
+      20
+    );
+    if (!mergedProfile.bio) delete mergedProfile.bio;
+    if (!mergedProfile.location) delete mergedProfile.location;
+    if (!mergedProfile.website) delete mergedProfile.website;
+    const nextSnapshot = { ...existingSnapshot, profile: mergedProfile };
+
+    const updatedSession = await persistPreferencesRemote(workingSession, nextSnapshot);
+    state.session = updatedSession || workingSession;
+    setProfileEditorStatus("Profile saved.", "success");
+    updateAccountUi(state.session);
+    renderProfileOverview();
+    window.setTimeout(() => closeProfileEditor(), 200);
+  } catch (error) {
+    const message =
+      (error && error.message) ||
+      "We couldn’t save those changes. Please try again.";
+    setProfileEditorStatus(message, "error");
+  } finally {
+    state.profileEditorSaving = false;
+  }
+}
+
 function handleOutsideClick(event) {
   if (state.accountMenuOpen && accountMenu && accountToggle) {
     const target = event.target;
     if (!accountMenu.contains(target) && !accountToggle.contains(target)) {
       toggleAccountMenu(false);
     }
+  }
+  if (state.profileEditorOpen && profileEditOverlay && event.target === profileEditOverlay) {
+    closeProfileEditor();
   }
 }
 
@@ -863,6 +1144,9 @@ function handleEscape(event) {
     }
     if (authOverlay && !authOverlay.hidden) {
       closeAuthOverlay();
+    }
+    if (state.profileEditorOpen) {
+      closeProfileEditor();
     }
   }
 }
@@ -953,6 +1237,36 @@ function attachListeners() {
       setTab("profile", "overview");
       toggleAccountMenu(false);
     });
+  }
+
+  if (profileEditOpenButton) {
+    profileEditOpenButton.addEventListener("click", () => {
+      if (!hasActiveSession()) {
+        promptForAuth("profile", "overview");
+        return;
+      }
+      toggleProfileEditor(true);
+    });
+  }
+
+  if (profileEditCloseButton) {
+    profileEditCloseButton.addEventListener("click", closeProfileEditor);
+  }
+
+  if (profileEditCancelButton) {
+    profileEditCancelButton.addEventListener("click", closeProfileEditor);
+  }
+
+  if (profileEditForm) {
+    profileEditForm.addEventListener("submit", handleProfileEditorSubmit);
+  }
+
+  if (profileGenreOptions) {
+    profileGenreOptions.addEventListener("change", updateProfileEditorCounts);
+  }
+
+  if (profileDecadeOptions) {
+    profileDecadeOptions.addEventListener("change", updateProfileEditorCounts);
   }
 
   document.addEventListener("click", handleOutsideClick);

@@ -921,6 +921,41 @@ function sanitizeDisplayName(name) {
   return name.trim().slice(0, 120);
 }
 
+function sanitizeStringList(values, maxItems = 12, maxLength = 60) {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+  const seen = new Set();
+  const result = [];
+  values.forEach((value) => {
+    const normalized = typeof value === "string" || typeof value === "number"
+      ? String(value).trim()
+      : "";
+    if (!normalized || normalized.length > maxLength || seen.has(normalized)) {
+      return;
+    }
+    if (result.length < maxItems) {
+      seen.add(normalized);
+      result.push(normalized);
+    }
+  });
+  return result;
+}
+
+function sanitizeWebsite(value) {
+  const trimmed = typeof value === "string" ? value.trim().slice(0, 200) : "";
+  if (!trimmed) {
+    return "";
+  }
+  const normalized = trimmed.startsWith("http") ? trimmed : `https://${trimmed}`;
+  try {
+    const url = new URL(normalized);
+    return url.toString();
+  } catch (error) {
+    return "";
+  }
+}
+
 function canonicalUsername(username) {
   return sanitizeUsername(username).toLowerCase();
 }
@@ -1002,6 +1037,12 @@ function sanitizePreferences(preferences) {
   }
   if (typeof preferences.likesText === "string") {
     safe.likesText = preferences.likesText.slice(0, 500);
+  }
+  const profilePreferences = sanitizeProfilePreferences(preferences.profile);
+  if (profilePreferences) {
+    safe.profile = profilePreferences;
+  } else {
+    delete safe.profile;
   }
   const personaPins = sanitizePersonaPins(
     preferences.personaPins || {
@@ -1108,6 +1149,42 @@ function sanitizeNotificationPreferences(prefs) {
     normalized.followEmails === DEFAULT_NOTIFICATION_PREFERENCES.followEmails &&
     normalized.partyEmails === DEFAULT_NOTIFICATION_PREFERENCES.partyEmails;
   return matchesDefaults ? null : normalized;
+}
+
+function sanitizeProfilePreferences(profile) {
+  if (!profile || typeof profile !== "object") {
+    return null;
+  }
+  const normalized = {};
+  const bio = typeof profile.bio === "string" ? profile.bio.trim().slice(0, 280) : "";
+  const location = typeof profile.location === "string" ? profile.location.trim().slice(0, 120) : "";
+  const website = sanitizeWebsite(profile.website);
+
+  if (bio) {
+    normalized.bio = bio;
+  }
+  if (location) {
+    normalized.location = location;
+  }
+  if (website) {
+    normalized.website = website;
+  }
+
+  const favoriteGenres = sanitizeStringList(profile.favoriteGenres, 12, 60);
+  if (favoriteGenres.length) {
+    normalized.favoriteGenres = favoriteGenres;
+  }
+
+  const favoriteDecades = sanitizeStringList(profile.favoriteDecades, 12, 20);
+  if (favoriteDecades.length) {
+    normalized.favoriteDecades = favoriteDecades;
+  }
+
+  if (typeof profile.isPrivate === "boolean") {
+    normalized.isPrivate = profile.isPrivate;
+  }
+
+  return Object.keys(normalized).length ? normalized : null;
 }
 
 function sanitizePinnedListPin(value) {
