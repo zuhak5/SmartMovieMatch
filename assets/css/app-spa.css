@@ -122,7 +122,7 @@ textarea {
 }
 
 .account-chip.is-visible {
-  display: flex;
+  display: contents;
 }
 
 .account-chip:hover {
