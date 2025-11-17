@@ -53,12 +53,14 @@ const authUsername = document.querySelector("[data-auth-username]");
 const authAvatar = document.querySelector("[data-auth-avatar]");
 const authMenu = document.querySelector("[data-auth-menu]");
 const authToggle = document.querySelector("[data-auth-toggle]");
-const authSignInBtn = document.querySelector("[data-auth-signin]");
-const authSignUpBtn = document.querySelector("[data-auth-signup]");
+const authSignInButtons = document.querySelectorAll("[data-auth-signin]");
+const authSignUpButtons = document.querySelectorAll("[data-auth-signup]");
 const authLogoutBtn = document.querySelector("[data-auth-logout]");
 const authProfileBtn = document.querySelector("[data-auth-profile]");
 const authSettingsBtn = document.querySelector("[data-auth-settings]");
 const authRequiredNodes = document.querySelectorAll("[data-auth-required]");
+const authGateCards = document.querySelectorAll("[data-auth-gate]");
+const authProtectedBlocks = document.querySelectorAll("[data-auth-protected]");
 const authModal = document.querySelector("[data-auth-modal]");
 const authForm = document.querySelector("[data-auth-form]");
 const authError = document.querySelector("[data-auth-error]");
@@ -152,6 +154,18 @@ function updateAuthGuards(hasSession) {
   if (!hasSession && state.activeSection === "profile") {
     setSection("home");
   }
+
+  authProtectedBlocks.forEach((node) => {
+    const guardKey = node.dataset.authProtected;
+    const requiresAuth = Boolean(guardKey);
+    node.classList.toggle("is-hidden", requiresAuth && !hasSession);
+  });
+
+  authGateCards.forEach((card) => {
+    const guardKey = card.dataset.authGate;
+    const shouldShow = Boolean(guardKey) && !hasSession;
+    card.classList.toggle("is-hidden", !shouldShow);
+  });
 }
 
 function renderAuthState(session) {
@@ -736,12 +750,12 @@ function attachAuthListeners() {
   if (authToggle) {
     authToggle.addEventListener("click", () => toggleAuthMenu());
   }
-  if (authSignInBtn) {
-    authSignInBtn.addEventListener("click", () => openAuthModal("signin"));
-  }
-  if (authSignUpBtn) {
-    authSignUpBtn.addEventListener("click", () => openAuthModal("signup"));
-  }
+  authSignInButtons.forEach((btn) => {
+    btn.addEventListener("click", () => openAuthModal("signin"));
+  });
+  authSignUpButtons.forEach((btn) => {
+    btn.addEventListener("click", () => openAuthModal("signup"));
+  });
   if (authLogoutBtn) {
     authLogoutBtn.addEventListener("click", () => {
       logoutSession();
