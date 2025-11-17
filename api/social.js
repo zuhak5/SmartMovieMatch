@@ -221,6 +221,9 @@ module.exports = async (req, res) => {
       case 'joinWatchParty':
         result = await handleJoinWatchParty(req, payload);
         break;
+      case 'startConversation':
+        result = await handleStartConversation(req, payload);
+        break;
       case 'listConversations':
         result = await handleListConversations(req, payload);
         break;
@@ -2603,6 +2606,171 @@ async function handlePostWatchPartyMessage(req, payload) {
   return { body: { ok: true, message } };
 }
 
+async function handleStartConversation(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const target = canonicalUsername(payload.username);
+  const actor = canonicalUsername(user.username);
+  const reuseExisting = payload.reuseExisting !== false;
+
+  if (!target) {
+    throw new HttpError(400, 'Choose someone to message first.');
+  }
+  if (actor === target) {
+    throw new HttpError(400, 'You cannot start a conversation with yourself.');
+  }
+  if (!(await userExists(target))) {
+    throw new HttpError(404, 'That user was not found.');
+  }
+
+  if (usingLocalStore()) {
+    const store = await readSocialStore();
+    if (reuseExisting) {
+      const existing = findExistingLocalConversation(store, actor, target);
+      if (existing) {
+        return { body: { ok: true, conversation: existing } };
+      }
+    }
+
+    const conversationId = randomUUID();
+    const timestamp = new Date().toISOString();
+    const conversationRow = {
+      id: conversationId,
+      isGroup: false,
+      createdBy: actor,
+      title: '',
+      lastMessageAt: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      metadata: {}
+    };
+    const participants = [
+      { conversationId, username: actor, role: 'owner', joinedAt: timestamp, metadata: {} },
+      { conversationId, username: target, role: 'member', joinedAt: timestamp, metadata: {} }
+    ];
+
+    store.userConversations = Array.isArray(store.userConversations)
+      ? store.userConversations
+      : [];
+    store.userConversations.push(conversationRow);
+
+    store.userConversationMembers = Array.isArray(store.userConversationMembers)
+      ? store.userConversationMembers
+      : [];
+    participants.forEach((member) => {
+      store.userConversationMembers.push({
+        conversation_id: member.conversationId,
+        username: member.username,
+        role: member.role,
+        joined_at: member.joinedAt,
+        last_read_message_id: null,
+        metadata: member.metadata
+      });
+    });
+
+    await writeSocialStore(store);
+
+    const summary = findExistingLocalConversation(store, actor, target);
+    return {
+      body: {
+        ok: true,
+        conversation: summary || normalizeConversationFromRow(conversationRow)
+      }
+    };
+  }
+
+  if (reuseExisting) {
+    try {
+      const existing = await findExistingSupabaseConversation(actor, target);
+      if (existing) {
+        return { body: { ok: true, conversation: existing } };
+      }
+    } catch (error) {
+      enableLocalFallback('loading existing conversations', error);
+      return handleStartConversation(req, payload);
+    }
+  }
+
+  const timestamp = new Date().toISOString();
+  let conversationRow = null;
+  try {
+    const inserted = await supabaseFetch('user_conversations', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: {
+        is_group: false,
+        created_by_username: actor,
+        title: null,
+        last_message_at: null,
+        metadata: {},
+        created_at: timestamp,
+        updated_at: timestamp
+      }
+    });
+    conversationRow = Array.isArray(inserted) && inserted.length ? inserted[0] : null;
+  } catch (error) {
+    enableLocalFallback('creating a conversation', error);
+    return handleStartConversation(req, payload);
+  }
+
+  const conversationId = normalizeId(conversationRow && conversationRow.id);
+  if (!conversationId) {
+    throw new HttpError(500, 'Unable to create the conversation.');
+  }
+
+  const actorMembership = {
+    conversation_id: conversationId,
+    username: actor,
+    role: 'owner',
+    joined_at: timestamp,
+    last_read_message_id: null,
+    metadata: {}
+  };
+  const targetMembership = {
+    conversation_id: conversationId,
+    username: target,
+    role: 'member',
+    joined_at: timestamp,
+    last_read_message_id: null,
+    metadata: {}
+  };
+
+  try {
+    await supabaseFetch('user_conversation_members', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: [actorMembership, targetMembership]
+    });
+  } catch (error) {
+    enableLocalFallback('saving conversation members', error);
+    return handleStartConversation(req, payload);
+  }
+
+  const summary = buildConversationSummaries(
+    [actorMembership],
+    [conversationRow],
+    [actorMembership, targetMembership],
+    []
+  ).find((entry) => entry && entry.id === conversationId);
+
+  return {
+    body: {
+      ok: true,
+      conversation:
+        summary ||
+        normalizeConversationFromRow({
+          id: conversationId,
+          is_group: false,
+          created_by_username: actor,
+          title: conversationRow && conversationRow.title,
+          last_message_at: conversationRow && conversationRow.last_message_at,
+          metadata: conversationRow && conversationRow.metadata,
+          created_at: conversationRow && conversationRow.created_at,
+          updated_at: conversationRow && conversationRow.updated_at
+        })
+    }
+  };
+}
+
 async function handleListConversations(req, payload) {
   const { user } = await authenticate(req, payload);
   const username = canonicalUsername(user.username);
@@ -2684,6 +2852,90 @@ async function handleListConversations(req, payload) {
   );
 
   return { body: { ok: true, conversations: summary } };
+}
+
+function findExistingLocalConversation(store, actor, target) {
+  const membership = Array.isArray(store.userConversationMembers)
+    ? store.userConversationMembers
+    : [];
+  const conversations = Array.isArray(store.userConversations)
+    ? store.userConversations
+    : [];
+  const messages = Array.isArray(store.userMessages) ? store.userMessages : [];
+  const actorMemberships = membership.filter(
+    (entry) => canonicalUsername(entry.username) === actor
+  );
+  const summaries = buildConversationSummaries(actorMemberships, conversations, membership, messages);
+  return summaries.find((conversation) => isDirectConversationWith(conversation, actor, target)) || null;
+}
+
+async function findExistingSupabaseConversation(actor, target) {
+  const actorMemberships = await supabaseFetch('user_conversation_members', {
+    query: {
+      select: 'conversation_id,username,role,joined_at,last_read_message_id,metadata',
+      username: `eq.${actor}`
+    }
+  });
+
+  const conversationIds = Array.isArray(actorMemberships)
+    ? actorMemberships.map((row) => normalizeId(row.conversation_id)).filter(Boolean)
+    : [];
+  if (!conversationIds.length) {
+    return null;
+  }
+
+  const conversationRows = await supabaseFetch('user_conversations', {
+    query: {
+      select: 'id,title,is_group,last_message_at,created_by_username,metadata,created_at,updated_at',
+      id: formatSupabaseIdIn(conversationIds),
+      is_group: 'eq.false'
+    }
+  });
+
+  const directIds = Array.isArray(conversationRows)
+    ? conversationRows.map((row) => normalizeId(row.id)).filter(Boolean)
+    : [];
+  if (!directIds.length) {
+    return null;
+  }
+
+  const participantRows = await supabaseFetch('user_conversation_members', {
+    query: {
+      select: 'conversation_id,username,role,joined_at,last_read_message_id,metadata',
+      conversation_id: formatSupabaseIdIn(directIds)
+    }
+  });
+
+  const messageRows = await supabaseFetch('user_messages', {
+    query: {
+      select: 'id,conversation_id,sender_username,body,message_type,created_at,metadata',
+      conversation_id: formatSupabaseIdIn(directIds),
+      order: 'created_at.desc',
+      limit: String(Math.max(directIds.length * 3, 30))
+    }
+  });
+
+  const summaries = buildConversationSummaries(
+    actorMemberships.filter((row) => directIds.includes(normalizeId(row.conversation_id))),
+    Array.isArray(conversationRows) ? conversationRows : [],
+    Array.isArray(participantRows) ? participantRows : [],
+    Array.isArray(messageRows) ? messageRows : []
+  );
+
+  return summaries.find((conversation) => isDirectConversationWith(conversation, actor, target)) || null;
+}
+
+function isDirectConversationWith(conversation, actor, target) {
+  if (!conversation || conversation.isGroup) {
+    return false;
+  }
+  const participants = Array.isArray(conversation.participants)
+    ? conversation.participants
+    : [];
+  const usernames = new Set(
+    participants.map((entry) => canonicalUsername(entry.username)).filter(Boolean)
+  );
+  return usernames.has(actor) && usernames.has(target) && usernames.size === 2;
 }
 
 async function handleListConversationMessages(req, payload) {
