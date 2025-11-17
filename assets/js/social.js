@@ -96,6 +96,9 @@ const state = {
   notifications: [],
   notificationsLoaded: false,
   notificationsLoading: false,
+  friendFeed: [],
+  friendFeedLoaded: false,
+  friendFeedLoading: false,
   notificationTimer: null,
   notificationSeen: new Set(),
   toastHost: null,
@@ -114,6 +117,7 @@ const state = {
 const followingSubscribers = new Set();
 const reviewSubscribers = new Map();
 const notificationSubscribers = new Set();
+const friendFeedSubscribers = new Set();
 const socialOverviewSubscribers = new Set();
 const collaborativeSubscribers = new Set();
 const presenceStatusSubscribers = new Set();
@@ -265,12 +269,16 @@ subscribeToSession((session) => {
     state.notifications = [];
     state.notificationsLoaded = false;
     state.notificationsLoading = false;
+    state.friendFeed = [];
+    state.friendFeedLoaded = false;
+    state.friendFeedLoading = false;
     state.notificationSeen.clear();
     stopNotificationPolling();
     stopNotificationStream();
     stopPresenceTicker();
     notifyPresenceStatusSubscribers();
     notifyNotificationSubscribers();
+    notifyFriendFeedSubscribers();
     notifyFollowingSubscribers();
     notifySocialOverviewSubscribers();
     notifyCollaborativeSubscribers();
@@ -284,7 +292,10 @@ subscribeToSession((session) => {
   loadFollowing().catch(() => {});
   state.notificationsLoaded = false;
   state.notificationsLoading = false;
+  state.friendFeedLoaded = false;
+  state.friendFeedLoading = false;
   loadNotifications().catch(() => {});
+  loadFriendFeed().catch(() => {});
   startNotificationPolling();
   startNotificationStream();
   startPresenceTicker();
@@ -299,6 +310,9 @@ export function initSocialFeatures() {
   if (state.session && state.session.token && !state.notificationsLoaded && !state.notificationsLoading) {
     loadNotifications().catch(() => {});
     startNotificationPolling();
+  }
+  if (state.session && state.session.token && !state.friendFeedLoaded && !state.friendFeedLoading) {
+    loadFriendFeed().catch(() => {});
   }
   if (state.session && state.session.token) {
     startNotificationStream();
@@ -757,6 +771,32 @@ export function subscribeToNotifications(callback) {
   return () => {
     notificationSubscribers.delete(callback);
   };
+}
+
+export function subscribeToFriendFeed(callback) {
+  if (typeof callback !== 'function') {
+    return () => {};
+  }
+  friendFeedSubscribers.add(callback);
+  try {
+    callback(getFriendFeedSnapshot());
+  } catch (error) {
+    console.warn('Friend feed subscriber error', error);
+  }
+  return () => {
+    friendFeedSubscribers.delete(callback);
+  };
+}
+
+export function getFriendFeedSnapshot() {
+  return {
+    entries: state.friendFeed.slice(),
+    loaded: state.friendFeedLoaded
+  };
+}
+
+export function refreshFriendFeed() {
+  return loadFriendFeed(true);
 }
 
 export async function acknowledgeNotifications() {
@@ -2945,6 +2985,17 @@ function notifyNotificationSubscribers() {
   });
 }
 
+function notifyFriendFeedSubscribers() {
+  const snapshot = getFriendFeedSnapshot();
+  friendFeedSubscribers.forEach((callback) => {
+    try {
+      callback(snapshot);
+    } catch (error) {
+      console.warn('Friend feed subscriber error', error);
+    }
+  });
+}
+
 function countUnreadNotifications() {
   return state.notifications.filter((entry) => !entry.readAt).length;
 }
@@ -2997,6 +3048,46 @@ function applyNotificationPayload(payload) {
     }
   });
   notifyNotificationSubscribers();
+}
+
+async function loadFriendFeed(force = false) {
+  if (!state.session || !state.session.token) {
+    state.friendFeedLoaded = false;
+    state.friendFeed = [];
+    notifyFriendFeedSubscribers();
+    return;
+  }
+  if (state.friendFeedLoading && !force) {
+    return;
+  }
+  state.friendFeedLoading = true;
+  try {
+    const response = await callSocial('listFriendFeed');
+    applyFriendFeedPayload(response);
+  } catch (error) {
+    console.warn('Failed to load friend feed', error);
+  } finally {
+    state.friendFeedLoading = false;
+  }
+}
+
+function applyFriendFeedPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return;
+  }
+  const list = Array.isArray(payload.entries) ? payload.entries : [];
+  const normalized = list.map((entry) => ({
+    id: entry.id || `${entry.username || 'friend'}-${entry.createdAt || Date.now()}`,
+    username: entry.username || '',
+    type: entry.type === 'review' ? 'review' : 'diary',
+    movieTitle: entry.movieTitle || '',
+    rating: typeof entry.rating === 'number' ? entry.rating : null,
+    capsule: typeof entry.capsule === 'string' ? entry.capsule.trim() : '',
+    createdAt: entry.createdAt || entry.watchedOn || null
+  }));
+  state.friendFeed = normalized;
+  state.friendFeedLoaded = true;
+  notifyFriendFeedSubscribers();
 }
 
 function startNotificationPolling() {
