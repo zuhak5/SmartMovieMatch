@@ -101,11 +101,11 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Backend: `user_follows` with RLS so users can only manage relationships they are part of.
   DONE 2025-11-17T04:41Z – Added session-aware friend suggestion cards with real follow/unfollow actions powered by the social API and live button states.
 
-- [x] **SOC-002 – Live follower/following counts**
+- [ ] **SOC-002 – Live follower/following counts**
   - Description: Pull follower/following counts from `user_follows` instead of fixed numbers in the profile header.
   - Files: Profile header render code.
   - Backend: `user_follows`.
-  - DONE 2025-11-17T04:47Z – Added periodic social overview polling so profile stats stay synced with live follow data.
+  - DONE: _…_
 
 - [ ] **SOC-003 – Friend feed based on social graph**
   - Description: Replace static friend feed items with:

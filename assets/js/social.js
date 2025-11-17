@@ -6,7 +6,6 @@ const MAX_REVIEW_LENGTH = 600;
 const MAX_LONG_REVIEW_LENGTH = 2400;
 
 const NOTIFICATION_POLL_INTERVAL = 45000;
-const SOCIAL_OVERVIEW_POLL_INTERVAL = 60000;
 const REVIEW_REACTIONS = ['👍', '❤️', '😂', '😮'];
 const THREAD_PROMPTS = [
   'What would you pair this with?',
@@ -102,7 +101,6 @@ const state = {
   toastHost: null,
   notificationStream: null,
   notificationRetry: 0,
-  socialOverviewTimer: null,
   collabState: {
     lists: { owned: [], shared: [], invites: [] },
     watchParties: { upcoming: [], invites: [] }
@@ -270,7 +268,6 @@ subscribeToSession((session) => {
     state.notificationSeen.clear();
     stopNotificationPolling();
     stopNotificationStream();
-    stopSocialOverviewPolling();
     stopPresenceTicker();
     notifyPresenceStatusSubscribers();
     notifyNotificationSubscribers();
@@ -290,7 +287,6 @@ subscribeToSession((session) => {
   loadNotifications().catch(() => {});
   startNotificationPolling();
   startNotificationStream();
-  startSocialOverviewPolling();
   startPresenceTicker();
   loadCollaborativeState().catch(() => {});
   state.sections.forEach((section) => showSection(section));
@@ -307,7 +303,6 @@ export function initSocialFeatures() {
   if (state.session && state.session.token) {
     startNotificationStream();
     startPresenceTicker();
-    startSocialOverviewPolling();
     loadCollaborativeState().catch(() => {});
   }
 }
@@ -2952,25 +2947,6 @@ function notifyNotificationSubscribers() {
 
 function countUnreadNotifications() {
   return state.notifications.filter((entry) => !entry.readAt).length;
-}
-
-function startSocialOverviewPolling() {
-  if (state.socialOverviewTimer || !state.session || !state.session.token) {
-    return;
-  }
-  state.socialOverviewTimer = window.setInterval(() => {
-    loadFollowing().catch((error) => {
-      console.warn('Failed to refresh social overview', error);
-    });
-  }, SOCIAL_OVERVIEW_POLL_INTERVAL);
-}
-
-function stopSocialOverviewPolling() {
-  if (!state.socialOverviewTimer) {
-    return;
-  }
-  window.clearInterval(state.socialOverviewTimer);
-  state.socialOverviewTimer = null;
 }
 
 async function loadNotifications(force = false) {
