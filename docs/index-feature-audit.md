@@ -178,13 +178,13 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Backend: `user_lists`, `user_list_items`.
   DONE 2025-11-17T11:51Z – Added Supabase-backed list creation, editing, deletion, and item saves/removals from search with live library list UI.
 
-- [ ] **LIST-002 – Favorites / “heart” button backed by DB**
+- [x] **LIST-002 – Favorites / “heart” button backed by DB**
   - Description: Hook the favorite/heart icon on movie cards to `user_favorites`.
     - Clicking toggles a row in `user_favorites`.
     - Optionally store extras in `metadata` (e.g., why it was favorited).
   - Files: Card component, detail page button.
   - Backend: `user_favorites`.
-  - DONE: _…_
+  - DONE 2025-05-07T00:00Z – Added favorite toggles on trending cards with session-backed sync and a library favorites panel.
 
 - [ ] **LIST-003 – Personal tags per user**
   - Description: Allow users to create personal tags and tag movies.
