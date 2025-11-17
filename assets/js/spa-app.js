@@ -37,6 +37,26 @@ const state = {
   authSubmitting: false
 };
 
+const authRequiredViews = [
+  {
+    section: "friends",
+    message: "Sign in to see your friends feed and requests."
+  },
+  {
+    section: "library",
+    message: "Sign in to view your watchlist and lists."
+  },
+  {
+    section: "profile",
+    message: "Sign in to view your profile and diary."
+  },
+  {
+    section: "home",
+    tab: "with-friends",
+    message: "Sign in to plan watch parties with friends."
+  }
+];
+
 const navButtons = document.querySelectorAll("[data-section-button]");
 const sections = document.querySelectorAll("[data-section-panel]");
 const tabGroups = document.querySelectorAll("[data-section-tabs]");
@@ -68,7 +88,44 @@ const accountLogoutButton = document.querySelector("[data-account-logout]");
 const accountProfileButton = document.querySelector("[data-account-profile]");
 const accountSettingsButton = document.querySelector("[data-account-settings]");
 
+function hasActiveSession() {
+  return Boolean(state.session && state.session.token);
+}
+
+function getAuthGuard(section, tab) {
+  return authRequiredViews.find(
+    (entry) =>
+      entry.section === section &&
+      (entry.tab === undefined || entry.tab === null || entry.tab === tab)
+  );
+}
+
+function canAccessView(section, tab) {
+  const guard = getAuthGuard(section, tab);
+  return !guard || hasActiveSession();
+}
+
+function promptForAuth(section, tab) {
+  const guard = getAuthGuard(section, tab);
+  if (!guard) return;
+  setAuthStatus(guard.message, "error");
+  openAuthOverlay("login");
+}
+
+function ensureAccessibleSection() {
+  const section = state.activeSection;
+  const tab = state.activeTabs[section] || defaultTabs[section];
+  if (canAccessView(section, tab)) return;
+  setSection("discover");
+}
+
 function setSection(section) {
+  const targetTab = state.activeTabs[section] || defaultTabs[section];
+  if (!canAccessView(section, targetTab)) {
+    promptForAuth(section, targetTab);
+    return;
+  }
+
   state.activeSection = section;
   navButtons.forEach((btn) => {
     const isActive = btn.dataset.sectionButton === section;
@@ -85,10 +142,15 @@ function setSection(section) {
     group.classList.toggle("is-active", isActive);
   });
 
-  setTab(section, state.activeTabs[section] || defaultTabs[section]);
+  setTab(section, targetTab);
 }
 
 function setTab(section, tab) {
+  if (!canAccessView(section, tab)) {
+    promptForAuth(section, tab);
+    return;
+  }
+
   state.activeTabs[section] = tab;
   const group = document.querySelector(`[data-section-tabs="${section}"]`);
   const panels = document.querySelectorAll(
@@ -239,6 +301,10 @@ function updateAccountUi(session) {
           : "Guest"
       );
     }
+  }
+
+  if (!hasSession) {
+    ensureAccessibleSection();
   }
 }
 
