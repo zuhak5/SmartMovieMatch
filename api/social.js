@@ -35,6 +35,7 @@ function enableLocalFallback(reason, error) {
 
 const MAX_REVIEW_LENGTH = 600;
 const MAX_LONG_REVIEW_LENGTH = 2400;
+const MAX_MESSAGE_LENGTH = 1200;
 const MAX_SUGGESTION_RESULTS = 8;
 const MAX_FOLLOW_NOTE_LENGTH = 180;
 const SEARCH_RESULT_LIMIT = 6;
@@ -180,6 +181,12 @@ module.exports = async (req, res) => {
         break;
       case 'listConversations':
         result = await handleListConversations(req, payload);
+        break;
+      case 'listConversationMessages':
+        result = await handleListConversationMessages(req, payload);
+        break;
+      case 'postConversationMessage':
+        result = await handlePostConversationMessage(req, payload);
         break;
       case 'listWatchPartyMessages':
         result = await handleListWatchPartyMessages(req, payload);
@@ -1762,6 +1769,120 @@ async function handleListConversations(req, payload) {
   return { body: { ok: true, conversations: summary } };
 }
 
+async function handleListConversationMessages(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const conversationId = typeof payload.conversationId === 'string' ? payload.conversationId.trim() : '';
+  if (!conversationId) {
+    throw new HttpError(400, 'Choose a conversation first.');
+  }
+
+  if (usingLocalStore()) {
+    const store = await readSocialStore();
+    const { messages } = assertLocalConversationAccess(store, conversationId, user.username);
+    return { body: { ok: true, messages } };
+  }
+
+  await assertConversationAccessSupabase(conversationId, user.username);
+  const rows = await supabaseFetch('user_messages', {
+    query: {
+      select: 'id,conversation_id,sender_username,body,message_type,created_at,metadata',
+      conversation_id: `eq.${conversationId}`,
+      order: 'created_at.asc'
+    }
+  });
+
+  const messages = Array.isArray(rows)
+    ? rows.map((entry) => normalizeConversationMessage(entry)).filter((message) => message && message.conversationId === conversationId)
+    : [];
+
+  return { body: { ok: true, messages } };
+}
+
+async function handlePostConversationMessage(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const conversationId = typeof payload.conversationId === 'string' ? payload.conversationId.trim() : '';
+  const bodyRaw = typeof payload.body === 'string' ? payload.body.trim() : '';
+  if (!conversationId) {
+    throw new HttpError(400, 'Choose a conversation first.');
+  }
+  if (!bodyRaw) {
+    throw new HttpError(400, 'Type a message before sending.');
+  }
+  const body = bodyRaw.slice(0, MAX_MESSAGE_LENGTH);
+
+  if (usingLocalStore()) {
+    const store = await readSocialStore();
+    const { conversation } = assertLocalConversationAccess(store, conversationId, user.username);
+    const timestamp = new Date().toISOString();
+    const message = normalizeConversationMessage({
+      id: randomUUID(),
+      conversation_id: conversationId,
+      sender_username: user.username,
+      body,
+      message_type: 'text',
+      created_at: timestamp,
+      metadata: {}
+    });
+    store.userMessages = Array.isArray(store.userMessages) ? store.userMessages : [];
+    store.userMessages.push({
+      id: message.id,
+      conversation_id: conversationId,
+      sender_username: user.username,
+      body,
+      message_type: message.messageType,
+      created_at: timestamp,
+      metadata: message.metadata
+    });
+    const storedConversation = Array.isArray(store.userConversations)
+      ? store.userConversations.find((entry) => normalizeId(entry.id) === conversationId)
+      : null;
+    if (storedConversation) {
+      storedConversation.last_message_at = timestamp;
+      storedConversation.updated_at = timestamp;
+    }
+    await writeSocialStore(store);
+    return { body: { ok: true, message } };
+  }
+
+  await assertConversationAccessSupabase(conversationId, user.username);
+  const rows = await supabaseFetch('user_messages', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: {
+      conversation_id: conversationId,
+      sender_username: canonicalUsername(user.username),
+      body,
+      message_type: 'text',
+      metadata: {}
+    }
+  });
+  const inserted = Array.isArray(rows) && rows.length ? rows[0] : null;
+  const message = normalizeConversationMessage(
+    inserted || {
+      id: randomUUID(),
+      conversation_id: conversationId,
+      sender_username: user.username,
+      body,
+      created_at: new Date().toISOString(),
+      message_type: 'text',
+      metadata: {}
+    }
+  );
+
+  try {
+    await supabaseFetch('user_conversations', {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      query: { id: `eq.${conversationId}` },
+      body: { last_message_at: message.createdAt || new Date().toISOString() }
+    });
+  } catch (error) {
+    console.warn('Failed to update conversation metadata', error);
+  }
+
+  return { body: { ok: true, message } };
+}
+
 async function handleUpdatePresence(req, payload) {
   const { user } = await authenticate(req, payload);
   const stateRaw = typeof payload.state === 'string' ? payload.state.trim().toLowerCase() : 'online';
@@ -2944,6 +3065,16 @@ function sanitizeFollowNote(value) {
     return trimmed.slice(0, MAX_FOLLOW_NOTE_LENGTH).trim();
   }
   return trimmed;
+}
+
+function normalizeId(value) {
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+  if (value === null || value === undefined) {
+    return '';
+  }
+  return String(value).trim();
 }
 
 function normalizeIdentifier(value) {
@@ -4323,6 +4454,82 @@ async function assertWatchPartyAccessSupabase(partyId, username) {
     throw new HttpError(403, 'You do not have access to this watch party.');
   }
   return party;
+}
+
+function assertLocalConversationAccess(store, conversationId, username) {
+  const normalizedConversation = typeof conversationId === 'string' ? conversationId.trim() : '';
+  const actor = canonicalUsername(username);
+  if (!normalizedConversation || !actor) {
+    throw new HttpError(400, 'Missing conversation details.');
+  }
+  const conversation = Array.isArray(store.userConversations)
+    ? store.userConversations.find((entry) => normalizeId(entry.id) === normalizedConversation)
+    : null;
+  if (!conversation) {
+    throw new HttpError(404, 'Conversation not found.');
+  }
+  const members = Array.isArray(store.userConversationMembers)
+    ? store.userConversationMembers.filter((entry) => normalizeId(entry.conversation_id) === normalizedConversation)
+    : [];
+  const isParticipant = members.some((entry) => canonicalUsername(entry.username) === actor);
+  if (!isParticipant) {
+    throw new HttpError(403, 'Only conversation participants can view messages.');
+  }
+  const messages = Array.isArray(store.userMessages)
+    ? store.userMessages
+        .filter((entry) => normalizeId(entry.conversation_id) === normalizedConversation)
+        .map((entry) => normalizeConversationMessage(entry))
+        .filter((message) => message && message.conversationId === normalizedConversation)
+        .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime())
+    : [];
+  return { conversation, members, messages };
+}
+
+async function assertConversationAccessSupabase(conversationId, username) {
+  const normalizedConversation = typeof conversationId === 'string' ? conversationId.trim() : '';
+  const actor = canonicalUsername(username);
+  if (!normalizedConversation || !actor) {
+    throw new HttpError(400, 'Missing conversation details.');
+  }
+
+  const membershipRows = await supabaseFetch('user_conversation_members', {
+    query: {
+      select: 'conversation_id,username,role,joined_at,last_read_message_id,metadata',
+      conversation_id: `eq.${normalizedConversation}`,
+      username: `eq.${actor}`,
+      limit: '1'
+    }
+  });
+  const membership = Array.isArray(membershipRows) && membershipRows.length ? membershipRows[0] : null;
+  if (!membership) {
+    throw new HttpError(403, 'Only conversation participants can view messages.');
+  }
+
+  const conversationRows = await supabaseFetch('user_conversations', {
+    query: {
+      select: 'id,title,is_group,last_message_at,created_by_username,metadata,created_at,updated_at',
+      id: `eq.${normalizedConversation}`,
+      limit: '1'
+    }
+  });
+  const conversationRow = Array.isArray(conversationRows) && conversationRows.length ? conversationRows[0] : null;
+  if (!conversationRow) {
+    throw new HttpError(404, 'Conversation not found.');
+  }
+
+  const participantRows = await supabaseFetch('user_conversation_members', {
+    query: {
+      select: 'conversation_id,username,role,joined_at,last_read_message_id,metadata',
+      conversation_id: `eq.${normalizedConversation}`
+    }
+  });
+
+  return {
+    conversation: normalizeConversationFromRow(conversationRow),
+    participants: Array.isArray(participantRows)
+      ? participantRows.map((entry) => normalizeConversationParticipant(entry)).filter(Boolean)
+      : []
+  };
 }
 
 function recordPresence(username, { state, movie, statusPreset, source }) {

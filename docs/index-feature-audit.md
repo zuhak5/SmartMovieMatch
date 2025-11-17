@@ -251,13 +251,13 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Backend: `user_conversations`, `user_conversation_members`.
   DONE 2025-11-17T09:20Z – Added a Messages inbox with Supabase-backed conversations, participant context, and last-message previews.
 
-- [ ] **DM-002 – Conversation detail & sending messages**
+- [x] **DM-002 – Conversation detail & sending messages**
   - Description: Implement a conversation view:
     - List messages from `user_messages`.
     - Allow sending new messages, writing to `user_messages`.
   - Files: Conversation page or modal.
   - Backend: `user_messages`, `user_conversation_members`.
-  - DONE: _…_
+  - DONE 2025-11-17T09:45Z – Added inbox thread view with live message history and sending powered by conversation membership checks.
 
 - [ ] **DM-003 – Start conversation from profile**
   - Description: Add a “Message” button on user profiles.
