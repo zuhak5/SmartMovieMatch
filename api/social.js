@@ -1627,6 +1627,44 @@ async function listFollowers(username) {
     .sort();
 }
 
+async function countFollowRows(query = {}) {
+  try {
+    return await supabaseCount('user_follows', { query });
+  } catch (error) {
+    enableLocalFallback('counting follow relationships', error);
+    return 0;
+  }
+}
+
+async function fetchFollowCounts(username, { followingFallback = 0, followersFallback = 0, mutualFallback = 0 } = {}) {
+  if (!username) {
+    return { following: followingFallback, followers: followersFallback, mutual: mutualFallback };
+  }
+
+  if (usingLocalStore()) {
+    return { following: followingFallback, followers: followersFallback, mutual: mutualFallback };
+  }
+
+  const [followingCount, followersCount] = await Promise.all([
+    countFollowRows({
+      select: 'followed_username',
+      follower_username: `eq.${username}`,
+      status: 'eq.accepted'
+    }),
+    countFollowRows({
+      select: 'follower_username',
+      followed_username: `eq.${username}`,
+      status: 'eq.accepted'
+    })
+  ]);
+
+  return {
+    following: followingCount || followingFallback,
+    followers: followersCount || followersFallback,
+    mutual: mutualFallback
+  };
+}
+
 async function listBlockedUsers(username) {
   if (!username) {
     return [];
@@ -1726,9 +1764,9 @@ async function buildSocialOverview(username) {
     followers: graph.followers,
     mutualFollowers: graph.mutualFollowers,
     counts: {
-      following: graph.following.length,
-      followers: graph.followers.length,
-      mutual: graph.mutualFollowers.length
+      following: graph.counts.following,
+      followers: graph.counts.followers,
+      mutual: graph.counts.mutual
     },
     suggestions,
     presence: buildPresenceSnapshot(),
@@ -1746,13 +1784,19 @@ async function loadSocialGraph(username) {
   const mutualFollowers = following
     .filter((handle) => followersSet.has(handle))
     .sort();
+  const counts = await fetchFollowCounts(username, {
+    followingFallback: following.length,
+    followersFallback: followers.length,
+    mutualFallback: mutualFollowers.length
+  });
   return {
     username,
     following,
     followers,
     mutualFollowers,
     followingSet,
-    followersSet
+    followersSet,
+    counts
   };
 }
 
@@ -4627,4 +4671,46 @@ async function safeReadResponse(response) {
   } catch (error) {
     return '';
   }
+}
+
+async function supabaseCount(pathname, { query, headers = {} } = {}) {
+  const url = new URL(`/rest/v1/${pathname}`, SUPABASE_URL);
+  if (query) {
+    Object.entries(query).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        url.searchParams.append(key, value);
+      }
+    });
+  }
+
+  let response;
+  try {
+    response = await fetchWithTimeout(url, {
+      timeoutMs: 15000,
+      method: 'GET',
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        Accept: 'application/json',
+        Prefer: 'count=exact',
+        Range: '0-0',
+        ...headers
+      }
+    });
+  } catch (networkError) {
+    throw new HttpError(503, networkError && networkError.message ? networkError.message : 'Unable to reach Supabase');
+  }
+
+  if (!response.ok) {
+    const text = await safeReadResponse(response);
+    throw new HttpError(response.status, text || 'Supabase request failed');
+  }
+
+  const range = response.headers.get('Content-Range');
+  if (!range || !range.includes('/')) {
+    return 0;
+  }
+  const [, totalRaw] = range.split('/');
+  const total = Number(totalRaw);
+  return Number.isFinite(total) ? total : 0;
 }
