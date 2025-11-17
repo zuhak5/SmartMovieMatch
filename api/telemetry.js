@@ -1,13 +1,8 @@
-const fs = require('fs/promises');
-const path = require('path');
 const { createSupabaseAdminClient } = require('../lib/supabase-admin');
-
-const AUTH_STORE_PATH = path.join(__dirname, '..', 'data', 'auth-users.json');
-const TELEMETRY_STORE_PATH = path.join(__dirname, '..', 'data', 'telemetry.json');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const USING_LOCAL_STORE = !(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+const TELEMETRY_SERVICE_CONFIGURED = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -15,6 +10,11 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  if (!TELEMETRY_SERVICE_CONFIGURED) {
+    res.status(503).json({ error: 'Telemetry service is not configured' });
     return;
   }
 
@@ -67,20 +67,6 @@ async function logSearchEvent({ username, payload }) {
     ? payload.clientContext
     : {};
 
-  if (USING_LOCAL_STORE) {
-    const store = await readTelemetryStore();
-    store.searchQueries.push({
-      username: username || null,
-      query,
-      filters,
-      resultsCount,
-      clientContext,
-      createdAt: new Date().toISOString()
-    });
-    await writeTelemetryStore(store);
-    return;
-  }
-
   const client = createSupabaseAdminClient({ url: SUPABASE_URL, serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY });
   await client.insert('search_queries', [{
     username: username || null,
@@ -122,19 +108,6 @@ async function logUserActivity({ username, payload }) {
   }
   const metadata = payload.metadata && typeof payload.metadata === 'object' ? payload.metadata : {};
 
-  if (USING_LOCAL_STORE) {
-    const store = await readTelemetryStore();
-    store.activity.push({
-      username,
-      verb,
-      objectType,
-      metadata,
-      createdAt: new Date().toISOString()
-    });
-    await writeTelemetryStore(store);
-    return;
-  }
-
   const client = createSupabaseAdminClient({ url: SUPABASE_URL, serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY });
   await client.insert('user_activity', [{
     username,
@@ -145,20 +118,8 @@ async function logUserActivity({ username, payload }) {
 }
 
 async function resolveUsername(token) {
-  if (!token) {
+  if (!token || !TELEMETRY_SERVICE_CONFIGURED) {
     return null;
-  }
-
-  if (USING_LOCAL_STORE) {
-    try {
-      const text = await fs.readFile(AUTH_STORE_PATH, 'utf8');
-      const parsed = JSON.parse(text);
-      const sessions = Array.isArray(parsed.sessions) ? parsed.sessions : [];
-      const sessionRow = sessions.find((session) => session && session.token === token);
-      return sessionRow ? sessionRow.username || null : null;
-    } catch (error) {
-      return null;
-    }
   }
 
   try {
@@ -176,27 +137,6 @@ async function resolveUsername(token) {
   } catch (error) {
     return null;
   }
-}
-
-async function readTelemetryStore() {
-  try {
-    const text = await fs.readFile(TELEMETRY_STORE_PATH, 'utf8');
-    const parsed = JSON.parse(text);
-    return {
-      searchQueries: Array.isArray(parsed.searchQueries) ? parsed.searchQueries.slice() : [],
-      activity: Array.isArray(parsed.activity) ? parsed.activity.slice() : []
-    };
-  } catch (error) {
-    return { searchQueries: [], activity: [] };
-  }
-}
-
-async function writeTelemetryStore(store) {
-  const payload = JSON.stringify({
-    searchQueries: Array.isArray(store.searchQueries) ? store.searchQueries : [],
-    activity: Array.isArray(store.activity) ? store.activity : []
-  }, null, 2);
-  await fs.writeFile(TELEMETRY_STORE_PATH, payload, 'utf8');
 }
 
 async function readBody(req) {
