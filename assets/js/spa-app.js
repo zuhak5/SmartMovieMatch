@@ -1,4 +1,4 @@
-import { fetchFromTmdb, searchMovies } from "./api.js";
+import { fetchFromTmdb } from "./api.js";
 import {
   discoverCandidateMovies,
   scoreAndSelectCandidates,
@@ -277,62 +277,12 @@ function createPoster(url) {
   return poster;
 }
 
-function formatGenres(entries = []) {
-  const list = Array.isArray(entries) ? entries : [];
-  const names = list
-    .map((entry) => {
-      if (entry === undefined || entry === null) return "";
-      const numeric = Number(entry);
-      if (!Number.isNaN(numeric) && TMDB_GENRES[numeric]) {
-        return TMDB_GENRES[numeric];
-      }
-      const text = String(entry).trim();
-      if (!Number.isNaN(Number(text)) && TMDB_GENRES[Number(text)]) {
-        return TMDB_GENRES[Number(text)];
-      }
-      return text;
-    })
+function formatGenres(ids = []) {
+  const names = ids
+    .map((id) => TMDB_GENRES[id] || "")
     .filter(Boolean)
     .slice(0, 2);
   return names.join(" · ");
-}
-
-function resolvePosterUrl(movie, size = "w342") {
-  if (!movie) return "";
-  if (movie.poster_url) return movie.poster_url;
-  const tmdbPath = movie.poster_path || (movie.tmdb && movie.tmdb.poster_path);
-  if (tmdbPath) {
-    return `https://image.tmdb.org/t/p/${size}${tmdbPath}`;
-  }
-  return "";
-}
-
-function getReleaseYear(movie) {
-  if (!movie) return "";
-  if (movie.release_year) return String(movie.release_year);
-  const releaseDate = movie.release_date || (movie.tmdb && movie.tmdb.release_date);
-  return releaseDate ? String(releaseDate).slice(0, 4) : "";
-}
-
-function getMovieTitle(movie) {
-  if (!movie) return "";
-  return (
-    movie.title ||
-    movie.original_title ||
-    (movie.tmdb && (movie.tmdb.title || movie.tmdb.original_title)) ||
-    "Untitled"
-  );
-}
-
-function getRatingValue(movie) {
-  if (!movie) return null;
-  const rating =
-    movie.rating_average ??
-    (movie.tmdb && movie.tmdb.vote_average) ??
-    movie.vote_average ??
-    null;
-  const numeric = Number(rating);
-  return Number.isFinite(numeric) ? numeric : null;
 }
 
 function initialsFromName(name = "") {
@@ -641,22 +591,23 @@ function renderDiscoverMovies(movies = []) {
     card.style.flexDirection = "column";
     card.style.alignItems = "flex-start";
 
-    const posterUrl = resolvePosterUrl(movie);
+    const posterUrl = movie.poster_path
+      ? `https://image.tmdb.org/t/p/w342${movie.poster_path}`
+      : "";
     card.appendChild(createPoster(posterUrl));
 
     const stack = document.createElement("div");
     stack.className = "stack";
     const title = document.createElement("strong");
-    title.textContent = getMovieTitle(movie);
+    title.textContent = movie.title || movie.original_title || "Untitled";
     const meta = document.createElement("div");
     meta.className = "small-text";
-    const year = getReleaseYear(movie);
-    const genres = formatGenres(movie.genres || movie.genre_ids || []);
+    const year = movie.release_date ? movie.release_date.slice(0, 4) : "";
+    const genres = formatGenres(movie.genre_ids || []);
     meta.textContent = [year, genres].filter(Boolean).join(" · ");
     const rating = document.createElement("span");
     rating.className = "badge rating";
-    const ratingValue = getRatingValue(movie);
-    rating.textContent = ratingValue !== null ? ratingValue.toFixed(1) : "N/A";
+    rating.textContent = movie.vote_average ? movie.vote_average.toFixed(1) : "N/A";
 
     stack.append(title, meta, rating);
     card.append(stack);
@@ -1076,9 +1027,19 @@ async function loadDiscover(filter = "popular") {
   const controller = new AbortController();
   state.discoverAbort = controller;
 
+  const paramsByFilter = {
+    popular: { path: "discover/movie", params: { sort_by: "popularity.desc", "vote_count.gte": "150" } },
+    "top-rated": { path: "movie/top_rated", params: { page: 1 } },
+    new: { path: "movie/now_playing", params: { page: 1 } },
+    friends: { path: "trending/movie/week", params: { page: 1 } }
+  };
+
+  const config = paramsByFilter[filter] || paramsByFilter.popular;
   try {
-    const data = await searchMovies({ filter, limit: 12 }, { signal: controller.signal });
-    const results = Array.isArray(data?.results) ? data.results : [];
+    const data = await fetchFromTmdb(config.path, config.params, {
+      signal: controller.signal
+    });
+    const results = Array.isArray(data?.results) ? data.results.slice(0, 12) : [];
     renderDiscoverMovies(results);
   } catch (error) {
     if (error.name === "AbortError") return;
@@ -1116,7 +1077,9 @@ function buildListsFromMovies(movies = []) {
           ? "A quick reel of what’s trending this week."
           : "Built from your selected moods and recent views.",
       badge: index === 0 ? "Trending" : "Personalized",
-      posters: bucket.map((movie) => resolvePosterUrl(movie, "w185"))
+      posters: bucket.map((movie) =>
+        movie.poster_path ? `https://image.tmdb.org/t/p/w185${movie.poster_path}` : ""
+      )
     }));
 }
 
@@ -1293,11 +1256,7 @@ function handleDiscoverSearchInput(value) {
     loadDiscover(state.discoverFilter);
     loadTrendingPeople();
     if (state.homeRecommendations.length) {
-      renderListCards(
-        buildListsFromMovies(
-          state.homeRecommendations.map((item) => item.tmdb || item.candidate)
-        )
-      );
+      renderListCards(buildListsFromMovies(state.homeRecommendations.map((item) => item.tmdb || item.candidate)));
     }
     return;
   }
@@ -1306,32 +1265,20 @@ function handleDiscoverSearchInput(value) {
 }
 
 async function loadDiscoverSearch(query) {
-  if (state.discoverAbort) {
-    state.discoverAbort.abort();
-  }
-  const controller = new AbortController();
-  state.discoverAbort = controller;
-
   try {
-    const [movieResponse, people] = await Promise.all([
-      searchMovies({ q: query, filter: state.discoverFilter, limit: 12 }, { signal: controller.signal }),
+    const [movies, people] = await Promise.all([
+      fetchFromTmdb("search/movie", { query, include_adult: "false" }),
       fetchFromTmdb("search/person", { query, include_adult: "false" })
     ]);
-    const movieResults = Array.isArray(movieResponse?.results) ? movieResponse.results : [];
+    const movieResults = Array.isArray(movies?.results) ? movies.results.slice(0, 12) : [];
     renderDiscoverMovies(movieResults);
-    const listSource = movieResults.length
-      ? movieResults
-      : state.homeRecommendations.map((item) => item.tmdb || item.candidate);
+    const listSource = movieResults.length ? movieResults : state.homeRecommendations.map((item) => item.tmdb);
     renderListCards(buildListsFromMovies(listSource));
     state.discoverPeople = Array.isArray(people?.results) ? people.results.slice(0, 6) : [];
     renderPeople(state.discoverPeople);
   } catch (error) {
-    if (error.name !== "AbortError") {
-      console.warn("search failed", error);
-    }
+    console.warn("search failed", error);
   }
-
-  state.discoverAbort = null;
 }
 
 async function handleAuthSubmit(event) {
