@@ -1076,10 +1076,68 @@ function renderDiaryEntries() {
     const meta = document.createElement("p");
     meta.className = "small-text";
     meta.textContent = buildDiaryMeta(entry);
-    stack.append(labelRow, title, meta);
+    const actions = document.createElement("div");
+    actions.className = "label-row diary-actions";
+    const rewatchButton = document.createElement("button");
+    rewatchButton.type = "button";
+    rewatchButton.className = "btn-ghost btn";
+    const nextRewatchNumber =
+      (Number.isFinite(entry.rewatchNumber) ? entry.rewatchNumber : 1) + 1;
+    rewatchButton.textContent = `Log rewatch #${nextRewatchNumber}`;
+    rewatchButton.addEventListener("click", () => handleDiaryRewatch(entry, rewatchButton));
+    actions.append(rewatchButton);
+    stack.append(labelRow, title, meta, actions);
     card.append(poster, stack);
     diaryList.append(card);
   });
+}
+
+async function handleDiaryRewatch(entry, button) {
+  if (!entry || !entry.movie || !entry.movie.imdbId) {
+    setDiaryStatus("Missing movie details for this diary entry.", "error");
+    return;
+  }
+  if (!hasActiveSession()) {
+    setDiaryStatus("Sign in to log a rewatch.", "error");
+    openAuthOverlay("login");
+    return;
+  }
+  const targetButton = button || null;
+  if (targetButton) {
+    targetButton.disabled = true;
+  }
+  const currentRewatchNumber = Number.isFinite(entry.rewatchNumber) ? entry.rewatchNumber : 1;
+  const nextRewatchNumber = currentRewatchNumber + 1;
+  const today = new Date().toISOString().slice(0, 10);
+  const payload = {
+    movie: {
+      imdbId: entry.movie.imdbId,
+      tmdbId: entry.movie.tmdbId || null,
+      title: entry.movie.title || "",
+      releaseYear: entry.movie.releaseYear || null
+    },
+    watchedOn: today,
+    rating: typeof entry.rating === "number" ? entry.rating : null,
+    tags: Array.isArray(entry.tags) ? entry.tags : [],
+    rewatchNumber: nextRewatchNumber,
+    visibility: entry.visibility || "public",
+    source: entry.source || null,
+    device: entry.device || null
+  };
+  try {
+    setDiaryStatus(`Logging rewatch #${nextRewatchNumber}…`, "loading");
+    await saveDiaryEntry(payload);
+    setDiaryStatus(`Logged rewatch #${nextRewatchNumber}.`, "success");
+  } catch (error) {
+    setDiaryStatus(
+      error instanceof Error ? error.message : "Could not log your rewatch.",
+      "error"
+    );
+  } finally {
+    if (targetButton) {
+      targetButton.disabled = false;
+    }
+  }
 }
 
 function renderDiarySearchResults() {
