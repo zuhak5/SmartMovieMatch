@@ -1468,6 +1468,8 @@ $$;
 -- ---------------------------------------------------------------------
 alter table public.movies enable row level security;
 
+drop policy if exists "Movies are readable by everyone" on public.movies;
+
 create policy "Movies are readable by everyone"
   on public.movies
   for select
@@ -1476,6 +1478,7 @@ create policy "Movies are readable by everyone"
 
 alter table public.streaming_providers enable row level security;
 
+drop policy if exists "Streaming providers are readable by everyone" on public.streaming_providers;
 create policy "Streaming providers are readable by everyone"
   on public.streaming_providers
   for select
@@ -1484,12 +1487,14 @@ create policy "Streaming providers are readable by everyone"
 
 alter table public.user_streaming_profiles enable row level security;
 
+drop policy if exists "Users can read their streaming profiles" on public.user_streaming_profiles;
 create policy "Users can read their streaming profiles"
   on public.user_streaming_profiles
   for select
   to authenticated
   using ( username = current_username() );
 
+drop policy if exists "Users can manage their streaming profiles" on public.user_streaming_profiles;
 create policy "Users can manage their streaming profiles"
   on public.user_streaming_profiles
   for all
@@ -1503,6 +1508,7 @@ create policy "Users can manage their streaming profiles"
 -- ---------------------------------------------------------------------
 alter table public.user_profiles enable row level security;
 
+drop policy if exists "Public or own profiles are readable" on public.user_profiles;
 create policy "Public or own profiles are readable"
   on public.user_profiles
   for select
@@ -1519,6 +1525,7 @@ create policy "Public or own profiles are readable"
     )
   );
 
+drop policy if exists "Users can manage their own profile" on public.user_profiles;
 create policy "Users can manage their own profile"
   on public.user_profiles
   for all
@@ -1532,6 +1539,7 @@ create policy "Users can manage their own profile"
 -- ---------------------------------------------------------------------
 alter table public.watch_diary enable row level security;
 
+drop policy if exists "Diary entries are visible based on visibility + follows" on public.watch_diary;
 create policy "Diary entries are visible based on visibility + follows"
   on public.watch_diary
   for select
@@ -1555,6 +1563,7 @@ create policy "Diary entries are visible based on visibility + follows"
     )
   );
 
+drop policy if exists "Users can manage their own diary entries" on public.watch_diary;
 create policy "Users can manage their own diary entries"
   on public.watch_diary
   for all
@@ -1565,6 +1574,7 @@ create policy "Users can manage their own diary entries"
 
 alter table public.movie_reviews enable row level security;
 
+drop policy if exists "Reviews are visible based on visibility + follows" on public.movie_reviews;
 create policy "Reviews are visible based on visibility + follows"
   on public.movie_reviews
   for select
@@ -1588,6 +1598,7 @@ create policy "Reviews are visible based on visibility + follows"
     )
   );
 
+drop policy if exists "Users can manage their own reviews" on public.movie_reviews;
 create policy "Users can manage their own reviews"
   on public.movie_reviews
   for all
@@ -1598,6 +1609,7 @@ create policy "Users can manage their own reviews"
 
 alter table public.review_comments enable row level security;
 
+drop policy if exists "Comments visible if you can see the parent review or you wrote them" on public.review_comments;
 create policy "Comments visible if you can see the parent review or you wrote them"
   on public.review_comments
   for select
@@ -1629,6 +1641,7 @@ create policy "Comments visible if you can see the parent review or you wrote th
     )
   );
 
+drop policy if exists "Users can manage their own comments" on public.review_comments;
 create policy "Users can manage their own comments"
   on public.review_comments
   for all
@@ -1639,12 +1652,14 @@ create policy "Users can manage their own comments"
 
 alter table public.review_likes enable row level security;
 
+drop policy if exists "Users can see which reviews they liked" on public.review_likes;
 create policy "Users can see which reviews they liked"
   on public.review_likes
   for select
   to authenticated
   using ( username = current_username() );
 
+drop policy if exists "Users can like/unlike reviews as themselves" on public.review_likes;
 create policy "Users can like/unlike reviews as themselves"
   on public.review_likes
   for all
@@ -1658,6 +1673,7 @@ create policy "Users can like/unlike reviews as themselves"
 -- ---------------------------------------------------------------------
 alter table public.user_favorites enable row level security;
 
+drop policy if exists "Favorites visible based on account privacy" on public.user_favorites;
 create policy "Favorites visible based on account privacy"
   on public.user_favorites
   for select
@@ -1688,6 +1704,7 @@ create policy "Favorites visible based on account privacy"
     )
   );
 
+drop policy if exists "Users can manage their own favorites" on public.user_favorites;
 create policy "Users can manage their own favorites"
   on public.user_favorites
   for all
@@ -1698,6 +1715,7 @@ create policy "Users can manage their own favorites"
 
 alter table public.user_follows enable row level security;
 
+drop policy if exists "Users can see relationships they are part of" on public.user_follows;
 create policy "Users can see relationships they are part of"
   on public.user_follows
   for select
@@ -1707,12 +1725,14 @@ create policy "Users can see relationships they are part of"
     or followed_username = current_username()
   );
 
+drop policy if exists "Users can follow others" on public.user_follows;
 create policy "Users can follow others"
   on public.user_follows
   for insert
   to authenticated
   with check ( follower_username = current_username() );
 
+drop policy if exists "Users can update their follow status" on public.user_follows;
 create policy "Users can update their follow status"
   on public.user_follows
   for update
@@ -1726,6 +1746,7 @@ create policy "Users can update their follow status"
     or followed_username = current_username()
   );
 
+drop policy if exists "Users can unfollow others" on public.user_follows;
 create policy "Users can unfollow others"
   on public.user_follows
   for delete
@@ -1735,6 +1756,7 @@ create policy "Users can unfollow others"
 
 alter table public.user_lists enable row level security;
 
+drop policy if exists "Lists visible if public or owned" on public.user_lists;
 create policy "Lists visible if public or owned"
   on public.user_lists
   for select
@@ -1744,6 +1766,7 @@ create policy "Lists visible if public or owned"
     or is_public = true
   );
 
+drop policy if exists "Users can manage their own lists" on public.user_lists;
 create policy "Users can manage their own lists"
   on public.user_lists
   for all
@@ -1754,6 +1777,7 @@ create policy "Users can manage their own lists"
 
 alter table public.user_list_items enable row level security;
 
+drop policy if exists "List items visible when parent list is visible" on public.user_list_items;
 create policy "List items visible when parent list is visible"
   on public.user_list_items
   for select
@@ -1770,6 +1794,7 @@ create policy "List items visible when parent list is visible"
     )
   );
 
+drop policy if exists "Only list owners (or collaborative lists) can manage items" on public.user_list_items;
 create policy "Only list owners (or collaborative lists) can manage items"
   on public.user_list_items
   for all
@@ -1800,12 +1825,14 @@ create policy "Only list owners (or collaborative lists) can manage items"
 
 alter table public.user_tags enable row level security;
 
+drop policy if exists "Users can see their own tags" on public.user_tags;
 create policy "Users can see their own tags"
   on public.user_tags
   for select
   to authenticated
   using ( username = current_username() );
 
+drop policy if exists "Users can manage their own tags" on public.user_tags;
 create policy "Users can manage their own tags"
   on public.user_tags
   for all
@@ -1819,12 +1846,14 @@ create policy "Users can manage their own tags"
 -- ---------------------------------------------------------------------
 alter table public.user_notifications enable row level security;
 
+drop policy if exists "Users can see their own notifications" on public.user_notifications;
 create policy "Users can see their own notifications"
   on public.user_notifications
   for select
   to authenticated
   using ( recipient_username = current_username() );
 
+drop policy if exists "Users can mark their notifications as read" on public.user_notifications;
 create policy "Users can mark their notifications as read"
   on public.user_notifications
   for update
@@ -1835,12 +1864,14 @@ create policy "Users can mark their notifications as read"
 
 alter table public.user_activity enable row level security;
 
+drop policy if exists "Users can see their own activity log" on public.user_activity;
 create policy "Users can see their own activity log"
   on public.user_activity
   for select
   to authenticated
   using ( username = current_username() );
 
+drop policy if exists "Users can append to their own activity log" on public.user_activity;
 create policy "Users can append to their own activity log"
   on public.user_activity
   for insert
@@ -1853,6 +1884,7 @@ create policy "Users can append to their own activity log"
 -- ---------------------------------------------------------------------
 alter table public.watch_parties enable row level security;
 
+drop policy if exists "Watch parties visible based on visibility, host, or participation" on public.watch_parties;
 create policy "Watch parties visible based on visibility, host, or participation"
   on public.watch_parties
   for select
@@ -1887,6 +1919,7 @@ create policy "Watch parties visible based on visibility, host, or participation
     )
   );
 
+drop policy if exists "Hosts can manage their own watch parties" on public.watch_parties;
 create policy "Hosts can manage their own watch parties"
   on public.watch_parties
   for all
@@ -1897,6 +1930,7 @@ create policy "Hosts can manage their own watch parties"
 
 alter table public.watch_party_participants enable row level security;
 
+drop policy if exists "Participants and host can view participants" on public.watch_party_participants;
 create policy "Participants and host can view participants"
   on public.watch_party_participants
   for select
@@ -1917,6 +1951,7 @@ create policy "Participants and host can view participants"
     )
   );
 
+drop policy if exists "Hosts can invite participants; users can join themselves" on public.watch_party_participants;
 create policy "Hosts can invite participants; users can join themselves"
   on public.watch_party_participants
   for insert
@@ -1933,6 +1968,7 @@ create policy "Hosts can invite participants; users can join themselves"
     )
   );
 
+drop policy if exists "Hosts or participants can update participant state" on public.watch_party_participants;
 create policy "Hosts or participants can update participant state"
   on public.watch_party_participants
   for all
@@ -1959,6 +1995,7 @@ create policy "Hosts or participants can update participant state"
 
 alter table public.watch_party_messages enable row level security;
 
+drop policy if exists "Only participants/host can read party messages" on public.watch_party_messages;
 create policy "Only participants/host can read party messages"
   on public.watch_party_messages
   for select
@@ -1978,6 +2015,7 @@ create policy "Only participants/host can read party messages"
     )
   );
 
+drop policy if exists "Only participants/host can send party messages" on public.watch_party_messages;
 create policy "Only participants/host can send party messages"
   on public.watch_party_messages
   for insert
@@ -2006,6 +2044,7 @@ create policy "Only participants/host can send party messages"
 -- ---------------------------------------------------------------------
 alter table public.user_conversations enable row level security;
 
+drop policy if exists "Users can see conversations they belong to" on public.user_conversations;
 create policy "Users can see conversations they belong to"
   on public.user_conversations
   for select
@@ -2019,12 +2058,14 @@ create policy "Users can see conversations they belong to"
     )
   );
 
+drop policy if exists "Users can create conversations they own" on public.user_conversations;
 create policy "Users can create conversations they own"
   on public.user_conversations
   for insert
   to authenticated
   with check ( created_by_username = current_username() );
 
+drop policy if exists "Only members with elevated role can update/delete conversations" on public.user_conversations;
 create policy "Only members with elevated role can update/delete conversations"
   on public.user_conversations
   for all
@@ -2051,6 +2092,7 @@ create policy "Only members with elevated role can update/delete conversations"
 
 alter table public.user_conversation_members enable row level security;
 
+drop policy if exists "Members can see membership of conversations they are in" on public.user_conversation_members;
 create policy "Members can see membership of conversations they are in"
   on public.user_conversation_members
   for select
@@ -2064,6 +2106,7 @@ create policy "Members can see membership of conversations they are in"
     )
   );
 
+drop policy if exists "Creators can add members; users can join themselves" on public.user_conversation_members;
 create policy "Creators can add members; users can join themselves"
   on public.user_conversation_members
   for insert
@@ -2078,6 +2121,7 @@ create policy "Creators can add members; users can join themselves"
     )
   );
 
+drop policy if exists "Members and creators can update/remove members" on public.user_conversation_members;
 create policy "Members and creators can update/remove members"
   on public.user_conversation_members
   for all
@@ -2104,6 +2148,7 @@ create policy "Members and creators can update/remove members"
 
 alter table public.user_messages enable row level security;
 
+drop policy if exists "Only conversation members can read messages" on public.user_messages;
 create policy "Only conversation members can read messages"
   on public.user_messages
   for select
@@ -2117,6 +2162,7 @@ create policy "Only conversation members can read messages"
     )
   );
 
+drop policy if exists "Only conversation members can send messages as themselves" on public.user_messages;
 create policy "Only conversation members can send messages as themselves"
   on public.user_messages
   for insert
@@ -2137,6 +2183,7 @@ create policy "Only conversation members can send messages as themselves"
 -- ---------------------------------------------------------------------
 alter table public.app_config enable row level security;
 
+drop policy if exists "App config is readable by all clients" on public.app_config;
 create policy "App config is readable by all clients"
   on public.app_config
   for select
@@ -2147,6 +2194,7 @@ create policy "App config is readable by all clients"
 
 alter table public.experiments enable row level security;
 
+drop policy if exists "Experiments are readable by all clients" on public.experiments;
 create policy "Experiments are readable by all clients"
   on public.experiments
   for select
@@ -2156,6 +2204,7 @@ create policy "Experiments are readable by all clients"
 
 alter table public.experiment_assignments enable row level security;
 
+drop policy if exists "Users can see their own experiment assignments" on public.experiment_assignments;
 create policy "Users can see their own experiment assignments"
   on public.experiment_assignments
   for select
@@ -2166,12 +2215,14 @@ create policy "Users can see their own experiment assignments"
 
 alter table public.search_queries enable row level security;
 
+drop policy if exists "Users can see their own search queries" on public.search_queries;
 create policy "Users can see their own search queries"
   on public.search_queries
   for select
   to authenticated
   using ( username = current_username() );
 
+drop policy if exists "Clients can log their own searches (or anonymous ones)" on public.search_queries;
 create policy "Clients can log their own searches (or anonymous ones)"
   on public.search_queries
   for insert
