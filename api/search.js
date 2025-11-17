@@ -303,6 +303,8 @@ function resolveOrdering(filter) {
       return { orderField: 'release_year', direction: 'desc' };
     case 'friends':
       return { orderField: 'user_favorites.count', direction: 'desc' };
+    case 'streaming':
+      return { orderField: 'watch_diary.count', direction: 'desc' };
     default:
       return { orderField: 'watch_diary.count', direction: 'desc', timeWindow: weekAgo };
   }

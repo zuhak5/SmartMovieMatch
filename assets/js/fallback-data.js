@@ -44,7 +44,11 @@ export const FALLBACK_DISCOVER_MOVIES = [
     poster_url: "https://via.placeholder.com/342x513.png?text=Clockwork+Chords",
     synopsis: "A synth musician discovers their melodies can physically bend time inside an abandoned observatory.",
     vote_average: 7.4,
-    genres: ["Music", "Fantasy"]
+    genres: ["Music", "Fantasy"],
+    streamingProviders: [
+      { key: "netflix", name: "Netflix", region: "US", brandColor: "#e50914" },
+      { key: "prime", name: "Prime Video", region: "US", brandColor: "#00a8e1" }
+    ]
   },
   {
     title: "Vanishing Point",
@@ -52,7 +56,11 @@ export const FALLBACK_DISCOVER_MOVIES = [
     poster_url: "https://via.placeholder.com/342x513.png?text=Vanishing+Point",
     synopsis: "Detectives trace a series of art heists to a mural that changes every full moon.",
     vote_average: 7.9,
-    genres: ["Crime", "Mystery"]
+    genres: ["Crime", "Mystery"],
+    streamingProviders: [
+      { key: "hulu", name: "Hulu", region: "US", brandColor: "#3dbb3d" },
+      { key: "kanopy", name: "Kanopy", region: "Library" }
+    ]
   },
   {
     title: "Northern Lullaby",
@@ -60,7 +68,10 @@ export const FALLBACK_DISCOVER_MOVIES = [
     poster_url: "https://via.placeholder.com/342x513.png?text=Northern+Lullaby",
     synopsis: "An ice-road driver and a radio host form an unlikely duo to guide travelers through a storm.",
     vote_average: 7.1,
-    genres: ["Adventure", "Drama"]
+    genres: ["Adventure", "Drama"],
+    streamingProviders: [
+      { key: "disney", name: "Disney+", region: "US", brandColor: "#113ccf" }
+    ]
   }
 ];
 
