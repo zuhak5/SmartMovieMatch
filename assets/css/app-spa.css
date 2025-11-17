@@ -645,6 +645,105 @@ p {
   color: var(--muted);
 }
 
+.auth-modal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 20;
+}
+
+.auth-modal.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.auth-modal__backdrop {
+  position: absolute;
+  inset: 0;
+}
+
+.auth-modal__dialog {
+  position: relative;
+  max-width: 420px;
+  width: 100%;
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border-strong);
+  animation: fade 0.2s ease;
+}
+
+.auth-modal__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.auth-modal__header {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.auth-form {
+  gap: 12px;
+}
+
+.form-field {
+  display: grid;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.form-field input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.form-field input:focus {
+  outline: 2px solid rgba(139, 92, 246, 0.5);
+  border-color: var(--accent);
+}
+
+.form-error {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+}
+
+.form-error.is-hidden {
+  display: none;
+}
+
+.auth-modal .action-row.spaced {
+  justify-content: space-between;
+}
+
 @media (min-width: 800px) {
   .app-shell {
     padding: 24px;
