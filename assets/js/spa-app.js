@@ -31,6 +31,7 @@ import {
   logoutSession,
   registerUser,
   subscribeToSession,
+  requestPasswordReset,
   persistFavoritesRemote,
   persistPreferencesRemote,
   updateProfile
@@ -124,6 +125,7 @@ const state = {
   accountMenuOpen: false,
   authMode: "login",
   authSubmitting: false,
+  authAvatarData: null,
   profileEditorOpen: false,
   profileEditorSaving: false,
   onboardingOpen: false,
@@ -411,11 +413,18 @@ const authUsernameInput = document.querySelector("[data-auth-username]");
 const authPasswordInput = document.querySelector("[data-auth-password]");
 const authDisplayNameRow = document.querySelector("[data-auth-display-name-row]");
 const authDisplayNameInput = document.querySelector("[data-auth-display-name]");
+const authAvatarRow = document.querySelector("[data-auth-avatar-row]");
+const authAvatarInput = document.querySelector("[data-auth-avatar-input]");
+const authAvatarPreview = document.querySelector("[data-auth-avatar-preview]");
+const authAvatarReset = document.querySelector("[data-auth-avatar-reset]");
 const authModeButtons = document.querySelectorAll("[data-auth-mode]");
 const authTitle = document.querySelector("[data-auth-title]");
 const authOpenButton = document.querySelector("[data-auth-open]");
 const authCloseButton = document.querySelector("[data-auth-close]");
 const authSubmitButton = document.querySelector("[data-auth-submit]");
+const authResetPasswordButton = document.querySelector("[data-auth-reset-password]");
+const authSupportToggle = document.querySelector("[data-auth-open-help]");
+const authSupportPanel = document.querySelector("[data-auth-support]");
 const accountMenu = document.querySelector("[data-account-menu]");
 const accountToggle = document.querySelector("[data-account-toggle]");
 const accountName = document.querySelector("[data-account-name]");
@@ -733,6 +742,65 @@ function setAuthStatus(message, variant = "info") {
   }
 }
 
+function resetAuthAvatarPreview() {
+  state.authAvatarData = null;
+  if (authAvatarInput) {
+    authAvatarInput.value = "";
+  }
+  if (authAvatarPreview) {
+    const fallbackName =
+      (authDisplayNameInput && authDisplayNameInput.value) ||
+      (authUsernameInput && authUsernameInput.value) ||
+      "";
+    const fallback = fallbackName ? initialsFromName(fallbackName) : "Add image";
+    authAvatarPreview.style.backgroundImage = "";
+    authAvatarPreview.textContent = fallback;
+  }
+}
+
+function handleAuthAvatarFallback() {
+  if (state.authAvatarData) return;
+  resetAuthAvatarPreview();
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error || new Error("Unable to read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleAuthAvatarChange(event) {
+  const file = event && event.target && event.target.files ? event.target.files[0] : null;
+  if (!file) {
+    resetAuthAvatarPreview();
+    return;
+  }
+
+  const maxSizeBytes = 2 * 1024 * 1024;
+  if (file.size > maxSizeBytes) {
+    setAuthStatus("Choose an image under 2MB.", "error");
+    resetAuthAvatarPreview();
+    return;
+  }
+
+  try {
+    const base64 = await readFileAsDataUrl(file);
+    state.authAvatarData = { base64, fileName: file.name };
+    if (authAvatarPreview) {
+      authAvatarPreview.style.backgroundImage = `url(${base64})`;
+      authAvatarPreview.textContent = "";
+    }
+    setAuthStatus("Image ready—finish signup to save it.");
+  } catch (error) {
+    console.warn("avatar upload failed", error);
+    setAuthStatus("We couldn't read that image. Try a different file.", "error");
+    resetAuthAvatarPreview();
+  }
+}
+
 function renderWebsiteLink(element, url, fallbackText = "Website not added") {
   if (!element) return;
   element.innerHTML = "";
@@ -759,6 +827,12 @@ function setAuthMode(mode) {
   if (authDisplayNameRow) {
     authDisplayNameRow.classList.toggle("is-hidden", state.authMode !== "signup");
   }
+  if (authAvatarRow) {
+    authAvatarRow.classList.toggle("is-hidden", state.authMode !== "signup");
+    if (state.authMode !== "signup") {
+      resetAuthAvatarPreview();
+    }
+  }
   if (authTitle) {
     authTitle.textContent =
       state.authMode === "signup"
@@ -775,6 +849,7 @@ function openAuthOverlay(mode = state.authMode) {
   setAuthMode(mode);
   setAuthStatus("");
   state.authSubmitting = false;
+  handleAuthAvatarFallback();
   if (authOverlay) {
     authOverlay.hidden = false;
     authOverlay.classList.add("is-visible");
@@ -4034,6 +4109,25 @@ async function loadDiscoverResults({ query = "" } = {}) {
   }
 }
 
+async function handlePasswordResetRequest() {
+  if (!authUsernameInput) return;
+  const username = authUsernameInput.value ? authUsernameInput.value.trim() : "";
+  if (!username) {
+    setAuthStatus("Enter your username to request a reset link.", "error");
+    return;
+  }
+
+  setAuthStatus("Sending password reset…");
+  try {
+    await requestPasswordReset(username);
+    setAuthStatus("If that username exists, we sent reset instructions.", "success");
+  } catch (error) {
+    const message =
+      (error && error.message) || "Unable to send a reset right now. Try again soon.";
+    setAuthStatus(message, "error");
+  }
+}
+
 async function handleAuthSubmit(event) {
   if (event) {
     event.preventDefault();
@@ -4047,6 +4141,13 @@ async function handleAuthSubmit(event) {
     authDisplayNameInput && authDisplayNameInput.value
       ? authDisplayNameInput.value.trim()
       : "";
+  const avatarPayload =
+    state.authMode === "signup" && state.authAvatarData
+      ? {
+          avatarBase64: state.authAvatarData.base64,
+          avatarFileName: state.authAvatarData.fileName
+        }
+      : {};
 
   if (!username || !password) {
     setAuthStatus("Enter your username and password.", "error");
@@ -4064,7 +4165,7 @@ async function handleAuthSubmit(event) {
   try {
     const session =
       state.authMode === "signup"
-        ? await registerUser({ username, password, name: displayName })
+        ? await registerUser({ username, password, name: displayName, ...avatarPayload })
         : await loginUser({ username, password });
     setAuthStatus("You're signed in!", "success");
     closeAuthOverlay();
@@ -4643,6 +4744,37 @@ function attachListeners() {
     authForm.addEventListener("submit", handleAuthSubmit);
   }
 
+  if (authResetPasswordButton) {
+    authResetPasswordButton.addEventListener("click", handlePasswordResetRequest);
+  }
+
+  if (authSupportToggle && authSupportPanel) {
+    authSupportToggle.setAttribute("aria-expanded", "false");
+    authSupportToggle.addEventListener("click", () => {
+      const isHidden = authSupportPanel.classList.toggle("is-hidden");
+      authSupportToggle.setAttribute("aria-expanded", isHidden ? "false" : "true");
+    });
+  }
+
+  if (authAvatarInput) {
+    authAvatarInput.addEventListener("change", handleAuthAvatarChange);
+  }
+
+  if (authAvatarReset) {
+    authAvatarReset.addEventListener("click", () => {
+      resetAuthAvatarPreview();
+      setAuthStatus("Profile image removed.");
+    });
+  }
+
+  if (authUsernameInput) {
+    authUsernameInput.addEventListener("input", handleAuthAvatarFallback);
+  }
+
+  if (authDisplayNameInput) {
+    authDisplayNameInput.addEventListener("input", handleAuthAvatarFallback);
+  }
+
   if (accountToggle) {
     accountToggle.addEventListener("click", () => toggleAccountMenu());
     accountToggle.addEventListener("keydown", (event) => {
@@ -4847,6 +4979,7 @@ function attachListeners() {
 
 function init() {
   setAuthMode(state.authMode);
+  handleAuthAvatarFallback();
   updateAccountUi(state.session);
   renderFavoritesList();
   subscribeToSocialOverview((overview) => {

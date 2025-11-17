@@ -1088,6 +1088,7 @@
         <div>
           <p class="small-text auth-dialog-eyebrow">Welcome back</p>
           <h3 id="authDialogTitle" data-auth-title>Sign in to Smart Movie Match</h3>
+          <p class="small-text muted">Securely sync your watchlist, diary, and invites.</p>
         </div>
         <button
           class="icon-circle close-circle"
@@ -1098,37 +1099,108 @@
           ✕
         </button>
       </div>
-      <div class="auth-mode-toggle" role="tablist" aria-label="Authentication mode">
-        <button
-          class="auth-mode-btn is-active"
-          type="button"
-          role="tab"
-          aria-selected="true"
-          data-auth-mode="login"
-        >
-          Sign in
-        </button>
-        <button class="auth-mode-btn" type="button" role="tab" aria-selected="false" data-auth-mode="signup">
-          Sign up
-        </button>
+
+      <div class="auth-dialog-body">
+        <section class="auth-panel auth-highlights" aria-label="Account benefits">
+          <div class="pill">Session toolkit</div>
+          <h4>Everything you need to keep watching</h4>
+          <ul class="auth-feature-list">
+            <li>
+              <span class="icon">🔐</span>
+              <div>
+                <p class="small-text">Secure by default</p>
+                <p class="muted">Supabase-backed sessions keep your preferences protected.</p>
+              </div>
+            </li>
+            <li>
+              <span class="icon">📩</span>
+              <div>
+                <p class="small-text">Invite ready</p>
+                <p class="muted">Host watch parties and share lists with friends instantly.</p>
+              </div>
+            </li>
+            <li>
+              <span class="icon">📱</span>
+              <div>
+                <p class="small-text">Cross-device</p>
+                <p class="muted">Your diary, favorites, and notifications stay in sync.</p>
+              </div>
+            </li>
+          </ul>
+
+          <div class="auth-tools" aria-label="Account tools">
+            <div class="auth-tools-heading">
+              <p class="small-text muted">Account tools</p>
+              <p class="small-text">Handle common account tasks right from here.</p>
+            </div>
+            <div class="tool-grid">
+              <button class="btn ghost" type="button" data-auth-reset-password>Send password reset</button>
+              <button class="btn ghost" type="button" data-auth-open-help>Show sign-in tips</button>
+            </div>
+            <div class="auth-support is-hidden" data-auth-support>
+              <p class="small-text">Trouble signing in?</p>
+              <ul class="small-text muted">
+                <li>Use the same username you created your account with.</li>
+                <li>Passwords are case-sensitive—double check your caps lock.</li>
+                <li>Reset links expire quickly, so open the latest email.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="auth-panel auth-form-panel" aria-label="Authentication form">
+          <div class="auth-mode-toggle" role="tablist" aria-label="Authentication mode">
+            <button
+              class="auth-mode-btn is-active"
+              type="button"
+              role="tab"
+              aria-selected="true"
+              data-auth-mode="login"
+            >
+              Sign in
+            </button>
+            <button class="auth-mode-btn" type="button" role="tab" aria-selected="false" data-auth-mode="signup">
+              Sign up
+            </button>
+          </div>
+          <form class="auth-form" data-auth-form>
+            <label class="input-group">
+              <span>Username</span>
+              <input type="text" name="username" autocomplete="username" required data-auth-username />
+            </label>
+            <label class="input-group" data-auth-display-name-row>
+              <span>Display name</span>
+              <input type="text" name="displayName" autocomplete="name" data-auth-display-name />
+            </label>
+            <div class="input-group auth-avatar is-hidden" data-auth-avatar-row>
+              <div class="auth-avatar-label">
+                <span>Profile image (optional)</span>
+                <p class="small-text muted">Show up in chats, watch parties, and lists.</p>
+              </div>
+              <div class="auth-avatar-control">
+                <div class="auth-avatar-preview" data-auth-avatar-preview aria-label="Profile image preview">Add image</div>
+                <div class="auth-avatar-actions">
+                  <label class="btn ghost">
+                    Upload image
+                    <input type="file" accept="image/*" data-auth-avatar-input hidden />
+                  </label>
+                  <button class="btn ghost" type="button" data-auth-avatar-reset>Remove</button>
+                  <p class="small-text muted">PNG or JPG up to 2MB.</p>
+                </div>
+              </div>
+            </div>
+            <label class="input-group">
+              <span>Password</span>
+              <input type="password" name="password" autocomplete="current-password" required data-auth-password />
+            </label>
+            <button class="btn btn-primary full-width" type="submit" data-auth-submit>Continue</button>
+            <p class="small-text auth-hint">
+              We create a Supabase-backed session and keep you signed in on this device.
+            </p>
+          </form>
+          <div class="auth-status" role="status" aria-live="polite" data-auth-status></div>
+        </section>
       </div>
-      <form class="auth-form" data-auth-form>
-        <label class="input-group">
-          <span>Username</span>
-          <input type="text" name="username" autocomplete="username" required data-auth-username />
-        </label>
-        <label class="input-group" data-auth-display-name-row>
-          <span>Display name</span>
-          <input type="text" name="displayName" autocomplete="name" data-auth-display-name />
-        </label>
-        <label class="input-group">
-          <span>Password</span>
-          <input type="password" name="password" autocomplete="current-password" required data-auth-password />
-        </label>
-        <button class="btn btn-primary full-width" type="submit" data-auth-submit>Continue</button>
-        <p class="small-text auth-hint">We create a Supabase-backed session and keep you signed in on this device.</p>
-      </form>
-      <div class="auth-status" role="status" aria-live="polite" data-auth-status></div>
     </div>
   </div>
 
