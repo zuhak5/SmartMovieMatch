@@ -118,20 +118,20 @@ Each item is a task for Codex (or any other assistant) to implement.
 
 ## Search & discovery (SRCH)
 
-- [ ] **SRCH-001 – Wire search input to Supabase**
+- [x] **SRCH-001 – Wire search input to Supabase**
   - Description: Use the discover search input and filter pills to query Supabase instead of local mocks.
     - Text query → `movies` (title, original_title).
     - Filters → genres, year, streaming provider, etc.
   - Files: Search bar handler in SPA, cards list component.
   - Backend: `movies`, `movie_genres`, `genres`, `search_queries` for telemetry.
-  - DONE: _…_
+  DONE 2025-05-07T00:00Z – Routed discover search & filter pills through Supabase-backed movie results with trending/release ordering and normalized cards.
 
-- [ ] **SRCH-002 – Save search queries for analytics**
+- [x] **SRCH-002 – Save search queries for analytics**
   - Description: On each search, insert a row into `search_queries`:
     - `username` (if logged in), `query`, `filters`, `results_count`, `client_context`.
   - Files: Search handler.
   - Backend: `search_queries` + RLS policies so users only see their own logs.
-  - DONE: _…_
+  DONE 2025-05-07T00:00Z – Added Supabase logging for discover searches (including filter metadata and session context) alongside SPA telemetry.
 
 - [ ] **SRCH-003 – “Trending now” powered by `trending_movies`**
   - Description: Replace hardcoded “trending” section with data pulled from `trending_movies` joined to `movies`.
