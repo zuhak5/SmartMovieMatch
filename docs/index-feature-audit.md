@@ -243,13 +243,13 @@ Each item is a task for Codex (or any other assistant) to implement.
 
 ## Direct messages & conversations (DM)
 
-- [ ] **DM-001 – Conversation list UI**
+- [x] **DM-001 – Conversation list UI**
   - Description: Add a “Messages” section with a list of conversations:
     - Data from `user_conversations` joined with `user_conversation_members`.
     - Show last message preview and `last_message_at`.
   - Files: Messages sidebar / drawer.
   - Backend: `user_conversations`, `user_conversation_members`.
-  - DONE: _…_
+  DONE 2025-11-17T09:20Z – Added a Messages inbox with Supabase-backed conversations, participant context, and last-message previews.
 
 - [ ] **DM-002 – Conversation detail & sending messages**
   - Description: Implement a conversation view:

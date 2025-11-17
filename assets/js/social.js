@@ -368,6 +368,14 @@ export async function joinWatchPartyRemote({ partyId, note }) {
   return callSocial('joinWatchParty', { partyId, note });
 }
 
+export async function listConversationsRemote() {
+  const response = await callSocial('listConversations');
+  const conversations = Array.isArray(response?.conversations)
+    ? response.conversations.map(normalizeConversationSummary).filter(Boolean)
+    : [];
+  return conversations;
+}
+
 export async function listWatchPartyMessagesRemote({ partyId }) {
   const trimmed = typeof partyId === 'string' ? partyId.trim() : '';
   if (!trimmed) {
@@ -3794,6 +3802,82 @@ function normalizeWatchPartyMessage(entry) {
     metadata: entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {},
     createdAt: entry.createdAt || entry.created_at || null
   };
+}
+
+function normalizeConversationSummary(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+  const id = normalizeConversationId(entry.id);
+  if (!id) {
+    return null;
+  }
+  const participants = Array.isArray(entry.participants)
+    ? entry.participants.map(normalizeConversationParticipant).filter(Boolean)
+    : [];
+  const lastMessage = entry.lastMessage
+    ? normalizeConversationMessage(entry.lastMessage)
+    : null;
+  const lastMessageAt =
+    entry.lastMessageAt || entry.last_message_at || (lastMessage && lastMessage.createdAt) || null;
+
+  return {
+    id,
+    title: typeof entry.title === 'string' ? entry.title.trim() : '',
+    isGroup: entry.isGroup === true || entry.is_group === true,
+    createdBy: canonicalUsername(entry.createdBy || entry.created_by || ''),
+    participants,
+    lastMessage,
+    lastMessageAt,
+    metadata: normalizeConversationMetadata(entry.metadata)
+  };
+}
+
+function normalizeConversationParticipant(entry) {
+  const username = canonicalUsername(entry?.username || entry?.handle || '');
+  if (!username) {
+    return null;
+  }
+  return {
+    username,
+    role: entry.role || 'member',
+    joinedAt: entry.joinedAt || entry.joined_at || null,
+    lastReadMessageId: entry.lastReadMessageId || entry.last_read_message_id || null,
+    metadata: normalizeConversationMetadata(entry.metadata)
+  };
+}
+
+function normalizeConversationMessage(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+  const sender = canonicalUsername(entry.senderUsername || entry.sender_username || entry.username || '');
+  const body = typeof entry.body === 'string' ? entry.body : '';
+  return {
+    id: entry.id || entry.messageId || null,
+    senderUsername: sender,
+    body,
+    messageType: entry.messageType || entry.message_type || 'text',
+    createdAt: entry.createdAt || entry.created_at || null,
+    metadata: normalizeConversationMetadata(entry.metadata)
+  };
+}
+
+function normalizeConversationId(value) {
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+  if (value === null || value === undefined) {
+    return '';
+  }
+  return String(value).trim();
+}
+
+function normalizeConversationMetadata(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  return value;
 }
 
 function createDefaultSocialOverview() {

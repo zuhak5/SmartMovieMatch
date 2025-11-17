@@ -21,6 +21,7 @@ import {
   unfollowUserByUsername,
   subscribeToCollaborativeState,
   refreshCollaborativeState,
+  listConversationsRemote,
   joinWatchPartyRemote,
   listWatchPartyMessagesRemote,
   postWatchPartyMessageRemote
@@ -30,6 +31,7 @@ const defaultTabs = {
   friends: "feed",
   discover: "movies",
   home: "for-you",
+  messages: "inbox",
   library: "watchlist",
   profile: "overview"
 };
@@ -90,6 +92,11 @@ const state = {
     lists: { owned: [], shared: [], invites: [] },
     watchParties: { upcoming: [], invites: [] }
   },
+  conversations: [],
+  conversationsLoaded: false,
+  conversationsLoading: false,
+  conversationsError: "",
+  activeConversationId: null,
   activeWatchParty: null,
   watchPartyMessages: [],
   watchPartyMessagesPartyId: null,
@@ -101,6 +108,10 @@ const authRequiredViews = [
   {
     section: "friends",
     message: "Sign in to see your friends feed and requests."
+  },
+  {
+    section: "messages",
+    message: "Sign in to view your conversations."
   },
   {
     section: "library",
@@ -138,6 +149,14 @@ const watchPartyMessagesList = document.querySelector('[data-watch-party-message
 const watchPartyForm = document.querySelector('[data-watch-party-chat-form]');
 const watchPartyInput = document.querySelector('[data-watch-party-input]');
 const watchPartyStatus = document.querySelector('[data-watch-party-status]');
+const conversationList = document.querySelector('[data-conversation-list]');
+const conversationStatus = document.querySelector('[data-conversation-status]');
+const conversationPreview = document.querySelector('[data-conversation-preview]');
+const conversationPlaceholder = document.querySelector('[data-conversation-placeholder]');
+const conversationThread = document.querySelector('[data-conversation-thread]');
+const conversationPreviewTitle = document.querySelector('[data-conversation-preview-title]');
+const conversationPreviewMeta = document.querySelector('[data-conversation-preview-meta]');
+const conversationPreviewBody = document.querySelector('[data-conversation-preview-body]');
 const authOverlay = document.querySelector("[data-auth-overlay]");
 const authForm = document.querySelector("[data-auth-form]");
 const authStatus = document.querySelector("[data-auth-status]");
@@ -256,6 +275,10 @@ function setSection(section) {
   });
 
   setTab(section, targetTab);
+
+  if (section === "messages" && hasActiveSession()) {
+    loadConversations();
+  }
 }
 
 function setTab(section, tab) {
@@ -1095,6 +1118,28 @@ function formatWatchPartyTime(value) {
   });
 }
 
+function formatRelativeTimestamp(value) {
+  if (!value) {
+    return "Just now";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Just now";
+  }
+  const diffMinutes = Math.round((Date.now() - date.getTime()) / 60000);
+  if (diffMinutes < 1) {
+    return "Just now";
+  }
+  if (diffMinutes < 60) {
+    return `${diffMinutes}m ago`;
+  }
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  }
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 function setWatchPartyStatus(message, variant = null) {
   if (!watchPartyStatus) return;
   watchPartyStatus.textContent = message || "";
@@ -1191,6 +1236,182 @@ async function handleJoinWatchParty(event) {
     setWatchPartyStatus("Joined the watch party.", "success");
   } catch (error) {
     setWatchPartyStatus(error.message || "Could not join this watch party.", "error");
+  }
+}
+
+function resetConversationsState() {
+  state.conversations = [];
+  state.conversationsLoaded = false;
+  state.conversationsLoading = false;
+  state.conversationsError = "";
+  state.activeConversationId = null;
+  renderConversationList();
+}
+
+function getConversationTitle(conversation) {
+  if (!conversation) return "Direct messages";
+  if (conversation.title) return conversation.title;
+  const selfHandle = canonicalHandle(state.session && state.session.username);
+  const handles = (conversation.participants || [])
+    .map((participant) => canonicalHandle(participant.username))
+    .filter(Boolean);
+  const others = handles.filter((handle) => handle !== selfHandle);
+  const names = (others.length ? others : handles).slice(0, 3);
+  if (!names.length) return "Direct messages";
+  const label = names.join(", ");
+  if (handles.length > names.length) {
+    return `${label} +${handles.length - names.length}`;
+  }
+  return label;
+}
+
+function getConversationPreviewSnippet(conversation) {
+  if (!conversation || !conversation.lastMessage) {
+    return "No messages yet.";
+  }
+  const sender = conversation.lastMessage.senderUsername
+    ? `@${canonicalHandle(conversation.lastMessage.senderUsername)}: `
+    : "";
+  const body = conversation.lastMessage.body || "";
+  const combined = `${sender}${body}`.trim();
+  if (!combined) {
+    return "No messages yet.";
+  }
+  return combined.length > 140 ? `${combined.slice(0, 137)}…` : combined;
+}
+
+function renderConversationList() {
+  if (!conversationList) return;
+  conversationList.innerHTML = "";
+  if (conversationStatus) {
+    conversationStatus.textContent = "";
+  }
+
+  if (state.conversationsLoading) {
+    if (conversationStatus) {
+      conversationStatus.textContent = "Loading conversations…";
+    }
+    renderConversationPreview();
+    return;
+  }
+
+  if (state.conversationsError) {
+    if (conversationStatus) {
+      conversationStatus.textContent = state.conversationsError;
+    }
+    renderConversationPreview();
+    return;
+  }
+
+  if (!state.conversations.length) {
+    if (conversationStatus) {
+      conversationStatus.textContent = "No conversations yet. Start one from a profile.";
+    }
+    renderConversationPreview();
+    return;
+  }
+
+  state.conversations.forEach((conversation) => {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "conversation-row";
+    row.dataset.conversationId = conversation.id || "";
+    if (conversation.id && conversation.id === state.activeConversationId) {
+      row.classList.add("is-active");
+    }
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar conversation-avatar";
+    avatar.textContent = initialsFromName(getConversationTitle(conversation));
+
+    const stack = document.createElement("div");
+    stack.className = "stack";
+
+    const title = document.createElement("div");
+    title.className = "conversation-title";
+    title.textContent = getConversationTitle(conversation);
+
+    const meta = document.createElement("div");
+    meta.className = "conversation-meta";
+    meta.textContent = formatRelativeTimestamp(conversation.lastMessageAt);
+
+    const snippet = document.createElement("p");
+    snippet.className = "conversation-snippet";
+    snippet.textContent = getConversationPreviewSnippet(conversation);
+
+    stack.append(title, meta, snippet);
+    row.append(avatar, stack);
+    row.addEventListener("click", () => setActiveConversation(conversation.id));
+    conversationList.append(row);
+  });
+
+  renderConversationPreview();
+}
+
+function renderConversationPreview() {
+  if (!conversationPreview || !conversationPlaceholder || !conversationThread) return;
+  const conversation = state.conversations.find((entry) => entry.id === state.activeConversationId);
+  if (!conversation) {
+    conversationPlaceholder.hidden = false;
+    conversationThread.hidden = true;
+    return;
+  }
+
+  conversationPlaceholder.hidden = true;
+  conversationThread.hidden = false;
+  if (conversationPreviewTitle) {
+    conversationPreviewTitle.textContent = getConversationTitle(conversation);
+  }
+  if (conversationPreviewMeta) {
+    const participantHandles = (conversation.participants || [])
+      .map((participant) => `@${canonicalHandle(participant.username)}`)
+      .filter(Boolean);
+    const details = [];
+    if (participantHandles.length) {
+      details.push(participantHandles.join(", "));
+    }
+    if (conversation.lastMessageAt) {
+      details.push(formatRelativeTimestamp(conversation.lastMessageAt));
+    }
+    conversationPreviewMeta.textContent = details.join(" · ") || "Conversation";
+  }
+  if (conversationPreviewBody) {
+    conversationPreviewBody.textContent = getConversationPreviewSnippet(conversation);
+  }
+}
+
+function setActiveConversation(conversationId) {
+  state.activeConversationId = conversationId || null;
+  renderConversationList();
+}
+
+async function loadConversations(force = false) {
+  if (!hasActiveSession()) {
+    resetConversationsState();
+    return;
+  }
+  if (state.conversationsLoading || (state.conversationsLoaded && !force)) {
+    return;
+  }
+  state.conversationsLoading = true;
+  state.conversationsError = "";
+  renderConversationList();
+  try {
+    const conversations = await listConversationsRemote();
+    state.conversations = conversations;
+    state.conversationsLoaded = true;
+    if (state.activeConversationId && !conversations.some((entry) => entry.id === state.activeConversationId)) {
+      state.activeConversationId = null;
+    }
+    if (!state.activeConversationId && conversations.length) {
+      state.activeConversationId = conversations[0].id;
+    }
+  } catch (error) {
+    state.conversationsError = error.message || "Unable to load conversations.";
+    state.conversationsLoaded = false;
+  } finally {
+    state.conversationsLoading = false;
+    renderConversationList();
   }
 }
 
@@ -2168,9 +2389,13 @@ function init() {
     if (session && session.token) {
       closeAuthOverlay();
       refreshCollaborativeState();
+      if (state.activeSection === "messages") {
+        loadConversations(true);
+      }
     } else {
       state.collabState = getDefaultCollaborativeState();
       setActiveWatchParty(null);
+      resetConversationsState();
     }
     maybeOpenOnboarding();
   });
