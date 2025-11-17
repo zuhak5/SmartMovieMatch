@@ -178,6 +178,9 @@ module.exports = async (req, res) => {
       case 'joinWatchParty':
         result = await handleJoinWatchParty(req, payload);
         break;
+      case 'listConversations':
+        result = await handleListConversations(req, payload);
+        break;
       case 'listWatchPartyMessages':
         result = await handleListWatchPartyMessages(req, payload);
         break;
@@ -1674,6 +1677,89 @@ async function handlePostWatchPartyMessage(req, payload) {
         createdAt: new Date().toISOString()
       };
   return { body: { ok: true, message } };
+}
+
+async function handleListConversations(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const username = canonicalUsername(user.username);
+  if (!username) {
+    throw new HttpError(401, 'Session expired. Sign in again.');
+  }
+
+  if (usingLocalStore()) {
+    const store = await readSocialStore();
+    const conversations = buildConversationSummariesFromStore(store, username);
+    return { body: { ok: true, conversations } };
+  }
+
+  let memberRows;
+  try {
+    memberRows = await supabaseFetch('user_conversation_members', {
+      query: {
+        select: 'conversation_id,role,joined_at,last_read_message_id,metadata',
+        username: `eq.${username}`
+      }
+    });
+  } catch (error) {
+    enableLocalFallback('loading conversations list', error);
+    return handleListConversations(req, payload);
+  }
+
+  if (!Array.isArray(memberRows) || !memberRows.length) {
+    return { body: { ok: true, conversations: [] } };
+  }
+
+  const conversationIds = Array.from(
+    new Set(
+      memberRows
+        .map((row) => normalizeId(row.conversation_id))
+        .filter(Boolean)
+    )
+  );
+
+  if (!conversationIds.length) {
+    return { body: { ok: true, conversations: [] } };
+  }
+
+  let conversationRows = [];
+  let participantRows = [];
+  let messageRows = [];
+  try {
+    conversationRows = await supabaseFetch('user_conversations', {
+      query: {
+        select: 'id,title,is_group,last_message_at,created_by_username,metadata,created_at,updated_at',
+        id: formatSupabaseIdIn(conversationIds)
+      }
+    });
+
+    participantRows = await supabaseFetch('user_conversation_members', {
+      query: {
+        select: 'conversation_id,username,role,joined_at,last_read_message_id,metadata',
+        conversation_id: formatSupabaseIdIn(conversationIds)
+      }
+    });
+
+    messageRows = await supabaseFetch('user_messages', {
+      query: {
+        select: 'id,conversation_id,sender_username,body,message_type,created_at,metadata',
+        conversation_id: formatSupabaseIdIn(conversationIds),
+        order: 'created_at.desc',
+        limit: String(Math.max(conversationIds.length * 3, 30))
+      }
+    });
+  } catch (error) {
+    enableLocalFallback('loading conversations list', error);
+    return handleListConversations(req, payload);
+  }
+
+  const summary = buildConversationSummaries(
+    memberRows,
+    Array.isArray(conversationRows) ? conversationRows : [],
+    Array.isArray(participantRows) ? participantRows : [],
+    Array.isArray(messageRows) ? messageRows : []
+  );
+
+  return { body: { ok: true, conversations: summary } };
 }
 
 async function handleUpdatePresence(req, payload) {
@@ -4955,8 +5041,157 @@ function canonicalUsername(username) {
   return username.trim().toLowerCase();
 }
 
+function normalizeConversationMetadata(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  return value;
+}
+
+function normalizeConversationFromRow(row) {
+  return {
+    id: normalizeId(row.id),
+    title: typeof row.title === 'string' ? row.title.trim() : '',
+    isGroup: Boolean(row.is_group || row.isGroup),
+    createdBy: canonicalUsername(row.created_by_username || row.createdBy),
+    lastMessageAt: row.last_message_at || row.lastMessageAt || null,
+    createdAt: row.created_at || row.createdAt || null,
+    updatedAt: row.updated_at || row.updatedAt || null,
+    metadata: normalizeConversationMetadata(row.metadata)
+  };
+}
+
+function normalizeConversationParticipant(entry) {
+  return {
+    conversationId: normalizeId(entry.conversation_id || entry.conversationId),
+    username: canonicalUsername(entry.username),
+    role: entry.role || 'member',
+    joinedAt: entry.joined_at || entry.joinedAt || null,
+    lastReadMessageId: normalizeId(entry.last_read_message_id || entry.lastReadMessageId),
+    metadata: normalizeConversationMetadata(entry.metadata)
+  };
+}
+
+function normalizeConversationMessage(entry) {
+  return {
+    id: normalizeId(entry.id),
+    conversationId: normalizeId(entry.conversation_id || entry.conversationId),
+    senderUsername: canonicalUsername(entry.sender_username || entry.senderUsername),
+    body: typeof entry.body === 'string' ? entry.body : '',
+    messageType: entry.message_type || entry.messageType || 'text',
+    createdAt: entry.created_at || entry.createdAt || null,
+    metadata: normalizeConversationMetadata(entry.metadata)
+  };
+}
+
+function buildConversationSummariesFromStore(store, username) {
+  if (!username) {
+    return [];
+  }
+  const members = Array.isArray(store.userConversationMembers)
+    ? store.userConversationMembers
+    : [];
+  const membership = members.filter(
+    (entry) => canonicalUsername(entry.username) === canonicalUsername(username)
+  );
+  if (!membership.length) {
+    return [];
+  }
+  const conversations = Array.isArray(store.userConversations)
+    ? store.userConversations
+    : [];
+  const messages = Array.isArray(store.userMessages) ? store.userMessages : [];
+  return buildConversationSummaries(membership, conversations, members, messages);
+}
+
+function buildConversationSummaries(memberRows, conversationRows, participantRows, messageRows) {
+  const conversationsById = new Map(
+    conversationRows
+      .map((row) => normalizeConversationFromRow(row))
+      .filter((conversation) => conversation.id)
+      .map((conversation) => [conversation.id, conversation])
+  );
+
+  const participantsByConversation = new Map();
+  participantRows
+    .map((entry) => normalizeConversationParticipant(entry))
+    .filter((participant) => participant.conversationId && participant.username)
+    .forEach((participant) => {
+      const list = participantsByConversation.get(participant.conversationId) || [];
+      list.push(participant);
+      participantsByConversation.set(participant.conversationId, list);
+    });
+
+  const latestMessageByConversation = new Map();
+  messageRows
+    .map((entry) => normalizeConversationMessage(entry))
+    .filter((message) => message.conversationId)
+    .forEach((message) => {
+      const existing = latestMessageByConversation.get(message.conversationId);
+      const currentTime = new Date(message.createdAt || 0).getTime();
+      const existingTime = existing ? new Date(existing.createdAt || 0).getTime() : -Infinity;
+      if (!existing || currentTime > existingTime) {
+        latestMessageByConversation.set(message.conversationId, message);
+      }
+    });
+
+  const summaries = memberRows
+    .map((member) => {
+      const conversationId = normalizeId(member.conversation_id || member.conversationId);
+      const conversation = conversationsById.get(conversationId);
+      if (!conversation) {
+        return null;
+      }
+      const participants = participantsByConversation.get(conversationId) || [];
+      const lastMessage = latestMessageByConversation.get(conversationId) || null;
+      const lastMessageAt =
+        conversation.lastMessageAt ||
+        (lastMessage && lastMessage.createdAt) ||
+        conversation.updatedAt ||
+        conversation.createdAt ||
+        null;
+
+      return {
+        ...conversation,
+        participants,
+        lastMessage,
+        lastMessageAt
+      };
+    })
+    .filter(Boolean);
+
+  return summaries.sort((a, b) => {
+    const aTime = new Date(a.lastMessageAt || 0).getTime();
+    const bTime = new Date(b.lastMessageAt || 0).getTime();
+    return bTime - aTime;
+  });
+}
+
 function formatSupabaseIn(values = []) {
   const cleaned = Array.from(new Set(values.map((value) => canonicalUsername(value)).filter(Boolean)));
+  if (!cleaned.length) {
+    return '';
+  }
+  const escaped = cleaned.map((value) => `"${value.replace(/"/g, '\\"')}"`);
+  return `in.(${escaped.join(',')})`;
+}
+
+function formatSupabaseIdIn(values = []) {
+  const cleaned = Array.from(
+    new Set(
+      values
+        .map((value) => {
+          if (value === null || value === undefined) {
+            return '';
+          }
+          if (typeof value === 'string') {
+            return value.trim();
+          }
+          return String(value).trim();
+        })
+        .filter(Boolean)
+    )
+  );
   if (!cleaned.length) {
     return '';
   }
@@ -5116,7 +5351,14 @@ async function readSocialStore() {
       watchParties: Array.isArray(parsed.watchParties) ? parsed.watchParties.slice() : [],
       watchPartyMessages: Array.isArray(parsed.watchPartyMessages)
         ? parsed.watchPartyMessages.slice()
-        : []
+        : [],
+      userConversations: Array.isArray(parsed.userConversations)
+        ? parsed.userConversations.slice()
+        : [],
+      userConversationMembers: Array.isArray(parsed.userConversationMembers)
+        ? parsed.userConversationMembers.slice()
+        : [],
+      userMessages: Array.isArray(parsed.userMessages) ? parsed.userMessages.slice() : []
     };
   } catch (error) {
     return {
@@ -5129,7 +5371,10 @@ async function readSocialStore() {
       reviewReactions: [],
       collabLists: [],
       watchParties: [],
-      watchPartyMessages: []
+      watchPartyMessages: [],
+      userConversations: [],
+      userConversationMembers: [],
+      userMessages: []
     };
   }
 }
@@ -5148,7 +5393,12 @@ async function writeSocialStore(store) {
       watchParties: Array.isArray(store.watchParties) ? store.watchParties : [],
       watchPartyMessages: Array.isArray(store.watchPartyMessages)
         ? store.watchPartyMessages
-        : []
+        : [],
+      userConversations: Array.isArray(store.userConversations) ? store.userConversations : [],
+      userConversationMembers: Array.isArray(store.userConversationMembers)
+        ? store.userConversationMembers
+        : [],
+      userMessages: Array.isArray(store.userMessages) ? store.userMessages : []
     },
     null,
     2

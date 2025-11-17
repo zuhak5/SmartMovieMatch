@@ -21,6 +21,15 @@
           </div>
         </div>
         <div class="top-actions" data-auth-shell>
+          <button
+            class="icon-circle top-message-button"
+            type="button"
+            aria-label="Open messages"
+            data-section-button="messages"
+          >
+            <span class="icon">🛩️</span>
+            <span class="badge-dot" aria-hidden="true"></span>
+          </button>
           <button class="btn btn-primary top-auth-btn" type="button" data-auth-open>
             Sign in / Sign up
           </button>
@@ -50,6 +59,9 @@
         <div class="tab-group" data-section-tabs="friends" role="tablist" aria-label="Friends tabs">
           <button class="tab-button" data-tab="feed" role="tab">Feed</button>
           <button class="tab-button" data-tab="requests" role="tab">Requests</button>
+        </div>
+        <div class="tab-group" data-section-tabs="messages" role="tablist" aria-label="Messages tabs">
+          <button class="tab-button" data-tab="inbox" role="tab">Inbox</button>
         </div>
         <div class="tab-group" data-section-tabs="discover" role="tablist" aria-label="Discover tabs">
           <button class="tab-button" data-tab="movies" role="tab">Movies</button>
@@ -141,6 +153,44 @@
               </div>
             </div>
             <div class="empty-state">No more requests right now. Grab popcorn!</div>
+          </div>
+        </section>
+
+        <section class="section-panel" data-section-panel="messages">
+          <div class="panel-heading">
+            <div>
+              <h2>Messages</h2>
+              <p class="lead">Pick up conversations with friends and groups.</p>
+            </div>
+          </div>
+          <div class="tab-panel" data-tab-panel="inbox">
+            <div class="messages-layout">
+              <div class="messages-column">
+                <div class="messages-column-header">
+                  <h3>Inbox</h3>
+                  <p class="small-text muted">Latest chats and group threads.</p>
+                </div>
+                <div class="messages-list" data-conversation-list></div>
+                <div class="small-text muted" data-conversation-status></div>
+              </div>
+              <div class="messages-column messages-column--preview">
+                <div class="messages-preview" data-conversation-preview>
+                  <div class="messages-placeholder" data-conversation-placeholder>
+                    <p class="small-text muted">Select a conversation to see the latest message.</p>
+                  </div>
+                  <div class="messages-thread" data-conversation-thread hidden>
+                    <div class="messages-thread-header">
+                      <div class="avatar conversation-avatar" aria-hidden="true">💬</div>
+                      <div class="stack">
+                        <strong data-conversation-preview-title>Conversation</strong>
+                        <div class="conversation-meta" data-conversation-preview-meta></div>
+                      </div>
+                    </div>
+                    <p class="conversation-snippet" data-conversation-preview-body></p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
