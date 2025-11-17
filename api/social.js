@@ -569,6 +569,8 @@ async function handleUpsertReview(req, payload) {
   const visibility = normalizeReviewVisibility(reviewInput.visibility);
 
   const content = normalizeReviewContent(reviewInput);
+  const tags = normalizeTagList(reviewInput.tags || reviewInput.tagList || reviewInput.tag_list);
+  const headline = sanitizeHeadline(reviewInput.headline || reviewInput.title);
   const resolvedMovie = await resolveMovieIdentifiers(movie);
   if (!usingLocalStore() && !resolvedMovie.imdbId) {
     throw new HttpError(400, 'Missing IMDb ID for this movie. Try another recommendation.');
@@ -577,11 +579,13 @@ async function handleUpsertReview(req, payload) {
     username: user.username,
     movie: resolvedMovie,
     rating,
+    headline,
     body: content.capsule || null,
     hasSpoilers: content.hasSpoilers,
     fullText: content.fullText || null,
     segments: content.segments,
-    visibility
+    visibility,
+    tags
   });
   await broadcastReviewActivity({
     actor: user.username,
@@ -3309,6 +3313,8 @@ async function fetchMovieReviews(movie, followingSet, currentUsername) {
       review.reactions = summarizeReactions(reactions, currentUsername);
       const comments = commentMap.get(lookupKey) || commentMap.get(review.username) || [];
       review.comments = mapCommentEntries(comments, currentUsername);
+      review.commentsCount = review.comments.length;
+      review.likesCount = review.likes.count;
     });
     const myReview = reviews.find((review) => review.username === currentUsername) || null;
     const stats = calculateReviewStats(reviews);
@@ -3321,7 +3327,8 @@ async function fetchMovieReviews(movie, followingSet, currentUsername) {
   try {
     rows = await supabaseFetch('movie_reviews', {
       query: {
-        select: 'id,username,rating,body,is_spoiler,created_at,updated_at,visibility',
+        select:
+          'id,username,headline,body,rating,is_spoiler,visibility,tags,likes_count,comments_count,metadata,created_at,updated_at',
         movie_imdb_id: `eq.${movie.imdbId}`,
         order: 'updated_at.desc'
       }
@@ -3361,6 +3368,7 @@ async function fetchMovieReviews(movie, followingSet, currentUsername) {
         reviews.forEach((review) => {
           const likes = likeMap.get(review.id) || [];
           review.likes = summarizeLikes(likes, currentUsername);
+          review.likesCount = review.likes.count;
         });
       }
     }
@@ -3371,7 +3379,52 @@ async function fetchMovieReviews(movie, followingSet, currentUsername) {
     if (!review.likes) {
       review.likes = summarizeLikes([], currentUsername);
     }
+    if (!review.likesCount && review.likes) {
+      review.likesCount = review.likes.count;
+    }
   });
+
+  if (reviewIds.length) {
+    try {
+      const commentRows = await supabaseFetch('review_comments', {
+        query: {
+          select: 'id,review_id,username,body,parent_comment_id,created_at',
+          review_id: `in.(${reviewIds.join(',')})`,
+          order: 'created_at.asc'
+        }
+      });
+      if (Array.isArray(commentRows) && commentRows.length) {
+        const commentMap = new Map();
+        commentRows.forEach((row) => {
+          if (!row.review_id) return;
+          if (!commentMap.has(row.review_id)) {
+            commentMap.set(row.review_id, []);
+          }
+          commentMap.get(row.review_id).push(row);
+        });
+        reviews.forEach((review) => {
+          const comments = commentMap.get(review.id) || [];
+          review.comments = mapCommentEntries(comments, currentUsername);
+          review.commentsCount = review.comments.length;
+        });
+      }
+    } catch (error) {
+      console.warn('Failed to load review comments for movie', error);
+    }
+  }
+
+  reviews.forEach((review) => {
+    if (!Array.isArray(review.comments)) {
+      review.comments = [];
+    }
+    if (typeof review.commentsCount !== 'number') {
+      review.commentsCount = review.comments.length;
+    }
+    if (typeof review.likesCount !== 'number' && review.likes) {
+      review.likesCount = review.likes.count;
+    }
+  });
+
   const myReview = reviews.find((review) => review.username === currentUsername) || null;
   const stats = calculateReviewStats(reviews);
   return { reviews, myReview, stats };
@@ -3381,11 +3434,13 @@ async function upsertReview({
   username,
   movie,
   rating,
+  headline,
   body,
   hasSpoilers,
   fullText,
   segments,
-  visibility = 'public'
+  visibility = 'public',
+  tags = []
 }) {
   const timestamp = new Date().toISOString();
   if (usingLocalStore()) {
@@ -3403,12 +3458,14 @@ async function upsertReview({
       movieImdbId: movie.imdbId || null,
       movieTitle: movie.title,
       rating,
+      headline: headline || null,
       body: body || null,
       capsule: body || null,
       fullText: fullText || null,
       segments: Array.isArray(segments) ? segments : existing?.segments || null,
       hasSpoilers,
       visibility: normalizeReviewVisibility(visibility),
+      tags: normalizeTagList(tags),
       createdAt: timestamp,
       updatedAt: timestamp
     };
@@ -3416,12 +3473,14 @@ async function upsertReview({
       store.reviews[existingIndex] = {
         ...existing,
         rating,
+        headline: headline || existing?.headline || null,
         body: body || null,
         capsule: body || null,
         fullText: fullText || existing?.fullText || null,
         segments: Array.isArray(segments) ? segments : existing?.segments || null,
         hasSpoilers,
         visibility: normalizeReviewVisibility(visibility),
+        tags: normalizeTagList(tags),
         updatedAt: timestamp,
         movieTitle: movie.title,
         movieImdbId: movie.imdbId || null,
@@ -3444,9 +3503,16 @@ async function upsertReview({
           username,
           movie_imdb_id: movie.imdbId,
           rating,
+          headline: headline || null,
           body: body || null,
           is_spoiler: hasSpoilers,
           visibility: normalizeReviewVisibility(visibility),
+          tags: normalizeTagList(tags),
+          metadata: {
+            fullText: fullText || null,
+            segments: Array.isArray(segments) ? segments : parseReviewSegments(fullText || body || ''),
+            hasSpoilers
+          },
           updated_at: timestamp
         }
       ]
@@ -3457,11 +3523,13 @@ async function upsertReview({
       username,
       movie,
       rating,
+      headline,
       body,
       hasSpoilers,
       fullText,
       segments,
-      visibility
+      visibility,
+      tags
     });
   }
 }
@@ -3494,6 +3562,7 @@ function mapReviewRow(row, followingSet, currentUsername) {
   const normalizedAuthor = canonicalUsername(username);
   const normalizedViewer = canonicalUsername(currentUsername);
   const fallbackId = buildLocalReviewId(row.movieTmdbId || row.movie_tmdb_id, username);
+  const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
   const segments = Array.isArray(row.segments)
     ? row.segments
         .map((segment) => ({
@@ -3501,19 +3570,48 @@ function mapReviewRow(row, followingSet, currentUsername) {
           spoiler: Boolean(segment.spoiler)
         }))
         .filter((segment) => segment.text)
-    : parseReviewSegments(row.fullText || row.body || '');
-  const capsule = buildCapsuleFromSegments(segments, row.body || row.capsule || row.fullText || '');
-  const fullText = typeof row.fullText === 'string' && row.fullText ? row.fullText : row.body || '';
+    : Array.isArray(metadata.segments)
+    ? metadata.segments
+        .map((segment) => ({
+          text: typeof segment.text === 'string' ? segment.text : '',
+          spoiler: Boolean(segment.spoiler)
+        }))
+        .filter((segment) => segment.text)
+    : parseReviewSegments(row.fullText || metadata.fullText || row.body || '');
+  const capsule = buildCapsuleFromSegments(
+    segments,
+    row.body || row.capsule || metadata.capsule || row.fullText || metadata.fullText || ''
+  );
+  const fullText =
+    (typeof metadata.fullText === 'string' && metadata.fullText) ||
+    (typeof row.fullText === 'string' && row.fullText) ||
+    row.body ||
+    '';
   return {
     id: row.id || row.reviewId || fallbackId || null,
     username,
     rating: typeof row.rating === 'number' ? Number(row.rating) : row.rating ? Number(row.rating) : null,
+    headline: sanitizeHeadline(row.headline || metadata.headline),
     body: capsule || null,
     capsule: capsule || null,
     fullText: fullText || null,
     segments,
     hasSpoilers:
-      Boolean(row.has_spoilers || row.hasSpoilers || row.is_spoiler) || segments.some((segment) => segment.spoiler),
+      Boolean(row.has_spoilers || row.hasSpoilers || row.is_spoiler || metadata.hasSpoilers) ||
+      segments.some((segment) => segment.spoiler),
+    tags: normalizeTagList(row.tags || metadata.tags),
+    likesCount:
+      typeof row.likes_count === 'number'
+        ? row.likes_count
+        : typeof metadata.likesCount === 'number'
+        ? metadata.likesCount
+        : 0,
+    commentsCount:
+      typeof row.comments_count === 'number'
+        ? row.comments_count
+        : typeof metadata.commentsCount === 'number'
+        ? metadata.commentsCount
+        : 0,
     createdAt: row.created_at || row.createdAt || null,
     updatedAt: row.updated_at || row.updatedAt || row.created_at || row.createdAt || null,
     isFriend: normalizedAuthor !== normalizedViewer && followingSet.has(normalizedAuthor),
@@ -5399,6 +5497,17 @@ function sanitizeShortText(value) {
   }
   const trimmed = value.trim().slice(0, 80);
   return trimmed || null;
+}
+
+function sanitizeHeadline(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  return trimmed.slice(0, 120);
 }
 
 function normalizeRating(value) {

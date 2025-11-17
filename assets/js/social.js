@@ -660,6 +660,20 @@ export function buildCommunitySection(movieContext) {
   ratingField.appendChild(ratingLabel);
   ratingField.appendChild(ratingInput);
 
+  const headlineField = document.createElement('div');
+  headlineField.className = 'community-form-field';
+  const headlineLabel = document.createElement('label');
+  headlineLabel.setAttribute('for', `communityHeadline-${tmdbId}`);
+  headlineLabel.textContent = 'Headline (optional)';
+  const headlineInput = document.createElement('input');
+  headlineInput.type = 'text';
+  headlineInput.className = 'input-base input-text';
+  headlineInput.id = `communityHeadline-${tmdbId}`;
+  headlineInput.maxLength = 120;
+  headlineInput.placeholder = 'Add a short title for your take';
+  headlineField.appendChild(headlineLabel);
+  headlineField.appendChild(headlineInput);
+
   const textField = document.createElement('div');
   textField.className = 'community-form-field';
   const textLabel = document.createElement('label');
@@ -701,6 +715,23 @@ export function buildCommunitySection(movieContext) {
   longField.appendChild(longArea);
   longField.appendChild(helperText);
   advancedDetails.appendChild(longField);
+
+  const tagsField = document.createElement('div');
+  tagsField.className = 'community-form-field';
+  const tagsLabel = document.createElement('label');
+  tagsLabel.setAttribute('for', `communityTags-${tmdbId}`);
+  tagsLabel.textContent = 'Tags';
+  const tagsInput = document.createElement('input');
+  tagsInput.type = 'text';
+  tagsInput.id = `communityTags-${tmdbId}`;
+  tagsInput.className = 'input-base input-text';
+  tagsInput.placeholder = 'e.g. cozy, noir, rewatch';
+  const tagsHint = document.createElement('p');
+  tagsHint.className = 'community-advanced-hint';
+  tagsHint.textContent = 'Add up to 6 comma-separated tags to group similar reviews.';
+  tagsField.appendChild(tagsLabel);
+  tagsField.appendChild(tagsInput);
+  tagsField.appendChild(tagsHint);
 
   const flagsRow = document.createElement('div');
   flagsRow.className = 'community-flags-row';
@@ -755,8 +786,10 @@ export function buildCommunitySection(movieContext) {
   submitRow.appendChild(statusEl);
 
   form.appendChild(ratingField);
+  form.appendChild(headlineField);
   form.appendChild(textField);
   form.appendChild(advancedDetails);
+  form.appendChild(tagsField);
   form.appendChild(flagsRow);
   form.appendChild(submitRow);
   section.appendChild(form);
@@ -800,10 +833,12 @@ export function buildCommunitySection(movieContext) {
     container: section,
     form,
     ratingInput,
+    headlineInput,
     textArea,
     fullTextArea: longArea,
     advancedDetails,
     spoilerInput,
+    tagsInput,
     visibilitySelect,
     submitBtn,
     statusEl,
@@ -1417,14 +1452,18 @@ async function handleSubmit(sectionState) {
   try {
     const longForm = sectionState.fullTextArea ? sectionState.fullTextArea.value.trim() : '';
     const hasMarkupSpoilers = /\[spoiler\]/i.test(longForm);
+    const headline = sectionState.headlineInput ? sectionState.headlineInput.value.trim() : '';
+    const tags = sectionState.tagsInput ? parseTagInput(sectionState.tagsInput.value) : [];
     await callSocial('upsertReview', {
       movie: sectionState.movie,
       review: {
         rating: ratingNumber,
+        headline,
         body: sectionState.textArea.value.trim(),
         fullText: longForm,
         hasSpoilers: sectionState.spoilerInput.checked || hasMarkupSpoilers,
-        visibility: visibilityValue
+        visibility: visibilityValue,
+        tags
       }
     });
     sectionState.statusEl.textContent = 'Review saved.';
@@ -1479,6 +1518,9 @@ function renderSection(sectionState, cache) {
 
   if (myReview) {
     sectionState.ratingInput.value = myReview.rating != null ? String(myReview.rating) : '';
+    if (sectionState.headlineInput) {
+      sectionState.headlineInput.value = myReview.headline || '';
+    }
     sectionState.textArea.value = myReview.body || '';
     sectionState.spoilerInput.checked = Boolean(myReview.hasSpoilers);
     if (sectionState.fullTextArea) {
@@ -1487,11 +1529,20 @@ function renderSection(sectionState, cache) {
         sectionState.advancedDetails.open = true;
       }
     }
+    if (sectionState.tagsInput) {
+      sectionState.tagsInput.value = formatTagsForInput(myReview.tags || []);
+    }
     if (sectionState.visibilitySelect) {
       sectionState.visibilitySelect.value = myReview.visibility || 'public';
     }
   } else if (sectionState.visibilitySelect) {
     sectionState.visibilitySelect.value = 'public';
+    if (sectionState.headlineInput) {
+      sectionState.headlineInput.value = '';
+    }
+    if (sectionState.tagsInput) {
+      sectionState.tagsInput.value = '';
+    }
   }
 
   sectionState.list.innerHTML = '';
@@ -1764,7 +1815,25 @@ function renderReviewItem(review, sectionState) {
 
   const bodyContainer = document.createElement('div');
   bodyContainer.className = 'community-review-body';
+  if (review.headline) {
+    const headline = document.createElement('p');
+    headline.className = 'community-review-headline';
+    headline.textContent = review.headline;
+    bodyContainer.appendChild(headline);
+  }
   renderReviewContent(bodyContainer, review);
+  const tags = Array.isArray(review.tags) ? review.tags.filter(Boolean) : [];
+  if (tags.length) {
+    const tagsWrap = document.createElement('div');
+    tagsWrap.className = 'community-review-tags';
+    tags.slice(0, 6).forEach((tag) => {
+      const tagEl = document.createElement('span');
+      tagEl.className = 'community-review-tag';
+      tagEl.textContent = `#${tag}`;
+      tagsWrap.appendChild(tagEl);
+    });
+    bodyContainer.appendChild(tagsWrap);
+  }
   if (hiddenReason) {
     bodyContainer.hidden = true;
     hiddenSections.push(bodyContainer);
@@ -1812,6 +1881,13 @@ function renderReviewItem(review, sectionState) {
     });
     metaBar.appendChild(followBtn);
   }
+
+  const commentCount = getReviewCommentsCount(review);
+  const commentMeta = document.createElement('span');
+  commentMeta.className = 'community-meta-count';
+  commentMeta.textContent = `💬 ${commentCount} ${commentCount === 1 ? 'comment' : 'comments'}`;
+  commentMeta.setAttribute('aria-label', `${commentCount} ${commentCount === 1 ? 'comment' : 'comments'}`);
+  metaBar.appendChild(commentMeta);
 
   const likeMeta = normalizeLikeMeta(review.likes);
   const likeBtn = document.createElement('button');
@@ -2352,6 +2428,49 @@ function updateLikeButtonState(button, meta) {
     button.classList.remove('is-liked');
     button.setAttribute('aria-pressed', 'false');
   }
+}
+
+function parseTagInput(value) {
+  if (typeof value !== 'string') {
+    return [];
+  }
+  const tags = value
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+    .slice(0, 6)
+    .map((tag) => tag.slice(0, 30));
+  return Array.from(new Set(tags));
+}
+
+function formatTagsForInput(tags) {
+  if (!Array.isArray(tags)) {
+    return '';
+  }
+  return tags.join(', ');
+}
+
+function countNestedComments(comments = []) {
+  if (!Array.isArray(comments)) {
+    return 0;
+  }
+  return comments.reduce((total, comment) => {
+    const replies = Array.isArray(comment?.replies) ? comment.replies : [];
+    return total + 1 + countNestedComments(replies);
+  }, 0);
+}
+
+function getReviewCommentsCount(review) {
+  if (!review) {
+    return 0;
+  }
+  if (typeof review.commentsCount === 'number') {
+    return review.commentsCount;
+  }
+  if (Array.isArray(review.comments)) {
+    return countNestedComments(review.comments);
+  }
+  return 0;
 }
 
 async function toggleReviewLike(sectionState, review, button) {
