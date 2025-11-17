@@ -170,13 +170,13 @@ Each item is a task for Codex (or any other assistant) to implement.
 
 ## Lists, favorites, and tags (LIST)
 
-- [ ] **LIST-001 – User-defined lists**
+- [x] **LIST-001 – User-defined lists**
   - Description: Make custom lists functional with Supabase:
     - Create/update/delete lists in `user_lists` (including `kind`, `is_collaborative`).
     - Add/remove movies via `user_list_items`.
   - Files: Lists sidebar, list detail view.
   - Backend: `user_lists`, `user_list_items`.
-  - DONE: _…_
+  DONE 2025-11-17T11:51Z – Added Supabase-backed list creation, editing, deletion, and item saves/removals from search with live library list UI.
 
 - [ ] **LIST-002 – Favorites / “heart” button backed by DB**
   - Description: Hook the favorite/heart icon on movie cards to `user_favorites`.

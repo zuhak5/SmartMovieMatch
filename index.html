@@ -394,28 +394,79 @@
             </div>
           </div>
           <div class="tab-panel" data-tab-panel="lists">
-            <button class="btn-ghost btn" style="margin-bottom: 12px;">+ Create new list</button>
-            <div class="card" style="flex-direction: column; align-items: flex-start;">
-              <strong>Feel-good Fridays</strong>
-              <div class="small-text">15 movies · Shared</div>
-              <div class="list-collage">
-                <div class="mini-poster"></div>
-                <div class="mini-poster"></div>
-                <div class="mini-poster"></div>
-                <div class="mini-poster"></div>
+            <div class="card" data-list-create-card>
+              <div class="stack" style="gap: 8px;">
+                <div class="inline-actions" style="gap: 8px;">
+                  <button class="btn-ghost btn" type="button" data-list-create-toggle>+ Create new list</button>
+                  <button class="btn-ghost btn" type="button" data-list-refresh>Refresh</button>
+                </div>
+                <form class="stack" data-list-create-form hidden>
+                  <label class="field">
+                    <span class="small-text muted">Name</span>
+                    <input type="text" placeholder="My favorites" data-list-name />
+                  </label>
+                  <label class="field">
+                    <span class="small-text muted">Description</span>
+                    <input type="text" placeholder="Optional description" data-list-description />
+                  </label>
+                  <div class="inline-actions" style="gap: 8px; align-items: center;">
+                    <select data-list-visibility aria-label="List visibility">
+                      <option value="public">Public</option>
+                      <option value="private">Private</option>
+                    </select>
+                    <label class="checkbox">
+                      <input type="checkbox" data-list-collaborative />
+                      <span>Collaborative</span>
+                    </label>
+                    <button class="btn btn-primary" type="submit">Save list</button>
+                    <button class="btn-ghost btn" type="button" data-list-cancel>Cancel</button>
+                  </div>
+                </form>
+                <div class="small-text muted" data-list-status></div>
               </div>
-              <span class="badge match">Shared</span>
             </div>
-            <div class="card" style="flex-direction: column; align-items: flex-start;">
-              <strong>Private comfort rewatches</strong>
-              <div class="small-text">9 movies · Private</div>
-              <div class="list-collage">
-                <div class="mini-poster"></div>
-                <div class="mini-poster"></div>
-                <div class="mini-poster"></div>
-                <div class="mini-poster"></div>
+            <div class="stack" data-library-lists></div>
+            <div class="card muted" data-library-lists-empty>
+              <div class="stack">
+                <strong>No lists yet</strong>
+                <div class="small-text">Sign in and create your first list to save movies from search.</div>
               </div>
-              <span class="badge">Private</span>
+            </div>
+            <div class="card" data-active-list-panel hidden>
+              <div class="panel-heading">
+                <div>
+                  <strong data-active-list-title>List</strong>
+                  <div class="small-text muted" data-active-list-meta></div>
+                </div>
+                <div class="inline-actions" style="gap: 8px;">
+                  <button class="btn-ghost btn" type="button" data-list-edit>✎ Edit</button>
+                  <button class="btn-ghost btn" type="button" data-list-delete>Delete</button>
+                </div>
+              </div>
+              <form class="stack" data-list-edit-form hidden>
+                <label class="field">
+                  <span class="small-text muted">Name</span>
+                  <input type="text" data-list-edit-name />
+                </label>
+                <label class="field">
+                  <span class="small-text muted">Description</span>
+                  <input type="text" data-list-edit-description />
+                </label>
+                <div class="inline-actions" style="gap: 8px; align-items: center;">
+                  <select data-list-edit-visibility aria-label="List visibility">
+                    <option value="public">Public</option>
+                    <option value="private">Private</option>
+                  </select>
+                  <label class="checkbox">
+                    <input type="checkbox" data-list-edit-collaborative />
+                    <span>Collaborative</span>
+                  </label>
+                  <button class="btn btn-primary" type="submit">Save changes</button>
+                  <button class="btn-ghost btn" type="button" data-list-edit-cancel>Cancel</button>
+                </div>
+              </form>
+              <div class="small-text muted" data-list-item-status></div>
+              <div class="stack" data-list-item-container></div>
             </div>
           </div>
         </section>

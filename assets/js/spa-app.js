@@ -36,6 +36,13 @@ import {
   joinWatchPartyRemote,
   listWatchPartyMessagesRemote,
   postWatchPartyMessageRemote,
+  listUserListsRemote,
+  getUserListItemsRemote,
+  createUserListRemote,
+  updateUserListRemote,
+  deleteUserListRemote,
+  addUserListItemRemote,
+  removeUserListItemRemote,
   acknowledgeNotifications,
   subscribeToDiaryEntries,
   refreshDiaryEntries,
@@ -113,6 +120,13 @@ const state = {
     lists: { owned: [], shared: [], invites: [] },
     watchParties: { upcoming: [], invites: [] }
   },
+  userLists: [],
+  userListsLoading: false,
+  userListsError: "",
+  activeListId: "",
+  activeListItems: [],
+  activeListLoading: false,
+  activeListError: "",
   notifications: [],
   unreadNotifications: 0,
   notificationsLoaded: false,
@@ -283,6 +297,30 @@ const diaryVisibilitySelect = document.querySelector('[data-diary-visibility]');
 const diarySourceSelect = document.querySelector('[data-diary-source]');
 const diaryDeviceSelect = document.querySelector('[data-diary-device]');
 const diarySubmitButton = document.querySelector('[data-diary-submit]');
+const libraryListsContainer = document.querySelector('[data-library-lists]');
+const libraryListsEmpty = document.querySelector('[data-library-lists-empty]');
+const listStatus = document.querySelector('[data-list-status]');
+const listCreateToggle = document.querySelector('[data-list-create-toggle]');
+const listRefreshButton = document.querySelector('[data-list-refresh]');
+const listCreateForm = document.querySelector('[data-list-create-form]');
+const listCreateCancel = document.querySelector('[data-list-cancel]');
+const listNameInput = document.querySelector('[data-list-name]');
+const listDescriptionInput = document.querySelector('[data-list-description]');
+const listVisibilitySelect = document.querySelector('[data-list-visibility]');
+const listCollaborativeInput = document.querySelector('[data-list-collaborative]');
+const activeListPanel = document.querySelector('[data-active-list-panel]');
+const activeListTitle = document.querySelector('[data-active-list-title]');
+const activeListMeta = document.querySelector('[data-active-list-meta]');
+const listItemContainer = document.querySelector('[data-list-item-container]');
+const listItemStatus = document.querySelector('[data-list-item-status]');
+const listEditButton = document.querySelector('[data-list-edit]');
+const listDeleteButton = document.querySelector('[data-list-delete]');
+const listEditForm = document.querySelector('[data-list-edit-form]');
+const listEditCancel = document.querySelector('[data-list-edit-cancel]');
+const listEditNameInput = document.querySelector('[data-list-edit-name]');
+const listEditDescriptionInput = document.querySelector('[data-list-edit-description]');
+const listEditVisibilitySelect = document.querySelector('[data-list-edit-visibility]');
+const listEditCollaborativeInput = document.querySelector('[data-list-edit-collaborative]');
 const authOverlay = document.querySelector("[data-auth-overlay]");
 const authForm = document.querySelector("[data-auth-form]");
 const authStatus = document.querySelector("[data-auth-status]");
@@ -439,6 +477,10 @@ function setTab(section, tab) {
     const isActive = panel.dataset.tabPanel === tab;
     panel.classList.toggle("is-active", isActive);
   });
+
+  if (section === "library" && tab === "lists" && hasActiveSession()) {
+    loadUserLists();
+  }
 }
 
 function createPoster(url) {
@@ -1321,7 +1363,29 @@ function renderDiscoverMovies(movies = []) {
       ? `${normalized.watchCount} logs`
       : "N/A";
 
-    stack.append(title, meta, rating);
+    const actions = document.createElement("div");
+    actions.className = "action-row";
+    actions.append(rating);
+
+    if (hasActiveSession()) {
+      const saveButton = document.createElement("button");
+      saveButton.type = "button";
+      saveButton.className = "btn-ghost btn";
+      saveButton.textContent = "Save to list";
+      saveButton.addEventListener("click", async () => {
+        saveButton.disabled = true;
+        saveButton.textContent = "Saving…";
+        await handleAddMovieToList(normalized);
+        saveButton.textContent = "Saved";
+        window.setTimeout(() => {
+          saveButton.textContent = "Save to list";
+          saveButton.disabled = false;
+        }, 900);
+      });
+      actions.append(saveButton);
+    }
+
+    stack.append(title, meta, actions);
     card.append(stack);
     discoverGrid.append(card);
   });
@@ -1453,6 +1517,8 @@ function normalizeDiscoverMovie(movie = {}) {
   const timeWindow = movie.timeWindow || movie.time_window || null;
 
   return {
+    tmdbId: movie.tmdbId || movie.tmdb_id || movie.id || movie.tmdbID || null,
+    imdbId: movie.imdbId || movie.imdb_id || null,
     title: movie.title || movie.original_title || movie.name || "Untitled",
     genres: movie.genres || movie.genre_ids || [],
     posterUrl,
@@ -1774,6 +1840,367 @@ function renderListCards(lists = []) {
     card.append(collage, title, owner, description, badge);
     discoverListCards.append(card);
   });
+}
+
+function setListStatus(message, tone = "") {
+  if (!listStatus) return;
+  listStatus.textContent = message || "";
+  listStatus.className = "small-text muted";
+  if (tone === "error") {
+    listStatus.classList.add("error-text");
+  } else if (tone === "success") {
+    listStatus.classList.add("success-text");
+  }
+}
+
+function setListItemStatus(message, tone = "") {
+  if (!listItemStatus) return;
+  listItemStatus.textContent = message || "";
+  listItemStatus.className = "small-text muted";
+  if (tone === "error") {
+    listItemStatus.classList.add("error-text");
+  } else if (tone === "success") {
+    listItemStatus.classList.add("success-text");
+  }
+}
+
+function renderUserLists() {
+  if (!libraryListsContainer) return;
+  libraryListsContainer.innerHTML = "";
+  const lists = Array.isArray(state.userLists) ? state.userLists : [];
+  const loading = state.userListsLoading;
+  if (!hasActiveSession()) {
+    setListStatus("Sign in to sync lists.", "error");
+  }
+  if (loading) {
+    const loadingRow = document.createElement("div");
+    loadingRow.className = "small-text muted";
+    loadingRow.textContent = "Loading lists…";
+    libraryListsContainer.append(loadingRow);
+  }
+  if (!lists.length) {
+    if (libraryListsEmpty) libraryListsEmpty.hidden = false;
+    if (activeListPanel) activeListPanel.hidden = true;
+    return;
+  }
+  if (libraryListsEmpty) libraryListsEmpty.hidden = true;
+  lists.forEach((list) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "card";
+    button.style.flexDirection = "column";
+    button.style.alignItems = "flex-start";
+    if (list.id === state.activeListId) {
+      button.classList.add("active");
+    }
+
+    const collage = document.createElement("div");
+    collage.className = "list-collage";
+    const posters = Array.isArray(list.posters) ? list.posters : [];
+    if (!posters.length) {
+      const placeholder = document.createElement("div");
+      placeholder.className = "mini-poster";
+      collage.append(placeholder);
+    }
+    posters.forEach((posterUrl) => {
+      const mini = document.createElement("div");
+      mini.className = "mini-poster";
+      if (posterUrl) {
+        mini.style.backgroundImage = `url(${posterUrl})`;
+        mini.style.backgroundSize = "cover";
+        mini.style.backgroundPosition = "center";
+      }
+      collage.append(mini);
+    });
+
+    const title = document.createElement("strong");
+    title.textContent = list.name || "Untitled list";
+    const meta = document.createElement("div");
+    meta.className = "small-text";
+    const visibility = list.isPublic ? "Public" : "Private";
+    const collab = list.isCollaborative ? " · Collaborative" : "";
+    const count = list.itemCount || 0;
+    meta.textContent = `${count} ${count === 1 ? "movie" : "movies"} · ${visibility}${collab}`;
+
+    button.append(title, meta, collage);
+    button.addEventListener("click", () => {
+      setActiveList(list.id);
+    });
+    libraryListsContainer.append(button);
+  });
+}
+
+function renderActiveListPanel() {
+  if (!activeListPanel) return;
+  const active = state.userLists.find((entry) => entry.id === state.activeListId);
+  if (!active || !hasActiveSession()) {
+    activeListPanel.hidden = true;
+    return;
+  }
+  activeListPanel.hidden = false;
+  if (activeListTitle) {
+    activeListTitle.textContent = active.name || "Untitled list";
+  }
+  if (activeListMeta) {
+    const visibility = active.isPublic ? "Public" : "Private";
+    const collab = active.isCollaborative ? " • Collaborative" : "";
+    const count = active.itemCount || state.activeListItems.length || 0;
+    activeListMeta.textContent = `${visibility}${collab} • ${count} ${count === 1 ? "movie" : "movies"}`;
+  }
+  renderListItems(state.activeListItems);
+}
+
+function renderListItems(items = []) {
+  if (!listItemContainer) return;
+  listItemContainer.innerHTML = "";
+  if (state.activeListLoading) {
+    const loadingRow = document.createElement("div");
+    loadingRow.className = "small-text muted";
+    loadingRow.textContent = "Loading list…";
+    listItemContainer.append(loadingRow);
+    return;
+  }
+  if (!items.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "No movies in this list yet.";
+    listItemContainer.append(empty);
+    return;
+  }
+
+  items.forEach((item) => {
+    const card = document.createElement("article");
+    card.className = "card";
+    card.style.alignItems = "flex-start";
+
+    const poster = createPoster(item.movie?.posterUrl || "");
+    const stack = document.createElement("div");
+    stack.className = "stack";
+    const title = document.createElement("strong");
+    title.textContent = item.movie?.title || item.movie?.imdbId || "Movie";
+    const meta = document.createElement("div");
+    meta.className = "small-text";
+    const year = item.movie?.releaseYear ? String(item.movie.releaseYear) : "";
+    meta.textContent = [year, item.movie?.imdbId].filter(Boolean).join(" · ");
+
+    const actions = document.createElement("div");
+    actions.className = "inline-actions";
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "btn-ghost btn";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", async () => {
+      await handleRemoveListItem(item.movie?.imdbId);
+    });
+    actions.append(removeBtn);
+
+    stack.append(title, meta, actions);
+    card.append(poster, stack);
+    listItemContainer.append(card);
+  });
+}
+
+async function loadUserLists(preferredId = state.activeListId) {
+  if (!hasActiveSession()) {
+    state.userLists = [];
+    state.activeListId = "";
+    state.activeListItems = [];
+    renderUserLists();
+    renderActiveListPanel();
+    return;
+  }
+  state.userListsLoading = true;
+  renderUserLists();
+  try {
+    const lists = await listUserListsRemote();
+    state.userLists = lists;
+    state.userListsError = "";
+    const fallbackId = preferredId && lists.some((entry) => entry.id === preferredId)
+      ? preferredId
+      : lists.length
+      ? lists[0].id
+      : "";
+    state.activeListId = fallbackId;
+  } catch (error) {
+    state.userListsError = error instanceof Error ? error.message : "Unable to load lists.";
+    setListStatus(state.userListsError, "error");
+  }
+  state.userListsLoading = false;
+  renderUserLists();
+  if (state.activeListId) {
+    await loadActiveListItems(state.activeListId);
+  } else {
+    renderActiveListPanel();
+  }
+}
+
+async function loadActiveListItems(listId = state.activeListId) {
+  if (!listId || !hasActiveSession()) {
+    state.activeListItems = [];
+    renderActiveListPanel();
+    return;
+  }
+  state.activeListLoading = true;
+  renderActiveListPanel();
+  try {
+    const { list, items } = await getUserListItemsRemote(listId);
+    if (list) {
+      state.activeListId = list.id;
+      state.userLists = state.userLists.map((entry) =>
+        entry.id === list.id ? { ...entry, itemCount: list.itemCount ?? items.length } : entry
+      );
+    }
+    state.activeListItems = items;
+    setListItemStatus(items.length ? "" : "Add movies from search to fill this list.");
+  } catch (error) {
+    setListItemStatus(error instanceof Error ? error.message : "Unable to load this list.", "error");
+  }
+  state.activeListLoading = false;
+  renderUserLists();
+  renderActiveListPanel();
+}
+
+function setActiveList(listId) {
+  if (!listId) return;
+  state.activeListId = listId;
+  renderUserLists();
+  loadActiveListItems(listId);
+}
+
+function resetListCreateForm() {
+  if (listCreateForm) {
+    listCreateForm.hidden = true;
+  }
+  if (listNameInput) listNameInput.value = "";
+  if (listDescriptionInput) listDescriptionInput.value = "";
+  if (listVisibilitySelect) listVisibilitySelect.value = "public";
+  if (listCollaborativeInput) listCollaborativeInput.checked = false;
+}
+
+async function handleListCreateSubmit(event) {
+  event.preventDefault();
+  if (!hasActiveSession()) {
+    setListStatus("Sign in to create a list.", "error");
+    openAuthOverlay("login");
+    return;
+  }
+  const name = listNameInput ? listNameInput.value.trim() : "";
+  const description = listDescriptionInput ? listDescriptionInput.value.trim() : "";
+  const visibility = listVisibilitySelect ? listVisibilitySelect.value : "public";
+  const isCollaborative = listCollaborativeInput ? listCollaborativeInput.checked : false;
+  if (!name) {
+    setListStatus("Give your list a name first.", "error");
+    return;
+  }
+  setListStatus("Saving list…", "");
+  try {
+    const created = await createUserListRemote({ name, description, visibility, isCollaborative });
+    setListStatus("List saved.", "success");
+    resetListCreateForm();
+    await loadUserLists(created?.id || state.activeListId);
+  } catch (error) {
+    setListStatus(error instanceof Error ? error.message : "Could not save list.", "error");
+  }
+}
+
+function openListEditForm() {
+  const active = state.userLists.find((entry) => entry.id === state.activeListId);
+  if (!active || !listEditForm) return;
+  listEditForm.hidden = false;
+  if (listEditNameInput) listEditNameInput.value = active.name || "";
+  if (listEditDescriptionInput) listEditDescriptionInput.value = active.description || "";
+  if (listEditVisibilitySelect) listEditVisibilitySelect.value = active.isPublic ? "public" : "private";
+  if (listEditCollaborativeInput) listEditCollaborativeInput.checked = Boolean(active.isCollaborative);
+}
+
+async function handleListEditSubmit(event) {
+  event.preventDefault();
+  if (!state.activeListId) return;
+  setListStatus("Updating list…", "");
+  try {
+    const updated = await updateUserListRemote({
+      listId: state.activeListId,
+      name: listEditNameInput ? listEditNameInput.value.trim() : undefined,
+      description: listEditDescriptionInput ? listEditDescriptionInput.value.trim() : undefined,
+      visibility: listEditVisibilitySelect ? listEditVisibilitySelect.value : undefined,
+      isCollaborative: listEditCollaborativeInput ? listEditCollaborativeInput.checked : undefined
+    });
+    if (updated) {
+      state.userLists = state.userLists.map((entry) => (entry.id === updated.id ? { ...entry, ...updated } : entry));
+      setListStatus("List updated.", "success");
+      if (listEditForm) listEditForm.hidden = true;
+      renderUserLists();
+      renderActiveListPanel();
+    }
+  } catch (error) {
+    setListStatus(error instanceof Error ? error.message : "Could not update list.", "error");
+  }
+}
+
+async function handleListDelete() {
+  if (!state.activeListId) return;
+  const confirmDelete = typeof window !== "undefined" ? window.confirm("Delete this list?") : true;
+  if (!confirmDelete) return;
+  setListStatus("Deleting list…", "");
+  try {
+    await deleteUserListRemote(state.activeListId);
+    state.activeListId = "";
+    state.activeListItems = [];
+    await loadUserLists();
+    setListStatus("List deleted.", "success");
+  } catch (error) {
+    setListStatus(error instanceof Error ? error.message : "Could not delete list.", "error");
+  }
+}
+
+function getPreferredListId() {
+  if (state.activeListId) return state.activeListId;
+  const first = Array.isArray(state.userLists) && state.userLists.length ? state.userLists[0].id : "";
+  return first || "";
+}
+
+async function handleAddMovieToList(movie) {
+  if (!hasActiveSession()) {
+    setListStatus("Sign in to save movies to lists.", "error");
+    openAuthOverlay("login");
+    return;
+  }
+  if (!movie || !movie.tmdbId || !movie.title) {
+    setListItemStatus("Unable to save this movie right now.", "error");
+    return;
+  }
+  const targetListId = getPreferredListId();
+  if (!targetListId) {
+    setListStatus("Create a list first.", "error");
+    setSection("library");
+    setTab("library", "lists");
+    return;
+  }
+  setListItemStatus("Saving to list…");
+  try {
+    const items = await addUserListItemRemote({ listId: targetListId, movie });
+    state.activeListId = targetListId;
+    if (targetListId === state.activeListId) {
+      state.activeListItems = items;
+    }
+    await loadUserLists(targetListId);
+    setListItemStatus("Saved to list.", "success");
+  } catch (error) {
+    setListItemStatus(error instanceof Error ? error.message : "Could not save to list.", "error");
+  }
+}
+
+async function handleRemoveListItem(imdbId) {
+  if (!imdbId || !state.activeListId) return;
+  setListItemStatus("Removing…");
+  try {
+    const items = await removeUserListItemRemote({ listId: state.activeListId, imdbId });
+    state.activeListItems = items;
+    await loadUserLists(state.activeListId);
+    setListItemStatus(items.length ? "" : "Add more movies from search to fill this list.");
+  } catch (error) {
+    setListItemStatus(error instanceof Error ? error.message : "Could not remove movie.", "error");
+  }
 }
 
 function getDefaultCollaborativeState() {
@@ -3524,6 +3951,37 @@ function attachListeners() {
     watchPartyJoinButton.addEventListener("click", handleJoinWatchParty);
   }
 
+  if (listCreateForm) {
+    listCreateForm.addEventListener("submit", handleListCreateSubmit);
+  }
+  if (listCreateToggle) {
+    listCreateToggle.addEventListener("click", () => {
+      if (listCreateForm) {
+        listCreateForm.hidden = !listCreateForm.hidden;
+      }
+    });
+  }
+  if (listCreateCancel) {
+    listCreateCancel.addEventListener("click", resetListCreateForm);
+  }
+  if (listRefreshButton) {
+    listRefreshButton.addEventListener("click", () => loadUserLists());
+  }
+  if (listEditButton) {
+    listEditButton.addEventListener("click", openListEditForm);
+  }
+  if (listEditForm) {
+    listEditForm.addEventListener("submit", handleListEditSubmit);
+  }
+  if (listEditCancel) {
+    listEditCancel.addEventListener("click", () => {
+      if (listEditForm) listEditForm.hidden = true;
+    });
+  }
+  if (listDeleteButton) {
+    listDeleteButton.addEventListener("click", handleListDelete);
+  }
+
   document.addEventListener("click", handleOutsideClick);
   document.addEventListener("keydown", handleEscape);
 }
@@ -3576,11 +4034,17 @@ function init() {
       renderNotificationList();
       state.notificationsLoaded = false;
       setNotificationStatus("Loading notifications…");
+      loadUserLists();
     } else {
       state.collabState = getDefaultCollaborativeState();
       setActiveWatchParty(null);
       resetConversationsState();
       resetNotificationsUi();
+      state.userLists = [];
+      state.activeListId = "";
+      state.activeListItems = [];
+      renderUserLists();
+      renderActiveListPanel();
     }
     maybeOpenOnboarding();
     refreshAppConfig();
@@ -3597,6 +4061,7 @@ function init() {
   loadTrendingPeople();
   loadHomeRecommendations();
   refreshDiaryEntries();
+  loadUserLists();
 }
 
 init();

@@ -137,6 +137,27 @@ module.exports = async (req, res) => {
       case 'recordLibraryAction':
         result = await handleRecordLibraryAction(req, payload);
         break;
+      case 'listUserLists':
+        result = await handleListUserLists(req, payload);
+        break;
+      case 'getUserListItems':
+        result = await handleGetUserListItems(req, payload);
+        break;
+      case 'createUserList':
+        result = await handleCreateUserList(req, payload);
+        break;
+      case 'updateUserList':
+        result = await handleUpdateUserList(req, payload);
+        break;
+      case 'deleteUserList':
+        result = await handleDeleteUserList(req, payload);
+        break;
+      case 'addUserListItem':
+        result = await handleAddUserListItem(req, payload);
+        break;
+      case 'removeUserListItem':
+        result = await handleRemoveUserListItem(req, payload);
+        break;
       case 'searchUsers':
         result = await handleSearchUsers(req, payload);
         break;
@@ -814,6 +835,560 @@ async function handleRecordLibraryAction(req, payload) {
     movie: resolvedMovie
   });
   return { body: { ok: true } };
+}
+
+async function handleListUserLists(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const lists = await fetchUserLists(user.username);
+  return { body: { lists } };
+}
+
+async function handleGetUserListItems(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const listId = normalizeUuid(payload.listId || payload.list_id || '');
+  if (!listId) {
+    throw new HttpError(400, 'Missing list id.');
+  }
+  const list = await fetchSingleList(user.username, listId);
+  if (!list) {
+    throw new HttpError(404, 'List not found.');
+  }
+  const items = await fetchUserListItems(listId);
+  return { body: { list, items } };
+}
+
+async function handleCreateUserList(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const name = typeof payload.name === 'string' ? payload.name.trim() : '';
+  if (!name) {
+    throw new HttpError(400, 'Enter a list name.');
+  }
+  const description = typeof payload.description === 'string' ? payload.description.trim() : '';
+  const kind = typeof payload.kind === 'string' && payload.kind.trim() ? payload.kind.trim() : null;
+  const isCollaborative = Boolean(payload.isCollaborative);
+  const visibility = (payload.visibility || '').toString().toLowerCase();
+  const isPublic = visibility === 'private' ? false : true;
+
+  const list = usingLocalStore()
+    ? await createLocalList({
+        username: user.username,
+        name,
+        description,
+        kind,
+        isCollaborative,
+        isPublic
+      })
+    : await createRemoteList({
+        username: user.username,
+        name,
+        description,
+        kind,
+        isCollaborative,
+        isPublic
+      });
+
+  return { status: 201, body: { list } };
+}
+
+async function handleUpdateUserList(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const listId = normalizeUuid(payload.listId || payload.list_id || '');
+  if (!listId) {
+    throw new HttpError(400, 'Missing list id.');
+  }
+  const updates = buildListUpdatePayload(payload);
+  const list = usingLocalStore()
+    ? await updateLocalList({ username: user.username, listId, updates })
+    : await updateRemoteList({ username: user.username, listId, updates });
+  return { body: { list } };
+}
+
+async function handleDeleteUserList(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const listId = normalizeUuid(payload.listId || payload.list_id || '');
+  if (!listId) {
+    throw new HttpError(400, 'Missing list id.');
+  }
+  if (usingLocalStore()) {
+    await deleteLocalList({ username: user.username, listId });
+  } else {
+    await deleteRemoteList({ username: user.username, listId });
+  }
+  return { body: { ok: true } };
+}
+
+async function handleAddUserListItem(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const listId = normalizeUuid(payload.listId || payload.list_id || '');
+  if (!listId) {
+    throw new HttpError(400, 'Missing list id.');
+  }
+  const movie = normalizeMovieInput(payload.movie);
+  if (!movie || !movie.tmdbId || !movie.title) {
+    throw new HttpError(400, 'Missing movie identifiers.');
+  }
+  const resolved = await resolveMovieIdentifiers(movie);
+  if (!resolved.imdbId) {
+    throw new HttpError(400, 'Unable to resolve movie identifiers.');
+  }
+  await ensureMovieRecord(resolved);
+  const itemPayload = {
+    listId,
+    movie: resolved,
+    notes: typeof payload.notes === 'string' ? payload.notes : null,
+    metadata: buildListItemMetadata(movie, payload.metadata)
+  };
+
+  const items = usingLocalStore()
+    ? await addLocalListItem({ username: user.username, ...itemPayload })
+    : await addRemoteListItem({ username: user.username, ...itemPayload });
+  return { status: 201, body: { items } };
+}
+
+async function handleRemoveUserListItem(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const listId = normalizeUuid(payload.listId || payload.list_id || '');
+  if (!listId) {
+    throw new HttpError(400, 'Missing list id.');
+  }
+  const imdbIdRaw = payload.movie?.imdbId || payload.movie?.imdbID || payload.imdbId || payload.imdb_id;
+  const imdbId = typeof imdbIdRaw === 'string' ? imdbIdRaw.trim() : '';
+  if (!imdbId) {
+    throw new HttpError(400, 'Missing movie id.');
+  }
+  const items = usingLocalStore()
+    ? await removeLocalListItem({ username: user.username, listId, imdbId })
+    : await removeRemoteListItem({ username: user.username, listId, imdbId });
+  return { body: { items } };
+}
+
+function buildListUpdatePayload(payload) {
+  const updates = {};
+  if (typeof payload.name === 'string' && payload.name.trim()) {
+    updates.name = payload.name.trim();
+  }
+  if (payload.description !== undefined) {
+    updates.description = typeof payload.description === 'string' ? payload.description.trim() : '';
+  }
+  if (typeof payload.kind === 'string') {
+    updates.kind = payload.kind.trim() || null;
+  }
+  if (typeof payload.isCollaborative === 'boolean') {
+    updates.is_collaborative = payload.isCollaborative;
+  }
+  if (payload.visibility !== undefined) {
+    const visibility = payload.visibility ? String(payload.visibility).toLowerCase() : '';
+    updates.is_public = visibility === 'private' ? false : true;
+  }
+  return updates;
+}
+
+function normalizeListRow(row) {
+  if (!row) return null;
+  const posters = Array.isArray(row.posters) ? row.posters.filter(Boolean).slice(0, 4) : [];
+  return {
+    id: row.id,
+    username: row.username,
+    name: row.name || 'Untitled list',
+    description: row.description || '',
+    isPublic: row.is_public ?? row.isPublic ?? true,
+    isCollaborative: Boolean(row.is_collaborative ?? row.isCollaborative),
+    kind: row.kind || null,
+    metadata: row.metadata && typeof row.metadata === 'object' ? row.metadata : {},
+    createdAt: row.created_at || row.createdAt || null,
+    updatedAt: row.updated_at || row.updatedAt || null,
+    itemCount: typeof row.itemCount === 'number' ? row.itemCount : row.item_count || 0,
+    posters
+  };
+}
+
+function normalizeListItem(row) {
+  if (!row) return null;
+  const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
+  const movieMeta = row.movies || {};
+  const posterUrl = metadata.poster_url || movieMeta.poster_url || '';
+  return {
+    imdbId: row.movie_imdb_id || row.movieImdbId,
+    addedAt: row.added_at || row.addedAt || null,
+    notes: row.notes || metadata.notes || null,
+    position: row.position ?? null,
+    metadata,
+    movie: {
+      imdbId: row.movie_imdb_id || row.movieImdbId,
+      tmdbId: metadata.tmdbId || metadata.tmdb_id || movieMeta.tmdb_id || null,
+      title: metadata.title || movieMeta.title || '',
+      posterUrl,
+      releaseYear: metadata.releaseYear || movieMeta.release_year || null
+    }
+  };
+}
+
+function buildListItemMetadata(movie, metadata = {}) {
+  const base = metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? metadata : {};
+  const posterUrl =
+    movie.posterUrl ||
+    movie.poster_url ||
+    (movie.poster_path ? `https://image.tmdb.org/t/p/w342${movie.poster_path}` : base.poster_url || '');
+  return {
+    ...base,
+    title: movie.title || base.title || '',
+    poster_url: posterUrl,
+    tmdbId: movie.tmdbId || movie.tmdb_id || movie.tmdbID || base.tmdbId || null
+  };
+}
+
+function normalizeUuid(value) {
+  const trimmed = typeof value === 'string' ? value.trim() : '';
+  const uuidPattern = /^[0-9a-fA-F-]{32,}$/;
+  return trimmed && uuidPattern.test(trimmed) ? trimmed : '';
+}
+
+async function fetchUserLists(username) {
+  if (!username) return [];
+  return usingLocalStore() ? fetchLocalUserLists(username) : fetchRemoteUserLists(username);
+}
+
+async function fetchSingleList(username, listId) {
+  if (usingLocalStore()) {
+    const store = await readSocialStore();
+    const list = (store.userLists || []).find((entry) => entry.id === listId && entry.username === username);
+    return list ? normalizeListRow(list) : null;
+  }
+  try {
+    const rows = await supabaseFetch('user_lists', {
+      query: {
+        select: 'id,username,name,description,is_public,is_collaborative,kind,metadata,created_at,updated_at',
+        id: `eq.${listId}`,
+        username: `eq.${username}`,
+        limit: '1'
+      }
+    });
+    if (!Array.isArray(rows) || !rows.length) {
+      return null;
+    }
+    return normalizeListRow(rows[0]);
+  } catch (error) {
+    enableLocalFallback('loading list details', error);
+    return fetchSingleList(username, listId);
+  }
+}
+
+async function fetchUserListItems(listId) {
+  return usingLocalStore() ? fetchLocalListItems(listId) : fetchRemoteListItems(listId);
+}
+
+async function fetchLocalUserLists(username) {
+  const store = await readSocialStore();
+  const lists = Array.isArray(store.userLists) ? store.userLists : [];
+  const items = Array.isArray(store.userListItems) ? store.userListItems : [];
+  const normalized = lists
+    .filter((entry) => entry.username === username)
+    .map((entry) => {
+      const matching = items.filter((item) => item.listId === entry.id);
+      const posters = matching
+        .map((item) => (item.metadata && item.metadata.poster_url ? item.metadata.poster_url : ''))
+        .filter(Boolean)
+        .slice(0, 4);
+      return normalizeListRow({ ...entry, posters, itemCount: matching.length });
+    });
+  return normalized;
+}
+
+async function fetchRemoteUserLists(username) {
+  let rows;
+  try {
+    rows = await supabaseFetch('user_lists', {
+      query: {
+        select: 'id,username,name,description,is_public,is_collaborative,kind,metadata,created_at,updated_at',
+        username: `eq.${username}`,
+        order: 'updated_at.desc'
+      }
+    });
+  } catch (error) {
+    enableLocalFallback('loading user lists', error);
+    return fetchLocalUserLists(username);
+  }
+  if (!Array.isArray(rows) || !rows.length) {
+    return [];
+  }
+  const listIds = rows.map((row) => row.id).filter(Boolean);
+  let itemRows = [];
+  if (listIds.length) {
+    try {
+      itemRows = await supabaseFetch('user_list_items', {
+        query: {
+          select:
+            'list_id,movie_imdb_id,notes,metadata,added_at,position,movies:movie_imdb_id (title,poster_url,tmdb_id,release_year)',
+          list_id: `in.(${listIds.join(',')})`,
+          order: 'added_at.desc',
+          limit: '200'
+        }
+      });
+    } catch (error) {
+      enableLocalFallback('loading list previews', error);
+      return fetchLocalUserLists(username);
+    }
+  }
+  return rows.map((row) => hydrateListSummary(row, itemRows));
+}
+
+function hydrateListSummary(row, itemRows = []) {
+  const items = Array.isArray(itemRows) ? itemRows.filter((item) => (item.list_id || item.listId) === row.id) : [];
+  const posters = items
+    .map((item) => {
+      if (item.metadata && item.metadata.poster_url) return item.metadata.poster_url;
+      if (item.movies && item.movies.poster_url) return item.movies.poster_url;
+      return '';
+    })
+    .filter(Boolean)
+    .slice(0, 4);
+  return normalizeListRow({ ...row, posters, itemCount: items.length });
+}
+
+async function fetchLocalListItems(listId) {
+  const store = await readSocialStore();
+  const items = Array.isArray(store.userListItems) ? store.userListItems : [];
+  return items.filter((item) => item.listId === listId).map(normalizeListItem).filter(Boolean);
+}
+
+async function fetchRemoteListItems(listId) {
+  try {
+    const rows = await supabaseFetch('user_list_items', {
+        query: {
+          select:
+            'list_id,movie_imdb_id,notes,metadata,added_at,position,movies:movie_imdb_id (title,poster_url,tmdb_id,release_year)',
+          list_id: `eq.${listId}`,
+          order: 'added_at.desc'
+        }
+      });
+    return Array.isArray(rows) ? rows.map(normalizeListItem).filter(Boolean) : [];
+  } catch (error) {
+    enableLocalFallback('loading list items', error);
+    return fetchLocalListItems(listId);
+  }
+}
+
+async function createLocalList({ username, name, description, kind, isCollaborative, isPublic }) {
+  const store = await readSocialStore();
+  const entry = {
+    id: randomUUID(),
+    username,
+    name,
+    description,
+    kind,
+    is_collaborative: Boolean(isCollaborative),
+    is_public: Boolean(isPublic),
+    metadata: {},
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+  store.userLists = Array.isArray(store.userLists) ? store.userLists : [];
+  store.userLists.push(entry);
+  await writeSocialStore(store);
+  return normalizeListRow(entry);
+}
+
+async function createRemoteList({ username, name, description, kind, isCollaborative, isPublic }) {
+  try {
+    const rows = await supabaseFetch('user_lists', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: [
+        {
+          username,
+          name,
+          description,
+          kind,
+          is_collaborative: Boolean(isCollaborative),
+          is_public: Boolean(isPublic)
+        }
+      ]
+    });
+    const created = Array.isArray(rows) && rows.length ? rows[0] : null;
+    return normalizeListRow(created);
+  } catch (error) {
+    enableLocalFallback('creating user list', error);
+    return createLocalList({ username, name, description, kind, isCollaborative, isPublic });
+  }
+}
+
+async function updateLocalList({ username, listId, updates }) {
+  const store = await readSocialStore();
+  const lists = Array.isArray(store.userLists) ? store.userLists : [];
+  const target = lists.find((entry) => entry.id === listId);
+  if (!target) {
+    throw new HttpError(404, 'List not found.');
+  }
+  if (target.username !== username) {
+    throw new HttpError(403, 'You can only edit your own lists.');
+  }
+  Object.assign(target, normalizeListUpdatePayload(updates));
+  target.updated_at = new Date().toISOString();
+  await writeSocialStore({ ...store, userLists: lists });
+  const items = Array.isArray(store.userListItems) ? store.userListItems : [];
+  const posters = items
+    .filter((item) => item.listId === listId)
+    .map((item) => (item.metadata && item.metadata.poster_url ? item.metadata.poster_url : ''))
+    .filter(Boolean)
+    .slice(0, 4);
+  return normalizeListRow({ ...target, posters, itemCount: items.filter((item) => item.listId === listId).length });
+}
+
+async function updateRemoteList({ username, listId, updates }) {
+  const list = await fetchSingleList(username, listId);
+  if (!list) {
+    throw new HttpError(404, 'List not found.');
+  }
+  try {
+    await supabaseFetch('user_lists', {
+      method: 'PATCH',
+      query: { id: `eq.${listId}`, username: `eq.${username}` },
+      body: normalizeListUpdatePayload(updates)
+    });
+  } catch (error) {
+    enableLocalFallback('updating list', error);
+    return updateLocalList({ username, listId, updates });
+  }
+  return fetchSingleList(username, listId);
+}
+
+function normalizeListUpdatePayload(updates) {
+  const payload = {};
+  if (updates.name !== undefined) payload.name = updates.name;
+  if (updates.description !== undefined) payload.description = updates.description;
+  if (updates.kind !== undefined) payload.kind = updates.kind;
+  if (updates.is_collaborative !== undefined) payload.is_collaborative = updates.is_collaborative;
+  if (updates.is_public !== undefined) payload.is_public = updates.is_public;
+  return payload;
+}
+
+async function deleteLocalList({ username, listId }) {
+  const store = await readSocialStore();
+  const lists = Array.isArray(store.userLists) ? store.userLists : [];
+  const target = lists.find((entry) => entry.id === listId);
+  if (!target) {
+    throw new HttpError(404, 'List not found.');
+  }
+  if (target.username !== username) {
+    throw new HttpError(403, 'You can only delete your own lists.');
+  }
+  store.userLists = lists.filter((entry) => entry.id !== listId);
+  store.userListItems = Array.isArray(store.userListItems)
+    ? store.userListItems.filter((item) => item.listId !== listId)
+    : [];
+  await writeSocialStore(store);
+}
+
+async function deleteRemoteList({ username, listId }) {
+  const list = await fetchSingleList(username, listId);
+  if (!list) {
+    throw new HttpError(404, 'List not found.');
+  }
+  try {
+    await supabaseFetch('user_lists', {
+      method: 'DELETE',
+      query: { id: `eq.${listId}`, username: `eq.${username}` }
+    });
+  } catch (error) {
+    enableLocalFallback('deleting list', error);
+    return deleteLocalList({ username, listId });
+  }
+}
+
+async function addLocalListItem({ username, listId, movie, notes, metadata }) {
+  const store = await readSocialStore();
+  const list = (store.userLists || []).find((entry) => entry.id === listId);
+  if (!list) {
+    throw new HttpError(404, 'List not found.');
+  }
+  if (list.username !== username && !list.is_collaborative) {
+    throw new HttpError(403, 'You can only edit your own lists.');
+  }
+  store.userListItems = Array.isArray(store.userListItems) ? store.userListItems : [];
+  const existing = store.userListItems.find(
+    (item) => item.listId === listId && item.movie_imdb_id === movie.imdbId
+  );
+  if (existing) {
+    existing.notes = notes || existing.notes || null;
+    existing.metadata = { ...existing.metadata, ...metadata };
+    existing.added_at = new Date().toISOString();
+  } else {
+    store.userListItems.push({
+      listId,
+      username,
+      movie_imdb_id: movie.imdbId,
+      notes: notes || null,
+      metadata,
+      added_at: new Date().toISOString()
+    });
+  }
+  await writeSocialStore(store);
+  return fetchLocalListItems(listId);
+}
+
+async function addRemoteListItem({ username, listId, movie, notes, metadata }) {
+  const list = await fetchSingleList(username, listId);
+  if (!list) {
+    throw new HttpError(404, 'List not found.');
+  }
+  if (list.username !== username && !list.isCollaborative) {
+    throw new HttpError(403, 'You can only edit your own lists.');
+  }
+  try {
+    await supabaseFetch('user_list_items', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates' },
+      body: [
+        {
+          list_id: listId,
+          movie_imdb_id: movie.imdbId,
+          notes: notes || null,
+          metadata
+        }
+      ]
+    });
+  } catch (error) {
+    enableLocalFallback('adding list item', error);
+    return addLocalListItem({ username, listId, movie, notes, metadata });
+  }
+  return fetchRemoteListItems(listId);
+}
+
+async function removeLocalListItem({ username, listId, imdbId }) {
+  const store = await readSocialStore();
+  const list = (store.userLists || []).find((entry) => entry.id === listId);
+  if (!list) {
+    throw new HttpError(404, 'List not found.');
+  }
+  if (list.username !== username && !list.is_collaborative) {
+    throw new HttpError(403, 'You can only edit your own lists.');
+  }
+  store.userListItems = Array.isArray(store.userListItems) ? store.userListItems : [];
+  store.userListItems = store.userListItems.filter(
+    (item) => !(item.listId === listId && item.movie_imdb_id === imdbId)
+  );
+  await writeSocialStore(store);
+  return fetchLocalListItems(listId);
+}
+
+async function removeRemoteListItem({ username, listId, imdbId }) {
+  const list = await fetchSingleList(username, listId);
+  if (!list) {
+    throw new HttpError(404, 'List not found.');
+  }
+  if (list.username !== username && !list.isCollaborative) {
+    throw new HttpError(403, 'You can only edit your own lists.');
+  }
+  try {
+    await supabaseFetch('user_list_items', {
+      method: 'DELETE',
+      query: { list_id: `eq.${listId}`, movie_imdb_id: `eq.${imdbId}` }
+    });
+  } catch (error) {
+    enableLocalFallback('removing list item', error);
+    return removeLocalListItem({ username, listId, imdbId });
+  }
+  return fetchRemoteListItems(listId);
 }
 
 async function handleSearchUsers(req, payload) {
@@ -5931,7 +6506,9 @@ async function readSocialStore() {
       userConversationMembers: Array.isArray(parsed.userConversationMembers)
         ? parsed.userConversationMembers.slice()
         : [],
-      userMessages: Array.isArray(parsed.userMessages) ? parsed.userMessages.slice() : []
+      userMessages: Array.isArray(parsed.userMessages) ? parsed.userMessages.slice() : [],
+      userLists: Array.isArray(parsed.userLists) ? parsed.userLists.slice() : [],
+      userListItems: Array.isArray(parsed.userListItems) ? parsed.userListItems.slice() : []
     };
   } catch (error) {
     return {
@@ -5948,7 +6525,9 @@ async function readSocialStore() {
       watchPartyMessages: [],
       userConversations: [],
       userConversationMembers: [],
-      userMessages: []
+      userMessages: [],
+      userLists: [],
+      userListItems: []
     };
   }
 }
@@ -5973,7 +6552,9 @@ async function writeSocialStore(store) {
       userConversationMembers: Array.isArray(store.userConversationMembers)
         ? store.userConversationMembers
         : [],
-      userMessages: Array.isArray(store.userMessages) ? store.userMessages : []
+      userMessages: Array.isArray(store.userMessages) ? store.userMessages : [],
+      userLists: Array.isArray(store.userLists) ? store.userLists : [],
+      userListItems: Array.isArray(store.userListItems) ? store.userListItems : []
     },
     null,
     2
