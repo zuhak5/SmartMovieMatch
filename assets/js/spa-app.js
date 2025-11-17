@@ -32,8 +32,7 @@ const state = {
   discoverPeople: [],
   discoverLists: [],
   session: loadSession(),
-  authMenuOpen: false,
-  authModalMode: "signin"
+  authMenuOpen: false
 };
 
 const navButtons = document.querySelectorAll("[data-section-button]");
@@ -59,20 +58,6 @@ const authLogoutBtn = document.querySelector("[data-auth-logout]");
 const authProfileBtn = document.querySelector("[data-auth-profile]");
 const authSettingsBtn = document.querySelector("[data-auth-settings]");
 const authRequiredNodes = document.querySelectorAll("[data-auth-required]");
-const authModal = document.querySelector("[data-auth-modal]");
-const authForm = document.querySelector("[data-auth-form]");
-const authError = document.querySelector("[data-auth-error]");
-const authSubmit = document.querySelector("[data-auth-submit]");
-const authSwitch = document.querySelector("[data-auth-switch]");
-const authHelper = document.querySelector("[data-auth-helper]");
-const authModalTitle = document.querySelector("[data-auth-modal-title]");
-const authModalEyebrow = document.querySelector("[data-auth-modal-eyebrow]");
-const authModalSubtitle = document.querySelector("[data-auth-modal-subtitle]");
-const authUsernameInput = document.querySelector("[data-auth-username-input]");
-const authNameInput = document.querySelector("[data-auth-name-input]");
-const authPasswordInput = document.querySelector("[data-auth-password-input]");
-const authDisplayNameField = document.querySelector("[data-auth-displayname-field]");
-const authModalDismiss = document.querySelectorAll("[data-auth-modal-dismiss]");
 
 function setSection(section) {
   state.activeSection = section;
@@ -189,102 +174,6 @@ function renderAuthState(session) {
     } else {
       authAvatar.style.backgroundImage = "none";
     }
-  }
-}
-
-function setAuthModalMode(mode = "signin") {
-  const nextMode = mode === "signup" ? "signup" : "signin";
-  state.authModalMode = nextMode;
-  const isSignUp = nextMode === "signup";
-
-  if (authModalTitle) {
-    authModalTitle.textContent = isSignUp ? "Create your account" : "Sign in";
-  }
-  if (authModalEyebrow) {
-    authModalEyebrow.textContent = isSignUp
-      ? "Join Smart Movie Match"
-      : "Welcome back";
-  }
-  if (authModalSubtitle) {
-    authModalSubtitle.textContent = isSignUp
-      ? "Make an account to sync your watchlists and diary."
-      : "Enter your details to jump into Smart Movie Match.";
-  }
-  if (authHelper) {
-    authHelper.textContent = isSignUp
-      ? "Pick a unique username. You can change your display name later."
-      : "Use your Smart Movie Match credentials to continue.";
-  }
-  if (authDisplayNameField) {
-    authDisplayNameField.classList.toggle("is-hidden", !isSignUp);
-  }
-  if (authSwitch) {
-    authSwitch.textContent = isSignUp ? "Already have an account? Sign in" : "Need an account? Sign up";
-  }
-  if (authSubmit) {
-    authSubmit.textContent = isSignUp ? "Create account" : "Sign in";
-  }
-  if (authPasswordInput) {
-    authPasswordInput.setAttribute("autocomplete", isSignUp ? "new-password" : "current-password");
-  }
-
-  resetAuthError();
-  if (!isSignUp && authNameInput) {
-    authNameInput.value = "";
-  }
-}
-
-function resetAuthError() {
-  if (authError) {
-    authError.textContent = "";
-    authError.classList.add("is-hidden");
-  }
-}
-
-function showAuthError(message) {
-  if (authError) {
-    authError.textContent = message || "";
-    authError.classList.toggle("is-hidden", !message);
-  }
-}
-
-function setAuthLoading(isLoading) {
-  if (authSubmit) {
-    authSubmit.disabled = isLoading;
-    const isSignUp = state.authModalMode === "signup";
-    authSubmit.textContent = isLoading
-      ? isSignUp
-        ? "Creating..."
-        : "Signing in..."
-      : isSignUp
-        ? "Create account"
-        : "Sign in";
-  }
-  if (authSwitch) {
-    authSwitch.disabled = isLoading;
-  }
-}
-
-function openAuthModal(mode = "signin") {
-  if (!authModal) return;
-  setAuthModalMode(mode);
-  resetAuthError();
-  authModal.classList.add("is-open");
-  authModal.setAttribute("aria-hidden", "false");
-  window.setTimeout(() => {
-    if (authUsernameInput) {
-      authUsernameInput.focus();
-    }
-  }, 10);
-}
-
-function closeAuthModal() {
-  if (!authModal) return;
-  authModal.classList.remove("is-open");
-  authModal.setAttribute("aria-hidden", "true");
-  resetAuthError();
-  if (authForm) {
-    authForm.reset();
   }
 }
 
@@ -697,38 +586,26 @@ async function loadDiscoverSearch(query) {
   }
 }
 
-async function handleAuthSubmit(event) {
-  if (event) {
-    event.preventDefault();
-  }
-  if (!authUsernameInput || !authPasswordInput) {
-    return;
-  }
-
-  const username = authUsernameInput.value.trim();
-  const password = authPasswordInput.value.trim();
-  const displayName = authNameInput ? authNameInput.value.trim() : "";
-
-  if (!username || !password) {
-    showAuthError("Enter your username and password to continue.");
-    return;
-  }
-
-  resetAuthError();
-  setAuthLoading(true);
+async function handleAuthPrompt(mode) {
+  const username = window.prompt(
+    mode === "signup"
+      ? "Choose a username to create your Smart Movie Match account"
+      : "Enter your username"
+  );
+  const password = window.prompt(
+    mode === "signup" ? "Create a password" : "Enter your password"
+  );
+  if (!username || !password) return;
 
   try {
-    if (state.authModalMode === "signup") {
-      await registerUser({ username, password, name: displayName || undefined });
+    if (mode === "signup") {
+      await registerUser({ username, password });
     } else {
       await loginUser({ username, password });
     }
-    closeAuthModal();
   } catch (error) {
-    const message = error && error.message ? error.message : "Unable to authenticate. Please try again.";
-    showAuthError(message);
-  } finally {
-    setAuthLoading(false);
+    const message = error && error.message ? error.message : "Unable to authenticate.";
+    window.alert(message);
   }
 }
 
@@ -737,36 +614,15 @@ function attachAuthListeners() {
     authToggle.addEventListener("click", () => toggleAuthMenu());
   }
   if (authSignInBtn) {
-    authSignInBtn.addEventListener("click", () => openAuthModal("signin"));
+    authSignInBtn.addEventListener("click", () => handleAuthPrompt("signin"));
   }
   if (authSignUpBtn) {
-    authSignUpBtn.addEventListener("click", () => openAuthModal("signup"));
+    authSignUpBtn.addEventListener("click", () => handleAuthPrompt("signup"));
   }
   if (authLogoutBtn) {
     authLogoutBtn.addEventListener("click", () => {
       logoutSession();
       toggleAuthMenu(false);
-    });
-  }
-  if (authForm) {
-    authForm.addEventListener("submit", handleAuthSubmit);
-  }
-  if (authSwitch) {
-    authSwitch.addEventListener("click", () => {
-      const nextMode = state.authModalMode === "signup" ? "signin" : "signup";
-      setAuthModalMode(nextMode);
-    });
-  }
-  if (authModalDismiss && authModalDismiss.length) {
-    authModalDismiss.forEach((node) => {
-      node.addEventListener("click", () => closeAuthModal());
-    });
-  }
-  if (authModal) {
-    authModal.addEventListener("click", (event) => {
-      if (event.target === authModal) {
-        closeAuthModal();
-      }
     });
   }
   if (authProfileBtn) {
@@ -791,20 +647,15 @@ function attachAuthListeners() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       toggleAuthMenu(false);
-      closeAuthModal();
     }
   });
 }
 
 function initAuth() {
-  setAuthModalMode(state.authModalMode);
   renderAuthState(state.session);
   subscribeToSession((session) => {
     state.session = session;
     renderAuthState(session);
-    if (session && session.token) {
-      closeAuthModal();
-    }
   });
   attachAuthListeners();
 }

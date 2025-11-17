@@ -45,14 +45,14 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Notes for Codex: Use `supabase.auth.getUser()` (or current client API) to drive initial state and subscribe to auth changes.
   - DONE 2025-11-17T01:13Z – Added session-aware header with sign-in/up CTAs, avatar dropdown, and auth-gated profile navigation.
 
-- [x] **AUTH-002 – Real login/logout flows**
+- [ ] **AUTH-002 – Real login/logout flows**
   - Description: Wire login and logout actions to Supabase auth instead of mock handlers.
     - Submit credentials to Supabase.
     - On success: store session token, refresh UI, redirect to main feed.
     - On logout: clear local session, navigate to logged-out landing state.
   - Files: `assets/js/spa-app.js`, any auth modal components, `index.html`.
   - Backend: `auth_users`, `auth_sessions`, RLS on user-owned data.
-  - DONE 2025-11-17T01:20Z – Added modal-based sign-in/sign-up flow with real auth submissions and logout wiring.
+  - DONE: _…_
 
 - [ ] **AUTH-003 – Enforce auth for protected views**
   - Description: Guard pages that require a logged-in user (feed, diary, lists, watch parties).
