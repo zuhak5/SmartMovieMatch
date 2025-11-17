@@ -65,13 +65,13 @@ Each item is a task for Codex (or any other assistant) to implement.
 
 ## Profiles & onboarding (PROF)
 
-- [ ] **PROF-001 – Dynamic profile header**
+- [x] **PROF-001 – Dynamic profile header**
   - Description: Replace hardcoded profile details (name, handle, stats) with data from Supabase.
     - Use `auth_users` and `user_profiles` to populate display name, handle, avatar, location, and bio.
     - Show follower/following counts from `user_follows`.
   - Files: `index.html` profile section, `assets/js/spa-app.js`.
   - Backend: `auth_users`, `user_profiles`, `user_follows`.
-  - DONE: _…_
+  DONE 2025-11-17T03:32Z – Wired profile card to session data and live social overview counts; handles avatar initials, handle, bio/location fallbacks, and follower/following stats in the SPA.
 
 - [ ] **PROF-002 – Profile editing UI**
   - Description: Add an “Edit profile” panel where the user can update:
