@@ -2696,6 +2696,8 @@ p {
   place-items: center;
   overflow: hidden;
   position: relative;
+  cursor: pointer;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .auth-avatar-visual.has-image::after {
@@ -2709,6 +2711,17 @@ p {
 .auth-avatar-placeholder {
   font-size: 18px;
   z-index: 1;
+}
+
+.auth-avatar-visual:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+}
+
+.auth-avatar-visual:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.35);
 }
 
 .auth-avatar-content {
@@ -2809,6 +2822,65 @@ p {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
   border-color: var(--accent);
+}
+
+.auth-password-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding-right: 4px;
+}
+
+.auth-password-field:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+.auth-password-field input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 10px;
+  color: var(--text);
+}
+
+.auth-password-field input:focus {
+  outline: none;
+  border-color: transparent;
+}
+
+.auth-password-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.18s ease, background-color 0.18s ease;
+}
+
+.auth-password-toggle:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.auth-password-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.auth-password-toggle.is-active {
+  color: var(--accent-strong);
+  background: rgba(139, 92, 246, 0.1);
 }
 
 .auth-status {

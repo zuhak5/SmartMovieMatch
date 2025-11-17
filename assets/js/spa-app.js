@@ -124,6 +124,7 @@ const state = {
   socialOverview: null,
   accountMenuOpen: false,
   authMode: "login",
+  authPasswordVisible: false,
   authSubmitting: false,
   profileEditorOpen: false,
   profileEditorSaving: false,
@@ -410,6 +411,7 @@ const authForm = document.querySelector("[data-auth-form]");
 const authStatus = document.querySelector("[data-auth-status]");
 const authUsernameInput = document.querySelector("[data-auth-username]");
 const authPasswordInput = document.querySelector("[data-auth-password]");
+const authPasswordToggle = document.querySelector("[data-auth-password-toggle]");
 const authDisplayNameRow = document.querySelector("[data-auth-display-name-row]");
 const authDisplayNameInput = document.querySelector("[data-auth-display-name]");
 const authModeButtons = document.querySelectorAll("[data-auth-mode]");
@@ -741,6 +743,22 @@ function setAuthStatus(message, variant = "info") {
   }
 }
 
+function setAuthPasswordVisibility(visible = false) {
+  if (!authPasswordInput) return;
+  const isVisible = Boolean(visible);
+  state.authPasswordVisible = isVisible;
+  authPasswordInput.type = isVisible ? "text" : "password";
+  if (authPasswordToggle) {
+    authPasswordToggle.setAttribute("aria-pressed", isVisible ? "true" : "false");
+    authPasswordToggle.setAttribute(
+      "aria-label",
+      isVisible ? "Hide password" : "Show password"
+    );
+    authPasswordToggle.classList.toggle("is-active", isVisible);
+    authPasswordToggle.textContent = isVisible ? "🙈 Hide" : "👁 Show";
+  }
+}
+
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -837,6 +855,7 @@ function setAuthMode(mode) {
 function openAuthOverlay(mode = state.authMode) {
   setAuthMode(mode);
   setAuthStatus("");
+  setAuthPasswordVisibility(false);
   state.authSubmitting = false;
   if (authOverlay) {
     authOverlay.hidden = false;
@@ -4710,6 +4729,21 @@ function attachListeners() {
     });
   }
 
+  if (authPasswordInput) {
+    setAuthPasswordVisibility(false);
+  }
+
+  if (authPasswordToggle && authPasswordInput) {
+    authPasswordToggle.addEventListener("click", () => {
+      setAuthPasswordVisibility(!state.authPasswordVisible);
+      authPasswordInput.focus();
+      const valueLength = authPasswordInput.value ? authPasswordInput.value.length : 0;
+      if (typeof authPasswordInput.setSelectionRange === "function") {
+        authPasswordInput.setSelectionRange(valueLength, valueLength);
+      }
+    });
+  }
+
   authModeButtons.forEach((btn) => {
     btn.addEventListener("click", () => setAuthMode(btn.dataset.authMode));
   });
@@ -4730,8 +4764,24 @@ function attachListeners() {
     });
   }
 
+  const openAuthAvatarPicker = () => {
+    if (authAvatarInput) {
+      authAvatarInput.click();
+    }
+  };
+
   if (authAvatarTrigger && authAvatarInput) {
-    authAvatarTrigger.addEventListener("click", () => authAvatarInput.click());
+    authAvatarTrigger.addEventListener("click", openAuthAvatarPicker);
+  }
+
+  if (authAvatarPreview && authAvatarInput) {
+    authAvatarPreview.addEventListener("click", openAuthAvatarPicker);
+    authAvatarPreview.addEventListener("keydown", (event) => {
+      if (event.key === " " || event.key === "Enter") {
+        event.preventDefault();
+        openAuthAvatarPicker();
+      }
+    });
   }
 
   if (authAvatarClear) {

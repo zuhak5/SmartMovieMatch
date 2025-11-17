@@ -1136,7 +1136,14 @@
           </div>
 
           <div class="auth-avatar-upload" data-auth-avatar-row>
-            <div class="auth-avatar-visual" data-auth-avatar-preview aria-live="polite">
+            <div
+              class="auth-avatar-visual"
+              data-auth-avatar-preview
+              aria-live="polite"
+              role="button"
+              tabindex="0"
+              aria-label="Choose an avatar image"
+            >
               <span class="auth-avatar-placeholder" data-auth-avatar-placeholder>😊</span>
             </div>
             <div class="auth-avatar-content">
@@ -1154,7 +1161,24 @@
 
           <label class="input-group">
             <span>Password</span>
-            <input type="password" name="password" autocomplete="current-password" required data-auth-password />
+            <div class="auth-password-field">
+              <input
+                type="password"
+                name="password"
+                autocomplete="current-password"
+                required
+                data-auth-password
+              />
+              <button
+                class="auth-password-toggle"
+                type="button"
+                aria-pressed="false"
+                aria-label="Show password"
+                data-auth-password-toggle
+              >
+                👁 Show
+              </button>
+            </div>
           </label>
 
           <button class="btn btn-primary full-width" type="submit" data-auth-submit>Continue</button>
