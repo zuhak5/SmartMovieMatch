@@ -18,6 +18,7 @@ import {
   logoutSession,
   registerUser,
   subscribeToSession,
+  persistFavoritesRemote,
   persistPreferencesRemote,
   updateProfile
 } from "./auth.js";
@@ -29,6 +30,7 @@ import {
   unfollowUserByUsername,
   subscribeToCollaborativeState,
   refreshCollaborativeState,
+  recordLibraryActivity,
   listConversationsRemote,
   listConversationMessagesRemote,
   postConversationMessageRemote,
@@ -123,6 +125,9 @@ const state = {
   userLists: [],
   userListsLoading: false,
   userListsError: "",
+  favorites: [],
+  favoritesSaving: false,
+  favoritesStatus: "",
   activeListId: "",
   activeListItems: [],
   activeListLoading: false,
@@ -321,6 +326,10 @@ const listEditNameInput = document.querySelector('[data-list-edit-name]');
 const listEditDescriptionInput = document.querySelector('[data-list-edit-description]');
 const listEditVisibilitySelect = document.querySelector('[data-list-edit-visibility]');
 const listEditCollaborativeInput = document.querySelector('[data-list-edit-collaborative]');
+const favoritesPanel = document.querySelector('[data-favorites-panel]');
+const favoritesList = document.querySelector('[data-favorites-list]');
+const favoritesEmpty = document.querySelector('[data-favorites-empty]');
+const favoritesStatus = document.querySelector('[data-favorites-status]');
 const authOverlay = document.querySelector("[data-auth-overlay]");
 const authForm = document.querySelector("[data-auth-form]");
 const authStatus = document.querySelector("[data-auth-status]");
@@ -1475,7 +1484,12 @@ function renderTrendingMovies(movies = []) {
     }
 
     badgeRow.append(rankBadge, statBadge);
-    stack.append(title, meta, badgeRow);
+    const favoriteToggle = createFavoriteToggleButton(movie);
+    const actions = document.createElement("div");
+    actions.className = "action-row";
+    actions.append(favoriteToggle);
+
+    stack.append(title, meta, badgeRow, actions);
     card.append(stack);
     trendingRow.append(card);
   });
@@ -1533,6 +1547,27 @@ function normalizeDiscoverMovie(movie = {}) {
     trendScore,
     timeWindow
   };
+}
+
+function createFavoriteToggleButton(movie) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "btn-ghost btn";
+
+  const updateLabel = () => {
+    const isFavorite = isFavoriteMovie(movie);
+    button.textContent = isFavorite ? "Saved ❤️" : "♡ Favorite";
+    button.setAttribute("aria-pressed", isFavorite ? "true" : "false");
+  };
+
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleFavorite(movie).then(updateLabel);
+  });
+
+  updateLabel();
+  return button;
 }
 
 function renderPeople(people = [], { source = "tmdb" } = {}) {
@@ -2201,6 +2236,138 @@ async function handleRemoveListItem(imdbId) {
   } catch (error) {
     setListItemStatus(error instanceof Error ? error.message : "Could not remove movie.", "error");
   }
+}
+
+function setFavoritesStatus(message, tone = "") {
+  if (!favoritesStatus) return;
+  favoritesStatus.textContent = message || "";
+  favoritesStatus.className = "small-text muted";
+  if (tone === "error") {
+    favoritesStatus.classList.add("error-text");
+  } else if (tone === "success") {
+    favoritesStatus.classList.add("success-text");
+  }
+}
+
+function getFavoriteKey(movie) {
+  if (!movie || typeof movie !== "object") return "";
+  const imdbId = typeof movie.imdbId === "string" ? movie.imdbId.trim() : "";
+  if (imdbId) return imdbId.toLowerCase();
+  const tmdbId = movie.tmdbId || movie.tmdb_id || movie.id || null;
+  if (tmdbId) return String(tmdbId);
+  const title = typeof movie.title === "string" ? movie.title.trim().toLowerCase() : "";
+  return title;
+}
+
+function normalizeFavoriteMovie(movie = {}) {
+  const normalized = normalizeDiscoverMovie(movie);
+  if (!normalized || !normalized.title) return null;
+  return {
+    title: normalized.title,
+    imdbId: normalized.imdbId || null,
+    tmdbId: normalized.tmdbId || null,
+    poster: normalized.posterUrl || "",
+    releaseYear: normalized.releaseYear || "",
+    genres: Array.isArray(normalized.genres) ? normalized.genres : []
+  };
+}
+
+function isFavoriteMovie(movie) {
+  const key = getFavoriteKey(movie);
+  if (!key) return false;
+  return state.favorites.some((entry) => getFavoriteKey(entry) === key);
+}
+
+async function syncFavoritesRemote() {
+  if (!hasActiveSession()) return;
+  if (state.favoritesSaving) return;
+  state.favoritesSaving = true;
+  setFavoritesStatus("Syncing favorites…");
+  try {
+    await persistFavoritesRemote(state.session, state.favorites);
+    setFavoritesStatus("Favorites synced", "success");
+  } catch (error) {
+    console.warn("Favorites sync failed", error);
+    setFavoritesStatus("Couldn’t sync favorites right now.", "error");
+  } finally {
+    state.favoritesSaving = false;
+  }
+}
+
+async function toggleFavorite(movie) {
+  const normalized = normalizeFavoriteMovie(movie);
+  if (!normalized || !normalized.title) {
+    return false;
+  }
+  if (!hasActiveSession()) {
+    setFavoritesStatus("Sign in to save favorites.", "error");
+    openAuthOverlay("login");
+    return false;
+  }
+  const key = getFavoriteKey(normalized);
+  const alreadyFavorite = isFavoriteMovie(normalized);
+  if (alreadyFavorite) {
+    state.favorites = state.favorites.filter((entry) => getFavoriteKey(entry) !== key);
+    setFavoritesStatus("Removed from favorites.");
+  } else {
+    state.favorites = [...state.favorites, normalized].slice(-100);
+    setFavoritesStatus(`Added “${normalized.title}” to favorites.`, "success");
+    recordLibraryActivity("favorite_add", normalized).catch((error) => {
+      console.warn("Failed to log favorite add", error);
+    });
+  }
+  renderFavoritesList();
+  await syncFavoritesRemote();
+  return !alreadyFavorite;
+}
+
+function renderFavoritesList() {
+  if (!favoritesPanel || !favoritesList) return;
+  favoritesList.innerHTML = "";
+  const favorites = Array.isArray(state.favorites) ? state.favorites : [];
+  if (!favorites.length) {
+    favoritesPanel.classList.add("is-empty");
+    if (favoritesEmpty) favoritesEmpty.hidden = false;
+    setFavoritesStatus("Tap a heart on a movie card to save it here.");
+    return;
+  }
+
+  favoritesPanel.classList.remove("is-empty");
+  if (favoritesEmpty) favoritesEmpty.hidden = true;
+
+  favorites.forEach((favorite) => {
+    const row = document.createElement("div");
+    row.className = "inline-actions";
+    const meta = document.createElement("div");
+    meta.className = "stack";
+    const title = document.createElement("strong");
+    title.textContent = favorite.title;
+    const details = document.createElement("div");
+    details.className = "small-text muted";
+    const pieces = [];
+    if (favorite.releaseYear) pieces.push(favorite.releaseYear);
+    if (Array.isArray(favorite.genres) && favorite.genres.length) {
+      pieces.push(formatGenres(favorite.genres));
+    }
+    details.textContent = pieces.join(" • ");
+    meta.append(title, details);
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "btn-ghost btn";
+    remove.textContent = "Remove";
+    remove.addEventListener("click", (event) => {
+      event.preventDefault();
+      const key = getFavoriteKey(favorite);
+      state.favorites = state.favorites.filter((entry) => getFavoriteKey(entry) !== key);
+      renderFavoritesList();
+      syncFavoritesRemote();
+      setFavoritesStatus(`Removed “${favorite.title}” from favorites.`);
+    });
+
+    row.append(meta, remove);
+    favoritesList.append(row);
+  });
 }
 
 function getDefaultCollaborativeState() {
@@ -3989,6 +4156,7 @@ function attachListeners() {
 function init() {
   setAuthMode(state.authMode);
   updateAccountUi(state.session);
+  renderFavoritesList();
   subscribeToSocialOverview((overview) => {
     state.socialOverview = overview;
     renderProfileOverview();
@@ -4023,6 +4191,8 @@ function init() {
   subscribeToSession((session) => {
     updateAccountUi(session);
     if (session && session.token) {
+      state.favorites = Array.isArray(session.favoritesList) ? session.favoritesList : [];
+      renderFavoritesList();
       closeAuthOverlay();
       refreshCollaborativeState();
       if (state.activeSection === "messages") {
@@ -4036,6 +4206,8 @@ function init() {
       setNotificationStatus("Loading notifications…");
       loadUserLists();
     } else {
+      state.favorites = [];
+      renderFavoritesList();
       state.collabState = getDefaultCollaborativeState();
       setActiveWatchParty(null);
       resetConversationsState();
