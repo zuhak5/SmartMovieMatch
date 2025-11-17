@@ -54,12 +54,12 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Backend: `auth_users`, `auth_sessions`, RLS on user-owned data.
   - DONE 2025-11-17T01:20Z – Added modal-based sign-in/sign-up flow with real auth submissions and logout wiring.
 
-- [x] **AUTH-003 – Enforce auth for protected views**
+- [ ] **AUTH-003 – Enforce auth for protected views**
   - Description: Guard pages that require a logged-in user (feed, diary, lists, watch parties).
     - If no active session, redirect to login or show an inline login prompt.
   - Files: SPA router / view-switcher, `assets/js/spa-app.js`.
   - Backend: Depends on Supabase RLS; rely on 401/403 to hide remote data if needed.
-  - DONE 2025-11-17T01:48Z – Added auth gates and session-aware toggles for feed, library lists, and watch party views with sign-in prompts for guests.
+  - DONE: _…_
 
 ---
 
