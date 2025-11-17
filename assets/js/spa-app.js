@@ -103,6 +103,7 @@ const STREAMING_PROVIDER_OPTIONS = [
 const ONBOARDING_STORAGE_KEY = "smartMovieMatch.onboardingComplete";
 const ONBOARDING_STEPS = ["taste", "providers", "import"];
 let authAvatarPreviewUrl = null;
+let detachDocumentHandlers = null;
 
 const state = {
   activeTabs: { ...defaultTabs },
@@ -4515,6 +4516,27 @@ function maybeOpenOnboarding(force = false) {
   }
 }
 
+function getEventPath(event) {
+  if (!event) return [];
+  if (typeof event.composedPath === "function") {
+    return event.composedPath();
+  }
+  const path = [];
+  let node = event.target;
+  while (node) {
+    path.push(node);
+    node = node.parentNode;
+  }
+  return path;
+}
+
+function eventPathIncludes(event, element) {
+  if (!element) {
+    return false;
+  }
+  return getEventPath(event).some((node) => node === element);
+}
+
 async function completeOnboardingFlow() {
   if (!hasActiveSession()) {
     closeOnboarding();
@@ -4647,8 +4669,9 @@ async function handleProfileEditorSubmit(event) {
 
 function handleOutsideClick(event) {
   if (state.accountMenuOpen && accountMenu && accountToggle) {
-    const target = event.target;
-    if (!accountMenu.contains(target) && !accountToggle.contains(target)) {
+    const insideAccountMenu =
+      eventPathIncludes(event, accountMenu) || eventPathIncludes(event, accountToggle);
+    if (!insideAccountMenu) {
       toggleAccountMenu(false);
     }
   }
@@ -4662,8 +4685,9 @@ function handleOutsideClick(event) {
     closeMovieDetail();
   }
   if (state.notificationMenuOpen && notificationMenu && notificationButton) {
-    const target = event.target;
-    if (!notificationMenu.contains(target) && !notificationButton.contains(target)) {
+    const insideNotificationUi =
+      eventPathIncludes(event, notificationMenu) || eventPathIncludes(event, notificationButton);
+    if (!insideNotificationUi) {
       closeNotificationMenu();
     }
   }
@@ -4690,6 +4714,23 @@ function handleEscape(event) {
       closeMovieDetail();
     }
   }
+}
+
+function attachDocumentHandlers() {
+  if (typeof detachDocumentHandlers === "function") {
+    detachDocumentHandlers();
+  }
+
+  const clickHandler = (event) => handleOutsideClick(event);
+  const keydownHandler = (event) => handleEscape(event);
+
+  document.addEventListener("click", clickHandler);
+  document.addEventListener("keydown", keydownHandler);
+
+  detachDocumentHandlers = () => {
+    document.removeEventListener("click", clickHandler);
+    document.removeEventListener("keydown", keydownHandler);
+  };
 }
 
 function attachListeners() {
@@ -5017,8 +5058,7 @@ function attachListeners() {
     movieDetailPartyForm.addEventListener("submit", handleMovieDetailPartySubmit);
   }
 
-  document.addEventListener("click", handleOutsideClick);
-  document.addEventListener("keydown", handleEscape);
+  attachDocumentHandlers();
 }
 
 function init() {

@@ -98,6 +98,8 @@ const DEFAULT_NOTIFICATION_PREFERENCES = {
   partyEmails: true
 };
 
+let removeDocumentListeners = null;
+
 let inviteQrRequest = 0;
 let notificationOverlayMediaQuery = null;
 let notificationOverlayMediaQueryListenerAttached = false;
@@ -994,6 +996,109 @@ function isAbortError(error) {
   return !!error && error.name === "AbortError";
 }
 
+function getEventPath(event) {
+  if (!event) {
+    return [];
+  }
+  if (typeof event.composedPath === "function") {
+    return event.composedPath();
+  }
+  const path = [];
+  let node = event.target;
+  while (node) {
+    path.push(node);
+    node = node.parentNode;
+  }
+  return path;
+}
+
+function eventPathIncludes(event, element) {
+  if (!element) {
+    return false;
+  }
+  return getEventPath(event).some((node) => node === element);
+}
+
+function closestFromEvent(event, selector) {
+  if (!event || !selector) {
+    return null;
+  }
+  const path = getEventPath(event);
+  for (const node of path) {
+    if (node instanceof Element && node.matches(selector)) {
+      return node;
+    }
+  }
+  const target = event.target;
+  return target instanceof Element ? target.closest(selector) : null;
+}
+
+function bindDocumentInteractions({
+  accountProfile,
+  accountProfileBtn,
+  notificationBell,
+  notificationPanel
+}) {
+  if (typeof removeDocumentListeners === "function") {
+    removeDocumentListeners();
+  }
+
+  const handleDocumentClick = (event) => {
+    if (state.accountMenuOpen) {
+      const container = accountProfile || (accountProfileBtn ? accountProfileBtn.parentElement : null);
+      if (!container || !eventPathIncludes(event, container)) {
+        closeAccountMenu();
+      }
+    }
+    if (state.notificationPanelOpen) {
+      const isBell = eventPathIncludes(event, notificationBell);
+      const isPanel = eventPathIncludes(event, notificationPanel);
+      if (!isBell && !isPanel) {
+        closeNotificationPanel();
+      }
+    }
+
+    const settingsButton = closestFromEvent(event, "[data-profile-settings-action]");
+    if (settingsButton) {
+      const section = settingsButton.getAttribute("data-profile-settings-action") || "profile";
+      event.preventDefault();
+      playUiClick();
+      openAccountSettings(section);
+    }
+  };
+
+  const handleDocumentKeydown = (event) => {
+    if (event.key === "Escape") {
+      if (isSocialProfileOpen()) {
+        closeSocialProfileOverlay();
+        return;
+      }
+      if (isMovieOverlayOpen()) {
+        closeMovieOverlay();
+        return;
+      }
+      if (state.accountMenuOpen) {
+        closeAccountMenu(true);
+      }
+      if (state.notificationPanelOpen) {
+        closeNotificationPanel();
+      }
+      const coach = $("onboardingCoach");
+      if (coach && !coach.hidden) {
+        closeOnboarding();
+      }
+    }
+  };
+
+  document.addEventListener("click", handleDocumentClick);
+  document.addEventListener("keydown", handleDocumentKeydown);
+
+  removeDocumentListeners = () => {
+    document.removeEventListener("click", handleDocumentClick);
+    document.removeEventListener("keydown", handleDocumentKeydown);
+  };
+}
+
 document.addEventListener("DOMContentLoaded", init);
 
 function init() {
@@ -1472,45 +1577,11 @@ function wireEvents() {
     });
   }
 
-  document.addEventListener("click", (event) => {
-    if (state.accountMenuOpen) {
-      const container = accountProfile || (accountProfileBtn ? accountProfileBtn.parentElement : null);
-      if (!container || !container.contains(event.target)) {
-        closeAccountMenu();
-      }
-    }
-    if (state.notificationPanelOpen) {
-      const bell = notificationBell;
-      const panel = notificationPanel;
-      const isBell = bell && bell.contains(event.target);
-      const isPanel = panel && panel.contains(event.target);
-      if (!isBell && !isPanel) {
-        closeNotificationPanel();
-      }
-    }
-  });
-
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-      if (isSocialProfileOpen()) {
-        closeSocialProfileOverlay();
-        return;
-      }
-      if (isMovieOverlayOpen()) {
-        closeMovieOverlay();
-        return;
-      }
-      if (state.accountMenuOpen) {
-        closeAccountMenu(true);
-      }
-      if (state.notificationPanelOpen) {
-        closeNotificationPanel();
-      }
-      const coach = $("onboardingCoach");
-      if (coach && !coach.hidden) {
-        closeOnboarding();
-      }
-    }
+  bindDocumentInteractions({
+    accountProfile,
+    accountProfileBtn,
+    notificationBell,
+    notificationPanel
   });
 
   if (profileForm) {
@@ -1669,17 +1740,6 @@ function wireEvents() {
           break;
       }
     });
-  });
-
-  document.addEventListener("click", (event) => {
-    const settingsButton = closest(event.target, "[data-profile-settings-action]");
-    if (!settingsButton) {
-      return;
-    }
-    const section = settingsButton.getAttribute("data-profile-settings-action") || "profile";
-    event.preventDefault();
-    playUiClick();
-    openAccountSettings(section);
   });
 
   initVibePresetToggle();
