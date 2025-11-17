@@ -107,12 +107,12 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Backend: `user_follows`.
   - DONE 2025-11-17T04:47Z – Added periodic social overview polling so profile stats stay synced with live follow data.
 
-- [ ] **SOC-003 – Friend feed based on social graph**
+- [x] **SOC-003 – Friend feed based on social graph**
   - Description: Replace static friend feed items with:
     - Recent diary entries and reviews from people the user follows (`watch_diary`, `movie_reviews`).
   - Files: Home/feed view rendering.
   - Backend: `watch_diary`, `movie_reviews`, `user_follows`, visibility logic aligned with RLS.
-  - DONE: _…_
+  DONE 2025-11-17T04:53Z – Replaced the static friends feed with live social activity cards sourced from recent diary/review notifications.
 
 ---
 
