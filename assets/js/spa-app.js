@@ -1,5 +1,6 @@
 import {
   fetchFromSearch,
+  fetchFromOmdb,
   fetchFromTmdb,
   fetchTrendingMovies,
   fetchStreamingProviders,
@@ -56,6 +57,7 @@ import {
   deleteUserTagRemote,
   tagMovieRemote,
   untagMovieRemote,
+  searchSocialUsers,
   acknowledgeNotifications,
   subscribeToDiaryEntries,
   refreshDiaryEntries,
@@ -103,6 +105,7 @@ const state = {
   activeSection: "home",
   discoverFilter: "popular",
   discoverAbort: null,
+  discoverPeopleAbort: null,
   trendingAbort: null,
   recommendationsAbort: null,
   recommendationSeed: Math.random(),
@@ -1898,7 +1901,7 @@ function renderTrendingStatus() {
       : state.trendingWindow === "monthly"
       ? "this month"
       : "this week";
-  trendingStatus.textContent = `Trending ${label} from community activity.`;
+  trendingStatus.textContent = `Trending ${label} on TMDB right now.`;
 }
 
 function renderTrendingMovies(movies = []) {
@@ -3772,16 +3775,17 @@ async function loadDiscover(filter = "popular") {
   await loadDiscoverResults({ query: discoverSearchInput ? discoverSearchInput.value : "" });
 }
 
-async function loadTrendingPeople(query = "") {
-  state.peopleSearchActive = Boolean(query && query.length >= 3);
+async function loadTrendingPeople(query = "", { signal } = {}) {
+  state.peopleSearchActive = Boolean(query && query.length >= 2);
   const searchPath = query && query.length >= 3 ? "search/person" : "trending/person/week";
   const params = query && query.length >= 3 ? { query, include_adult: "false" } : { page: 1 };
   try {
-    const data = await fetchFromTmdb(searchPath, params);
+    const data = await fetchFromTmdb(searchPath, params, { signal });
     const limit = getUiLimit("ui.discover.maxPeople", 6);
     state.discoverPeople = Array.isArray(data?.results) ? data.results.slice(0, limit) : [];
     renderPeopleSection();
   } catch (error) {
+    if (error.name === "AbortError") return;
     console.warn("people fetch failed", error);
     state.discoverPeople = [];
     renderPeopleSection();
@@ -3812,15 +3816,20 @@ async function loadTrendingMovies(timeWindow = state.trendingWindow) {
   state.trendingAbort = controller;
 
   try {
+    const limit = getUiLimit("ui.discover.trendingCount", 8);
     const data = await fetchTrendingMovies(
       {
         time_window: state.trendingWindow,
-        limit: getUiLimit("ui.discover.trendingCount", 8)
+        limit
       },
       { signal: controller.signal }
     );
 
-    state.trendingMovies = Array.isArray(data?.movies) ? data.movies : [];
+    const movies = Array.isArray(data?.movies) ? data.movies.slice(0, limit) : [];
+    state.trendingMovies = await attachOmdbMetadata(movies, {
+      signal: controller.signal,
+      max: Math.min(6, limit)
+    });
   } catch (error) {
     if (error.name === "AbortError") return;
     console.warn("trending fetch failed", error);
@@ -4049,13 +4058,125 @@ function renderGroupPicks(items = []) {
 
 function handleDiscoverSearchInput(value) {
   const query = value.trim();
-  state.peopleSearchActive = query.length >= 3;
+  state.peopleSearchActive = query.length >= 2;
   loadDiscoverResults({ query });
-  if (state.peopleSearchActive) {
-    loadTrendingPeople(query);
-  } else {
-    loadTrendingPeople();
+  loadDiscoverPeople(query);
+}
+
+async function loadDiscoverPeople(query = "") {
+  const trimmed = query.trim();
+  if (state.discoverPeopleAbort) {
+    state.discoverPeopleAbort.abort();
   }
+
+  const controller = new AbortController();
+  state.discoverPeopleAbort = controller;
+
+  if (!trimmed) {
+    await loadTrendingPeople();
+    state.discoverPeopleAbort = null;
+    return;
+  }
+
+  try {
+    const socialMatches = await searchSocialUsers(trimmed);
+    if (controller.signal.aborted) return;
+    if (Array.isArray(socialMatches) && socialMatches.length) {
+      state.discoverPeople = socialMatches;
+      renderPeople(state.discoverPeople, { source: "social" });
+      state.discoverPeopleAbort = null;
+      return;
+    }
+  } catch (error) {
+    if (error.name !== "AbortError") {
+      console.warn("social user search failed", error);
+    }
+  }
+
+  try {
+    await loadTrendingPeople(trimmed, { signal: controller.signal });
+  } finally {
+    state.discoverPeopleAbort = null;
+  }
+}
+
+function buildDiscoverParams(filter = "popular", query = "") {
+  const params = {
+    language: "en-US",
+    include_adult: "false",
+    page: 1
+  };
+
+  if (query) {
+    params.query = query;
+    return { path: "search/movie", params };
+  }
+
+  switch (filter) {
+    case "top-rated":
+      params.sort_by = "vote_average.desc";
+      params["vote_count.gte"] = 500;
+      break;
+    case "new":
+      params.sort_by = "primary_release_date.desc";
+      params["primary_release_date.gte"] = formatRecentDate(120);
+      break;
+    case "streaming":
+      params.sort_by = "popularity.desc";
+      params.with_watch_monetization_types = "flatrate|ads|free";
+      params.watch_region = "US";
+      break;
+    case "friends":
+      params.sort_by = "popularity.desc";
+      break;
+    default:
+      params.sort_by = "popularity.desc";
+  }
+
+  return { path: "discover/movie", params };
+}
+
+function formatRecentDate(daysAgo = 120) {
+  const boundary = new Date();
+  boundary.setDate(boundary.getDate() - daysAgo);
+  return boundary.toISOString().slice(0, 10);
+}
+
+async function attachOmdbMetadata(movies, { signal, max = 6 } = {}) {
+  const sample = movies.slice(0, max);
+  const lookups = await Promise.all(
+    sample.map(async (movie) => {
+      const title = movie.title || movie.original_title || movie.name || "";
+      if (!title) return null;
+      const year = movie.release_date ? movie.release_date.slice(0, 4) : movie.releaseYear || "";
+      try {
+        const omdb = await fetchFromOmdb({ t: title, y: year }, { signal });
+        if (omdb && omdb.Response !== "False") {
+          return { imdbId: omdb.imdbID || movie.imdbId || movie.imdb_id || null, omdb };
+        }
+      } catch (error) {
+        if (error.name === "AbortError") throw error;
+        console.warn("OMDb lookup failed", error);
+      }
+      return null;
+    })
+  );
+
+  return movies.map((movie, index) => {
+    const enrichment = index < lookups.length ? lookups[index] : null;
+    if (enrichment && enrichment.omdb) {
+      return { ...movie, imdbId: enrichment.imdbId, omdb: enrichment.omdb };
+    }
+    return movie;
+  });
+}
+
+async function fetchDiscoverMoviesOnline({ query = "", filter = "popular", signal } = {}) {
+  const limit = getUiLimit("ui.discover.maxMovies", 12);
+  const { path, params } = buildDiscoverParams(filter, query);
+  const data = await fetchFromTmdb(path, params, { signal });
+  const results = Array.isArray(data?.results) ? data.results.slice(0, limit) : [];
+  return attachOmdbMetadata(results, { signal, max: Math.min(6, limit) });
 }
 
 async function loadDiscoverResults({ query = "" } = {}) {
@@ -4066,26 +4187,12 @@ async function loadDiscoverResults({ query = "" } = {}) {
   const controller = new AbortController();
   state.discoverAbort = controller;
 
-  const params = {
-    filter: state.discoverFilter,
-    limit: getUiLimit("ui.discover.maxMovies", 12)
-  };
-
-  if (trimmedQuery.length >= 2) {
-    params.q = trimmedQuery;
-  }
-
-  if (state.discoverFilter === "streaming") {
-    params.providers = "mine";
-    params.streaming_only = "true";
-  }
-
   try {
-    const data = await fetchFromSearch(params, {
-      signal: controller.signal,
-      token: state.session?.token
+    const movieResults = await fetchDiscoverMoviesOnline({
+      query: trimmedQuery,
+      filter: state.discoverFilter,
+      signal: controller.signal
     });
-    const movieResults = Array.isArray(data?.movies) ? data.movies : [];
     renderDiscoverMovies(movieResults);
     const listSource = movieResults.length
       ? movieResults
@@ -4758,7 +4865,7 @@ function attachListeners() {
     discoverSearchInput.addEventListener("input", (event) => {
       const { value } = event.target;
       window.clearTimeout(handle);
-      handle = window.setTimeout(() => handleDiscoverSearchInput(value), 240);
+      handle = window.setTimeout(() => handleDiscoverSearchInput(value), 140);
     });
   }
 
@@ -5137,7 +5244,7 @@ function init() {
   setSection("home");
   loadTrendingMovies(state.trendingWindow);
   loadDiscover(state.discoverFilter);
-  loadTrendingPeople();
+  loadDiscoverPeople();
   loadHomeRecommendations();
   refreshDiaryEntries();
   loadUserLists();
