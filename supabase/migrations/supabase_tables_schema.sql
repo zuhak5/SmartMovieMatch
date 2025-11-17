@@ -1316,3 +1316,867 @@ ALTER TABLE IF EXISTS public.user_list_items
 -- user_tags: freeform metadata (color, icon, etc.)
 ALTER TABLE IF EXISTS public.user_tags
   ADD COLUMN IF NOT EXISTS metadata jsonb not null default '{}'::jsonb;
+
+-- =====================================================================
+-- FEATURE MAPPING & RLS POLICIES
+-- =====================================================================
+-- This section documents how the newer tables/columns map to upcoming
+-- product features AND defines Supabase Row Level Security (RLS) policies
+-- so the public schema can be safely exposed to the client.
+
+-- ---------------------------------------------------------------------
+-- FEATURE MAPPING (high level)
+-- ---------------------------------------------------------------------
+-- user_profiles
+--   Powers:
+--     - Rich profile pages (bio, location, website) instead of only username.
+--     - Onboarding wizard that asks for favorite genres/decades.
+--     - Profile-level settings in `settings` (layout, discovery, etc.).
+--   Key columns:
+--     - favorite_genres, favorite_decades, headline, settings.
+
+-- auth_users (new columns)
+--   Powers:
+--     - Email-based flows and login alerts (email, is_email_verified).
+--     - Privacy toggles for the whole account (is_private).
+--     - Localized UI and timestamps (time_zone, locale).
+--     - Per-account preferences without schema churn (settings jsonb).
+
+-- streaming_providers
+--   Powers:
+--     - Registry of supported streaming services (Netflix, Prime, etc.).
+--     - Filter/search by provider and show provider badges on movie cards.
+
+-- user_streaming_profiles
+--   Powers:
+--     - Onboarding step "Where do you watch?".
+--     - Filter: "Only show movies on the services I subscribe to".
+--     - Future: per-provider sync of watch history.
+
+-- movies (new columns)
+--   Powers:
+--     - Richer metadata & discovery:
+--         * international titles (original_title, original_language),
+--         * release_date vs release_year,
+--         * production_countries,
+--         * providers/external_ids jsonb for deep links,
+--         * rating_average + rating_count for sort & badges,
+--         * popularity_score for trending views.
+
+-- watch_diary (new columns)
+--   Powers:
+--     - Rewatch tracking via rewatch_number.
+--     - Basic analytics on where/how the user watched (source, device).
+--     - Flexible per-entry extensions via metadata jsonb.
+
+-- movie_reviews (new columns)
+--   Powers:
+--     - Engagement counters on reviews (likes_count, comments_count).
+--     - Review tags for filtering and badges (tags).
+--     - Extra behavior flags / moderation data (metadata).
+
+-- review_comments, review_likes (metadata)
+--   Powers:
+--     - Track reactions, edits, moderation, UI state on comments/likes.
+
+-- user_favorites (metadata)
+--   Powers:
+--     - Per-favorite notes, source of discovery, pinned flags.
+
+-- user_follows (metadata)
+--   Powers:
+--     - Relationship flags like "close friend", "muted", "request origin".
+
+-- user_lists (kind, is_collaborative, metadata)
+--   Powers:
+--     - Different list types: watchlist, challenge, ranked list, etc.
+--     - Collaborative lists where friends can contribute items.
+--     - Additional list settings (sort behavior, cover image) via metadata.
+
+-- user_list_items (metadata)
+--   Powers:
+--     - Per-entry notes, pinned flag, discovery source.
+
+-- user_tags (metadata)
+--   Powers:
+--     - Color/icon/emoji styling and behavior flags for tags.
+
+-- watch_parties / watch_party_participants / watch_party_messages
+--   Powers:
+--     - Scheduled & live watch parties with host, title, description.
+--     - Participation list with roles (host/guest), kicks, presence.
+--     - In-party chat messages, including future system & reaction messages.
+
+-- user_conversations / user_conversation_members / user_messages
+--   Powers:
+--     - Direct messages and group chats (movie clubs, friend chats).
+--     - Membership roles and read state (last_read_message_id).
+--     - Rich message types (text, system, suggestion) via message_type + metadata.
+
+-- app_config
+--   Powers:
+--     - Remote config for limits, feature toggles, and UI behavior without redeploy.
+
+-- experiments / experiment_assignments
+--   Powers:
+--     - AB testing of layouts, recommendation algorithms, and onboarding flows.
+
+-- search_queries
+--   Powers:
+--     - Per-user recent searches.
+--     - Global analytics for search UX and auto-suggest models.
+
+
+-- ---------------------------------------------------------------------
+-- HELPER: Resolve current app username from Supabase JWT
+-- ---------------------------------------------------------------------
+-- Assumes your JWT includes either:
+--   - "username" claim, or
+--   - uses the "sub" claim as the username.
+-- If neither is present, this returns NULL.
+create or replace function public.current_username()
+returns text
+language plpgsql
+stable
+as $$
+declare
+  claims jsonb;
+begin
+  -- auth.jwt() is a Supabase helper which returns the JWT claims as jsonb.
+  -- If it's not available for some reason, fall back to NULL.
+  begin
+    claims := auth.jwt();
+  exception
+    when others then
+      return null;
+  end;
+
+  if claims is null then
+    return null;
+  end if;
+
+  return coalesce(
+    nullif(claims->>'username', ''),
+    nullif(claims->>'sub', '')
+  );
+end;
+$$;
+
+
+-- ---------------------------------------------------------------------
+-- RLS: Movies & streaming metadata
+-- ---------------------------------------------------------------------
+alter table public.movies enable row level security;
+
+create policy "Movies are readable by everyone"
+  on public.movies
+  for select
+  to anon, authenticated
+  using ( true );
+
+alter table public.streaming_providers enable row level security;
+
+create policy "Streaming providers are readable by everyone"
+  on public.streaming_providers
+  for select
+  to anon, authenticated
+  using ( true );
+
+alter table public.user_streaming_profiles enable row level security;
+
+create policy "Users can read their streaming profiles"
+  on public.user_streaming_profiles
+  for select
+  to authenticated
+  using ( username = current_username() );
+
+create policy "Users can manage their streaming profiles"
+  on public.user_streaming_profiles
+  for all
+  to authenticated
+  using ( username = current_username() )
+  with check ( username = current_username() );
+
+
+-- ---------------------------------------------------------------------
+-- RLS: Extended profiles & account privacy
+-- ---------------------------------------------------------------------
+alter table public.user_profiles enable row level security;
+
+create policy "Public or own profiles are readable"
+  on public.user_profiles
+  for select
+  to anon, authenticated
+  using (
+    -- Owner can always see their own profile
+    (current_username() is not null and username = current_username())
+    -- Everyone can see profiles for non-private accounts
+    or exists (
+      select 1
+      from public.auth_users u
+      where u.username = user_profiles.username
+        and coalesce(u.is_private, false) = false
+    )
+  );
+
+create policy "Users can manage their own profile"
+  on public.user_profiles
+  for all
+  to authenticated
+  using ( username = current_username() )
+  with check ( username = current_username() );
+
+
+-- ---------------------------------------------------------------------
+-- RLS: Watch diary & reviews (visibility + friends)
+-- ---------------------------------------------------------------------
+alter table public.watch_diary enable row level security;
+
+create policy "Diary entries are visible based on visibility + follows"
+  on public.watch_diary
+  for select
+  to anon, authenticated
+  using (
+    -- Owner
+    (current_username() is not null and username = current_username())
+    -- Public entries
+    or visibility = 'public'
+    -- Friends-only entries: follower has accepted follow to this user
+    or (
+      visibility = 'friends'
+      and current_username() is not null
+      and exists (
+        select 1
+        from public.user_follows f
+        where f.follower_username = current_username()
+          and f.followed_username = watch_diary.username
+          and f.status = 'accepted'
+      )
+    )
+  );
+
+create policy "Users can manage their own diary entries"
+  on public.watch_diary
+  for all
+  to authenticated
+  using ( username = current_username() )
+  with check ( username = current_username() );
+
+
+alter table public.movie_reviews enable row level security;
+
+create policy "Reviews are visible based on visibility + follows"
+  on public.movie_reviews
+  for select
+  to anon, authenticated
+  using (
+    -- Owner
+    (current_username() is not null and username = current_username())
+    -- Public reviews
+    or visibility = 'public'
+    -- Friends-only reviews
+    or (
+      visibility = 'friends'
+      and current_username() is not null
+      and exists (
+        select 1
+        from public.user_follows f
+        where f.follower_username = current_username()
+          and f.followed_username = movie_reviews.username
+          and f.status = 'accepted'
+      )
+    )
+  );
+
+create policy "Users can manage their own reviews"
+  on public.movie_reviews
+  for all
+  to authenticated
+  using ( username = current_username() )
+  with check ( username = current_username() );
+
+
+alter table public.review_comments enable row level security;
+
+create policy "Comments visible if you can see the parent review or you wrote them"
+  on public.review_comments
+  for select
+  to anon, authenticated
+  using (
+    -- Owner of the comment
+    (current_username() is not null and username = current_username())
+    -- Or you can see the parent review under its own rules
+    or exists (
+      select 1
+      from public.movie_reviews r
+      where r.id = review_id
+        and (
+          -- Same logic as movie_reviews SELECT policy
+          (current_username() is not null and r.username = current_username())
+          or r.visibility = 'public'
+          or (
+            r.visibility = 'friends'
+            and current_username() is not null
+            and exists (
+              select 1
+              from public.user_follows f
+              where f.follower_username = current_username()
+                and f.followed_username = r.username
+                and f.status = 'accepted'
+            )
+          )
+        )
+    )
+  );
+
+create policy "Users can manage their own comments"
+  on public.review_comments
+  for all
+  to authenticated
+  using ( username = current_username() )
+  with check ( username = current_username() );
+
+
+alter table public.review_likes enable row level security;
+
+create policy "Users can see which reviews they liked"
+  on public.review_likes
+  for select
+  to authenticated
+  using ( username = current_username() );
+
+create policy "Users can like/unlike reviews as themselves"
+  on public.review_likes
+  for all
+  to authenticated
+  using ( username = current_username() )
+  with check ( username = current_username() );
+
+
+-- ---------------------------------------------------------------------
+-- RLS: User favorites, follows, tags, lists
+-- ---------------------------------------------------------------------
+alter table public.user_favorites enable row level security;
+
+create policy "Favorites visible based on account privacy"
+  on public.user_favorites
+  for select
+  to anon, authenticated
+  using (
+    -- Owner sees all their favorites
+    (current_username() is not null and username = current_username())
+    -- Everyone can see favorites of non-private accounts
+    or exists (
+      select 1
+      from public.auth_users u
+      where u.username = user_favorites.username
+        and coalesce(u.is_private, false) = false
+    )
+    -- Followers can see favorites of private accounts they follow
+    or (
+      current_username() is not null
+      and exists (
+        select 1
+        from public.auth_users u
+        join public.user_follows f
+          on f.followed_username = u.username
+         and f.follower_username = current_username()
+        where u.username = user_favorites.username
+          and coalesce(u.is_private, false) = true
+          and f.status = 'accepted'
+      )
+    )
+  );
+
+create policy "Users can manage their own favorites"
+  on public.user_favorites
+  for all
+  to authenticated
+  using ( username = current_username() )
+  with check ( username = current_username() );
+
+
+alter table public.user_follows enable row level security;
+
+create policy "Users can see relationships they are part of"
+  on public.user_follows
+  for select
+  to authenticated
+  using (
+    follower_username = current_username()
+    or followed_username = current_username()
+  );
+
+create policy "Users can follow others"
+  on public.user_follows
+  for insert
+  to authenticated
+  with check ( follower_username = current_username() );
+
+create policy "Users can update their follow status"
+  on public.user_follows
+  for update
+  to authenticated
+  using (
+    follower_username = current_username()
+    or followed_username = current_username()
+  )
+  with check (
+    follower_username = current_username()
+    or followed_username = current_username()
+  );
+
+create policy "Users can unfollow others"
+  on public.user_follows
+  for delete
+  to authenticated
+  using ( follower_username = current_username() );
+
+
+alter table public.user_lists enable row level security;
+
+create policy "Lists visible if public or owned"
+  on public.user_lists
+  for select
+  to anon, authenticated
+  using (
+    (current_username() is not null and username = current_username())
+    or is_public = true
+  );
+
+create policy "Users can manage their own lists"
+  on public.user_lists
+  for all
+  to authenticated
+  using ( username = current_username() )
+  with check ( username = current_username() );
+
+
+alter table public.user_list_items enable row level security;
+
+create policy "List items visible when parent list is visible"
+  on public.user_list_items
+  for select
+  to anon, authenticated
+  using (
+    exists (
+      select 1
+      from public.user_lists l
+      where l.id = list_id
+        and (
+          (current_username() is not null and l.username = current_username())
+          or l.is_public = true
+        )
+    )
+  );
+
+create policy "Only list owners (or collaborative lists) can manage items"
+  on public.user_list_items
+  for all
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.user_lists l
+      where l.id = list_id
+        and (
+          l.username = current_username()
+          or l.is_collaborative = true
+        )
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.user_lists l
+      where l.id = list_id
+        and (
+          l.username = current_username()
+          or l.is_collaborative = true
+        )
+    )
+  );
+
+
+alter table public.user_tags enable row level security;
+
+create policy "Users can see their own tags"
+  on public.user_tags
+  for select
+  to authenticated
+  using ( username = current_username() );
+
+create policy "Users can manage their own tags"
+  on public.user_tags
+  for all
+  to authenticated
+  using ( username = current_username() )
+  with check ( username = current_username() );
+
+
+-- ---------------------------------------------------------------------
+-- RLS: Notifications & activity
+-- ---------------------------------------------------------------------
+alter table public.user_notifications enable row level security;
+
+create policy "Users can see their own notifications"
+  on public.user_notifications
+  for select
+  to authenticated
+  using ( recipient_username = current_username() );
+
+create policy "Users can mark their notifications as read"
+  on public.user_notifications
+  for update
+  to authenticated
+  using ( recipient_username = current_username() )
+  with check ( recipient_username = current_username() );
+
+
+alter table public.user_activity enable row level security;
+
+create policy "Users can see their own activity log"
+  on public.user_activity
+  for select
+  to authenticated
+  using ( username = current_username() );
+
+create policy "Users can append to their own activity log"
+  on public.user_activity
+  for insert
+  to authenticated
+  with check ( username = current_username() );
+
+
+-- ---------------------------------------------------------------------
+-- RLS: Watch parties (real-time social)
+-- ---------------------------------------------------------------------
+alter table public.watch_parties enable row level security;
+
+create policy "Watch parties visible based on visibility, host, or participation"
+  on public.watch_parties
+  for select
+  to anon, authenticated
+  using (
+    -- Host always sees their parties
+    (current_username() is not null and host_username = current_username())
+    -- Public parties visible to everyone
+    or status in ('scheduled', 'live') and visibility = 'public'
+    -- Friends-only parties: followers of the host can see them
+    or (
+      status in ('scheduled', 'live')
+      and visibility = 'friends'
+      and current_username() is not null
+      and exists (
+        select 1
+        from public.user_follows f
+        where f.follower_username = current_username()
+          and f.followed_username = watch_parties.host_username
+          and f.status = 'accepted'
+      )
+    )
+    -- Any participant can see the party
+    or (
+      current_username() is not null
+      and exists (
+        select 1
+        from public.watch_party_participants p
+        where p.party_id = watch_parties.id
+          and p.username = current_username()
+      )
+    )
+  );
+
+create policy "Hosts can manage their own watch parties"
+  on public.watch_parties
+  for all
+  to authenticated
+  using ( host_username = current_username() )
+  with check ( host_username = current_username() );
+
+
+alter table public.watch_party_participants enable row level security;
+
+create policy "Participants and host can view participants"
+  on public.watch_party_participants
+  for select
+  to authenticated
+  using (
+    username = current_username()
+    or exists (
+      select 1
+      from public.watch_parties wp
+      where wp.id = party_id
+        and wp.host_username = current_username()
+    )
+    or exists (
+      select 1
+      from public.watch_party_participants p2
+      where p2.party_id = party_id
+        and p2.username = current_username()
+    )
+  );
+
+create policy "Hosts can invite participants; users can join themselves"
+  on public.watch_party_participants
+  for insert
+  to authenticated
+  with check (
+    -- User joins themselves
+    username = current_username()
+    -- Or host invites someone else
+    or exists (
+      select 1
+      from public.watch_parties wp
+      where wp.id = party_id
+        and wp.host_username = current_username()
+    )
+  );
+
+create policy "Hosts or participants can update participant state"
+  on public.watch_party_participants
+  for all
+  to authenticated
+  using (
+    username = current_username()
+    or exists (
+      select 1
+      from public.watch_parties wp
+      where wp.id = party_id
+        and wp.host_username = current_username()
+    )
+  )
+  with check (
+    username = current_username()
+    or exists (
+      select 1
+      from public.watch_parties wp
+      where wp.id = party_id
+        and wp.host_username = current_username()
+    )
+  );
+
+
+alter table public.watch_party_messages enable row level security;
+
+create policy "Only participants/host can read party messages"
+  on public.watch_party_messages
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.watch_party_participants p
+      where p.party_id = party_id
+        and p.username = current_username()
+    )
+    or exists (
+      select 1
+      from public.watch_parties wp
+      where wp.id = party_id
+        and wp.host_username = current_username()
+    )
+  );
+
+create policy "Only participants/host can send party messages"
+  on public.watch_party_messages
+  for insert
+  to authenticated
+  with check (
+    username = current_username()
+    and (
+      exists (
+        select 1
+        from public.watch_party_participants p
+        where p.party_id = party_id
+          and p.username = current_username()
+      )
+      or exists (
+        select 1
+        from public.watch_parties wp
+        where wp.id = party_id
+          and wp.host_username = current_username()
+      )
+    )
+  );
+
+
+-- ---------------------------------------------------------------------
+-- RLS: Direct messages & conversations
+-- ---------------------------------------------------------------------
+alter table public.user_conversations enable row level security;
+
+create policy "Users can see conversations they belong to"
+  on public.user_conversations
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.user_conversation_members m
+      where m.conversation_id = user_conversations.id
+        and m.username = current_username()
+    )
+  );
+
+create policy "Users can create conversations they own"
+  on public.user_conversations
+  for insert
+  to authenticated
+  with check ( created_by_username = current_username() );
+
+create policy "Only members with elevated role can update/delete conversations"
+  on public.user_conversations
+  for all
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.user_conversation_members m
+      where m.conversation_id = user_conversations.id
+        and m.username = current_username()
+        and m.role in ('owner', 'admin')
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.user_conversation_members m
+      where m.conversation_id = user_conversations.id
+        and m.username = current_username()
+        and m.role in ('owner', 'admin')
+    )
+  );
+
+
+alter table public.user_conversation_members enable row level security;
+
+create policy "Members can see membership of conversations they are in"
+  on public.user_conversation_members
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.user_conversation_members self
+      where self.conversation_id = conversation_id
+        and self.username = current_username()
+    )
+  );
+
+create policy "Creators can add members; users can join themselves"
+  on public.user_conversation_members
+  for insert
+  to authenticated
+  with check (
+    username = current_username()
+    or exists (
+      select 1
+      from public.user_conversations c
+      where c.id = conversation_id
+        and c.created_by_username = current_username()
+    )
+  );
+
+create policy "Members and creators can update/remove members"
+  on public.user_conversation_members
+  for all
+  to authenticated
+  using (
+    username = current_username()
+    or exists (
+      select 1
+      from public.user_conversations c
+      where c.id = conversation_id
+        and c.created_by_username = current_username()
+    )
+  )
+  with check (
+    username = current_username()
+    or exists (
+      select 1
+      from public.user_conversations c
+      where c.id = conversation_id
+        and c.created_by_username = current_username()
+    )
+  );
+
+
+alter table public.user_messages enable row level security;
+
+create policy "Only conversation members can read messages"
+  on public.user_messages
+  for select
+  to authenticated
+  using (
+    exists (
+      select 1
+      from public.user_conversation_members m
+      where m.conversation_id = user_messages.conversation_id
+        and m.username = current_username()
+    )
+  );
+
+create policy "Only conversation members can send messages as themselves"
+  on public.user_messages
+  for insert
+  to authenticated
+  with check (
+    sender_username = current_username()
+    and exists (
+      select 1
+      from public.user_conversation_members m
+      where m.conversation_id = user_messages.conversation_id
+        and m.username = current_username()
+    )
+  );
+
+
+-- ---------------------------------------------------------------------
+-- RLS: App config, experiments & search analytics
+-- ---------------------------------------------------------------------
+alter table public.app_config enable row level security;
+
+create policy "App config is readable by all clients"
+  on public.app_config
+  for select
+  to anon, authenticated
+  using ( true );
+-- (No INSERT/UPDATE/DELETE policy: only service_role can modify via bypass RLS)
+
+
+alter table public.experiments enable row level security;
+
+create policy "Experiments are readable by all clients"
+  on public.experiments
+  for select
+  to anon, authenticated
+  using ( true );
+
+
+alter table public.experiment_assignments enable row level security;
+
+create policy "Users can see their own experiment assignments"
+  on public.experiment_assignments
+  for select
+  to authenticated
+  using ( username = current_username() );
+-- Assignments should be written by backend jobs only; no client write policy.
+
+
+alter table public.search_queries enable row level security;
+
+create policy "Users can see their own search queries"
+  on public.search_queries
+  for select
+  to authenticated
+  using ( username = current_username() );
+
+create policy "Clients can log their own searches (or anonymous ones)"
+  on public.search_queries
+  for insert
+  to anon, authenticated
+  with check (
+    username is null
+    or username = current_username()
+  );
