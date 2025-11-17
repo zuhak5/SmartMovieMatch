@@ -495,60 +495,205 @@
               <p class="lead">Your vibe, stats, and diary in one place.</p>
             </div>
           </div>
-          <div class="tab-panel" data-tab-panel="overview">
-            <div class="card">
-              <div
-                class="poster"
-                style="max-width: 110px;"
-                aria-hidden="true"
-                data-profile-avatar
-              ></div>
-              <div class="stack">
-                <h3 data-profile-name>Guest</h3>
-                <div class="small-text" data-profile-handle>@guest</div>
-                <p class="small-text" data-profile-bio>
-                  Sign in to add a bio and location for your profile.
-                </p>
-                <div class="small-text" data-profile-location>
-                  Location unknown
-                </div>
-                <div class="small-text" data-profile-website>
-                  Website not added
-                </div>
-                <div class="stat-row">
-                  <div class="stat">
-                    <div class="small-text">Films</div>
-                    <strong data-profile-stat="films">0</strong>
+        <div class="tab-panel" data-tab-panel="overview">
+            <div class="profile-layout">
+              <section class="card profile-hero-card">
+                <div class="profile-hero-header">
+                  <div class="profile-identity">
+                    <div class="profile-hero-avatar" id="profileHeroAvatar" aria-hidden="true">
+                      <img id="profileHeroAvatarImg" alt="" />
+                      <span id="profileHeroAvatarInitials">SM</span>
+                    </div>
+                    <div class="profile-identity-text">
+                      <p class="eyebrow" id="profilePulseSummary">Your movie persona</p>
+                      <h3 id="profileHeroName" data-profile-name>Guest member</h3>
+                      <div class="profile-handle" id="profileHeroHandle" data-profile-handle data-state="guest">
+                        @guest
+                      </div>
+                      <p class="profile-tagline" id="profileHeroTagline">
+                        Tell Smart Movie Match what you’re into and this space will feel uniquely yours.
+                      </p>
+                      <div class="profile-meta-row">
+                        <span class="profile-meta" data-profile-location>Location unknown</span>
+                        <span class="profile-meta" data-profile-website>Website not added</span>
+                      </div>
+                    </div>
                   </div>
-                  <div class="stat">
-                    <div class="small-text">Diary entries</div>
-                    <strong data-profile-stat="diary">0</strong>
-                  </div>
-                  <div class="stat">
-                    <div class="small-text">Followers</div>
-                    <strong data-profile-stat="followers">0</strong>
-                  </div>
-                  <div class="stat">
-                    <div class="small-text">Following</div>
-                    <strong data-profile-stat="following">0</strong>
+                  <div class="profile-hero-actions">
+                    <button class="btn-ghost btn" type="button" data-profile-message>Message</button>
+                    <button class="btn-ghost btn" type="button" data-profile-action="favorites">Favorites</button>
+                    <button class="btn-ghost btn" type="button" data-profile-action="watched">Watched</button>
+                    <button class="btn-primary btn" type="button" data-profile-edit-open>Edit profile</button>
                   </div>
                 </div>
-                <div class="stack">
-                  <div class="small-text">Taste summary</div>
-                  <div class="bar-chart">
-                    <div class="bar" style="height: 30px;"></div>
-                    <div class="bar" style="height: 36px;"></div>
-                    <div class="bar" style="height: 46px;"></div>
-                    <div class="bar" style="height: 52px;"></div>
-                    <div class="bar" style="height: 44px;"></div>
+                <div class="profile-hero-stats">
+                  <div class="profile-stat-card">
+                    <p class="small-text muted">Favorites</p>
+                    <div class="profile-stat-value" id="profileHeroFavorites">0</div>
+                    <p class="small-text">Saved picks across your library.</p>
                   </div>
-                  <p class="small-text">You love sci-fi and thrillers.</p>
+                  <div class="profile-stat-card">
+                    <p class="small-text muted">Watched</p>
+                    <div class="profile-stat-value" id="profileHeroWatched">0</div>
+                    <p class="small-text">Diary entries and logged titles.</p>
+                  </div>
+                  <div class="profile-stat-card">
+                    <p class="small-text muted">Followers</p>
+                    <div class="profile-stat-value" id="profileHeroFollowers">0</div>
+                    <p class="small-text">People who see your updates.</p>
+                  </div>
+                  <div class="profile-stat-card">
+                    <p class="small-text muted">Following</p>
+                    <div class="profile-stat-value" id="profileHeroFollowing">0</div>
+                    <p class="small-text">Members you follow.</p>
+                  </div>
+                  <div class="profile-stat-card">
+                    <p class="small-text muted">Mutuals</p>
+                    <div class="profile-stat-value" id="profileHeroMutual">0</div>
+                    <p class="small-text">Shared connections.</p>
+                  </div>
                 </div>
-                <div class="action-row">
-                  <button class="btn-primary btn" data-profile-edit-open>Edit profile</button>
-                  <button class="btn btn-secondary" data-profile-message>Message</button>
-                  <button class="btn-ghost btn">Share profile</button>
+              </section>
+
+              <section class="card profile-callout" id="profileOverviewCallout" aria-live="polite" data-sync-state="guest">
+                <div class="profile-callout-header">
+                  <div>
+                    <p class="eyebrow">Library pulse</p>
+                    <h4>Sync, favorites, and diary at a glance</h4>
+                  </div>
+                  <span class="badge" id="profileCalloutSyncBadge">Guest mode</span>
                 </div>
+                <div class="profile-callout-metrics">
+                  <div class="profile-metric">
+                    <div class="profile-metric-label">Favorites</div>
+                    <div class="profile-metric-value" id="profileCalloutFavoritesValue">0</div>
+                    <p class="small-text" id="profileCalloutFavoritesMeta">Ready when you are.</p>
+                    <button
+                      class="btn-ghost btn profile-callout-toggle"
+                      type="button"
+                      data-profile-snapshot-toggle
+                      data-target="profileCalloutFavoritesList"
+                      data-label-singular="favorite"
+                      data-label-plural="favorites"
+                      data-profile-action="favorites"
+                    >
+                      Show all favorites
+                    </button>
+                  </div>
+                  <div class="profile-metric">
+                    <div class="profile-metric-label">Watched</div>
+                    <div class="profile-metric-value" id="profileCalloutWatchedValue">0</div>
+                    <p class="small-text" id="profileCalloutWatchedMeta">Log watched titles to tune picks.</p>
+                    <button
+                      class="btn-ghost btn profile-callout-toggle"
+                      type="button"
+                      data-profile-snapshot-toggle
+                      data-target="profileCalloutWatchedList"
+                      data-label-singular="watched title"
+                      data-label-plural="watched titles"
+                      data-profile-action="watched"
+                    >
+                      Show all watched
+                    </button>
+                  </div>
+                  <div class="profile-metric">
+                    <div class="profile-metric-label">Sync status</div>
+                    <div class="profile-metric-value" id="profileCalloutSyncValue">Guest mode</div>
+                    <p class="small-text" id="profileCalloutSyncMeta">Sign in to start syncing automatically.</p>
+                    <div class="profile-progress" id="profileCalloutProgress">
+                      <div class="profile-progress-bar" id="profileCalloutProgressFill"></div>
+                      <span class="profile-progress-label" id="profileCalloutProgressText">
+                        Complete your profile to sync everything.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div class="profile-callout-lists">
+                  <div class="profile-snapshot">
+                    <div class="profile-snapshot-heading">
+                      <div>
+                        <p class="small-text muted">Latest favorites</p>
+                        <p class="small-text" id="profileCalloutFavoritesSubtitle">Save favorites to surface them here.</p>
+                      </div>
+                      <button
+                        class="profile-callout-toggle btn-ghost btn"
+                        type="button"
+                        data-profile-snapshot-toggle
+                        data-target="profileCalloutFavoritesList"
+                        data-label-singular="favorite"
+                        data-label-plural="favorites"
+                      >
+                        Show all favorites
+                      </button>
+                    </div>
+                    <ul class="profile-callout-snapshot-list" id="profileCalloutFavoritesList" data-expanded="false"></ul>
+                  </div>
+                  <div class="profile-snapshot">
+                    <div class="profile-snapshot-heading">
+                      <div>
+                        <p class="small-text muted">Recent diary</p>
+                        <p class="small-text" id="profileCalloutWatchedSubtitle">Log watched titles to see recent activity.</p>
+                      </div>
+                      <button
+                        class="profile-callout-toggle btn-ghost btn"
+                        type="button"
+                        data-profile-snapshot-toggle
+                        data-target="profileCalloutWatchedList"
+                        data-label-singular="watched title"
+                        data-label-plural="watched titles"
+                      >
+                        Show all diary
+                      </button>
+                    </div>
+                    <ul class="profile-callout-snapshot-list" id="profileCalloutWatchedList" data-expanded="false"></ul>
+                  </div>
+                </div>
+              </section>
+
+              <div class="profile-subgrid">
+                <section class="card profile-taste-card">
+                  <div class="profile-card-header">
+                    <div>
+                      <p class="eyebrow">Taste map</p>
+                      <h4>Genres and favorites that define you</h4>
+                    </div>
+                  </div>
+                  <div class="profile-genre-stack">
+                    <div class="profile-genre-donut" id="profileGenreDonut" data-state="empty"></div>
+                    <div class="profile-genre-legend-wrap">
+                      <p class="small-text" id="profileGenreMeta">Pick a few genres to visualize.</p>
+                      <ul class="profile-genre-legend" id="profileGenreLegend"></ul>
+                    </div>
+                  </div>
+                  <div class="profile-genre-chips">
+                    <p class="small-text muted">Favorite genres</p>
+                    <ul class="profile-genre-chiplist" id="profileCalloutGenreChips"></ul>
+                    <p class="small-text" id="profileCalloutGenreEmpty">Add genres in your preferences to see them highlighted here.</p>
+                  </div>
+                </section>
+
+                <section class="card profile-activity-card">
+                  <div class="profile-card-header">
+                    <div>
+                      <p class="eyebrow">Highlights & streaks</p>
+                      <h4>Keep momentum with real-time signals</h4>
+                    </div>
+                    <span class="badge">Live</span>
+                  </div>
+                  <div class="profile-activity-timeline" id="profileActivityTimeline" role="list"></div>
+                  <p class="small-text" id="profileActivityMeta">No activity logged yet.</p>
+                  <div class="profile-taste-highlights">
+                    <div class="profile-snapshot-heading">
+                      <div>
+                        <p class="small-text muted">Taste highlights</p>
+                        <p class="small-text" id="profileCalloutTasteSubtitle">
+                          We’ll summarize your taste once you start saving titles.
+                        </p>
+                      </div>
+                    </div>
+                    <ul class="profile-taste-list" id="profileCalloutTasteList"></ul>
+                  </div>
+                </section>
               </div>
             </div>
           </div>
