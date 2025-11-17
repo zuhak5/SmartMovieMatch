@@ -34,6 +34,20 @@ const FAVORITE_DECADE_OPTIONS = [
   "2020s"
 ];
 
+const STREAMING_PROVIDER_OPTIONS = [
+  { value: "netflix", label: "Netflix" },
+  { value: "prime-video", label: "Prime Video" },
+  { value: "disney-plus", label: "Disney+" },
+  { value: "max", label: "Max" },
+  { value: "hulu", label: "Hulu" },
+  { value: "apple-tv", label: "Apple TV+" },
+  { value: "peacock", label: "Peacock" },
+  { value: "paramount-plus", label: "Paramount+" }
+];
+
+const ONBOARDING_STORAGE_KEY = "smartMovieMatch.onboardingComplete";
+const ONBOARDING_STEPS = ["taste", "providers", "import"];
+
 const state = {
   activeTabs: { ...defaultTabs },
   activeSection: "home",
@@ -50,7 +64,17 @@ const state = {
   authMode: "login",
   authSubmitting: false,
   profileEditorOpen: false,
-  profileEditorSaving: false
+  profileEditorSaving: false,
+  onboardingOpen: false,
+  onboardingStep: ONBOARDING_STEPS[0],
+  onboardingSubmitting: false,
+  onboardingSelections: {
+    favoriteGenres: [],
+    favoriteDecades: [],
+    streamingProviders: [],
+    importChoice: "later"
+  },
+  onboardingDismissed: false
 };
 
 const authRequiredViews = [
@@ -130,6 +154,21 @@ const profileDecadeCount = document.querySelector("[data-profile-decade-count]")
 const profileEditOpenButton = document.querySelector("[data-profile-edit-open]");
 const profileEditCloseButton = document.querySelector("[data-profile-editor-close]");
 const profileEditCancelButton = document.querySelector("[data-profile-editor-cancel]");
+const onboardingOverlay = document.querySelector("[data-onboarding]");
+const onboardingSteps = document.querySelectorAll("[data-onboarding-step]");
+const onboardingProgress = document.querySelector("[data-onboarding-progress]");
+const onboardingStatus = document.querySelector("[data-onboarding-status]");
+const onboardingCloseButton = document.querySelector("[data-onboarding-close]");
+const onboardingBackButton = document.querySelector("[data-onboarding-back]");
+const onboardingNextButton = document.querySelector("[data-onboarding-next]");
+const onboardingFinishButton = document.querySelector("[data-onboarding-finish]");
+const onboardingGenreOptions = document.querySelector("[data-onboarding-genre-options]");
+const onboardingDecadeOptions = document.querySelector("[data-onboarding-decade-options]");
+const onboardingProviderOptions = document.querySelector("[data-onboarding-provider-options]");
+const onboardingGenreCount = document.querySelector("[data-onboarding-genre-count]");
+const onboardingDecadeCount = document.querySelector("[data-onboarding-decade-count]");
+const onboardingProviderCount = document.querySelector("[data-onboarding-provider-count]");
+const onboardingImportOptions = document.querySelectorAll("[data-onboarding-import]");
 
 function hasActiveSession() {
   return Boolean(state.session && state.session.token);
@@ -278,6 +317,33 @@ function uniqueStringList(list, maxItems = 12, maxLength = 60) {
   return result;
 }
 
+function readOnboardingLocalMap() {
+  if (typeof window === "undefined" || !window.localStorage) return {};
+  try {
+    const raw = window.localStorage.getItem(ONBOARDING_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (error) {
+    console.warn("Unable to read onboarding state", error);
+    return {};
+  }
+}
+
+function isOnboardingLocallyComplete(username = "anonymous") {
+  const map = readOnboardingLocalMap();
+  return Boolean(map[username] || map.anonymous);
+}
+
+function markOnboardingCompleteLocally(username = "anonymous") {
+  if (typeof window === "undefined" || !window.localStorage) return;
+  const map = readOnboardingLocalMap();
+  map[username] = true;
+  try {
+    window.localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(map));
+  } catch (error) {
+    console.warn("Unable to persist onboarding completion", error);
+  }
+}
+
 function arraysEqual(a = [], b = []) {
   if (a.length !== b.length) return false;
   return a.every((value, index) => value === b[index]);
@@ -365,6 +431,7 @@ function toggleAccountMenu(forceOpen = null) {
 }
 
 function updateAccountUi(session) {
+  const previousUsername = state.session && state.session.username;
   state.session = session || null;
   const hasSession = Boolean(state.session && state.session.token);
   if (authOpenButton) {
@@ -404,6 +471,12 @@ function updateAccountUi(session) {
 
   if (!hasSession) {
     ensureAccessibleSection();
+    closeOnboarding(false);
+    state.onboardingDismissed = false;
+  }
+
+  if (hasSession && previousUsername !== state.session.username) {
+    state.onboardingDismissed = false;
   }
 
   renderProfileOverview();
@@ -1057,6 +1130,241 @@ function closeProfileEditor() {
   toggleProfileEditor(false);
 }
 
+function setOnboardingStatus(message, variant = "info") {
+  if (!onboardingStatus) return;
+  onboardingStatus.textContent = message || "";
+  onboardingStatus.classList.remove("error", "success");
+  if (variant === "error") {
+    onboardingStatus.classList.add("error");
+  }
+  if (variant === "success") {
+    onboardingStatus.classList.add("success");
+  }
+}
+
+function ensureOnboardingOptionChips() {
+  if (onboardingGenreOptions && !onboardingGenreOptions.dataset.built) {
+    const genres = Object.entries(TMDB_GENRES)
+      .map(([key, label]) => ({ value: String(key), label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+    buildChipOptions(onboardingGenreOptions, genres);
+    onboardingGenreOptions.dataset.built = "true";
+  }
+  if (onboardingDecadeOptions && !onboardingDecadeOptions.dataset.built) {
+    const decades = FAVORITE_DECADE_OPTIONS.map((label) => ({ value: label, label }));
+    buildChipOptions(onboardingDecadeOptions, decades);
+    onboardingDecadeOptions.dataset.built = "true";
+  }
+  if (onboardingProviderOptions && !onboardingProviderOptions.dataset.built) {
+    buildChipOptions(onboardingProviderOptions, STREAMING_PROVIDER_OPTIONS);
+    onboardingProviderOptions.dataset.built = "true";
+  }
+}
+
+function updateOnboardingCounts() {
+  if (onboardingGenreCount && onboardingGenreOptions) {
+    const count = onboardingGenreOptions.querySelectorAll('input[type="checkbox"]:checked').length;
+    onboardingGenreCount.textContent = `${count} selected`;
+  }
+  if (onboardingDecadeCount && onboardingDecadeOptions) {
+    const count = onboardingDecadeOptions.querySelectorAll('input[type="checkbox"]:checked').length;
+    onboardingDecadeCount.textContent = `${count} selected`;
+  }
+  if (onboardingProviderCount && onboardingProviderOptions) {
+    const count = onboardingProviderOptions.querySelectorAll('input[type="checkbox"]:checked').length;
+    onboardingProviderCount.textContent = `${count} selected`;
+  }
+}
+
+function getSelectedImportChoice() {
+  const checked = Array.from(onboardingImportOptions || []).find((input) => input.checked);
+  return (checked && checked.value) || "later";
+}
+
+function populateOnboardingSelections() {
+  ensureOnboardingOptionChips();
+  const preferences = (state.session && state.session.preferencesSnapshot) || {};
+  const profilePrefs = preferences.profile || {};
+  const streamingPrefs = preferences.streaming || {};
+  const onboardingPrefs = preferences.onboarding || {};
+
+  const favoriteGenres =
+    state.onboardingSelections.favoriteGenres.length
+      ? state.onboardingSelections.favoriteGenres
+      : profilePrefs.favoriteGenres || [];
+  const favoriteDecades =
+    state.onboardingSelections.favoriteDecades.length
+      ? state.onboardingSelections.favoriteDecades
+      : profilePrefs.favoriteDecades || [];
+  const streamingProviders =
+    state.onboardingSelections.streamingProviders.length
+      ? state.onboardingSelections.streamingProviders
+      : streamingPrefs.providers || [];
+  const importChoice =
+    state.onboardingSelections.importChoice || onboardingPrefs.importChoice || "later";
+
+  setSelectedOptions(onboardingGenreOptions, favoriteGenres);
+  setSelectedOptions(onboardingDecadeOptions, favoriteDecades);
+  setSelectedOptions(onboardingProviderOptions, streamingProviders);
+  (onboardingImportOptions || []).forEach((input) => {
+    input.checked = input.value === importChoice;
+  });
+
+  state.onboardingSelections = {
+    favoriteGenres,
+    favoriteDecades,
+    streamingProviders,
+    importChoice
+  };
+
+  updateOnboardingCounts();
+  setOnboardingStatus("Pick a few quick options to personalize your feed.");
+}
+
+function readOnboardingSelections() {
+  state.onboardingSelections = {
+    favoriteGenres: getSelectedOptionValues(onboardingGenreOptions),
+    favoriteDecades: getSelectedOptionValues(onboardingDecadeOptions),
+    streamingProviders: getSelectedOptionValues(onboardingProviderOptions),
+    importChoice: getSelectedImportChoice()
+  };
+  updateOnboardingCounts();
+}
+
+function setOnboardingStep(step) {
+  const safeStep = ONBOARDING_STEPS.includes(step) ? step : ONBOARDING_STEPS[0];
+  state.onboardingStep = safeStep;
+  const activeIndex = ONBOARDING_STEPS.indexOf(safeStep);
+  onboardingSteps.forEach((panel) => {
+    const isActive = panel.dataset.onboardingStep === safeStep;
+    panel.hidden = !isActive;
+    panel.classList.toggle("is-active", isActive);
+  });
+
+  const labelMap = {
+    taste: "Taste profile",
+    providers: "Streaming services",
+    import: "Import & history"
+  };
+  if (onboardingProgress) {
+    onboardingProgress.textContent = `Step ${activeIndex + 1} of ${
+      ONBOARDING_STEPS.length
+    } · ${labelMap[safeStep] || "Onboarding"}`;
+  }
+
+  if (onboardingBackButton) {
+    onboardingBackButton.disabled = activeIndex <= 0;
+  }
+  if (onboardingNextButton) {
+    onboardingNextButton.hidden = activeIndex >= ONBOARDING_STEPS.length - 1;
+  }
+  if (onboardingFinishButton) {
+    onboardingFinishButton.hidden = activeIndex < ONBOARDING_STEPS.length - 1;
+  }
+}
+
+function openOnboarding() {
+  if (!hasActiveSession() || !onboardingOverlay) return;
+  state.onboardingOpen = true;
+  onboardingOverlay.hidden = false;
+  onboardingOverlay.classList.add("is-visible");
+  populateOnboardingSelections();
+  setOnboardingStep(state.onboardingStep);
+}
+
+function closeOnboarding(markDismissed = true) {
+  if (!onboardingOverlay) return;
+  onboardingOverlay.classList.remove("is-visible");
+  onboardingOverlay.hidden = true;
+  state.onboardingOpen = false;
+  if (markDismissed) {
+    state.onboardingDismissed = true;
+  }
+}
+
+function shouldOpenOnboarding() {
+  if (!hasActiveSession()) return false;
+  if (state.onboardingOpen || state.onboardingDismissed) return false;
+  const username = (state.session && state.session.username) || "anonymous";
+  const preferences = (state.session && state.session.preferencesSnapshot) || {};
+  const onboardingPrefs = preferences.onboarding || {};
+  if (onboardingPrefs.completedAt) return false;
+  return !isOnboardingLocallyComplete(username);
+}
+
+function maybeOpenOnboarding(force = false) {
+  if (force) {
+    state.onboardingDismissed = false;
+  }
+  if (!onboardingOverlay) return;
+  if (force || shouldOpenOnboarding()) {
+    state.onboardingStep = ONBOARDING_STEPS[0];
+    openOnboarding();
+  }
+}
+
+async function completeOnboardingFlow() {
+  if (!hasActiveSession()) {
+    closeOnboarding();
+    promptForAuth("home", "for-you");
+    return;
+  }
+  if (state.onboardingSubmitting) return;
+
+  readOnboardingSelections();
+  state.onboardingSubmitting = true;
+  setOnboardingStatus("Saving your preferences...");
+  if (onboardingFinishButton) {
+    onboardingFinishButton.setAttribute("disabled", "disabled");
+  }
+
+  try {
+    const workingSession = state.session;
+    const existingSnapshot = (workingSession && workingSession.preferencesSnapshot) || {};
+    const profilePrefs = existingSnapshot.profile || {};
+    const streamingPrefs = existingSnapshot.streaming || {};
+    const onboardingPrefs = existingSnapshot.onboarding || {};
+
+    const favoriteGenres = uniqueStringList(state.onboardingSelections.favoriteGenres, 12, 60);
+    const favoriteDecades = uniqueStringList(
+      state.onboardingSelections.favoriteDecades,
+      FAVORITE_DECADE_OPTIONS.length,
+      20
+    );
+    const streamingProviders = uniqueStringList(state.onboardingSelections.streamingProviders, 12, 30);
+    const importChoice = state.onboardingSelections.importChoice || "later";
+
+    const nextSnapshot = {
+      ...existingSnapshot,
+      profile: { ...profilePrefs, favoriteGenres, favoriteDecades },
+      streaming: { ...streamingPrefs, providers: streamingProviders },
+      onboarding: {
+        ...onboardingPrefs,
+        completedAt: new Date().toISOString(),
+        importChoice
+      }
+    };
+
+    const updatedSession = await persistPreferencesRemote(workingSession, nextSnapshot);
+    state.session = updatedSession || workingSession;
+    markOnboardingCompleteLocally(state.session.username || "anonymous");
+    setOnboardingStatus("Preferences saved. You're all set!", "success");
+    updateAccountUi(state.session);
+    renderProfileOverview();
+    state.onboardingDismissed = true;
+    window.setTimeout(() => closeOnboarding(), 180);
+  } catch (error) {
+    const message =
+      (error && error.message) || "We couldn't save your onboarding preferences just yet.";
+    setOnboardingStatus(message, "error");
+  } finally {
+    state.onboardingSubmitting = false;
+    if (onboardingFinishButton) {
+      onboardingFinishButton.removeAttribute("disabled");
+    }
+  }
+}
+
 async function handleProfileEditorSubmit(event) {
   event.preventDefault();
   if (state.profileEditorSaving) return;
@@ -1135,6 +1443,9 @@ function handleOutsideClick(event) {
   if (state.profileEditorOpen && profileEditOverlay && event.target === profileEditOverlay) {
     closeProfileEditor();
   }
+  if (state.onboardingOpen && onboardingOverlay && event.target === onboardingOverlay) {
+    closeOnboarding();
+  }
 }
 
 function handleEscape(event) {
@@ -1147,6 +1458,9 @@ function handleEscape(event) {
     }
     if (state.profileEditorOpen) {
       closeProfileEditor();
+    }
+    if (state.onboardingOpen) {
+      closeOnboarding();
     }
   }
 }
@@ -1269,6 +1583,56 @@ function attachListeners() {
     profileDecadeOptions.addEventListener("change", updateProfileEditorCounts);
   }
 
+  const goToAdjacentOnboardingStep = (offset) => {
+    readOnboardingSelections();
+    const currentIndex = Math.max(0, ONBOARDING_STEPS.indexOf(state.onboardingStep));
+    const targetIndex = Math.min(
+      Math.max(currentIndex + offset, 0),
+      ONBOARDING_STEPS.length - 1
+    );
+    setOnboardingStep(ONBOARDING_STEPS[targetIndex]);
+  };
+
+  if (onboardingCloseButton) {
+    onboardingCloseButton.addEventListener("click", () => closeOnboarding());
+  }
+  if (onboardingBackButton) {
+    onboardingBackButton.addEventListener("click", () => goToAdjacentOnboardingStep(-1));
+  }
+  if (onboardingNextButton) {
+    onboardingNextButton.addEventListener("click", () => goToAdjacentOnboardingStep(1));
+  }
+  if (onboardingFinishButton) {
+    onboardingFinishButton.addEventListener("click", completeOnboardingFlow);
+  }
+  if (onboardingOverlay) {
+    onboardingOverlay.addEventListener("click", (event) => {
+      if (event.target === onboardingOverlay) {
+        closeOnboarding();
+      }
+    });
+  }
+  if (onboardingGenreOptions) {
+    onboardingGenreOptions.addEventListener("change", () => {
+      readOnboardingSelections();
+    });
+  }
+  if (onboardingDecadeOptions) {
+    onboardingDecadeOptions.addEventListener("change", () => {
+      readOnboardingSelections();
+    });
+  }
+  if (onboardingProviderOptions) {
+    onboardingProviderOptions.addEventListener("change", () => {
+      readOnboardingSelections();
+    });
+  }
+  if (onboardingImportOptions && onboardingImportOptions.length) {
+    onboardingImportOptions.forEach((input) => {
+      input.addEventListener("change", () => readOnboardingSelections());
+    });
+  }
+
   document.addEventListener("click", handleOutsideClick);
   document.addEventListener("keydown", handleEscape);
 }
@@ -1285,6 +1649,7 @@ function init() {
     if (session && session.token) {
       closeAuthOverlay();
     }
+    maybeOpenOnboarding();
   });
   initSocialFeatures();
   attachListeners();

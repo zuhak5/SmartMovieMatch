@@ -80,14 +80,14 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Backend: `user_profiles`, `auth_users.is_private`, RLS so only the owner can update.
   - DONE 2025-11-17T03:38Z – Added profile editor overlay with editable bio, location, website, favorites, privacy toggle, and display name sync to auth.
 
-- [ ] **PROF-003 – Onboarding wizard**
+- [x] **PROF-003 – Onboarding wizard**
   - Description: First-time users see a 2–3 step wizard:
     - Step 1: Choose preferred genres / decades → store in `user_profiles.favorite_genres` & `favorite_decades`.
     - Step 2: Pick streaming providers → store in `user_streaming_profiles`.
     - Step 3: Optional: import ratings or connect external services (stub).
   - Files: New onboarding view + routing, local storage flag to avoid showing after completion.
   - Backend: `user_profiles`, `user_streaming_profiles`, `import_jobs` (future).
-  - DONE: _…_
+  - DONE 2025-11-17T04:28Z – Added a three-step onboarding overlay that syncs taste, streaming providers, and import intent to preferences with a per-user completion flag.
 
 ---
 
