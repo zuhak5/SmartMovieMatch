@@ -186,13 +186,13 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Backend: `user_favorites`.
   - DONE 2025-05-07T00:00Z – Added favorite toggles on trending cards with session-backed sync and a library favorites panel.
 
-- [ ] **LIST-003 – Personal tags per user**
+- [x] **LIST-003 – Personal tags per user**
   - Description: Allow users to create personal tags and tag movies.
     - Manage tag definitions via `user_tags`.
     - Attach tags to movies via `user_tagged_movies`.
   - Files: Tag editor UI on movie detail page, filter chips in list views.
   - Backend: `user_tags`, `user_tagged_movies`.
-  - DONE: _…_
+  DONE 2025-11-17T14:45Z – Added tag editor overlay on movie details with personal tag creation, assignment, and list-level tag filters driven by user tag metadata.
 
 ---
 
@@ -216,13 +216,13 @@ Each item is a task for Codex (or any other assistant) to implement.
 
 ## Watch parties (PARTY)
 
-- [ ] **PARTY-001 – Create watch party flow**
+- [x] **PARTY-001 – Create watch party flow**
   - Description: Implement UI to create a watch party from a movie detail page:
     - Fields: title, description, scheduled time, visibility (public/friends/invite-only).
     - Save to `watch_parties`.
   - Files: Movie detail actions, party creation modal.
   - Backend: `watch_parties` with RLS for host ownership.
-  - DONE: _…_
+  DONE 2025-11-17T14:45Z – Added movie detail watch-party form with visibility options persisting to watch_parties and surfacing party visibility in the home lobby.
 
 - [x] **PARTY-002 – Join & participants list**
   - Description: Allow users to join an existing party and see who is attending.

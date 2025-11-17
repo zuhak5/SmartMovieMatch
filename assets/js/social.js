@@ -644,6 +644,55 @@ export async function removeUserListItemRemote({ listId, imdbId }) {
   return Array.isArray(response?.items) ? response.items : [];
 }
 
+export async function listUserTagsRemote() {
+  const response = await callSocial('listUserTags');
+  return {
+    tags: Array.isArray(response?.tags) ? response.tags : [],
+    taggedMovies: Array.isArray(response?.taggedMovies) ? response.taggedMovies : []
+  };
+}
+
+export async function upsertUserTagRemote({ tagId, label }) {
+  const payload = { label };
+  if (tagId) {
+    payload.tagId = tagId;
+  }
+  const response = await callSocial('upsertUserTag', payload);
+  return {
+    tags: Array.isArray(response?.tags) ? response.tags : [],
+    taggedMovies: Array.isArray(response?.taggedMovies) ? response.taggedMovies : [],
+    tag: response?.tag || null
+  };
+}
+
+export async function deleteUserTagRemote(tagId) {
+  const trimmed = typeof tagId === 'string' ? tagId.trim() : '';
+  if (!trimmed) {
+    throw new Error('Choose a tag to delete first.');
+  }
+  const response = await callSocial('deleteUserTag', { tagId: trimmed });
+  return {
+    tags: Array.isArray(response?.tags) ? response.tags : [],
+    taggedMovies: Array.isArray(response?.taggedMovies) ? response.taggedMovies : []
+  };
+}
+
+export async function tagMovieRemote({ tagId, movie }) {
+  const response = await callSocial('tagMovie', { tagId, movie });
+  return {
+    tags: Array.isArray(response?.tags) ? response.tags : [],
+    taggedMovies: Array.isArray(response?.taggedMovies) ? response.taggedMovies : []
+  };
+}
+
+export async function untagMovieRemote({ tagId, movie }) {
+  const response = await callSocial('untagMovie', { tagId, movie });
+  return {
+    tags: Array.isArray(response?.tags) ? response.tags : [],
+    taggedMovies: Array.isArray(response?.taggedMovies) ? response.taggedMovies : []
+  };
+}
+
 export async function voteCollaborativeItemRemote({ listId, tmdbId, vote }) {
   return callSocial('voteCollaborativeItem', { listId, tmdbId, vote });
 }

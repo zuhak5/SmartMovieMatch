@@ -45,6 +45,11 @@ import {
   deleteUserListRemote,
   addUserListItemRemote,
   removeUserListItemRemote,
+  listUserTagsRemote,
+  upsertUserTagRemote,
+  deleteUserTagRemote,
+  tagMovieRemote,
+  untagMovieRemote,
   acknowledgeNotifications,
   subscribeToDiaryEntries,
   refreshDiaryEntries,
@@ -125,6 +130,10 @@ const state = {
   userLists: [],
   userListsLoading: false,
   userListsError: "",
+  userTags: [],
+  userTaggedMovies: [],
+  userTagsLoading: false,
+  userTagsError: "",
   favorites: [],
   favoritesSaving: false,
   favoritesStatus: "",
@@ -132,6 +141,7 @@ const state = {
   activeListItems: [],
   activeListLoading: false,
   activeListError: "",
+  tagFilters: [],
   notifications: [],
   unreadNotifications: 0,
   notificationsLoaded: false,
@@ -158,6 +168,14 @@ const state = {
   diarySearchResults: [],
   diarySearchAbort: null,
   diarySubmitting: false,
+  movieDetail: {
+    open: false,
+    movie: null,
+    status: "",
+    submitting: false,
+    tagInput: "",
+    partySubmitting: false
+  },
   appConfig: {
     config: {},
     experiments: { experiments: [], assignments: {} },
@@ -353,6 +371,8 @@ const listEditNameInput = document.querySelector('[data-list-edit-name]');
 const listEditDescriptionInput = document.querySelector('[data-list-edit-description]');
 const listEditVisibilitySelect = document.querySelector('[data-list-edit-visibility]');
 const listEditCollaborativeInput = document.querySelector('[data-list-edit-collaborative]');
+const listTagFilters = document.querySelector('[data-list-tag-filters]');
+const listTagStatus = document.querySelector('[data-list-tag-status]');
 const favoritesPanel = document.querySelector('[data-favorites-panel]');
 const favoritesList = document.querySelector('[data-favorites-list]');
 const favoritesEmpty = document.querySelector('[data-favorites-empty]');
@@ -428,6 +448,20 @@ const onboardingGenreCount = document.querySelector("[data-onboarding-genre-coun
 const onboardingDecadeCount = document.querySelector("[data-onboarding-decade-count]");
 const onboardingProviderCount = document.querySelector("[data-onboarding-provider-count]");
 const onboardingImportOptions = document.querySelectorAll("[data-onboarding-import]");
+const movieDetailOverlay = document.querySelector('[data-movie-detail]');
+const movieDetailClose = document.querySelector('[data-movie-detail-close]');
+const movieDetailTitle = document.querySelector('[data-movie-detail-title]');
+const movieDetailMeta = document.querySelector('[data-movie-detail-meta]');
+const movieDetailProviders = document.querySelector('[data-movie-detail-providers]');
+const movieDetailTags = document.querySelector('[data-movie-detail-tags]');
+const movieDetailTagForm = document.querySelector('[data-movie-detail-tag-form]');
+const movieDetailTagInput = document.querySelector('[data-movie-detail-tag-input]');
+const movieDetailStatus = document.querySelector('[data-movie-detail-status]');
+const movieDetailPartyForm = document.querySelector('[data-movie-detail-party-form]');
+const movieDetailPartyWhen = document.querySelector('[data-movie-detail-party-when]');
+const movieDetailPartyTitle = document.querySelector('[data-movie-detail-party-title]');
+const movieDetailPartyVisibility = document.querySelector('[data-movie-detail-party-visibility]');
+const movieDetailPartyNote = document.querySelector('[data-movie-detail-party-note]');
 
 function hasActiveSession() {
   return Boolean(state.session && state.session.token);
@@ -516,6 +550,7 @@ function setTab(section, tab) {
 
   if (section === "library" && tab === "lists" && hasActiveSession()) {
     loadUserLists();
+    loadUserTags();
   }
 }
 
@@ -545,6 +580,30 @@ function formatGenres(genres = []) {
     .filter(Boolean)
     .slice(0, 2);
   return names.join(" · ");
+}
+
+function buildMovieKey(movie) {
+  if (!movie || typeof movie !== "object") return "";
+  const imdbId = movie.imdbId || movie.imdbID || null;
+  if (imdbId) {
+    return String(imdbId).trim().toLowerCase();
+  }
+  const tmdbId = movie.tmdbId || movie.tmdbID || movie.id || null;
+  return tmdbId ? String(tmdbId).trim() : "";
+}
+
+function getTagsForMovie(movie) {
+  const key = buildMovieKey(movie);
+  if (!key) return [];
+  return state.userTaggedMovies
+    .filter((entry) => buildMovieKey(entry) === key)
+    .map((entry) => ({ ...entry, label: getTagLabel(entry.tagId) }))
+    .filter((entry) => entry.label);
+}
+
+function getTagLabel(tagId) {
+  const tag = state.userTags.find((entry) => entry.id === tagId);
+  return tag ? tag.label : "";
 }
 
 function initialsFromName(name = "") {
@@ -1416,6 +1475,13 @@ function renderDiscoverMovies(movies = []) {
     actions.append(rating);
 
     if (hasActiveSession()) {
+      const detailButton = document.createElement("button");
+      detailButton.type = "button";
+      detailButton.className = "btn-ghost btn";
+      detailButton.textContent = "Details";
+      detailButton.addEventListener("click", () => openMovieDetail(normalized));
+      actions.append(detailButton);
+
       const saveButton = document.createElement("button");
       saveButton.type = "button";
       saveButton.className = "btn-ghost btn";
@@ -1437,10 +1503,265 @@ function renderDiscoverMovies(movies = []) {
     if (providerBadges.length) {
       stack.append(providerRow);
     }
+    const tagRow = renderMovieTagRow(normalized);
+    if (tagRow) {
+      stack.append(tagRow);
+    }
     stack.append(actions);
     card.append(stack);
     discoverGrid.append(card);
   });
+}
+
+function normalizeMovieDetail(movie) {
+  if (!movie || typeof movie !== "object") return null;
+  const tmdbId = movie.tmdbId || movie.tmdbID || movie.id || null;
+  const title = movie.title || movie.movieTitle || "";
+  if (!tmdbId || !title) return null;
+  const releaseYear = movie.releaseYear || movie.year || null;
+  const genres = Array.isArray(movie.genres) ? movie.genres : [];
+  const streamingProviders = Array.isArray(movie.streamingProviders)
+    ? movie.streamingProviders
+    : Array.isArray(movie.providers)
+      ? movie.providers
+      : [];
+  return {
+    tmdbId: tmdbId,
+    imdbId: movie.imdbId || movie.imdbID || null,
+    title,
+    releaseYear,
+    genres,
+    streamingProviders
+  };
+}
+
+function setMovieDetailStatus(message, tone = "") {
+  state.movieDetail.status = message || "";
+  if (!movieDetailStatus) return;
+  movieDetailStatus.textContent = state.movieDetail.status;
+  movieDetailStatus.className = "small-text";
+  if (tone === "error") {
+    movieDetailStatus.classList.add("error-text");
+  } else if (tone === "success") {
+    movieDetailStatus.classList.add("success-text");
+  } else if (tone === "loading") {
+    movieDetailStatus.classList.add("muted");
+  }
+}
+
+function isTagAppliedToMovie(tagId, movie) {
+  if (!tagId) return false;
+  return getTagsForMovie(movie).some((entry) => entry.tagId === tagId);
+}
+
+function renderMovieDetail() {
+  if (!movieDetailOverlay) return;
+  if (!state.movieDetail.open || !state.movieDetail.movie) {
+    movieDetailOverlay.hidden = true;
+    return;
+  }
+  movieDetailOverlay.hidden = false;
+  const movie = state.movieDetail.movie;
+  if (movieDetailTitle) {
+    movieDetailTitle.textContent = movie.title;
+  }
+  if (movieDetailMeta) {
+    const year = movie.releaseYear ? String(movie.releaseYear) : "";
+    const genreText = formatGenres(movie.genres || []);
+    movieDetailMeta.textContent = [year, genreText].filter(Boolean).join(" • ");
+  }
+  if (movieDetailProviders) {
+    movieDetailProviders.innerHTML = "";
+    (movie.streamingProviders || []).forEach((provider) => {
+      const badge = createProviderBadge(provider);
+      movieDetailProviders.append(badge);
+    });
+  }
+  if (movieDetailTagInput && state.movieDetail.tagInput !== undefined) {
+    movieDetailTagInput.value = state.movieDetail.tagInput;
+  }
+  if (movieDetailTags) {
+    movieDetailTags.innerHTML = "";
+    if (!hasActiveSession()) {
+      const hint = document.createElement("p");
+      hint.className = "small-text muted";
+      hint.textContent = "Sign in to add personal tags.";
+      movieDetailTags.append(hint);
+    } else if (!state.userTags.length) {
+      const hint = document.createElement("p");
+      hint.className = "small-text muted";
+      hint.textContent = state.userTagsLoading ? "Loading tags…" : "Add your first tag to get started.";
+      movieDetailTags.append(hint);
+    } else {
+      state.userTags.forEach((tag) => {
+        const pill = document.createElement("button");
+        pill.type = "button";
+        pill.className = "pill";
+        pill.dataset.movieTagId = tag.id;
+        pill.textContent = `#${tag.label}`;
+        if (isTagAppliedToMovie(tag.id, movie)) {
+          pill.dataset.active = "true";
+        }
+        movieDetailTags.append(pill);
+      });
+    }
+  }
+  if (movieDetailPartyTitle && !movieDetailPartyTitle.value) {
+    movieDetailPartyTitle.value = `Watch “${movie.title}” together`;
+  }
+  setMovieDetailStatus(state.movieDetail.status);
+}
+
+function openMovieDetail(movie) {
+  const normalized = normalizeMovieDetail(movie);
+  if (!normalized) {
+    setListItemStatus("Unable to load details for that movie.", "error");
+    return;
+  }
+  state.movieDetail = {
+    ...state.movieDetail,
+    open: true,
+    movie: normalized,
+    status: "",
+    submitting: false,
+    tagInput: "",
+    partySubmitting: false
+  };
+  renderMovieDetail();
+  if (!state.userTagsLoading && !state.userTags.length) {
+    loadUserTags();
+  }
+}
+
+function closeMovieDetail() {
+  state.movieDetail = {
+    ...state.movieDetail,
+    open: false,
+    movie: null,
+    status: "",
+    tagInput: "",
+    submitting: false,
+    partySubmitting: false
+  };
+  if (movieDetailOverlay) {
+    movieDetailOverlay.hidden = true;
+  }
+}
+
+async function toggleMovieTag(tagId) {
+  if (!state.movieDetail.movie || !tagId) return;
+  if (!hasActiveSession()) {
+    openAuthOverlay("login");
+    return;
+  }
+  const already = isTagAppliedToMovie(tagId, state.movieDetail.movie);
+  setMovieDetailStatus(already ? "Removing tag…" : "Saving tag…", "loading");
+  try {
+    const result = already
+      ? await untagMovieRemote({ tagId, movie: state.movieDetail.movie })
+      : await tagMovieRemote({ tagId, movie: state.movieDetail.movie });
+    setUserTagData(result);
+    setMovieDetailStatus(already ? "Removed tag." : "Tagged movie.", "success");
+  } catch (error) {
+    setMovieDetailStatus(error instanceof Error ? error.message : "Could not update tag.", "error");
+  }
+}
+
+async function handleMovieDetailTagSubmit(event) {
+  event.preventDefault();
+  if (!hasActiveSession()) {
+    openAuthOverlay("login");
+    return;
+  }
+  const label = movieDetailTagInput ? movieDetailTagInput.value.trim() : "";
+  if (!label) {
+    setMovieDetailStatus("Add a tag name first.", "error");
+    return;
+  }
+  state.movieDetail.submitting = true;
+  setMovieDetailStatus("Saving tag…", "loading");
+  if (movieDetailTagInput) {
+    movieDetailTagInput.disabled = true;
+  }
+  try {
+    const result = await upsertUserTagRemote({ label });
+    setUserTagData(result);
+    const createdId = result?.tag?.id;
+    state.movieDetail.tagInput = "";
+    if (createdId && state.movieDetail.movie && !isTagAppliedToMovie(createdId, state.movieDetail.movie)) {
+      const tagged = await tagMovieRemote({ tagId: createdId, movie: state.movieDetail.movie });
+      setUserTagData(tagged);
+    }
+    setMovieDetailStatus("Tag saved.", "success");
+  } catch (error) {
+    setMovieDetailStatus(error instanceof Error ? error.message : "Unable to save that tag.", "error");
+  } finally {
+    state.movieDetail.submitting = false;
+    if (movieDetailTagInput) {
+      movieDetailTagInput.disabled = false;
+      movieDetailTagInput.value = state.movieDetail.tagInput;
+      movieDetailTagInput.focus();
+    }
+  }
+}
+
+function handleMovieDetailTagClick(event) {
+  const target = event.target.closest('[data-movie-tag-id]');
+  if (!target) return;
+  const tagId = target.dataset.movieTagId;
+  toggleMovieTag(tagId);
+}
+
+async function handleMovieDetailPartySubmit(event) {
+  event.preventDefault();
+  if (!hasActiveSession()) {
+    openAuthOverlay("login");
+    return;
+  }
+  if (!state.movieDetail.movie) {
+    setMovieDetailStatus("Select a movie first.", "error");
+    return;
+  }
+  const whenRaw = movieDetailPartyWhen ? movieDetailPartyWhen.value.trim() : "";
+  if (!whenRaw) {
+    setMovieDetailStatus("Choose a start time for your watch party.", "error");
+    return;
+  }
+  const whenDate = new Date(whenRaw);
+  if (Number.isNaN(whenDate.getTime())) {
+    setMovieDetailStatus("Enter a valid date and time.", "error");
+    return;
+  }
+  const visibility = movieDetailPartyVisibility ? movieDetailPartyVisibility.value : "friends";
+  const note = movieDetailPartyNote ? movieDetailPartyNote.value.trim() : "";
+  const title = movieDetailPartyTitle ? movieDetailPartyTitle.value.trim() : state.movieDetail.movie.title;
+  state.movieDetail.partySubmitting = true;
+  setMovieDetailStatus("Scheduling watch party…", "loading");
+  try {
+    await scheduleWatchPartyRemote({
+      movie: {
+        title: state.movieDetail.movie.title,
+        tmdbId: state.movieDetail.movie.tmdbId,
+        imdbId: state.movieDetail.movie.imdbId || null
+      },
+      scheduledFor: whenDate.toISOString(),
+      note: note || title,
+      visibility
+    });
+    setMovieDetailStatus("Watch party scheduled!", "success");
+    if (movieDetailPartyForm) {
+      movieDetailPartyForm.reset();
+    }
+    await refreshCollaborativeState();
+  } catch (error) {
+    setMovieDetailStatus(
+      error instanceof Error ? error.message : "Could not schedule that watch party right now.",
+      "error"
+    );
+  } finally {
+    state.movieDetail.partySubmitting = false;
+    renderMovieDetail();
+  }
 }
 
 function renderTrendingStatus() {
@@ -1979,6 +2300,17 @@ function setListStatus(message, tone = "") {
   }
 }
 
+function setListTagStatus(message, tone = "") {
+  if (!listTagStatus) return;
+  listTagStatus.textContent = message || "";
+  listTagStatus.className = "small-text muted";
+  if (tone === "error") {
+    listTagStatus.classList.add("error-text");
+  } else if (tone === "success") {
+    listTagStatus.classList.add("success-text");
+  }
+}
+
 function setListItemStatus(message, tone = "") {
   if (!listItemStatus) return;
   listItemStatus.textContent = message || "";
@@ -1988,6 +2320,14 @@ function setListItemStatus(message, tone = "") {
   } else if (tone === "success") {
     listItemStatus.classList.add("success-text");
   }
+}
+
+function setUserTagData({ tags = [], taggedMovies = [] } = {}) {
+  state.userTags = Array.isArray(tags) ? tags : [];
+  state.userTaggedMovies = Array.isArray(taggedMovies) ? taggedMovies : [];
+  renderListTagFilters();
+  renderActiveListPanel();
+  renderMovieDetail();
 }
 
 function renderUserLists() {
@@ -2076,6 +2416,101 @@ function renderActiveListPanel() {
   renderListItems(state.activeListItems);
 }
 
+function applyListTagFilters(items = []) {
+  if (!state.tagFilters.length) {
+    return items;
+  }
+  const selected = new Set(state.tagFilters.filter(Boolean));
+  return items.filter((item) => {
+    const tags = getTagsForMovie(item.movie).map((entry) => entry.tagId);
+    if (!tags.length) return false;
+    return Array.from(selected).every((tagId) => tags.includes(tagId));
+  });
+}
+
+function renderMovieTagRow(movie) {
+  const tags = getTagsForMovie(movie);
+  if (!tags.length) {
+    return null;
+  }
+  const row = document.createElement("div");
+  row.className = "pill-row";
+  tags.forEach((tag) => {
+    const pill = document.createElement("span");
+    pill.className = "pill";
+    pill.textContent = `#${tag.label}`;
+    row.append(pill);
+  });
+  return row;
+}
+
+function renderListTagFilters() {
+  if (!listTagFilters) return;
+  listTagFilters.innerHTML = "";
+  if (!hasActiveSession()) {
+    listTagFilters.hidden = true;
+    setListTagStatus("");
+    return;
+  }
+  listTagFilters.hidden = false;
+  const items = Array.isArray(state.activeListItems) ? state.activeListItems : [];
+  const movieKeys = new Set(items.map((item) => buildMovieKey(item.movie)).filter(Boolean));
+  const tagUsage = state.userTags
+    .map((tag) => {
+      const count = state.userTaggedMovies.filter(
+        (entry) => entry.tagId === tag.id && movieKeys.has(buildMovieKey(entry))
+      ).length;
+      return { tag, count };
+    })
+    .filter((entry) => entry.count > 0);
+  if (!tagUsage.length) {
+    setListTagStatus(state.userTagsLoading ? "" : "Tag movies to filter your lists.");
+    return;
+  }
+  setListTagStatus(state.tagFilters.length ? "Filtering by tags." : "");
+  tagUsage
+    .sort((a, b) => b.count - a.count)
+    .forEach(({ tag, count }) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "pill";
+      button.dataset.tagFilter = tag.id;
+      if (state.tagFilters.includes(tag.id)) {
+        button.dataset.active = "true";
+      }
+      button.textContent = `#${tag.label} (${count})`;
+      listTagFilters.append(button);
+    });
+  if (state.tagFilters.length) {
+    const clear = document.createElement("button");
+    clear.type = "button";
+    clear.className = "pill";
+    clear.dataset.tagFilterClear = "true";
+    clear.textContent = "Clear filters";
+    listTagFilters.append(clear);
+  }
+}
+
+function handleListTagFilterClick(event) {
+  const clear = event.target.closest('[data-tag-filter-clear]');
+  if (clear) {
+    state.tagFilters = [];
+    renderListTagFilters();
+    renderListItems(state.activeListItems);
+    return;
+  }
+  const target = event.target.closest('[data-tag-filter]');
+  if (!target) return;
+  const tagId = target.dataset.tagFilter;
+  if (!tagId) return;
+  const isActive = state.tagFilters.includes(tagId);
+  state.tagFilters = isActive
+    ? state.tagFilters.filter((entry) => entry !== tagId)
+    : [...state.tagFilters, tagId];
+  renderListTagFilters();
+  renderListItems(state.activeListItems);
+}
+
 function renderListItems(items = []) {
   if (!listItemContainer) return;
   listItemContainer.innerHTML = "";
@@ -2086,15 +2521,18 @@ function renderListItems(items = []) {
     listItemContainer.append(loadingRow);
     return;
   }
-  if (!items.length) {
+  const filteredItems = applyListTagFilters(items);
+  if (!filteredItems.length) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.textContent = "No movies in this list yet.";
+    empty.textContent = state.tagFilters.length
+      ? "No movies match the selected tags yet."
+      : "No movies in this list yet.";
     listItemContainer.append(empty);
     return;
   }
 
-  items.forEach((item) => {
+  filteredItems.forEach((item) => {
     const card = document.createElement("article");
     card.className = "card";
     card.style.alignItems = "flex-start";
@@ -2111,6 +2549,18 @@ function renderListItems(items = []) {
 
     const actions = document.createElement("div");
     actions.className = "inline-actions";
+    const tagBtn = document.createElement("button");
+    tagBtn.type = "button";
+    tagBtn.className = "btn-ghost btn";
+    tagBtn.textContent = "Tags";
+    tagBtn.addEventListener("click", () => {
+      if (!hasActiveSession()) {
+        setListItemStatus("Sign in to manage tags.", "error");
+        openAuthOverlay("login");
+        return;
+      }
+      openMovieDetail(item.movie);
+    });
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
     removeBtn.className = "btn-ghost btn";
@@ -2118,9 +2568,14 @@ function renderListItems(items = []) {
     removeBtn.addEventListener("click", async () => {
       await handleRemoveListItem(item.movie?.imdbId);
     });
-    actions.append(removeBtn);
+    actions.append(tagBtn, removeBtn);
 
-    stack.append(title, meta, actions);
+    const tagRow = renderMovieTagRow(item.movie);
+    stack.append(title, meta);
+    if (tagRow) {
+      stack.append(tagRow);
+    }
+    stack.append(actions);
     card.append(poster, stack);
     listItemContainer.append(card);
   });
@@ -2184,6 +2639,29 @@ async function loadActiveListItems(listId = state.activeListId) {
   state.activeListLoading = false;
   renderUserLists();
   renderActiveListPanel();
+  renderListTagFilters();
+}
+
+async function loadUserTags() {
+  if (!hasActiveSession()) {
+    state.userTags = [];
+    state.userTaggedMovies = [];
+    renderListTagFilters();
+    renderMovieDetail();
+    return;
+  }
+  state.userTagsLoading = true;
+  setListTagStatus("Loading tags…");
+  try {
+    const result = await listUserTagsRemote();
+    setUserTagData(result);
+    state.userTagsError = "";
+    setListTagStatus(result.tags.length ? "" : "Tag movies to filter your lists.");
+  } catch (error) {
+    state.userTagsError = error instanceof Error ? error.message : "Unable to load tags.";
+    setListTagStatus(state.userTagsError, "error");
+  }
+  state.userTagsLoading = false;
 }
 
 function setActiveList(listId) {
@@ -2529,7 +3007,8 @@ function renderWatchPartyPanel() {
   }
   if (watchPartyMeta) {
     const host = party.host ? `Hosted by @${canonicalHandle(party.host)}` : "Watch party";
-    watchPartyMeta.textContent = host;
+    const visibility = party.visibility ? `${formatWatchPartyVisibilityLabel(party.visibility)} • ` : "";
+    watchPartyMeta.textContent = `${visibility}${host}`;
   }
   if (watchPartyTime) {
     watchPartyTime.textContent = formatWatchPartyTime(party.scheduledFor || party.createdAt);
@@ -2639,6 +3118,17 @@ function formatWatchPartyTime(value) {
     hour: "numeric",
     minute: "2-digit"
   });
+}
+
+function formatWatchPartyVisibilityLabel(value) {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (normalized === "public") {
+    return "Public";
+  }
+  if (normalized.startsWith("invite")) {
+    return "Invite-only";
+  }
+  return "Friends";
 }
 
 function formatRelativeTimestamp(value) {
@@ -4004,6 +4494,9 @@ function handleOutsideClick(event) {
   if (state.onboardingOpen && onboardingOverlay && event.target === onboardingOverlay) {
     closeOnboarding();
   }
+  if (state.movieDetail.open && movieDetailOverlay && event.target === movieDetailOverlay) {
+    closeMovieDetail();
+  }
   if (state.notificationMenuOpen && notificationMenu && notificationButton) {
     const target = event.target;
     if (!notificationMenu.contains(target) && !notificationButton.contains(target)) {
@@ -4028,6 +4521,9 @@ function handleEscape(event) {
     }
     if (state.onboardingOpen) {
       closeOnboarding();
+    }
+    if (state.movieDetail.open) {
+      closeMovieDetail();
     }
   }
 }
@@ -4274,6 +4770,23 @@ function attachListeners() {
     listDeleteButton.addEventListener("click", handleListDelete);
   }
 
+  if (listTagFilters) {
+    listTagFilters.addEventListener("click", handleListTagFilterClick);
+  }
+
+  if (movieDetailClose) {
+    movieDetailClose.addEventListener("click", closeMovieDetail);
+  }
+  if (movieDetailTags) {
+    movieDetailTags.addEventListener("click", handleMovieDetailTagClick);
+  }
+  if (movieDetailTagForm) {
+    movieDetailTagForm.addEventListener("submit", handleMovieDetailTagSubmit);
+  }
+  if (movieDetailPartyForm) {
+    movieDetailPartyForm.addEventListener("submit", handleMovieDetailPartySubmit);
+  }
+
   document.addEventListener("click", handleOutsideClick);
   document.addEventListener("keydown", handleEscape);
 }
@@ -4321,6 +4834,7 @@ function init() {
       renderFavoritesList();
       closeAuthOverlay();
       refreshCollaborativeState();
+      loadUserTags();
       if (state.activeSection === "messages") {
         loadConversations(true);
       }
@@ -4341,6 +4855,10 @@ function init() {
       state.userLists = [];
       state.activeListId = "";
       state.activeListItems = [];
+      state.userTags = [];
+      state.userTaggedMovies = [];
+      state.tagFilters = [];
+      renderListTagFilters();
       renderUserLists();
       renderActiveListPanel();
     }
