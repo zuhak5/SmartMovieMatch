@@ -908,17 +908,8 @@ textarea {
   overflow: hidden;
 }
 
-.account-name {
-  font-weight: 700;
-}
-
 .account-handle {
   color: var(--muted);
-}
-
-.chevron {
-  color: var(--muted);
-  font-size: 12px;
 }
 
 .account-menu {
