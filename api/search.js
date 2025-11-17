@@ -3,7 +3,6 @@ const { createSupabaseAdminClient } = require('../lib/supabase-admin');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const USING_LOCAL_STORE = !(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 const DEFAULT_LIMIT = 12;
 const MAX_LIMIT = 50;
 
@@ -13,6 +12,11 @@ module.exports = async (req, res) => {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
     res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  if (!(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY)) {
+    res.status(503).json({ error: 'Search service is not configured' });
     return;
   }
 
@@ -31,9 +35,7 @@ module.exports = async (req, res) => {
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
 
   try {
-    const client = USING_LOCAL_STORE
-      ? null
-      : createSupabaseAdminClient({ url: SUPABASE_URL, serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY });
+    const client = createSupabaseAdminClient({ url: SUPABASE_URL, serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY });
     const username = client && token ? await resolveUsername(client, token) : null;
     const activeProviders =
       !streamingOnly && providerKeys.length
@@ -42,36 +44,32 @@ module.exports = async (req, res) => {
         ? await fetchUserProviders(client, username)
         : providerKeys;
 
-    if (streamingOnly && !activeProviders.length && !USING_LOCAL_STORE) {
+    if (streamingOnly && !activeProviders.length) {
       res.status(200).json({ movies: [] });
       return;
     }
 
-    const movies = USING_LOCAL_STORE
-      ? buildLocalFallback({ query, limit })
-      : await searchSupabase({
-          query,
-          filter,
-          limit,
-          genres,
-          year,
-          providerKeys: activeProviders,
-          streamingOnly,
-          includeAvailability: true
-        });
+    const movies = await searchSupabase({
+      query,
+      filter,
+      limit,
+      genres,
+      year,
+      providerKeys: activeProviders,
+      streamingOnly,
+      includeAvailability: true
+    });
 
-    if (!USING_LOCAL_STORE) {
-      await logSearchQuery({
-        query,
-        filter,
-        genres,
-        year,
-        resultsCount: movies.length,
-        token,
-        client,
-        username
-      });
-    }
+    await logSearchQuery({
+      query,
+      filter,
+      genres,
+      year,
+      resultsCount: movies.length,
+      token,
+      client,
+      username
+    });
 
     res.status(200).json({ movies });
   } catch (error) {
@@ -369,39 +367,6 @@ async function resolveUsername(client, token) {
   } catch (error) {
     return null;
   }
-}
-
-function buildLocalFallback({ query, limit }) {
-  const sample = [
-    {
-      imdbId: 'tt0816692',
-      tmdbId: '157336',
-      title: 'Interstellar',
-      posterUrl: 'https://image.tmdb.org/t/p/w342/nBNZadXqJSdt05SHLqgT0HuC5Gm.jpg',
-      releaseYear: 2014,
-      genres: ['Adventure', 'Drama', 'Science Fiction'],
-      synopsis: 'A team of explorers travel through a wormhole in space in an attempt to ensure humanity\'s survival.',
-      stats: { watchCount: 128, favorites: 43, reviews: 18 },
-      lastSyncedAt: new Date().toISOString()
-    },
-    {
-      imdbId: 'tt0133093',
-      tmdbId: '603',
-      title: 'The Matrix',
-      posterUrl: 'https://image.tmdb.org/t/p/w342/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg',
-      releaseYear: 1999,
-      genres: ['Action', 'Science Fiction'],
-      synopsis: 'A computer hacker learns about the true nature of his reality and his role in the war against its controllers.',
-      stats: { watchCount: 152, favorites: 61, reviews: 27 },
-      lastSyncedAt: new Date().toISOString()
-    }
-  ];
-
-  const trimmed = query
-    ? sample.filter((item) => item.title.toLowerCase().includes(query.toLowerCase())).slice(0, limit)
-    : sample.slice(0, limit);
-
-  return trimmed;
 }
 
 async function safeReadResponse(response) {
