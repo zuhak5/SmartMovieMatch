@@ -418,7 +418,6 @@ const authAvatarPreview = document.querySelector("[data-auth-avatar-preview]");
 const authAvatarPlaceholder = document.querySelector("[data-auth-avatar-placeholder]");
 const accountMenu = document.querySelector("[data-account-menu]");
 const accountToggle = document.querySelector("[data-account-toggle]");
-const accountName = document.querySelector("[data-account-name]");
 const accountHandle = document.querySelector("[data-account-handle]");
 const accountAvatar = document.querySelector("[data-account-avatar]");
 const accountLogoutButton = document.querySelector("[data-account-logout]");
@@ -967,11 +966,6 @@ function updateAccountUi(session) {
   if (accountMenu && !hasSession) {
     accountMenu.classList.remove("is-open");
     state.accountMenuOpen = false;
-  }
-  if (accountName) {
-    accountName.textContent = hasSession
-      ? state.session.displayName || state.session.username
-      : "Guest";
   }
   if (accountHandle) {
     accountHandle.textContent = hasSession && state.session.username
