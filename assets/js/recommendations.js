@@ -369,7 +369,7 @@ export async function discoverCandidateMovies(options = {}, { signal } = {}) {
   }
 
   if (isApiOffline() && candidateMap.size === 0) {
-    throw new OfflineApiError("API offline; using fallback recommendations");
+    throw new OfflineApiError("API offline; recommendations unavailable");
   }
 
   return Array.from(candidateMap.values());

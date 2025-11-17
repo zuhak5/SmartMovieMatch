@@ -2,7 +2,6 @@ const { fetchWithTimeout } = require('../lib/http-client');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const USING_LOCAL_STORE = !(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 50;
@@ -17,14 +16,17 @@ module.exports = async (req, res) => {
     return;
   }
 
+  if (!(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY)) {
+    res.status(503).json({ error: 'Trending service is not configured' });
+    return;
+  }
+
   const parsed = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const timeWindow = parseTimeWindow(parsed.searchParams.get('time_window'));
   const limit = clampLimit(parsed.searchParams.get('limit'));
 
   try {
-    const movies = USING_LOCAL_STORE
-      ? buildLocalFallback(limit)
-      : await fetchTrendingFromSupabase({ timeWindow, limit });
+    const movies = await fetchTrendingFromSupabase({ timeWindow, limit });
 
     res.status(200).json({ movies });
   } catch (error) {
@@ -199,43 +201,6 @@ function encodeInList(values = []) {
     .filter(Boolean)
     .map((value) => `"${value.replace(/"/g, '\\"')}"`);
   return `(${safeValues.join(',')})`;
-}
-
-function buildLocalFallback(limit) {
-  const sample = [
-    {
-      imdbId: 'tt0816692',
-      tmdbId: '157336',
-      title: 'Interstellar',
-      posterUrl: 'https://image.tmdb.org/t/p/w342/nBNZadXqJSdt05SHLqgT0HuC5Gm.jpg',
-      releaseYear: 2014,
-      genres: ['Adventure', 'Drama', 'Science Fiction'],
-      synopsis:
-        "A team of explorers travel through a wormhole in space in an attempt to ensure humanity's survival.",
-      stats: { watchCount: 128, favorites: 43, reviews: 18 },
-      lastSyncedAt: new Date().toISOString(),
-      trendScore: 98.2,
-      rank: 1,
-      timeWindow: 'weekly'
-    },
-    {
-      imdbId: 'tt0133093',
-      tmdbId: '603',
-      title: 'The Matrix',
-      posterUrl: 'https://image.tmdb.org/t/p/w342/f89U3ADr1oiB1s9GkdPOEpXUk5Gm.jpg',
-      releaseYear: 1999,
-      genres: ['Action', 'Science Fiction'],
-      synopsis:
-        'A computer hacker learns about the true nature of his reality and his role in the war against its controllers.',
-      stats: { watchCount: 152, favorites: 61, reviews: 27 },
-      lastSyncedAt: new Date().toISOString(),
-      trendScore: 91.4,
-      rank: 2,
-      timeWindow: 'weekly'
-    }
-  ];
-
-  return sample.slice(0, limit);
 }
 
 async function safeReadResponse(response) {
