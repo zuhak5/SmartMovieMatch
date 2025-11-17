@@ -54,12 +54,12 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Backend: `auth_users`, `auth_sessions`, RLS on user-owned data.
   DONE 2025-11-17T03:11Z – Added inline sign-in/sign-up modal backed by the auth API; successful auth persists Supabase sessions, refreshes SPA state, and logout clears stored tokens with UI reset.
 
-- [ ] **AUTH-003 – Enforce auth for protected views**
+- [x] **AUTH-003 – Enforce auth for protected views**
   - Description: Guard pages that require a logged-in user (feed, diary, lists, watch parties).
     - If no active session, redirect to login or show an inline login prompt.
   - Files: SPA router / view-switcher, `assets/js/spa-app.js`.
   - Backend: Depends on Supabase RLS; rely on 401/403 to hide remote data if needed.
-  - DONE: _…_
+  DONE 2025-11-17T03:25Z – Added guarded navigation for friends, library, profile, and watch-party tabs with login prompts.
 
 ---
 
