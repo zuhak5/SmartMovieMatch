@@ -578,6 +578,72 @@ export async function postWatchPartyMessageRemote({ partyId, body }) {
   return normalizeWatchPartyMessage(response?.message);
 }
 
+export async function listUserListsRemote() {
+  const response = await callSocial('listUserLists');
+  return Array.isArray(response?.lists) ? response.lists : [];
+}
+
+export async function getUserListItemsRemote(listId) {
+  const trimmed = typeof listId === 'string' ? listId.trim() : '';
+  if (!trimmed) return { list: null, items: [] };
+  const response = await callSocial('getUserListItems', { listId: trimmed });
+  return {
+    list: response?.list || null,
+    items: Array.isArray(response?.items) ? response.items : []
+  };
+}
+
+export async function createUserListRemote({ name, description, visibility = 'public', isCollaborative = false }) {
+  const payload = { name, description, visibility, isCollaborative: Boolean(isCollaborative) };
+  const response = await callSocial('createUserList', payload);
+  return response?.list || null;
+}
+
+export async function updateUserListRemote({ listId, name, description, visibility, isCollaborative }) {
+  const trimmed = typeof listId === 'string' ? listId.trim() : '';
+  if (!trimmed) return null;
+  const response = await callSocial('updateUserList', {
+    listId: trimmed,
+    name,
+    description,
+    visibility,
+    isCollaborative
+  });
+  return response?.list || null;
+}
+
+export async function deleteUserListRemote(listId) {
+  const trimmed = typeof listId === 'string' ? listId.trim() : '';
+  if (!trimmed) return false;
+  await callSocial('deleteUserList', { listId: trimmed });
+  return true;
+}
+
+export async function addUserListItemRemote({ listId, movie, notes, metadata }) {
+  const normalized = normalizeMovieForApi(movie);
+  if (!normalized) {
+    throw new Error('Missing movie identifiers.');
+  }
+  const trimmed = typeof listId === 'string' ? listId.trim() : '';
+  if (!trimmed) {
+    throw new Error('Choose a list first.');
+  }
+  const response = await callSocial('addUserListItem', {
+    listId: trimmed,
+    movie: normalized,
+    notes,
+    metadata
+  });
+  return Array.isArray(response?.items) ? response.items : [];
+}
+
+export async function removeUserListItemRemote({ listId, imdbId }) {
+  const trimmed = typeof listId === 'string' ? listId.trim() : '';
+  if (!trimmed || !imdbId) return [];
+  const response = await callSocial('removeUserListItem', { listId: trimmed, imdbId });
+  return Array.isArray(response?.items) ? response.items : [];
+}
+
 export async function voteCollaborativeItemRemote({ listId, tmdbId, vote }) {
   return callSocial('voteCollaborativeItem', { listId, tmdbId, vote });
 }
