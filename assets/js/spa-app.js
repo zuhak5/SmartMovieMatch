@@ -5,7 +5,6 @@ import {
   fetchOmdbForCandidates
 } from "./recommendations.js";
 import { TMDB_GENRES } from "./config.js";
-import { loadSession, logoutSession, subscribeToSession } from "./auth.js";
 
 const defaultTabs = {
   friends: "feed",
@@ -37,123 +36,6 @@ const discoverListCards = document.querySelector('[data-list="discover-lists"]')
 const homeRecommendationsRow = document.querySelector('[data-row="home-recommendations"]');
 const tonightPickCard = document.querySelector("[data-tonight-pick]");
 const groupPicksList = document.querySelector('[data-list="group-picks"]');
-const authCtaButton = document.querySelector("[data-auth-cta]");
-const userMenu = document.querySelector("[data-user-menu]");
-const userMenuToggle = document.querySelector("[data-user-menu-toggle]");
-const userDropdown = document.querySelector("[data-user-dropdown]");
-const userNameLabel = document.querySelector("[data-user-name]");
-const userMetaLabel = document.querySelector("[data-user-meta]");
-const userAvatar = document.querySelector("[data-user-avatar]");
-const profileMenuItem = document.querySelector('[data-menu-item="profile"]');
-const settingsMenuItem = document.querySelector('[data-menu-item="settings"]');
-const logoutMenuItem = document.querySelector('[data-menu-item="logout"]');
-let isUserMenuOpen = false;
-
-function initialsFromName(value = "") {
-  if (!value || typeof value !== "string") return "👤";
-  const parts = value.trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return value.slice(0, 2).toUpperCase() || "👤";
-  return parts
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
-}
-
-function setUserMenuOpen(isOpen) {
-  if (!userMenu || !userMenuToggle) return;
-  isUserMenuOpen = Boolean(isOpen && !userMenu.hidden);
-  userMenu.classList.toggle("is-open", isUserMenuOpen);
-  userMenuToggle.setAttribute("aria-expanded", isUserMenuOpen ? "true" : "false");
-}
-
-function renderAuthSession(session) {
-  const isAuthenticated = Boolean(session && session.username);
-  const displayName = isAuthenticated ? session.displayName || session.username : "Guest";
-  const handle = isAuthenticated && session.username ? `@${session.username}` : "Sign in to personalize";
-
-  if (authCtaButton) {
-    authCtaButton.hidden = isAuthenticated;
-  }
-
-  if (userMenu) {
-    userMenu.hidden = !isAuthenticated;
-    if (!isAuthenticated) {
-      setUserMenuOpen(false);
-    }
-  }
-
-  if (userNameLabel) {
-    userNameLabel.textContent = displayName;
-  }
-
-  if (userMetaLabel) {
-    userMetaLabel.textContent = handle;
-  }
-
-  if (userAvatar) {
-    const avatarText = initialsFromName(session?.displayName || session?.username || "");
-    userAvatar.textContent = avatarText;
-    if (session?.avatarUrl) {
-      userAvatar.style.backgroundImage = `url(${session.avatarUrl})`;
-      userAvatar.classList.add("has-photo");
-    } else {
-      userAvatar.style.backgroundImage = "";
-      userAvatar.classList.remove("has-photo");
-    }
-  }
-}
-
-function initAuthUi() {
-  renderAuthSession(loadSession());
-  subscribeToSession(renderAuthSession);
-
-  if (authCtaButton) {
-    authCtaButton.addEventListener("click", () => {
-      window.location.href = "login.html";
-    });
-  }
-
-  if (userMenuToggle) {
-    userMenuToggle.addEventListener("click", () => setUserMenuOpen(!isUserMenuOpen));
-  }
-
-  if (profileMenuItem) {
-    profileMenuItem.addEventListener("click", () => {
-      setSection("profile");
-      setTab("profile", "overview");
-      setUserMenuOpen(false);
-    });
-  }
-
-  if (settingsMenuItem) {
-    settingsMenuItem.addEventListener("click", () => {
-      setSection("profile");
-      setTab("profile", "overview");
-      setUserMenuOpen(false);
-    });
-  }
-
-  if (logoutMenuItem) {
-    logoutMenuItem.addEventListener("click", () => {
-      logoutSession();
-      setUserMenuOpen(false);
-      setSection("home");
-    });
-  }
-
-  document.addEventListener("click", (event) => {
-    if (!isUserMenuOpen) return;
-    if (userMenu && userMenu.contains(event.target)) return;
-    setUserMenuOpen(false);
-  });
-
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-      setUserMenuOpen(false);
-    }
-  });
-}
 
 function setSection(section) {
   state.activeSection = section;
@@ -649,7 +531,6 @@ function attachListeners() {
 
 function init() {
   attachListeners();
-  initAuthUi();
   setSection("home");
   loadDiscover(state.discoverFilter);
   loadTrendingPeople();
