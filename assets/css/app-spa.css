@@ -309,6 +309,33 @@ p {
   margin-top: 12px;
 }
 
+.media-card {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+}
+
+.poster-frame {
+  position: relative;
+  width: 100%;
+}
+
+.poster-frame .poster {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.poster-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.stack.tight {
+  gap: 6px;
+}
+
 .avatar {
   width: 44px;
   height: 44px;
@@ -450,10 +477,15 @@ p {
 .horizontal-scroll {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: 150px;
+  grid-auto-columns: 170px;
   gap: 12px;
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding: 4px 2px 6px;
+}
+
+.horizontal-scroll .card {
+  margin-top: 0;
+  height: 100%;
 }
 
 .hero-card {

@@ -548,25 +548,36 @@ function renderHomeRecommendations(items = []) {
   updateTonightPick(heroSource);
 
   items.forEach((item) => {
-    const card = document.createElement("div");
-    card.className = "card";
-    card.style.flexDirection = "column";
+    const card = document.createElement("article");
+    card.className = "card media-card";
 
     const posterUrl = item.tmdb?.poster_path
       ? `https://image.tmdb.org/t/p/w342${item.tmdb.poster_path}`
       : item.omdb?.Poster && item.omdb.Poster !== "N/A"
       ? item.omdb.Poster
       : "";
-    card.appendChild(createPoster(posterUrl));
 
-    const title = document.createElement("strong");
-    title.textContent = item.omdb?.Title || item.tmdb?.title || "Untitled";
+    const posterFrame = document.createElement("div");
+    posterFrame.className = "poster-frame";
+    posterFrame.appendChild(createPoster(posterUrl));
     const badge = document.createElement("span");
-    badge.className = "badge rating";
+    badge.className = "badge rating poster-badge";
     const tmdbScore = item.tmdb?.vote_average;
     badge.textContent = tmdbScore ? tmdbScore.toFixed(1) : "New";
+    posterFrame.appendChild(badge);
 
-    card.append(title, badge);
+    const stack = document.createElement("div");
+    stack.className = "stack tight";
+    const title = document.createElement("strong");
+    title.textContent = item.omdb?.Title || item.tmdb?.title || "Untitled";
+    const meta = document.createElement("div");
+    meta.className = "small-text";
+    const year = item.omdb?.Year || (item.tmdb?.release_date || "").slice(0, 4);
+    const genres = formatGenres(item.tmdb?.genre_ids || []);
+    meta.textContent = [genres, year].filter(Boolean).join(" · ");
+
+    stack.append(title, meta);
+    card.append(posterFrame, stack);
     homeRecommendationsRow.append(card);
   });
 }
