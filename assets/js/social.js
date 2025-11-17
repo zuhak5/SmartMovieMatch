@@ -1,4 +1,5 @@
 import { loadSession, subscribeToSession } from './auth.js';
+import { logUserActivity } from './analytics.js';
 import { createInlineProfileLink } from './profile-overlay.js';
 
 const SOCIAL_ENDPOINT = '/api/social';
@@ -922,6 +923,7 @@ export async function followUserByUsername(username, options = {}) {
   const note = typeof options.note === 'string' ? options.note.trim() : '';
   const payload = note ? { target: normalized, note } : { target: normalized };
   await callSocial('followUser', payload);
+  logUserActivity({ verb: 'follow', objectType: 'user', metadata: { target: normalized } });
   await loadFollowing(true);
   refreshAllSections();
 }
@@ -932,6 +934,7 @@ export async function unfollowUserByUsername(username) {
     throw new Error('Enter a username to unfollow.');
   }
   await callSocial('unfollowUser', { target: normalized });
+  logUserActivity({ verb: 'unfollow', objectType: 'user', metadata: { target: normalized } });
   await loadFollowing(true);
   refreshAllSections();
 }
@@ -1219,6 +1222,15 @@ async function handleSubmit(sectionState) {
     sectionState.statusEl.textContent = 'Review saved.';
     sectionState.statusEl.dataset.variant = 'success';
     await fetchReviews(sectionState.key, sectionState.movie, true);
+    logUserActivity({
+      verb: 'review_save',
+      objectType: 'movie',
+      metadata: {
+        tmdbId: sectionState.movie?.tmdbId || sectionState.movie?.tmdb_id || sectionState.movie?.id || null,
+        rating: ratingNumber,
+        visibility: visibilityValue
+      }
+    });
   } catch (error) {
     sectionState.statusEl.textContent =
       error instanceof Error ? error.message : 'Could not save your review. Try again later.';

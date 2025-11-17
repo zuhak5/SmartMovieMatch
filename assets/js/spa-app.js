@@ -4,6 +4,13 @@ import {
   scoreAndSelectCandidates,
   fetchOmdbForCandidates
 } from "./recommendations.js";
+import {
+  getConfigValue,
+  getExperimentVariant,
+  getFeatureFlag,
+  refreshAppConfig,
+  subscribeToConfig
+} from "./app-config.js";
 import { TMDB_GENRES } from "./config.js";
 import {
   loadSession,
@@ -31,6 +38,7 @@ import {
   postWatchPartyMessageRemote,
   acknowledgeNotifications
 } from "./social.js";
+import { logRecommendationEvent, logSearchEvent } from "./analytics.js";
 
 const defaultTabs = {
   friends: "feed",
@@ -115,10 +123,74 @@ const state = {
   watchPartyMessages: [],
   watchPartyMessagesPartyId: null,
   watchPartyMessagesLoading: false,
-  watchPartyMessageSending: false
+  watchPartyMessageSending: false,
+  appConfig: {
+    config: {},
+    experiments: { experiments: [], assignments: {} },
+    loaded: false,
+    error: ""
+  }
 };
 
 let unsubscribeNotifications = null;
+
+subscribeToConfig((configState) => {
+  state.appConfig = configState;
+  applyFeatureFlags();
+});
+
+function getUiLimit(key, fallback) {
+  const value = getConfigValue(key, fallback);
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function applyFeatureFlags() {
+  const watchPartyEnabled = getFeatureFlag("feature.watchParties.enabled", true);
+  if (watchPartyPanel) {
+    if (watchPartyEnabled) {
+      watchPartyPanel.removeAttribute("hidden");
+    } else {
+      watchPartyPanel.setAttribute("hidden", "true");
+    }
+  }
+  if (watchPartyEmpty) {
+    if (watchPartyEnabled) {
+      watchPartyEmpty.removeAttribute("hidden");
+    } else {
+      watchPartyEmpty.setAttribute("hidden", "true");
+    }
+  }
+
+  toggleSectionAvailability("messages", getFeatureFlag("feature.messages.enabled", true));
+}
+
+function toggleSectionAvailability(sectionKey, enabled) {
+  const navButton = document.querySelector(`[data-section-button="${sectionKey}"]`);
+  const panel = document.querySelector(`[data-section-panel="${sectionKey}"]`);
+  if (navButton) {
+    navButton.disabled = !enabled;
+    navButton.classList.toggle("is-disabled", !enabled);
+    if (!enabled) {
+      navButton.setAttribute("aria-disabled", "true");
+    } else {
+      navButton.removeAttribute("aria-disabled");
+    }
+  }
+  if (panel) {
+    if (enabled) {
+      panel.removeAttribute("hidden");
+    } else {
+      panel.setAttribute("hidden", "true");
+    }
+  }
+  if (!enabled && state.activeSection === sectionKey) {
+    setSection("home");
+  }
+}
 
 const authRequiredViews = [
   {
@@ -1943,7 +2015,9 @@ async function loadDiscover(filter = "popular") {
     const data = await fetchFromTmdb(config.path, config.params, {
       signal: controller.signal
     });
-    const results = Array.isArray(data?.results) ? data.results.slice(0, 12) : [];
+    const results = Array.isArray(data?.results)
+      ? data.results.slice(0, getUiLimit("ui.discover.maxMovies", 12))
+      : [];
     renderDiscoverMovies(results);
   } catch (error) {
     if (error.name === "AbortError") return;
@@ -1959,7 +2033,8 @@ async function loadTrendingPeople(query = "") {
   const params = query && query.length >= 3 ? { query, include_adult: "false" } : { page: 1 };
   try {
     const data = await fetchFromTmdb(searchPath, params);
-    state.discoverPeople = Array.isArray(data?.results) ? data.results.slice(0, 6) : [];
+    const limit = getUiLimit("ui.discover.maxPeople", 6);
+    state.discoverPeople = Array.isArray(data?.results) ? data.results.slice(0, limit) : [];
     renderPeopleSection();
   } catch (error) {
     console.warn("people fetch failed", error);
@@ -1971,8 +2046,10 @@ async function loadTrendingPeople(query = "") {
 function buildListsFromMovies(movies = []) {
   const cleanMovies = (movies || []).filter(Boolean);
   if (!cleanMovies.length) return [];
-  const top = cleanMovies.slice(0, 8);
-  const split = [top.slice(0, 4), top.slice(4, 8)];
+  const listLimit = getUiLimit("ui.home.maxRecommendations", 10);
+  const top = cleanMovies.slice(0, Math.max(4, listLimit));
+  const splitPoint = Math.ceil(top.length / 2);
+  const split = [top.slice(0, splitPoint), top.slice(splitPoint)];
   return split
     .filter((bucket) => bucket.length)
     .map((bucket, index) => ({
@@ -2007,14 +2084,19 @@ async function loadHomeRecommendations() {
       { signal: controller.signal }
     );
 
-    const scored = scoreAndSelectCandidates(candidates, { maxCount: 10 }, []);
+    const maxRecs = getUiLimit("ui.home.maxRecommendations", 10);
+    const scored = scoreAndSelectCandidates(candidates, { maxCount: maxRecs }, []);
     const enriched = await fetchOmdbForCandidates(scored, { signal: controller.signal });
     state.homeRecommendations = enriched;
     renderHomeRecommendations(enriched);
-    renderGroupPicks(enriched.slice(0, 3));
+    renderGroupPicks(enriched.slice(0, getUiLimit("ui.home.groupPicks", 3)));
     renderListCards(
       buildListsFromMovies(enriched.map((item) => item.tmdb || item.candidate))
     );
+    logRecommendationEvent({
+      action: "home_recommendations_generated",
+      metadata: { count: enriched.length, seed: state.recommendationSeed }
+    });
   } catch (error) {
     if (error.name === "AbortError") return;
     console.warn("recommendations failed", error);
@@ -2034,10 +2116,19 @@ function renderHomeRecommendations(items = []) {
     return;
   }
 
-  const heroSource = items[0];
-  updateTonightPick(heroSource);
+  const maxRecs = getUiLimit("ui.home.maxRecommendations", 10);
+  const layoutVariant = getExperimentVariant("home_recs_layout", "hero");
+  const limitedItems = items.slice(0, maxRecs);
+  const visibleItems =
+    layoutVariant === "stacked"
+      ? limitedItems.slice(0, Math.max(3, Math.min(6, maxRecs)))
+      : limitedItems;
 
-  items.forEach((item) => {
+  const heroSource = limitedItems[0];
+  updateTonightPick(heroSource);
+  homeRecommendationsRow.dataset.layout = layoutVariant;
+
+  visibleItems.forEach((item) => {
     const card = document.createElement("article");
     card.className = "card media-card";
 
@@ -2179,12 +2270,23 @@ async function loadDiscoverSearch(query) {
       fetchFromTmdb("search/movie", { query, include_adult: "false" }),
       fetchFromTmdb("search/person", { query, include_adult: "false" })
     ]);
-    const movieResults = Array.isArray(movies?.results) ? movies.results.slice(0, 12) : [];
+    const movieResults = Array.isArray(movies?.results)
+      ? movies.results.slice(0, getUiLimit("ui.discover.maxMovies", 12))
+      : [];
     renderDiscoverMovies(movieResults);
     const listSource = movieResults.length ? movieResults : state.homeRecommendations.map((item) => item.tmdb);
     renderListCards(buildListsFromMovies(listSource));
-    state.discoverPeople = Array.isArray(people?.results) ? people.results.slice(0, 6) : [];
+    const peopleLimit = getUiLimit("ui.discover.maxPeople", 6);
+    state.discoverPeople = Array.isArray(people?.results)
+      ? people.results.slice(0, peopleLimit)
+      : [];
     renderPeopleSection();
+    logSearchEvent({
+      query,
+      filters: { source: "discover" },
+      resultsCount: movieResults.length + state.discoverPeople.length,
+      clientContext: { hasSession: Boolean(state.session?.token) }
+    });
   } catch (error) {
     console.warn("search failed", error);
     state.discoverPeople = [];
@@ -2954,9 +3056,11 @@ function init() {
       resetNotificationsUi();
     }
     maybeOpenOnboarding();
+    refreshAppConfig();
   });
   initSocialFeatures();
   attachListeners();
+  refreshAppConfig();
   setSection("home");
   loadDiscover(state.discoverFilter);
   loadTrendingPeople();

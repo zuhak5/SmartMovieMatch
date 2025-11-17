@@ -278,30 +278,30 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Backend: `user_notifications`.
   DONE 2025-11-17T10:03Z – Added Supabase-backed notification bell with unread badge, dropdown list, click-to-mark-read and mark-all controls wired to the social API stream.
 
-- [ ] **NOTIF-002 – Activity log for user actions**
+- [x] **NOTIF-002 – Activity log for user actions**
   - Description: Log key SPA actions to `user_activity` (e.g. follow, review, diary entry).
     - Use metadata to capture context (movie id, source action).
   - Files: Centralized logging helper in SPA.
   - Backend: `user_activity`.
-  - DONE: _…_
+  - DONE 2025-11-17T10:24Z – Added telemetry API and SPA logging helper that records follows, reviews, and discovery searches into `user_activity` with contextual metadata.
 
 ---
 
 ## App config & experiments (CONF)
 
-- [ ] **CONF-001 – Remote app config wiring**
+- [x] **CONF-001 – Remote app config wiring**
   - Description: Fetch `app_config` on app startup to control:
     - UI limits (max items per list), feature flags (enable watch parties, DMs).
   - Files: App bootstrap, config context/provider.
   - Backend: `app_config`.
-  - DONE: _…_
+  - DONE 2025-11-17T10:24Z – Added config endpoint plus SPA provider to load `app_config` on startup, applying feature flags and list limits across discovery and home views.
 
-- [ ] **CONF-002 – Experiments & variants**
+- [x] **CONF-002 – Experiments & variants**
   - Description: Use `experiments` + `experiment_assignments` to:
     - Decide which layout or algorithm to use per user.
   - Files: Feature-flag helper, experiment switch points (e.g. home page layout).
   - Backend: `experiments`, `experiment_assignments`.
-  - DONE: _…_
+  - DONE 2025-11-17T10:24Z – SPA now fetches experiment assignments from Supabase and switches the home recommendations layout based on the `home_recs_layout` variant.
 
 ---
 
@@ -323,12 +323,12 @@ Each item is a task for Codex (or any other assistant) to implement.
   - Backend: `movies`, `streaming_providers`, `experiments`, `app_config`, etc.
   - DONE: _…_
 
-- [ ] **ANALYT-001 – Central telemetry helper**
+- [x] **ANALYT-001 – Central telemetry helper**
   - Description: Create a small SPA module that:
     - Logs search, click, and view events into `search_queries`, `recommendation_events`, and `user_activity` as appropriate.
   - Files: `analytics.js` (or equivalent), called from UI components.
   - Backend: `search_queries`, `recommendation_events`, `user_activity`.
-  - DONE: _…_
+  - DONE 2025-11-17T10:24Z – Added `analytics.js` telemetry helper and server endpoint to persist search and recommendation events (stored in `user_activity` until `recommendation_events` exists) plus contextual metadata.
 
 ---
 
