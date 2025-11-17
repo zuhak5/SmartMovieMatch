@@ -102,6 +102,7 @@ const STREAMING_PROVIDER_OPTIONS = [
 
 const ONBOARDING_STORAGE_KEY = "smartMovieMatch.onboardingComplete";
 const ONBOARDING_STEPS = ["taste", "providers", "import"];
+let authAvatarPreviewUrl = null;
 
 const state = {
   activeTabs: { ...defaultTabs },
@@ -413,9 +414,16 @@ const authDisplayNameRow = document.querySelector("[data-auth-display-name-row]"
 const authDisplayNameInput = document.querySelector("[data-auth-display-name]");
 const authModeButtons = document.querySelectorAll("[data-auth-mode]");
 const authTitle = document.querySelector("[data-auth-title]");
+const authSubtitle = document.querySelector("[data-auth-subtitle]");
 const authOpenButton = document.querySelector("[data-auth-open]");
 const authCloseButton = document.querySelector("[data-auth-close]");
 const authSubmitButton = document.querySelector("[data-auth-submit]");
+const authAvatarRow = document.querySelector("[data-auth-avatar-row]");
+const authAvatarInput = document.querySelector("[data-auth-avatar-input]");
+const authAvatarTrigger = document.querySelector("[data-auth-avatar-trigger]");
+const authAvatarClear = document.querySelector("[data-auth-avatar-clear]");
+const authAvatarPreview = document.querySelector("[data-auth-avatar-preview]");
+const authAvatarPlaceholder = document.querySelector("[data-auth-avatar-placeholder]");
 const accountMenu = document.querySelector("[data-account-menu]");
 const accountToggle = document.querySelector("[data-account-toggle]");
 const accountName = document.querySelector("[data-account-name]");
@@ -733,6 +741,48 @@ function setAuthStatus(message, variant = "info") {
   }
 }
 
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      const commaIndex = result.indexOf(",");
+      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+    };
+    reader.onerror = () => reject(new Error("Could not read the selected file."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function clearAuthAvatarPreview() {
+  if (authAvatarPreviewUrl) {
+    URL.revokeObjectURL(authAvatarPreviewUrl);
+    authAvatarPreviewUrl = null;
+  }
+  if (authAvatarPreview) {
+    authAvatarPreview.style.removeProperty("--avatar-preview-image");
+    authAvatarPreview.classList.remove("has-image");
+  }
+  if (authAvatarPlaceholder) {
+    authAvatarPlaceholder.hidden = false;
+  }
+  if (authAvatarInput) {
+    authAvatarInput.value = "";
+  }
+}
+
+function applyAuthAvatarPreview(file) {
+  if (!file || !authAvatarPreview) return;
+  clearAuthAvatarPreview();
+  const objectUrl = URL.createObjectURL(file);
+  authAvatarPreviewUrl = objectUrl;
+  authAvatarPreview.style.setProperty("--avatar-preview-image", `url(${objectUrl})`);
+  authAvatarPreview.classList.add("has-image");
+  if (authAvatarPlaceholder) {
+    authAvatarPlaceholder.hidden = true;
+  }
+}
+
 function renderWebsiteLink(element, url, fallbackText = "Website not added") {
   if (!element) return;
   element.innerHTML = "";
@@ -759,11 +809,24 @@ function setAuthMode(mode) {
   if (authDisplayNameRow) {
     authDisplayNameRow.classList.toggle("is-hidden", state.authMode !== "signup");
   }
+  if (authAvatarRow) {
+    const isSignup = state.authMode === "signup";
+    authAvatarRow.classList.toggle("is-hidden", !isSignup);
+    if (!isSignup) {
+      clearAuthAvatarPreview();
+    }
+  }
   if (authTitle) {
     authTitle.textContent =
       state.authMode === "signup"
         ? "Create your Smart Movie Match account"
         : "Sign in to Smart Movie Match";
+  }
+  if (authSubtitle) {
+    authSubtitle.textContent =
+      state.authMode === "signup"
+        ? "Add a display name and avatar so friends recognize you."
+        : "Sign in to keep your watchlists, diaries, and parties in sync.";
   }
   if (authPasswordInput) {
     authPasswordInput.autocomplete =
@@ -4047,9 +4110,23 @@ async function handleAuthSubmit(event) {
     authDisplayNameInput && authDisplayNameInput.value
       ? authDisplayNameInput.value.trim()
       : "";
+  const avatarFile =
+    state.authMode === "signup" && authAvatarInput && authAvatarInput.files
+      ? authAvatarInput.files[0] || null
+      : null;
 
   if (!username || !password) {
     setAuthStatus("Enter your username and password.", "error");
+    return;
+  }
+
+  if (avatarFile && !avatarFile.type.startsWith("image/")) {
+    setAuthStatus("Please choose an image for your avatar.", "error");
+    return;
+  }
+
+  if (avatarFile && avatarFile.size > 5 * 1024 * 1024) {
+    setAuthStatus("Avatar images must be 5 MB or smaller.", "error");
     return;
   }
 
@@ -4062,9 +4139,23 @@ async function handleAuthSubmit(event) {
   );
 
   try {
+    let avatarBase64 = null;
+    let avatarFileName = null;
+
+    if (state.authMode === "signup" && avatarFile) {
+      avatarBase64 = await fileToBase64(avatarFile);
+      avatarFileName = avatarFile.name;
+    }
+
     const session =
       state.authMode === "signup"
-        ? await registerUser({ username, password, name: displayName })
+        ? await registerUser({
+            username,
+            password,
+            name: displayName,
+            avatarBase64,
+            avatarFileName
+          })
         : await loginUser({ username, password });
     setAuthStatus("You're signed in!", "success");
     closeAuthOverlay();
@@ -4636,6 +4727,41 @@ function attachListeners() {
       if (event.target === authOverlay) {
         closeAuthOverlay();
       }
+    });
+  }
+
+  if (authAvatarTrigger && authAvatarInput) {
+    authAvatarTrigger.addEventListener("click", () => authAvatarInput.click());
+  }
+
+  if (authAvatarClear) {
+    authAvatarClear.addEventListener("click", () => {
+      clearAuthAvatarPreview();
+      setAuthStatus("Avatar removed. You can keep going without one.");
+    });
+  }
+
+  if (authAvatarInput) {
+    authAvatarInput.addEventListener("change", () => {
+      const file = authAvatarInput.files && authAvatarInput.files[0];
+      if (!file) {
+        clearAuthAvatarPreview();
+        return;
+      }
+
+      if (!file.type.startsWith("image/")) {
+        setAuthStatus("Please choose an image for your avatar.", "error");
+        clearAuthAvatarPreview();
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        setAuthStatus("Images must be 5 MB or smaller.", "error");
+        clearAuthAvatarPreview();
+        return;
+      }
+
+      applyAuthAvatarPreview(file);
     });
   }
 
