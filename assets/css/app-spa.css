@@ -440,6 +440,17 @@ p {
   transform: translateY(-1px);
 }
 
+.btn-secondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.btn-secondary:hover {
+  border-color: var(--accent);
+}
+
 .btn-ghost {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
@@ -1073,6 +1084,68 @@ p {
   gap: 10px;
   padding: 6px 4px 12px;
   border-bottom: 1px solid var(--border);
+}
+
+.onboarding-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.onboarding-step {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 6px 2px;
+}
+
+.onboarding-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.onboarding-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.radio-row {
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.radio-row strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.radio-row input {
+  margin-top: 5px;
+}
+
+.onboarding-actions {
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(180deg, rgba(10, 12, 22, 0.92), rgba(10, 12, 22, 0.96));
+}
+
+.onboarding-actions .sheet-action-buttons {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+[data-onboarding-status].error {
+  color: var(--warning);
+}
+
+[data-onboarding-status].success {
+  color: var(--success);
 }
 
 .sheet-title-group {
