@@ -736,6 +736,27 @@ function initialsFromName(name = "") {
   return letters || "👤";
 }
 
+function setAvatarContent(element, { imageUrl = "", initials = "", label = "" } = {}) {
+  if (!element) return;
+  const cleanUrl = typeof imageUrl === "string" ? imageUrl.trim() : "";
+  const displayInitials = initials || initialsFromName(label);
+  const existingImg = element.querySelector("img");
+  if (existingImg) {
+    existingImg.remove();
+  }
+  element.style.backgroundImage = "";
+  element.classList.toggle("has-image", Boolean(cleanUrl));
+  if (cleanUrl) {
+    const img = document.createElement("img");
+    img.src = cleanUrl;
+    img.alt = label || "User avatar";
+    element.textContent = "";
+    element.appendChild(img);
+  } else {
+    element.textContent = displayInitials || "";
+  }
+}
+
 function canonicalHandle(value = "") {
   if (typeof value !== "string") return "";
   return value.replace(/^@/, "").trim().toLowerCase();
@@ -987,17 +1008,12 @@ function updateAccountUi(session) {
       : "@guest";
   }
   if (accountAvatar) {
-    accountAvatar.style.backgroundImage = "";
-    if (hasSession && state.session.avatarUrl) {
-      accountAvatar.style.backgroundImage = `url(${state.session.avatarUrl})`;
-      accountAvatar.textContent = "";
-    } else {
-      accountAvatar.textContent = initialsFromName(
-        hasSession
-          ? state.session.displayName || state.session.username
-          : "Guest"
-      );
-    }
+    const name = hasSession ? state.session.displayName || state.session.username : "Guest";
+    setAvatarContent(accountAvatar, {
+      imageUrl: hasSession ? state.session.avatarUrl : "",
+      initials: initialsFromName(name),
+      label: `${name} avatar`
+    });
   }
 
   if (notificationButton) {
@@ -1297,13 +1313,11 @@ function renderProfileOverview() {
     renderWebsiteLink(profileWebsite, profile.website, fallback);
   }
   if (profileAvatar) {
-    profileAvatar.style.backgroundImage = "";
-    if (profile.avatarUrl) {
-      profileAvatar.style.backgroundImage = `url(${profile.avatarUrl})`;
-      profileAvatar.textContent = "";
-    } else {
-      profileAvatar.textContent = initialsFromName(profile.name);
-    }
+    setAvatarContent(profileAvatar, {
+      imageUrl: profile.avatarUrl,
+      initials: initialsFromName(profile.name),
+      label: `${profile.name} avatar`
+    });
   }
 
   Object.entries(profileStats).forEach(([key, element]) => {
@@ -2130,12 +2144,21 @@ function renderPeople(people = [], { source = "tmdb" } = {}) {
 
       const avatar = document.createElement("div");
       avatar.className = "avatar";
-      avatar.textContent = initialsFromName(person.displayName || handle);
+      const displayName = person.displayName || `@${handle}`;
+      const avatarUrl =
+        (typeof person.avatarUrl === "string" && person.avatarUrl.trim()) ||
+        (typeof person.avatar_url === "string" && person.avatar_url.trim()) ||
+        "";
+      setAvatarContent(avatar, {
+        imageUrl: avatarUrl,
+        initials: initialsFromName(displayName),
+        label: `${displayName} avatar`
+      });
 
       const stack = document.createElement("div");
       stack.className = "stack";
       const name = document.createElement("strong");
-      name.textContent = person.displayName || `@${handle}`;
+      name.textContent = displayName;
       const handleLine = document.createElement("div");
       handleLine.className = "small-text muted";
       handleLine.textContent = `@${handle}`;
@@ -2194,12 +2217,21 @@ function renderPeople(people = [], { source = "tmdb" } = {}) {
           .join("")
           .slice(0, 2)
       : "?";
-    avatar.textContent = initials;
+    const displayName = person.name || "Unknown";
+    const avatarUrl =
+      (typeof person.avatarUrl === "string" && person.avatarUrl.trim()) ||
+      (typeof person.avatar_url === "string" && person.avatar_url.trim()) ||
+      "";
+    setAvatarContent(avatar, {
+      imageUrl: avatarUrl,
+      initials,
+      label: `${displayName} avatar`
+    });
 
     const stack = document.createElement("div");
     stack.className = "stack";
     const name = document.createElement("strong");
-    name.textContent = person.name || "Unknown";
+    name.textContent = displayName;
     const meta = document.createElement("div");
     meta.className = "small-text";
     const known = Array.isArray(person.known_for)
@@ -3167,7 +3199,16 @@ function renderWatchPartyParticipants(participants = []) {
     row.dataset.presence = participant.metadata?.presence || "online";
     const avatar = document.createElement("div");
     avatar.className = "avatar";
-    avatar.textContent = initialsFromName(participant.username || "?");
+    const participantName = participant.username || "?";
+    const avatarUrl =
+      (typeof participant.avatarUrl === "string" && participant.avatarUrl.trim()) ||
+      (typeof participant.avatar_url === "string" && participant.avatar_url.trim()) ||
+      "";
+    setAvatarContent(avatar, {
+      imageUrl: avatarUrl,
+      initials: initialsFromName(participantName),
+      label: `${participantName} avatar`
+    });
     const stack = document.createElement("div");
     stack.className = "stack";
     const name = document.createElement("strong");
@@ -3484,16 +3525,26 @@ function renderConversationList() {
       row.classList.add("is-active");
     }
 
+    const conversationTitle = getConversationTitle(conversation);
+    const conversationAvatarUrl =
+      (typeof conversation.avatarUrl === "string" && conversation.avatarUrl.trim()) ||
+      (typeof conversation.avatar_url === "string" && conversation.avatar_url.trim()) ||
+      "";
+
     const avatar = document.createElement("div");
     avatar.className = "avatar conversation-avatar";
-    avatar.textContent = initialsFromName(getConversationTitle(conversation));
+    setAvatarContent(avatar, {
+      imageUrl: conversationAvatarUrl,
+      initials: initialsFromName(conversationTitle),
+      label: `${conversationTitle} avatar`
+    });
 
     const stack = document.createElement("div");
     stack.className = "stack";
 
     const title = document.createElement("div");
     title.className = "conversation-title";
-    title.textContent = getConversationTitle(conversation);
+    title.textContent = conversationTitle;
 
     const meta = document.createElement("div");
     meta.className = "conversation-meta";
