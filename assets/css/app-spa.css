@@ -77,7 +77,7 @@ textarea {
 }
 
 .brand {
-  display: flex;
+  display: -webkit-inline-box;
   align-items: center;
   gap: 10px;
   font-weight: 700;
