@@ -17,6 +17,7 @@ import {
 import {
   initSocialFeatures,
   subscribeToSocialOverview,
+  subscribeToNotifications,
   followUserByUsername,
   unfollowUserByUsername,
   subscribeToCollaborativeState,
@@ -27,7 +28,8 @@ import {
   startDirectConversationRemote,
   joinWatchPartyRemote,
   listWatchPartyMessagesRemote,
-  postWatchPartyMessageRemote
+  postWatchPartyMessageRemote,
+  acknowledgeNotifications
 } from "./social.js";
 
 const defaultTabs = {
@@ -95,6 +97,10 @@ const state = {
     lists: { owned: [], shared: [], invites: [] },
     watchParties: { upcoming: [], invites: [] }
   },
+  notifications: [],
+  unreadNotifications: 0,
+  notificationsLoaded: false,
+  notificationMenuOpen: false,
   conversations: [],
   conversationsLoaded: false,
   conversationsLoading: false,
@@ -111,6 +117,8 @@ const state = {
   watchPartyMessagesLoading: false,
   watchPartyMessageSending: false
 };
+
+let unsubscribeNotifications = null;
 
 const authRequiredViews = [
   {
@@ -190,6 +198,14 @@ const accountAvatar = document.querySelector("[data-account-avatar]");
 const accountLogoutButton = document.querySelector("[data-account-logout]");
 const accountProfileButton = document.querySelector("[data-account-profile]");
 const accountSettingsButton = document.querySelector("[data-account-settings]");
+const notificationButton = document.querySelector("[data-notification-toggle]");
+const notificationMenu = document.querySelector("[data-notification-menu]");
+const notificationList = document.querySelector("[data-notification-list]");
+const notificationEmpty = document.querySelector("[data-notification-empty]");
+const notificationStatus = document.querySelector("[data-notification-status]");
+const notificationCount = document.querySelector("[data-notification-count]");
+const notificationDot = document.querySelector("[data-notification-dot]");
+const notificationMarkRead = document.querySelector("[data-notification-mark-read]");
 const profileName = document.querySelector("[data-profile-name]");
 const profileHandle = document.querySelector("[data-profile-handle]");
 const profileBio = document.querySelector("[data-profile-bio]");
@@ -542,6 +558,16 @@ function updateAccountUi(session) {
     }
   }
 
+  if (notificationButton) {
+    notificationButton.disabled = !hasSession;
+    notificationButton.setAttribute("aria-disabled", hasSession ? "false" : "true");
+  }
+  if (!hasSession) {
+    resetNotificationsUi();
+  } else {
+    renderNotificationBadge();
+  }
+
   if (!hasSession) {
     ensureAccessibleSection();
     closeOnboarding(false);
@@ -553,6 +579,203 @@ function updateAccountUi(session) {
   }
 
   renderProfileOverview();
+}
+
+function setNotificationStatus(message, variant = "") {
+  if (!notificationStatus) return;
+  notificationStatus.textContent = message || "";
+  if (variant) {
+    notificationStatus.dataset.variant = variant;
+  } else {
+    notificationStatus.removeAttribute("data-variant");
+  }
+}
+
+function countUnreadNotificationsLocal(list = state.notifications) {
+  if (!Array.isArray(list)) return 0;
+  return list.filter((entry) => entry && !entry.readAt).length;
+}
+
+function formatTitleCase(text = "") {
+  return text
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function formatNotificationMeta(entry) {
+  const parts = [];
+  if (entry.actor) {
+    parts.push(`@${canonicalHandle(entry.actor)}`);
+  }
+  if (entry.type) {
+    parts.push(formatTitleCase(String(entry.type).replace(/[-_]/g, " ")));
+  }
+  parts.push(formatRelativeTimestamp(entry.createdAt));
+  return parts.filter(Boolean).join(" · ");
+}
+
+function renderNotificationBadge() {
+  if (!notificationButton) return;
+  const count = Math.max(0, Number(state.unreadNotifications) || 0);
+  notificationButton.classList.toggle("is-active", state.notificationMenuOpen);
+  notificationButton.setAttribute("aria-expanded", state.notificationMenuOpen ? "true" : "false");
+  notificationButton.setAttribute(
+    "aria-label",
+    count > 0 ? `Open notifications (${count} unread)` : "Open notifications"
+  );
+  if (notificationCount) {
+    notificationCount.textContent = count > 99 ? "99+" : String(count);
+    notificationCount.hidden = count <= 0;
+  }
+  if (notificationDot) {
+    notificationDot.hidden = count <= 0;
+  }
+  if (!hasActiveSession()) {
+    notificationButton.disabled = true;
+    notificationButton.setAttribute("aria-disabled", "true");
+  } else {
+    notificationButton.disabled = false;
+    notificationButton.removeAttribute("aria-disabled");
+  }
+}
+
+function renderNotificationList() {
+  if (!notificationList || !notificationEmpty) return;
+  notificationList.innerHTML = "";
+  const notifications = Array.isArray(state.notifications)
+    ? [...state.notifications].sort(
+        (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      )
+    : [];
+  if (!notifications.length) {
+    notificationEmpty.hidden = false;
+    return;
+  }
+  notificationEmpty.hidden = true;
+  notifications.forEach((entry) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "notification-item";
+    if (!entry.readAt) {
+      item.dataset.unread = "true";
+    }
+    const title = document.createElement("div");
+    title.className = "notification-item-title";
+    title.textContent = entry.message || "New activity";
+    const meta = document.createElement("div");
+    meta.className = "notification-item-meta";
+    const typePill = document.createElement("span");
+    typePill.className = "pill";
+    typePill.textContent = entry.type ? formatTitleCase(entry.type.replace(/[-_]/g, " ")) : "Activity";
+    const metaText = document.createElement("span");
+    metaText.textContent = formatNotificationMeta(entry);
+    meta.append(typePill, metaText);
+    item.append(title, meta);
+    item.addEventListener("click", () => handleNotificationClick(entry));
+    notificationList.append(item);
+  });
+}
+
+function markNotificationAsRead(notificationId) {
+  if (!notificationId) return;
+  const now = new Date().toISOString();
+  let hasChanged = false;
+  state.notifications = state.notifications.map((entry) => {
+    if (entry.id === notificationId && !entry.readAt) {
+      hasChanged = true;
+      return { ...entry, readAt: now };
+    }
+    return entry;
+  });
+  if (hasChanged) {
+    state.unreadNotifications = countUnreadNotificationsLocal();
+    renderNotificationBadge();
+    renderNotificationList();
+  }
+}
+
+function maybeNavigateForNotification(entry) {
+  if (!entry || !entry.type) return;
+  const type = String(entry.type).toLowerCase();
+  if (type.includes("message")) {
+    setSection("messages");
+  } else if (type.includes("party")) {
+    setSection("home");
+    setTab("home", "with-friends");
+  } else if (type.includes("follow") || type.includes("friend")) {
+    setSection("friends");
+    setTab("friends", "requests");
+  } else if (type.includes("review") || type.includes("diary")) {
+    setSection("friends");
+    setTab("friends", "feed");
+  }
+}
+
+function handleNotificationClick(entry) {
+  if (!entry) return;
+  if (!hasActiveSession()) {
+    setAuthStatus("Sign in to view notifications.", "error");
+    openAuthOverlay("login");
+    return;
+  }
+  markNotificationAsRead(entry.id);
+  toggleNotificationMenu(false);
+  acknowledgeNotifications();
+  maybeNavigateForNotification(entry);
+}
+
+function handleMarkAllNotificationsRead() {
+  if (!hasActiveSession()) {
+    setAuthStatus("Sign in to view notifications.", "error");
+    openAuthOverlay("login");
+    return;
+  }
+  if (!state.notifications.length) return;
+  const now = new Date().toISOString();
+  state.notifications = state.notifications.map((entry) => ({ ...entry, readAt: entry.readAt || now }));
+  state.unreadNotifications = 0;
+  renderNotificationBadge();
+  renderNotificationList();
+  acknowledgeNotifications();
+}
+
+function toggleNotificationMenu(forceOpen = null) {
+  if (!hasActiveSession()) {
+    setAuthStatus("Sign in to view notifications.", "error");
+    openAuthOverlay("login");
+    return;
+  }
+  const next = forceOpen === null ? !state.notificationMenuOpen : Boolean(forceOpen);
+  state.notificationMenuOpen = next;
+  if (notificationMenu) {
+    notificationMenu.classList.toggle("is-open", next);
+  }
+  renderNotificationBadge();
+  if (next && !state.notificationsLoaded) {
+    setNotificationStatus("Loading notifications…");
+  } else if (!next) {
+    setNotificationStatus("");
+  }
+}
+
+function closeNotificationMenu() {
+  if (!state.notificationMenuOpen) return;
+  toggleNotificationMenu(false);
+}
+
+function resetNotificationsUi() {
+  state.notifications = [];
+  state.unreadNotifications = 0;
+  state.notificationsLoaded = false;
+  state.notificationMenuOpen = false;
+  if (notificationMenu) {
+    notificationMenu.classList.remove("is-open");
+  }
+  renderNotificationBadge();
+  renderNotificationList();
+  setNotificationStatus("");
 }
 
 function renderProfileOverview() {
@@ -2454,12 +2677,21 @@ function handleOutsideClick(event) {
   if (state.onboardingOpen && onboardingOverlay && event.target === onboardingOverlay) {
     closeOnboarding();
   }
+  if (state.notificationMenuOpen && notificationMenu && notificationButton) {
+    const target = event.target;
+    if (!notificationMenu.contains(target) && !notificationButton.contains(target)) {
+      closeNotificationMenu();
+    }
+  }
 }
 
 function handleEscape(event) {
   if (event.key === "Escape") {
     if (state.accountMenuOpen) {
       toggleAccountMenu(false);
+    }
+    if (state.notificationMenuOpen) {
+      closeNotificationMenu();
     }
     if (authOverlay && !authOverlay.hidden) {
       closeAuthOverlay();
@@ -2559,6 +2791,14 @@ function attachListeners() {
       setTab("profile", "overview");
       toggleAccountMenu(false);
     });
+  }
+
+  if (notificationButton) {
+    notificationButton.addEventListener("click", () => toggleNotificationMenu());
+  }
+
+  if (notificationMarkRead) {
+    notificationMarkRead.addEventListener("click", handleMarkAllNotificationsRead);
   }
 
   if (profileEditOpenButton) {
@@ -2678,6 +2918,21 @@ function init() {
     state.collabState = collabState || getDefaultCollaborativeState();
     setActiveWatchParty(selectPrimaryWatchParty(state.collabState));
   });
+  if (unsubscribeNotifications) {
+    unsubscribeNotifications();
+  }
+  unsubscribeNotifications = subscribeToNotifications((payload) => {
+    const notifications = Array.isArray(payload?.notifications) ? payload.notifications : [];
+    state.notifications = notifications;
+    state.unreadNotifications =
+      typeof payload?.unreadCount === "number"
+        ? payload.unreadCount
+        : countUnreadNotificationsLocal(notifications);
+    state.notificationsLoaded = true;
+    renderNotificationBadge();
+    renderNotificationList();
+    setNotificationStatus("");
+  });
   subscribeToSession((session) => {
     updateAccountUi(session);
     if (session && session.token) {
@@ -2686,10 +2941,17 @@ function init() {
       if (state.activeSection === "messages") {
         loadConversations(true);
       }
+      state.notifications = [];
+      state.unreadNotifications = 0;
+      renderNotificationBadge();
+      renderNotificationList();
+      state.notificationsLoaded = false;
+      setNotificationStatus("Loading notifications…");
     } else {
       state.collabState = getDefaultCollaborativeState();
       setActiveWatchParty(null);
       resetConversationsState();
+      resetNotificationsUi();
     }
     maybeOpenOnboarding();
   });

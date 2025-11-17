@@ -30,6 +30,17 @@
             <span class="icon">🛩️</span>
             <span class="badge-dot" aria-hidden="true"></span>
           </button>
+          <button
+            class="icon-circle top-notification-button"
+            type="button"
+            aria-label="Open notifications"
+            aria-expanded="false"
+            data-notification-toggle
+          >
+            <span class="icon">🔔</span>
+            <span class="badge-dot" data-notification-dot aria-hidden="true"></span>
+            <span class="badge-count" data-notification-count aria-hidden="true">0</span>
+          </button>
           <button class="btn btn-primary top-auth-btn" type="button" data-auth-open>
             Sign in / Sign up
           </button>
@@ -51,6 +62,24 @@
             <button type="button" data-account-profile>Profile</button>
             <button type="button" data-account-settings>Settings</button>
             <button type="button" data-account-logout>Logout</button>
+          </div>
+          <div class="notification-menu" data-notification-menu>
+            <div class="notification-menu-header">
+              <div>
+                <p class="eyebrow">Inbox</p>
+                <strong>Notifications</strong>
+              </div>
+              <button class="btn-subtle" type="button" data-notification-mark-read>
+                Mark all read
+              </button>
+            </div>
+            <div class="notification-menu-body">
+              <div class="small-text muted" data-notification-status></div>
+              <div class="notification-list" data-notification-list></div>
+              <p class="small-text muted notification-empty" data-notification-empty>
+                You're all caught up.
+              </p>
+            </div>
           </div>
         </div>
       </header>
