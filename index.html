@@ -253,6 +253,18 @@
               placeholder="Search movies, people, or lists…"
             />
           </div>
+          <div class="panel-heading" style="align-items: center;">
+            <div>
+              <h3>Trending now</h3>
+              <span class="small-text muted" data-trending-status>Loading trending movies…</span>
+            </div>
+            <select class="sort-select" data-trending-window aria-label="Trending window">
+              <option value="weekly" selected>This week</option>
+              <option value="daily">Today</option>
+              <option value="monthly">This month</option>
+            </select>
+          </div>
+          <div class="horizontal-scroll" data-row="discover-trending"></div>
           <div class="tab-panel" data-tab-panel="movies">
             <div class="filter-row">
               <button class="filter-pill is-active" data-filter="popular">Popular</button>

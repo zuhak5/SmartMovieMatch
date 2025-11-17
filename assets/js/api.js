@@ -75,3 +75,15 @@ export async function fetchFromSearch(params = {}, { signal, token } = {}) {
     headers
   });
 }
+
+export async function fetchTrendingMovies(params = {}, { signal } = {}) {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") {
+      return;
+    }
+    searchParams.append(key, value);
+  });
+
+  return fetchJson(`${API_ROUTES.trending}?${searchParams.toString()}`, { signal });
+}
