@@ -87,3 +87,12 @@ export async function fetchTrendingMovies(params = {}, { signal } = {}) {
 
   return fetchJson(`${API_ROUTES.trending}?${searchParams.toString()}`, { signal });
 }
+
+export async function fetchStreamingProviders({ signal, token } = {}) {
+  const headers = token
+    ? {
+        Authorization: `Bearer ${token}`
+      }
+    : undefined;
+  return fetchJson(API_ROUTES.streaming, { signal, headers });
+}

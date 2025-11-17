@@ -892,6 +892,19 @@ p {
   border-color: rgba(245, 158, 11, 0.45);
 }
 
+.badge.provider {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+.badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+}
+
 .btn,
 .button-ghost {
   border: none;

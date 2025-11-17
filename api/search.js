@@ -22,14 +22,43 @@ module.exports = async (req, res) => {
   const limit = clampLimit(parsed.searchParams.get('limit'));
   const genres = parseMultiValues(parsed.searchParams.getAll('genre'));
   const year = parseYear(parsed.searchParams.get('year'));
+  const providerKeys = parseMultiValues(parsed.searchParams.getAll('provider'));
+  const preferUserProviders = parsed.searchParams.get('providers') === 'mine';
+  const streamingOnly =
+    parsed.searchParams.get('streaming_only') === 'true' || filter === 'streaming' || preferUserProviders;
 
   const authHeader = req.headers.authorization || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
 
   try {
+    const client = USING_LOCAL_STORE
+      ? null
+      : createSupabaseAdminClient({ url: SUPABASE_URL, serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY });
+    const username = client && token ? await resolveUsername(client, token) : null;
+    const activeProviders =
+      !streamingOnly && providerKeys.length
+        ? providerKeys
+        : streamingOnly && preferUserProviders
+        ? await fetchUserProviders(client, username)
+        : providerKeys;
+
+    if (streamingOnly && !activeProviders.length && !USING_LOCAL_STORE) {
+      res.status(200).json({ movies: [] });
+      return;
+    }
+
     const movies = USING_LOCAL_STORE
       ? buildLocalFallback({ query, limit })
-      : await searchSupabase({ query, filter, limit, genres, year });
+      : await searchSupabase({
+          query,
+          filter,
+          limit,
+          genres,
+          year,
+          providerKeys: activeProviders,
+          streamingOnly,
+          includeAvailability: true
+        });
 
     if (!USING_LOCAL_STORE) {
       await logSearchQuery({
@@ -38,7 +67,9 @@ module.exports = async (req, res) => {
         genres,
         year,
         resultsCount: movies.length,
-        token
+        token,
+        client,
+        username
       });
     }
 
@@ -70,6 +101,14 @@ function parseMultiValues(values = []) {
     .slice(0, 4);
 }
 
+function encodeInList(values = []) {
+  const safeValues = values
+    .map((value) => String(value || ''))
+    .filter(Boolean)
+    .map((value) => `"${value.replace(/"/g, '\\"')}"`);
+  return `(${safeValues.join(',')})`;
+}
+
 function parseYear(value) {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed)) return null;
@@ -77,7 +116,16 @@ function parseYear(value) {
   return parsed;
 }
 
-async function searchSupabase({ query, filter, limit, genres, year }) {
+async function searchSupabase({
+  query,
+  filter,
+  limit,
+  genres,
+  year,
+  providerKeys = [],
+  streamingOnly = false,
+  includeAvailability = false
+}) {
   const searchParams = new URLSearchParams();
   searchParams.set(
     'select',
@@ -131,7 +179,26 @@ async function searchSupabase({ query, filter, limit, genres, year }) {
 
   const text = await response.text();
   const rawRows = text ? JSON.parse(text) : [];
-  return Array.isArray(rawRows) ? rawRows.map(normalizeMovieRow) : [];
+  const movies = Array.isArray(rawRows) ? rawRows.map(normalizeMovieRow) : [];
+
+  if (!includeAvailability || !movies.length) {
+    return movies;
+  }
+
+  const availabilityByMovie = await fetchMovieAvailability(
+    movies.map((movie) => movie.imdbId).filter(Boolean),
+    { providerKeys }
+  );
+  const withAvailability = movies.map((movie) => ({
+    ...movie,
+    streamingProviders: availabilityByMovie[movie.imdbId] || []
+  }));
+
+  if (streamingOnly) {
+    return withAvailability.filter((movie) => movie.streamingProviders.length);
+  }
+
+  return withAvailability;
 }
 
 function normalizeMovieRow(row) {
@@ -153,6 +220,68 @@ function normalizeMovieRow(row) {
       reviews
     },
     lastSyncedAt: row.last_synced_at || null
+  };
+}
+
+async function fetchMovieAvailability(imdbIds = [], { providerKeys = [] } = {}) {
+  if (!Array.isArray(imdbIds) || !imdbIds.length) {
+    return {};
+  }
+
+  const url = new URL('/rest/v1/movie_availability', SUPABASE_URL);
+  url.searchParams.set(
+    'select',
+    'movie_imdb_id,provider_key,region,deeplink,provider:provider_key(key,display_name,url,metadata)'
+  );
+  url.searchParams.append('movie_imdb_id', `in.${encodeInList(imdbIds)}`);
+
+  const filteredProviders = (providerKeys || []).filter(Boolean);
+  if (filteredProviders.length) {
+    url.searchParams.append('provider_key', `in.${encodeInList(filteredProviders)}`);
+  }
+
+  const response = await fetchWithTimeout(url, {
+    timeoutMs: 15000,
+    headers: {
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      Accept: 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    const text = await safeReadResponse(response);
+    throw new Error(text || 'Supabase availability request failed');
+  }
+
+  const text = await response.text();
+  const rows = text ? JSON.parse(text) : [];
+  if (!Array.isArray(rows)) {
+    return {};
+  }
+
+  return rows.reduce((acc, row) => {
+    if (!row || !row.movie_imdb_id) {
+      return acc;
+    }
+    const normalized = mapAvailabilityRow(row);
+    if (!acc[row.movie_imdb_id]) {
+      acc[row.movie_imdb_id] = [];
+    }
+    acc[row.movie_imdb_id].push(normalized);
+    return acc;
+  }, {});
+}
+
+function mapAvailabilityRow(row = {}) {
+  const provider = row.provider || {};
+  return {
+    key: row.provider_key || provider.key || '',
+    name: provider.display_name || row.provider_key || 'Streaming',
+    url: provider.url || null,
+    region: row.region || null,
+    deeplink: row.deeplink || null,
+    brandColor: provider.metadata?.brand_color || null
   };
 }
 
@@ -179,15 +308,37 @@ function resolveOrdering(filter) {
   }
 }
 
-async function logSearchQuery({ query, filter, genres, year, resultsCount, token }) {
+async function fetchUserProviders(client, username) {
+  if (!client || !username) {
+    return [];
+  }
+  try {
+    const rows = await client.select('user_streaming_profiles', {
+      columns: 'provider_key,is_active',
+      filters: { username }
+    });
+    return Array.from(
+      new Set(
+        (Array.isArray(rows) ? rows : [])
+          .filter((row) => row && row.provider_key && row.is_active !== false)
+          .map((row) => row.provider_key)
+      )
+    );
+  } catch (error) {
+    return [];
+  }
+}
+
+async function logSearchQuery({ query, filter, genres, year, resultsCount, token, client, username }) {
   if (!query && !genres.length && !year) {
     return;
   }
   try {
-    const client = createSupabaseAdminClient({ url: SUPABASE_URL, serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY });
-    const username = await resolveUsername(client, token);
-    await client.insert('search_queries', [{
-      username: username || null,
+    const workingClient =
+      client || createSupabaseAdminClient({ url: SUPABASE_URL, serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY });
+    const resolvedUsername = username || (token ? await resolveUsername(workingClient, token) : null);
+    await workingClient.insert('search_queries', [{
+      username: resolvedUsername || null,
       query: query || '(empty)',
       filters: { sort: filter, genres, year },
       results_count: Number.isFinite(resultsCount) ? resultsCount : null,

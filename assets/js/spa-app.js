@@ -1,4 +1,4 @@
-import { fetchFromSearch, fetchFromTmdb, fetchTrendingMovies } from "./api.js";
+import { fetchFromSearch, fetchFromTmdb, fetchTrendingMovies, fetchStreamingProviders } from "./api.js";
 import {
   discoverCandidateMovies,
   scoreAndSelectCandidates,
@@ -200,6 +200,33 @@ function applyFeatureFlags() {
   }
 
   toggleSectionAvailability("messages", getFeatureFlag("feature.messages.enabled", true));
+}
+
+async function loadStreamingProviders() {
+  try {
+    const data = await fetchStreamingProviders({ token: state.session?.token });
+    const providers = Array.isArray(data?.providers)
+      ? data.providers.map(normalizeStreamingProvider)
+      : [];
+    const userProviders = Array.isArray(data?.userProviders)
+      ? data.userProviders.filter(Boolean)
+      : [];
+
+    state.streamingProviders = providers;
+
+    if (userProviders.length && !state.onboardingSelections.streamingProviders.length) {
+      state.onboardingSelections.streamingProviders = userProviders;
+    }
+  } catch (error) {
+    state.streamingProviders = STREAMING_PROVIDER_OPTIONS.map((provider) => ({
+      key: provider.value,
+      displayName: provider.label,
+      brandColor: null
+    }));
+  } finally {
+    ensureOnboardingOptionChips();
+    updateOnboardingCounts();
+  }
 }
 
 function toggleSectionAvailability(sectionKey, enabled) {
@@ -1339,7 +1366,13 @@ function renderDiscoverMovies(movies = []) {
   if (!movies.length) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.textContent = "Nothing matched—try a different filter.";
+    if (state.discoverFilter === "streaming") {
+      empty.textContent = hasActiveSession()
+        ? "No matches on your streaming services yet. Try another genre or add more services."
+        : "Sign in and choose your streaming services to filter results.";
+    } else {
+      empty.textContent = "Nothing matched—try a different filter.";
+    }
     discoverGrid.append(empty);
     return;
   }
@@ -1364,6 +1397,12 @@ function renderDiscoverMovies(movies = []) {
     const year = normalized.releaseYear ? String(normalized.releaseYear) : "";
     const genres = formatGenres(normalized.genres);
     meta.textContent = [year, genres].filter(Boolean).join(" · ");
+    const providerRow = document.createElement("div");
+    providerRow.className = "badge-row";
+    const providerBadges = (normalized.streamingProviders || [])
+      .slice(0, 4)
+      .map((provider) => createProviderBadge(provider));
+    providerBadges.forEach((badge) => providerRow.append(badge));
     const rating = document.createElement("span");
     rating.className = "badge rating";
     rating.textContent = normalized.rating
@@ -1394,7 +1433,11 @@ function renderDiscoverMovies(movies = []) {
       actions.append(saveButton);
     }
 
-    stack.append(title, meta, actions);
+    stack.append(title, meta);
+    if (providerBadges.length) {
+      stack.append(providerRow);
+    }
+    stack.append(actions);
     card.append(stack);
     discoverGrid.append(card);
   });
@@ -1466,6 +1509,12 @@ function renderTrendingMovies(movies = []) {
     meta.className = "small-text";
     const year = movie.releaseYear ? String(movie.releaseYear) : "";
     meta.textContent = [year, formatGenres(movie.genres)].filter(Boolean).join(" · ");
+    const providerRow = document.createElement("div");
+    providerRow.className = "badge-row";
+    const providerBadges = (movie.streamingProviders || [])
+      .slice(0, 4)
+      .map((provider) => createProviderBadge(provider));
+    providerBadges.forEach((badge) => providerRow.append(badge));
 
     const badgeRow = document.createElement("div");
     badgeRow.className = "action-row";
@@ -1489,12 +1538,37 @@ function renderTrendingMovies(movies = []) {
     actions.className = "action-row";
     actions.append(favoriteToggle);
 
-    stack.append(title, meta, badgeRow, actions);
+    stack.append(title, meta);
+    if (providerBadges.length) {
+      stack.append(providerRow);
+    }
+    stack.append(badgeRow, actions);
     card.append(stack);
     trendingRow.append(card);
   });
 
   renderTrendingStatus();
+}
+
+function normalizeStreamingProviders(raw = []) {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw
+    .map((entry) => {
+      const key = entry.key || entry.provider_key || entry.value || "";
+      const name = entry.name || entry.displayName || entry.label || key;
+      if (!key && !name) return null;
+      return {
+        key,
+        name,
+        url: entry.url || entry.deeplink || entry.link || "",
+        region: entry.region || null,
+        deeplink: entry.deeplink || null,
+        brandColor: entry.brandColor || entry.color || entry.brand_color || null
+      };
+    })
+    .filter(Boolean);
 }
 
 function normalizeDiscoverMovie(movie = {}) {
@@ -1545,7 +1619,10 @@ function normalizeDiscoverMovie(movie = {}) {
     stats: { watchCount, favorites, reviews },
     rank,
     trendScore,
-    timeWindow
+    timeWindow,
+    streamingProviders: normalizeStreamingProviders(
+      movie.streamingProviders || movie.streaming_providers || []
+    )
   };
 }
 
@@ -1568,6 +1645,20 @@ function createFavoriteToggleButton(movie) {
 
   updateLabel();
   return button;
+}
+
+function createProviderBadge(provider) {
+  const badge = document.createElement("span");
+  badge.className = "badge provider";
+  badge.textContent = provider.name || provider.key || "Stream";
+  if (provider.brandColor) {
+    badge.style.borderColor = provider.brandColor;
+    badge.style.color = provider.brandColor;
+  }
+  if (provider.region) {
+    badge.title = provider.region;
+  }
+  return badge;
 }
 
 function renderPeople(people = [], { source = "tmdb" } = {}) {
@@ -3366,6 +3457,11 @@ async function loadDiscoverResults({ query = "" } = {}) {
     params.q = trimmedQuery;
   }
 
+  if (state.discoverFilter === "streaming") {
+    params.providers = "mine";
+    params.streaming_only = "true";
+  }
+
   try {
     const data = await fetchFromSearch(params, {
       signal: controller.signal,
@@ -3588,10 +3684,39 @@ function ensureOnboardingOptionChips() {
     buildChipOptions(onboardingDecadeOptions, decades);
     onboardingDecadeOptions.dataset.built = "true";
   }
-  if (onboardingProviderOptions && !onboardingProviderOptions.dataset.built) {
-    buildChipOptions(onboardingProviderOptions, STREAMING_PROVIDER_OPTIONS);
-    onboardingProviderOptions.dataset.built = "true";
+  if (onboardingProviderOptions) {
+    const providerOptions = getStreamingProviderOptions();
+    const signature = providerOptions.map((option) => option.value).join(",");
+    if (onboardingProviderOptions.dataset.built !== signature) {
+      buildChipOptions(onboardingProviderOptions, providerOptions);
+      onboardingProviderOptions.dataset.built = signature;
+    }
   }
+}
+
+function getStreamingProviderOptions() {
+  const providers = state.streamingProviders.length
+    ? state.streamingProviders
+    : STREAMING_PROVIDER_OPTIONS.map((provider) => ({
+        key: provider.value,
+        displayName: provider.label
+      }));
+
+  return providers.map((provider) => ({
+    value: provider.key || provider.value,
+    label: provider.displayName || provider.label || provider.key,
+    brandColor: provider.brandColor || provider.metadata?.brand_color || null
+  }));
+}
+
+function normalizeStreamingProvider(provider = {}) {
+  return {
+    key: provider.key || provider.value || "",
+    displayName:
+      provider.displayName || provider.display_name || provider.label || provider.key || "Streaming provider",
+    url: provider.url || (provider.metadata && provider.metadata.url) || "",
+    brandColor: provider.brandColor || provider.metadata?.brand_color || null
+  };
 }
 
 function updateOnboardingCounts() {
@@ -4190,6 +4315,7 @@ function init() {
   });
   subscribeToSession((session) => {
     updateAccountUi(session);
+    loadStreamingProviders();
     if (session && session.token) {
       state.favorites = Array.isArray(session.favoritesList) ? session.favoritesList : [];
       renderFavoritesList();
@@ -4227,6 +4353,7 @@ function init() {
   }
   attachListeners();
   refreshAppConfig();
+  loadStreamingProviders();
   setSection("home");
   loadTrendingMovies(state.trendingWindow);
   loadDiscover(state.discoverFilter);

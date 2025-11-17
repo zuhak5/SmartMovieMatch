@@ -1099,6 +1099,39 @@ create table IF NOT EXISTS public.user_streaming_profiles (
 create index IF not exists user_streaming_profiles_user_idx
   on public.user_streaming_profiles using btree (username, provider_key);
 
+create table IF NOT EXISTS public.movie_availability (
+  id uuid not null default gen_random_uuid(),
+  movie_imdb_id text not null,
+  provider_key text not null,
+  region text null,
+  deeplink text null,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamp with time zone not null default timezone('utc'::text, now()),
+  updated_at timestamp with time zone not null default timezone('utc'::text, now()),
+  constraint movie_availability_pkey primary key (id),
+  constraint movie_availability_movie_fkey foreign key (movie_imdb_id) references movies (imdb_id) on delete cascade,
+  constraint movie_availability_provider_fkey foreign key (provider_key) references streaming_providers (key) on delete cascade
+) TABLESPACE pg_default;
+
+create unique index IF not exists movie_availability_movie_provider_region_idx
+  on public.movie_availability using btree (movie_imdb_id, provider_key, coalesce(region, ''));
+
+insert into public.streaming_providers as sp (key, display_name, url, metadata)
+values
+  ('netflix', 'Netflix', 'https://www.netflix.com', '{"brand_color": "#e50914"}'),
+  ('prime-video', 'Prime Video', 'https://www.primevideo.com', '{"brand_color": "#00a8e1"}'),
+  ('disney-plus', 'Disney+', 'https://www.disneyplus.com', '{"brand_color": "#113ccf"}'),
+  ('max', 'Max', 'https://www.max.com', '{"brand_color": "#3300cc"}'),
+  ('hulu', 'Hulu', 'https://www.hulu.com', '{"brand_color": "#1ce783"}'),
+  ('apple-tv', 'Apple TV+', 'https://tv.apple.com', '{"brand_color": "#0a84ff"}'),
+  ('peacock', 'Peacock', 'https://www.peacocktv.com', '{"brand_color": "#000000"}'),
+  ('paramount-plus', 'Paramount+', 'https://www.paramountplus.com', '{"brand_color": "#0064d2"}')
+on conflict (key) do update
+  set display_name = excluded.display_name,
+      url = excluded.url,
+      metadata = excluded.metadata,
+      updated_at = timezone('utc'::text, now());
+
 -- ---------------------------------------------------------------------
 -- 3) Watch parties (for live/shared viewing & chat)
 -- ---------------------------------------------------------------------
@@ -1517,6 +1550,15 @@ alter table public.streaming_providers enable row level security;
 drop policy if exists "Streaming providers are readable by everyone" on public.streaming_providers;
 create policy "Streaming providers are readable by everyone"
   on public.streaming_providers
+  for select
+  to anon, authenticated
+  using ( true );
+
+alter table public.movie_availability enable row level security;
+
+drop policy if exists "Movie availability is readable by everyone" on public.movie_availability;
+create policy "Movie availability is readable by everyone"
+  on public.movie_availability
   for select
   to anon, authenticated
   using ( true );

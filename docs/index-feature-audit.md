@@ -198,19 +198,19 @@ Each item is a task for Codex (or any other assistant) to implement.
 
 ## Streaming providers & availability (STRM)
 
-- [ ] **STRM-001 – Streaming provider registry in UI**
+- [x] **STRM-001 – Streaming provider registry in UI**
   - Description: Display provider badges on movie cards using `streaming_providers` and `movie_availability`.
   - Files: Movie card component, filters UI.
   - Backend: `streaming_providers`, `movie_availability`.
-  - DONE: _…_
+  - DONE 2025-11-18T00:00Z – Added streaming provider registry with availability badges on discover and trending cards backed by Supabase availability rows.
 
-- [ ] **STRM-002 – “Where I can watch” filter**
+- [x] **STRM-002 – “Where I can watch” filter**
   - Description: Add filters (and onboarding step) for the user’s subscribed services.
     - Store user choices in `user_streaming_profiles`.
     - Filter discovery results to those providers.
   - Files: Onboarding, filter panel in search/discover view.
   - Backend: `user_streaming_profiles`, `movie_availability`.
-  - DONE: _…_
+  - DONE 2025-11-18T00:00Z – Added onboarding-backed provider sync to user streaming profiles plus a “Where I can watch” discover filter powered by the user’s saved providers.
 
 ---
 
