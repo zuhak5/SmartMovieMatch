@@ -300,26 +300,37 @@
           </div>
           <div class="tab-panel" data-tab-panel="overview">
             <div class="card">
-              <div class="poster" style="max-width: 110px;"></div>
+              <div
+                class="poster"
+                style="max-width: 110px;"
+                aria-hidden="true"
+                data-profile-avatar
+              ></div>
               <div class="stack">
-                <h3>Alex Morgan</h3>
-                <div class="small-text">@alexm · Loves sci-fi, thrillers, and moody dramas.</div>
+                <h3 data-profile-name>Guest</h3>
+                <div class="small-text" data-profile-handle>@guest</div>
+                <p class="small-text" data-profile-bio>
+                  Sign in to add a bio and location for your profile.
+                </p>
+                <div class="small-text" data-profile-location>
+                  Location unknown
+                </div>
                 <div class="stat-row">
                   <div class="stat">
                     <div class="small-text">Films</div>
-                    <strong>328</strong>
+                    <strong data-profile-stat="films">0</strong>
                   </div>
                   <div class="stat">
                     <div class="small-text">Diary entries</div>
-                    <strong>112</strong>
+                    <strong data-profile-stat="diary">0</strong>
                   </div>
                   <div class="stat">
                     <div class="small-text">Followers</div>
-                    <strong>689</strong>
+                    <strong data-profile-stat="followers">0</strong>
                   </div>
                   <div class="stat">
                     <div class="small-text">Following</div>
-                    <strong>245</strong>
+                    <strong data-profile-stat="following">0</strong>
                   </div>
                 </div>
                 <div class="stack">

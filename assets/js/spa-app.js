@@ -12,6 +12,7 @@ import {
   registerUser,
   subscribeToSession
 } from "./auth.js";
+import { initSocialFeatures, subscribeToSocialOverview } from "./social.js";
 
 const defaultTabs = {
   friends: "feed",
@@ -32,6 +33,7 @@ const state = {
   discoverPeople: [],
   discoverLists: [],
   session: loadSession(),
+  socialOverview: null,
   accountMenuOpen: false,
   authMode: "login",
   authSubmitting: false
@@ -87,6 +89,17 @@ const accountAvatar = document.querySelector("[data-account-avatar]");
 const accountLogoutButton = document.querySelector("[data-account-logout]");
 const accountProfileButton = document.querySelector("[data-account-profile]");
 const accountSettingsButton = document.querySelector("[data-account-settings]");
+const profileName = document.querySelector("[data-profile-name]");
+const profileHandle = document.querySelector("[data-profile-handle]");
+const profileBio = document.querySelector("[data-profile-bio]");
+const profileLocation = document.querySelector("[data-profile-location]");
+const profileAvatar = document.querySelector("[data-profile-avatar]");
+const profileStats = {
+  films: document.querySelector('[data-profile-stat="films"]'),
+  diary: document.querySelector('[data-profile-stat="diary"]'),
+  followers: document.querySelector('[data-profile-stat="followers"]'),
+  following: document.querySelector('[data-profile-stat="following"]')
+};
 
 function hasActiveSession() {
   return Boolean(state.session && state.session.token);
@@ -306,6 +319,83 @@ function updateAccountUi(session) {
   if (!hasSession) {
     ensureAccessibleSection();
   }
+
+  renderProfileOverview();
+}
+
+function renderProfileOverview() {
+  const hasSession = Boolean(state.session && state.session.token);
+  const profile = {
+    name: hasSession
+      ? state.session.displayName || state.session.username
+      : "Guest",
+    handle: hasSession && state.session.username ? `@${state.session.username}` : "@guest",
+    bio:
+      (state.session &&
+        state.session.preferencesSnapshot &&
+        state.session.preferencesSnapshot.profile &&
+        state.session.preferencesSnapshot.profile.bio) ||
+      (hasSession
+        ? "Add a short bio so friends know your vibe."
+        : "Sign in to add a bio and location for your profile."),
+    location:
+      (state.session &&
+        state.session.preferencesSnapshot &&
+        state.session.preferencesSnapshot.profile &&
+        state.session.preferencesSnapshot.profile.location) ||
+      (hasSession ? "Location not set" : "Location unknown"),
+    avatarUrl: hasSession && state.session.avatarUrl ? state.session.avatarUrl : null,
+    stats: {
+      films:
+        (state.session &&
+          state.session.preferencesSnapshot &&
+          Number.isFinite(state.session.preferencesSnapshot.filmsLogged)
+            ? state.session.preferencesSnapshot.filmsLogged
+            : 0),
+      diary:
+        (state.session &&
+          state.session.preferencesSnapshot &&
+          Number.isFinite(state.session.preferencesSnapshot.diaryEntries)
+            ? state.session.preferencesSnapshot.diaryEntries
+            : 0),
+      followers:
+        state.socialOverview && state.socialOverview.counts
+          ? Number(state.socialOverview.counts.followers || 0)
+          : 0,
+      following:
+        state.socialOverview && state.socialOverview.counts
+          ? Number(state.socialOverview.counts.following || 0)
+          : 0
+    }
+  };
+
+  if (profileName) {
+    profileName.textContent = profile.name;
+  }
+  if (profileHandle) {
+    profileHandle.textContent = profile.handle;
+  }
+  if (profileBio) {
+    profileBio.textContent = profile.bio;
+  }
+  if (profileLocation) {
+    profileLocation.textContent = profile.location;
+  }
+  if (profileAvatar) {
+    profileAvatar.style.backgroundImage = "";
+    if (profile.avatarUrl) {
+      profileAvatar.style.backgroundImage = `url(${profile.avatarUrl})`;
+      profileAvatar.textContent = "";
+    } else {
+      profileAvatar.textContent = initialsFromName(profile.name);
+    }
+  }
+
+  Object.entries(profileStats).forEach(([key, element]) => {
+    if (!element) return;
+    const value = profile.stats[key] || 0;
+    element.textContent = value.toLocaleString();
+  });
 }
 
 function renderDiscoverMovies(movies = []) {
@@ -872,12 +962,17 @@ function attachListeners() {
 function init() {
   setAuthMode(state.authMode);
   updateAccountUi(state.session);
+  subscribeToSocialOverview((overview) => {
+    state.socialOverview = overview;
+    renderProfileOverview();
+  });
   subscribeToSession((session) => {
     updateAccountUi(session);
     if (session && session.token) {
       closeAuthOverlay();
     }
   });
+  initSocialFeatures();
   attachListeners();
   setSection("home");
   loadDiscover(state.discoverFilter);
