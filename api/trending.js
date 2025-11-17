@@ -82,9 +82,22 @@ async function fetchTrendingFromSupabase({ timeWindow, limit }) {
 
   const text = await response.text();
   const rawRows = text ? JSON.parse(text) : [];
-  return Array.isArray(rawRows)
+  const movies = Array.isArray(rawRows)
     ? rawRows.map(normalizeTrendingRow).filter(Boolean)
     : [];
+
+  if (!movies.length) {
+    return movies;
+  }
+
+  const availabilityByMovie = await fetchMovieAvailability(
+    movies.map((movie) => movie.imdbId).filter(Boolean)
+  );
+
+  return movies.map((movie) => ({
+    ...movie,
+    streamingProviders: availabilityByMovie[movie.imdbId] || []
+  }));
 }
 
 function normalizeTrendingRow(row) {
@@ -121,6 +134,71 @@ function extractRelationshipCount(rel) {
     return rel[0].count;
   }
   return 0;
+}
+
+async function fetchMovieAvailability(imdbIds = []) {
+  if (!Array.isArray(imdbIds) || !imdbIds.length) {
+    return {};
+  }
+
+  const url = new URL('/rest/v1/movie_availability', SUPABASE_URL);
+  url.searchParams.set(
+    'select',
+    'movie_imdb_id,provider_key,region,deeplink,provider:provider_key(key,display_name,url,metadata)'
+  );
+  url.searchParams.append('movie_imdb_id', `in.${encodeInList(imdbIds)}`);
+
+  const response = await fetchWithTimeout(url, {
+    timeoutMs: 15000,
+    headers: {
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      Accept: 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    const text = await safeReadResponse(response);
+    throw new Error(text || 'Supabase availability request failed');
+  }
+
+  const text = await response.text();
+  const rows = text ? JSON.parse(text) : [];
+  if (!Array.isArray(rows)) {
+    return {};
+  }
+
+  return rows.reduce((acc, row) => {
+    if (!row || !row.movie_imdb_id) {
+      return acc;
+    }
+    const normalized = mapAvailabilityRow(row);
+    if (!acc[row.movie_imdb_id]) {
+      acc[row.movie_imdb_id] = [];
+    }
+    acc[row.movie_imdb_id].push(normalized);
+    return acc;
+  }, {});
+}
+
+function mapAvailabilityRow(row = {}) {
+  const provider = row.provider || {};
+  return {
+    key: row.provider_key || provider.key || '',
+    name: provider.display_name || row.provider_key || 'Streaming',
+    url: provider.url || null,
+    region: row.region || null,
+    deeplink: row.deeplink || null,
+    brandColor: provider.metadata?.brand_color || null
+  };
+}
+
+function encodeInList(values = []) {
+  const safeValues = values
+    .map((value) => String(value || ''))
+    .filter(Boolean)
+    .map((value) => `"${value.replace(/"/g, '\\"')}"`);
+  return `(${safeValues.join(',')})`;
 }
 
 function buildLocalFallback(limit) {

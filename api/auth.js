@@ -316,6 +316,12 @@ async function syncPreferences(req, payload) {
         lastActiveAt: now
       };
 
+  if (AUTH_SERVICE_CONFIGURED) {
+    const streamingProviders =
+      (preferences && preferences.streaming && preferences.streaming.providers) || [];
+    await syncStreamingProfiles(userRecord.username, streamingProviders);
+  }
+
   return {
     body: {
       ok: true,
@@ -702,6 +708,61 @@ async function updateSessionRow(token, patch) {
   );
 }
 
+async function syncStreamingProfiles(username, providers) {
+  if (!username) {
+    return;
+  }
+
+  const providerKeys = sanitizeStringList(providers, 12, 40);
+  const existing = await supabaseFetch("user_streaming_profiles", {
+    query: {
+      select: "id,provider_key,is_active",
+      username: `eq.${encodeURIComponent(username)}`
+    }
+  });
+
+  const existingRows = Array.isArray(existing) ? existing : [];
+  const existingMap = new Map(
+    existingRows.filter((row) => row && row.provider_key).map((row) => [row.provider_key, row])
+  );
+
+  const toInsert = providerKeys
+    .filter((key) => !existingMap.has(key))
+    .map((key) => ({ username, provider_key: key, is_active: true }));
+  const toActivate = existingRows.filter(
+    (row) => row && providerKeys.includes(row.provider_key) && row.is_active === false
+  );
+  const toDelete = existingRows.filter(
+    (row) => row && row.provider_key && !providerKeys.includes(row.provider_key)
+  );
+
+  if (toInsert.length) {
+    await supabaseFetch("user_streaming_profiles", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: toInsert
+    });
+  }
+
+  await Promise.all(
+    toActivate.map((row) =>
+      supabaseFetch(`user_streaming_profiles?id=eq.${encodeURIComponent(row.id)}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: { is_active: true }
+      })
+    )
+  );
+
+  if (toDelete.length) {
+    const encodedIds = encodeIdsInList(toDelete.map((row) => row.id));
+    await supabaseFetch(`user_streaming_profiles?id=in.${encodedIds}`, {
+      method: "DELETE",
+      headers: { Prefer: "return=minimal" }
+    });
+  }
+}
+
 async function selectSessionRow(token) {
   if (!token) {
     return null;
@@ -772,6 +833,14 @@ async function mutateRows(path, values, method) {
     return rows[0] || null;
   }
   return rows || null;
+}
+
+function encodeIdsInList(values = []) {
+  const safeValues = values
+    .map((value) => String(value || ""))
+    .filter(Boolean)
+    .map((value) => `"${value.replace(/"/g, '\\"')}"`);
+  return `(${safeValues.join(",")})`;
 }
 
 async function supabaseFetch(path, { method = "GET", headers = {}, query, body } = {}) {
@@ -1044,6 +1113,12 @@ function sanitizePreferences(preferences) {
   } else {
     delete safe.profile;
   }
+  const streamingPreferences = sanitizeStreamingPreferences(preferences.streaming);
+  if (streamingPreferences) {
+    safe.streaming = streamingPreferences;
+  } else {
+    delete safe.streaming;
+  }
   const personaPins = sanitizePersonaPins(
     preferences.personaPins || {
       list: preferences.pinnedList || null,
@@ -1149,6 +1224,15 @@ function sanitizeNotificationPreferences(prefs) {
     normalized.followEmails === DEFAULT_NOTIFICATION_PREFERENCES.followEmails &&
     normalized.partyEmails === DEFAULT_NOTIFICATION_PREFERENCES.partyEmails;
   return matchesDefaults ? null : normalized;
+}
+
+function sanitizeStreamingPreferences(streaming) {
+  if (!streaming || typeof streaming !== "object") {
+    return null;
+  }
+  const providers = sanitizeStringList(streaming.providers, 12, 40);
+  const normalized = providers.length ? { providers } : {};
+  return Object.keys(normalized).length ? normalized : null;
 }
 
 function sanitizeProfilePreferences(profile) {
