@@ -1,11 +1,11 @@
 const { fetchWithTimeout } = require('../lib/http-client');
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const TMDB_API_KEY = process.env.TMDB_API_KEY;
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 50;
 const ALLOWED_WINDOWS = new Set(['daily', 'weekly', 'monthly']);
+const REQUEST_TIMEOUT_MS = 10000;
 
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -16,8 +16,8 @@ module.exports = async (req, res) => {
     return;
   }
 
-  if (!(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY)) {
-    res.status(503).json({ error: 'Trending service is not configured' });
+  if (!TMDB_API_KEY) {
+    res.status(503).json({ error: 'TMDB API key is not configured' });
     return;
   }
 
@@ -26,8 +26,7 @@ module.exports = async (req, res) => {
   const limit = clampLimit(parsed.searchParams.get('limit'));
 
   try {
-    const movies = await fetchTrendingFromSupabase({ timeWindow, limit });
-
+    const movies = await fetchTrendingFromTmdb({ timeWindow, limit });
     res.status(200).json({ movies });
   } catch (error) {
     console.error('trending endpoint failed', error);
@@ -49,158 +48,69 @@ function parseTimeWindow(value) {
   return ALLOWED_WINDOWS.has(normalized) ? normalized : 'weekly';
 }
 
-async function fetchTrendingFromSupabase({ timeWindow, limit }) {
-  const searchParams = new URLSearchParams();
-  searchParams.set(
-    'select',
-    [
-      'time_window,rank,trend_score,captured_at',
-      'movie:movie_imdb_id(imdb_id,tmdb_id,title,poster_url,release_year,genres,synopsis,last_synced_at,watch_diary:watch_diary(count),movie_reviews:movie_reviews(count),user_favorites:user_favorites(count))'
-    ].join(',')
-  );
-  searchParams.set('time_window', `eq.${timeWindow}`);
-  searchParams.append('order', 'rank.asc.nullslast');
-  searchParams.append('order', 'trend_score.desc.nullslast');
-  searchParams.set('limit', String(limit));
-
-  const url = new URL('/rest/v1/trending_movies', SUPABASE_URL);
-  for (const [key, value] of searchParams.entries()) {
-    url.searchParams.append(key, value);
-  }
-
-  const response = await fetchWithTimeout(url, {
-    timeoutMs: 15000,
-    headers: {
-      apikey: SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      Accept: 'application/json'
-    }
-  });
+async function fetchTrendingFromTmdb({ timeWindow, limit }) {
+  const url = buildTrendingUrl(timeWindow);
+  const response = await fetchWithTimeout(url, { timeoutMs: REQUEST_TIMEOUT_MS });
 
   if (!response.ok) {
     const text = await safeReadResponse(response);
-    throw new Error(text || 'Supabase trending request failed');
+    throw new Error(text || 'TMDB trending request failed');
   }
 
-  const text = await response.text();
-  const rawRows = text ? JSON.parse(text) : [];
-  const movies = Array.isArray(rawRows)
-    ? rawRows.map(normalizeTrendingRow).filter(Boolean)
-    : [];
+  const payload = await parseJson(response);
+  const results = Array.isArray(payload?.results) ? payload.results.slice(0, limit) : [];
+  return results.map((movie, index) => normalizeTrendingMovie(movie, { timeWindow, index }));
+}
 
-  if (!movies.length) {
-    return movies;
+function buildTrendingUrl(timeWindow = 'weekly') {
+  const tmdbWindow = timeWindow === 'daily' ? 'day' : 'week';
+  const basePath = timeWindow === 'monthly'
+    ? 'https://api.themoviedb.org/3/discover/movie'
+    : `https://api.themoviedb.org/3/trending/movie/${tmdbWindow}`;
+
+  const url = new URL(basePath);
+  url.searchParams.set('api_key', TMDB_API_KEY);
+  url.searchParams.set('language', 'en-US');
+  url.searchParams.set('include_adult', 'false');
+  url.searchParams.set('page', '1');
+  url.searchParams.set('region', 'US');
+
+  if (timeWindow === 'monthly') {
+    url.searchParams.set('sort_by', 'popularity.desc');
+    url.searchParams.set('primary_release_date.gte', dateStringDaysAgo(30));
   }
 
-  const availabilityByMovie = await fetchMovieAvailability(
-    movies.map((movie) => movie.imdbId).filter(Boolean)
-  );
+  return url;
+}
 
-  return movies.map((movie) => ({
+function normalizeTrendingMovie(movie = {}, { timeWindow, index }) {
+  const releaseYear = movie.release_date ? movie.release_date.slice(0, 4) : null;
+  const rank = Number.isFinite(Number(movie.rank)) ? Number(movie.rank) : index + 1;
+  const trendScore = Number.isFinite(Number(movie.popularity))
+    ? Number(movie.popularity)
+    : movie.vote_average || null;
+
+  return {
     ...movie,
-    streamingProviders: availabilityByMovie[movie.imdbId] || []
-  }));
-}
-
-function normalizeTrendingRow(row) {
-  if (!row || !row.movie) {
-    return null;
-  }
-
-  const watchCount = extractRelationshipCount(row.movie.watch_diary);
-  const favorites = extractRelationshipCount(row.movie.user_favorites);
-  const reviews = extractRelationshipCount(row.movie.movie_reviews);
-
-  return {
-    imdbId: row.movie.imdb_id || null,
-    tmdbId: row.movie.tmdb_id || null,
-    title: row.movie.title || 'Untitled',
-    posterUrl: row.movie.poster_url || '',
-    releaseYear: row.movie.release_year || null,
-    genres: Array.isArray(row.movie.genres) ? row.movie.genres : [],
-    synopsis: row.movie.synopsis || '',
-    stats: {
-      watchCount,
-      favorites,
-      reviews
-    },
-    lastSyncedAt: row.movie.last_synced_at || null,
-    trendScore: Number.isFinite(Number(row.trend_score)) ? Number(row.trend_score) : null,
-    rank: Number.isFinite(Number(row.rank)) ? Number(row.rank) : null,
-    timeWindow: row.time_window || 'weekly'
+    releaseYear,
+    trendScore,
+    rank,
+    timeWindow
   };
 }
 
-function extractRelationshipCount(rel) {
-  if (Array.isArray(rel) && rel.length && typeof rel[0].count === 'number') {
-    return rel[0].count;
-  }
-  return 0;
+function dateStringDaysAgo(days = 30) {
+  const boundary = new Date();
+  boundary.setDate(boundary.getDate() - days);
+  return boundary.toISOString().slice(0, 10);
 }
 
-async function fetchMovieAvailability(imdbIds = []) {
-  if (!Array.isArray(imdbIds) || !imdbIds.length) {
-    return {};
+async function parseJson(response) {
+  try {
+    return await response.json();
+  } catch (error) {
+    throw new Error('Unable to parse TMDB response');
   }
-
-  const url = new URL('/rest/v1/movie_availability', SUPABASE_URL);
-  url.searchParams.set(
-    'select',
-    'movie_imdb_id,provider_key,region,deeplink,provider:provider_key(key,display_name,url,metadata)'
-  );
-  url.searchParams.append('movie_imdb_id', `in.${encodeInList(imdbIds)}`);
-
-  const response = await fetchWithTimeout(url, {
-    timeoutMs: 15000,
-    headers: {
-      apikey: SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      Accept: 'application/json'
-    }
-  });
-
-  if (!response.ok) {
-    const text = await safeReadResponse(response);
-    throw new Error(text || 'Supabase availability request failed');
-  }
-
-  const text = await response.text();
-  const rows = text ? JSON.parse(text) : [];
-  if (!Array.isArray(rows)) {
-    return {};
-  }
-
-  return rows.reduce((acc, row) => {
-    if (!row || !row.movie_imdb_id) {
-      return acc;
-    }
-    const normalized = mapAvailabilityRow(row);
-    if (!acc[row.movie_imdb_id]) {
-      acc[row.movie_imdb_id] = [];
-    }
-    acc[row.movie_imdb_id].push(normalized);
-    return acc;
-  }, {});
-}
-
-function mapAvailabilityRow(row = {}) {
-  const provider = row.provider || {};
-  return {
-    key: row.provider_key || provider.key || '',
-    name: provider.display_name || row.provider_key || 'Streaming',
-    url: provider.url || null,
-    region: row.region || null,
-    deeplink: row.deeplink || null,
-    brandColor: provider.metadata?.brand_color || null
-  };
-}
-
-function encodeInList(values = []) {
-  const safeValues = values
-    .map((value) => String(value || ''))
-    .filter(Boolean)
-    .map((value) => `"${value.replace(/"/g, '\\"')}"`);
-  return `(${safeValues.join(',')})`;
 }
 
 async function safeReadResponse(response) {
