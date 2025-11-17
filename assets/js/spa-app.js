@@ -13,6 +13,12 @@ import {
 } from "./app-config.js";
 import { TMDB_GENRES } from "./config.js";
 import {
+  FALLBACK_DISCOVER_MOVIES,
+  FALLBACK_PEOPLE,
+  FALLBACK_RECOMMENDATIONS,
+  FALLBACK_TRENDING_MOVIES
+} from "./fallback-data.js";
+import {
   loadSession,
   loginUser,
   logoutSession,
@@ -3675,7 +3681,7 @@ async function loadTrendingPeople(query = "") {
     renderPeopleSection();
   } catch (error) {
     console.warn("people fetch failed", error);
-    state.discoverPeople = [];
+    state.discoverPeople = FALLBACK_PEOPLE;
     renderPeopleSection();
   }
 }
@@ -3707,9 +3713,9 @@ async function loadTrendingMovies(timeWindow = state.trendingWindow) {
   } catch (error) {
     if (error.name === "AbortError") return;
     console.warn("trending fetch failed", error);
-    state.trendingMovies = [];
-    state.trendingError = "Unable to load trending movies.";
-    renderTrendingMovies([]);
+    state.trendingMovies = FALLBACK_TRENDING_MOVIES;
+    state.trendingError = "Showing offline trending picks while we reconnect.";
+    renderTrendingMovies(state.trendingMovies);
   } finally {
     state.trendingAbort = null;
     state.trendingLoading = false;
@@ -3772,6 +3778,12 @@ async function loadHomeRecommendations() {
   } catch (error) {
     if (error.name === "AbortError") return;
     console.warn("recommendations failed", error);
+    state.homeRecommendations = FALLBACK_RECOMMENDATIONS;
+    renderHomeRecommendations(state.homeRecommendations);
+    renderGroupPicks(
+      state.homeRecommendations.slice(0, getUiLimit("ui.home.groupPicks", 3))
+    );
+    renderListCards(buildListsFromMovies(state.homeRecommendations.map((item) => item.tmdb)));
   }
 
   state.recommendationsAbort = null;
@@ -3974,7 +3986,8 @@ async function loadDiscoverResults({ query = "" } = {}) {
   } catch (error) {
     if (error.name === "AbortError") return;
     console.warn("search failed", error);
-    renderDiscoverMovies([]);
+    renderDiscoverMovies(FALLBACK_DISCOVER_MOVIES);
+    renderListCards(buildListsFromMovies(FALLBACK_DISCOVER_MOVIES));
   } finally {
     state.discoverAbort = null;
   }
