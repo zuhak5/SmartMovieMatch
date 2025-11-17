@@ -368,6 +368,31 @@ export async function joinWatchPartyRemote({ partyId, note }) {
   return callSocial('joinWatchParty', { partyId, note });
 }
 
+export async function listWatchPartyMessagesRemote({ partyId }) {
+  const trimmed = typeof partyId === 'string' ? partyId.trim() : '';
+  if (!trimmed) {
+    throw new Error('Choose a watch party first.');
+  }
+  const response = await callSocial('listWatchPartyMessages', { partyId: trimmed });
+  const messages = Array.isArray(response?.messages)
+    ? response.messages.map(normalizeWatchPartyMessage).filter(Boolean)
+    : [];
+  return messages;
+}
+
+export async function postWatchPartyMessageRemote({ partyId, body }) {
+  const trimmed = typeof partyId === 'string' ? partyId.trim() : '';
+  const message = typeof body === 'string' ? body.trim() : '';
+  if (!trimmed) {
+    throw new Error('Choose a watch party first.');
+  }
+  if (!message) {
+    throw new Error('Type a message before sending.');
+  }
+  const response = await callSocial('postWatchPartyMessage', { partyId: trimmed, body: message });
+  return normalizeWatchPartyMessage(response?.message);
+}
+
 export async function voteCollaborativeItemRemote({ listId, tmdbId, vote }) {
   return callSocial('voteCollaborativeItem', { listId, tmdbId, vote });
 }
@@ -3747,6 +3772,27 @@ function cloneCollaborativeState(collabState) {
           }))
         : []
     }
+  };
+}
+
+function normalizeWatchPartyMessage(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+  const id = entry.id || String(Math.random());
+  const username = canonicalUsername(entry.username);
+  const body = typeof entry.body === 'string' ? entry.body : '';
+  if (!username || !body) {
+    return null;
+  }
+  return {
+    id,
+    partyId: entry.partyId || entry.party_id || null,
+    username,
+    body,
+    messageType: entry.messageType || entry.message_type || 'chat',
+    metadata: entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {},
+    createdAt: entry.createdAt || entry.created_at || null
   };
 }
 
