@@ -543,6 +543,7 @@ p {
 
 .small-text {
   color: var(--muted);
+  content-visibility: hidden;
   font-size: 13px;
 }
 
