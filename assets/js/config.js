@@ -1,4 +1,8 @@
 export const API_ROUTES = {
+  auth: "/api/auth",
+  social: "/api/social",
+  config: "/api/config",
+  telemetry: "/api/telemetry",
   tmdb: "/api/tmdb",
   omdb: "/api/omdb",
   youtube: "/api/youtube",

@@ -1,8 +1,9 @@
 import { loadSession, subscribeToSession } from './auth.js';
 import { logUserActivity } from './analytics.js';
+import { API_ROUTES } from './config.js';
 import { createInlineProfileLink } from './profile-overlay.js';
 
-const SOCIAL_ENDPOINT = '/api/social';
+const SOCIAL_ENDPOINT = API_ROUTES.social;
 const MAX_REVIEW_LENGTH = 600;
 const MAX_LONG_REVIEW_LENGTH = 2400;
 
@@ -3684,7 +3685,7 @@ function startNotificationStream() {
   if (state.notificationStream) {
     return;
   }
-  const url = `/api/social?channel=notifications&token=${encodeURIComponent(state.session.token)}`;
+  const url = `${SOCIAL_ENDPOINT}?channel=notifications&token=${encodeURIComponent(state.session.token)}`;
   try {
     const source = new EventSource(url);
     state.notificationStream = source;

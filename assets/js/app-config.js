@@ -1,6 +1,7 @@
+import { API_ROUTES } from './config.js';
 import { loadSession, subscribeToSession } from './auth.js';
 
-const CONFIG_ENDPOINT = '/api/config';
+const CONFIG_ENDPOINT = API_ROUTES.config;
 const CONFIG_CACHE_KEY = 'smartmoviematch.configCache.v1';
 
 const DEFAULT_CONFIG = {
