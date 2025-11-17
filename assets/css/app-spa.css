@@ -81,6 +81,7 @@ textarea {
   align-items: center;
   gap: 10px;
   font-weight: 700;
+  font-size: small;
   letter-spacing: 0.4px;
 }
 
@@ -543,6 +544,7 @@ p {
 
 .small-text {
   color: var(--muted);
+  display: none;
   font-size: 13px;
 }
 
