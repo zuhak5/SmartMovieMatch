@@ -117,7 +117,7 @@ textarea {
 }
 
 .top-tabs-area {
-  padding: 8px 12px;
+  padding: unset;
   border-bottom: 1px solid var(--border);
   background: rgba(16, 23, 43, 0.9);
   position: sticky;
@@ -536,7 +536,7 @@ p {
 
 .bottom-nav {
   position: fixed;
-  bottom: 12px;
+  bottom: 3px;
   left: 50%;
   transform: translateX(-50%);
   width: min(100%, 420px);
