@@ -144,12 +144,12 @@ Each item is a task for Codex (or any other assistant) to implement.
 
 ## Watch diary & reviews (DIARY)
 
-- [ ] **DIARY-001 – Persist watch diary entries**
+- [x] **DIARY-001 – Persist watch diary entries**
   - Description: Replace any local mock watch history with Supabase-backed `watch_diary` rows.
     - Support `watched_on`, `rating`, `tags`, `rewatch_number`, `source`, `device`.
   - Files: Diary entry creation UI, diary list view.
   - Backend: `watch_diary` with RLS so only the owner can mutate and visibility is respected for readers.
-  - DONE: _…_
+  DONE 2025-11-17T11:17Z – Added Supabase-backed diary form and list with movie search, tag/source/device metadata, and insert logic wired to `watch_diary`.
 
 - [ ] **DIARY-002 – Rewatch support**
   - Description: When rewatching a movie from the diary or detail page:

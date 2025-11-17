@@ -110,6 +110,12 @@ module.exports = async (req, res) => {
       case 'getMovieReviews':
         result = await handleGetMovieReviews(req, payload);
         break;
+      case 'listDiaryEntries':
+        result = await handleListDiaryEntries(req, payload);
+        break;
+      case 'upsertDiaryEntry':
+        result = await handleUpsertDiaryEntry(req, payload);
+        break;
       case 'upsertReview':
         result = await handleUpsertReview(req, payload);
         break;
@@ -447,6 +453,105 @@ async function handleGetMovieReviews(req, payload) {
       stats
     }
   };
+}
+
+async function handleListDiaryEntries(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const limit = clampLimit(payload.limit, 40, 5);
+
+  if (usingLocalStore()) {
+    const store = await readSocialStore();
+    const entries = (Array.isArray(store.watchDiary) ? store.watchDiary : [])
+      .filter((entry) => entry && entry.username === user.username)
+      .sort((a, b) => normalizeTimestamp(b.watchedOn) - normalizeTimestamp(a.watchedOn))
+      .slice(0, limit)
+      .map(mapLocalDiaryEntry);
+    return { body: { ok: true, entries } };
+  }
+
+  try {
+    const rows = await supabaseFetch('watch_diary', {
+      query: {
+        select:
+          'id,watched_on,rating,tags,rewatch_number,source,device,visibility,created_at,updated_at,' +
+          'movie:movies(imdb_id,tmdb_id,title,poster_url,release_year)',
+        username: `eq.${user.username}`,
+        order: 'watched_on.desc',
+        limit: String(limit)
+      }
+    });
+    const entries = Array.isArray(rows) ? rows.map(mapDiaryRow) : [];
+    return { body: { ok: true, entries } };
+  } catch (error) {
+    enableLocalFallback('loading diary entries', error);
+    return handleListDiaryEntries(req, payload);
+  }
+}
+
+async function handleUpsertDiaryEntry(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const entryInput = payload.entry && typeof payload.entry === 'object' ? payload.entry : {};
+  const normalizedEntry = normalizeDiaryEntry(entryInput);
+  if (!normalizedEntry) {
+    throw new HttpError(400, 'Select a movie before saving to your diary.');
+  }
+
+  const timestamp = new Date().toISOString();
+
+  if (usingLocalStore()) {
+    const store = await readSocialStore();
+    const entryId = randomUUID();
+    const payloadEntry = {
+      id: entryId,
+      username: user.username,
+      movieImdbId: normalizedEntry.movie.imdbId,
+      movieTmdbId: normalizedEntry.movie.tmdbId || null,
+      movieTitle: normalizedEntry.movie.title,
+      watchedOn: normalizedEntry.watchedOn,
+      rating: normalizedEntry.rating,
+      tags: normalizedEntry.tags,
+      rewatchNumber: normalizedEntry.rewatchNumber,
+      source: normalizedEntry.source,
+      device: normalizedEntry.device,
+      visibility: normalizedEntry.visibility,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+    if (!Array.isArray(store.watchDiary)) {
+      store.watchDiary = [];
+    }
+    store.watchDiary.unshift(payloadEntry);
+    await writeSocialStore(store);
+    return { body: { ok: true, entry: mapLocalDiaryEntry(payloadEntry) } };
+  }
+
+  try {
+    await ensureMovieRecord(normalizedEntry.movie);
+    const rows = await supabaseFetch('watch_diary', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: [
+        {
+          username: user.username,
+          movie_imdb_id: normalizedEntry.movie.imdbId,
+          watched_on: normalizedEntry.watchedOn,
+          rating: normalizedEntry.rating,
+          tags: normalizedEntry.tags,
+          rewatch_number: normalizedEntry.rewatchNumber,
+          source: normalizedEntry.source || null,
+          device: normalizedEntry.device || null,
+          visibility: normalizedEntry.visibility,
+          metadata: normalizedEntry.metadata || {},
+          updated_at: timestamp
+        }
+      ]
+    });
+    const row = Array.isArray(rows) && rows.length ? rows[0] : null;
+    return { body: { ok: true, entry: row ? mapDiaryRow(row) : null } };
+  } catch (error) {
+    enableLocalFallback('saving a diary entry', error);
+    return handleUpsertDiaryEntry(req, payload);
+  }
 }
 
 async function handleUpsertReview(req, payload) {
@@ -5204,6 +5309,98 @@ function normalizeMovieInput(movie) {
   };
 }
 
+function normalizeDiaryEntry(input) {
+  if (!input || typeof input !== 'object') {
+    return null;
+  }
+  const movie = normalizeDiaryMovie(input.movie);
+  if (!movie || !movie.imdbId) {
+    return null;
+  }
+  const watchedOn = normalizeDiaryDate(input.watchedOn || input.watched_on);
+  const rating = normalizeRating(input.rating);
+  const tags = normalizeTags(input.tags);
+  const rewatchNumber = normalizeRewatchNumber(input.rewatchNumber ?? input.rewatch_number);
+  const visibility = normalizeReviewVisibility(input.visibility);
+  const source = sanitizeShortText(input.source);
+  const device = sanitizeShortText(input.device);
+  const metadata = input && typeof input.metadata === 'object' && !Array.isArray(input.metadata)
+    ? input.metadata
+    : {};
+  return {
+    movie,
+    watchedOn,
+    rating,
+    tags,
+    rewatchNumber,
+    visibility,
+    source,
+    device,
+    metadata
+  };
+}
+
+function normalizeDiaryMovie(movie) {
+  if (!movie || typeof movie !== 'object') {
+    return null;
+  }
+  const imdbId = movie.imdbId || movie.imdb_id || null;
+  const tmdbId = movie.tmdbId || movie.tmdb_id || movie.tmdbID || null;
+  const title = typeof movie.title === 'string' ? movie.title.trim() : '';
+  if (!imdbId || !title) {
+    return null;
+  }
+  return {
+    imdbId: String(imdbId).trim(),
+    tmdbId: tmdbId ? String(tmdbId).trim() : null,
+    title
+  };
+}
+
+function normalizeDiaryDate(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+  if (typeof value === 'string' && value.trim()) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toISOString().slice(0, 10);
+    }
+  }
+  return new Date().toISOString().slice(0, 10);
+}
+
+function normalizeTags(value) {
+  if (!value) {
+    return [];
+  }
+  const list = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+    ? value.split(',')
+    : [];
+  return list
+    .map((tag) => (tag == null ? '' : String(tag)).trim())
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function normalizeRewatchNumber(value) {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return 1;
+}
+
+function sanitizeShortText(value) {
+  if (!value || typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim().slice(0, 80);
+  return trimmed || null;
+}
+
 function normalizeRating(value) {
   if (value === null || value === undefined) {
     return null;
@@ -5214,6 +5411,65 @@ function normalizeRating(value) {
   }
   const clamped = Math.min(10, Math.max(0, number));
   return Math.round(clamped * 10) / 10;
+}
+
+function mapDiaryRow(row) {
+  if (!row) {
+    return null;
+  }
+  const movie = row.movie || {};
+  return {
+    id: row.id || null,
+    movie: {
+      imdbId: movie.imdb_id || movie.imdbId || null,
+      tmdbId: movie.tmdb_id || movie.tmdbId || null,
+      title: movie.title || 'Untitled',
+      posterUrl: movie.poster_url || movie.posterUrl || null,
+      releaseYear: movie.release_year || movie.releaseYear || null
+    },
+    watchedOn: row.watched_on || null,
+    rating: normalizeRating(row.rating),
+    tags: Array.isArray(row.tags) ? row.tags : [],
+    rewatchNumber: normalizeRewatchNumber(row.rewatch_number),
+    source: sanitizeShortText(row.source),
+    device: sanitizeShortText(row.device),
+    visibility: normalizeReviewVisibility(row.visibility),
+    createdAt: row.created_at || null,
+    updatedAt: row.updated_at || null
+  };
+}
+
+function mapLocalDiaryEntry(entry) {
+  if (!entry) {
+    return null;
+  }
+  return {
+    id: entry.id || null,
+    movie: {
+      imdbId: entry.movieImdbId || null,
+      tmdbId: entry.movieTmdbId || null,
+      title: entry.movieTitle || 'Untitled',
+      posterUrl: entry.posterUrl || null,
+      releaseYear: entry.releaseYear || null
+    },
+    watchedOn: entry.watchedOn || entry.createdAt || null,
+    rating: normalizeRating(entry.rating),
+    tags: Array.isArray(entry.tags) ? entry.tags : [],
+    rewatchNumber: normalizeRewatchNumber(entry.rewatchNumber),
+    source: sanitizeShortText(entry.source),
+    device: sanitizeShortText(entry.device),
+    visibility: normalizeReviewVisibility(entry.visibility),
+    createdAt: entry.createdAt || null,
+    updatedAt: entry.updatedAt || null
+  };
+}
+
+function clampLimit(value, max = 50, fallback = 20) {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return Math.min(max, Math.max(1, parsed));
+  }
+  return fallback;
 }
 
 function normalizeReviewContent(input = {}) {
@@ -5554,6 +5810,7 @@ async function readSocialStore() {
       activity: Array.isArray(parsed.activity) ? parsed.activity.slice() : legacyLibrary,
       reviewComments: Array.isArray(parsed.reviewComments) ? parsed.reviewComments.slice() : [],
       reviewReactions: Array.isArray(parsed.reviewReactions) ? parsed.reviewReactions.slice() : [],
+      watchDiary: Array.isArray(parsed.watchDiary) ? parsed.watchDiary.slice() : [],
       collabLists: Array.isArray(parsed.collabLists) ? parsed.collabLists.slice() : [],
       watchParties: Array.isArray(parsed.watchParties) ? parsed.watchParties.slice() : [],
       watchPartyMessages: Array.isArray(parsed.watchPartyMessages)
@@ -5576,6 +5833,7 @@ async function readSocialStore() {
       activity: [],
       reviewComments: [],
       reviewReactions: [],
+      watchDiary: [],
       collabLists: [],
       watchParties: [],
       watchPartyMessages: [],
@@ -5596,6 +5854,7 @@ async function writeSocialStore(store) {
       activity: Array.isArray(store.activity) ? store.activity : [],
       reviewComments: Array.isArray(store.reviewComments) ? store.reviewComments : [],
       reviewReactions: Array.isArray(store.reviewReactions) ? store.reviewReactions : [],
+      watchDiary: Array.isArray(store.watchDiary) ? store.watchDiary : [],
       collabLists: Array.isArray(store.collabLists) ? store.collabLists : [],
       watchParties: Array.isArray(store.watchParties) ? store.watchParties : [],
       watchPartyMessages: Array.isArray(store.watchPartyMessages)
