@@ -793,6 +793,132 @@ p {
   display: flex;
   align-items: center;
   gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.sheet-action-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ping {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4);
+  animation: pingPulse 2s infinite;
+}
+
+@keyframes pingPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.35);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(139, 92, 246, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0);
+  }
+}
+
+.sheet-action-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.sheet-aside {
+  padding: 8px;
+}
+
+.sheet-aside-card {
+  position: relative;
+  height: 100%;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(38, 46, 80, 0.7), rgba(20, 25, 45, 0.9));
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sheet-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+}
+
+.sheet-preview-text strong {
+  display: block;
+  margin: 4px 0;
+}
+
+.sheet-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sheet-progress-track {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.sheet-progress-value {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), #8bcdef);
+  box-shadow: 0 8px 20px rgba(139, 92, 246, 0.45);
+}
+
+.sheet-checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sheet-checklist li {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.sheet-checklist .icon {
+  font-size: 18px;
+}
+
+@media (max-width: 960px) {
+  .sheet-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sheet-aside {
+    padding-top: 0;
+  }
+
+  .field-span-2 {
+    grid-column: span 1;
+  }
 }
 
 .sheet-status-chip {
