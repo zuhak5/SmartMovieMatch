@@ -342,6 +342,8 @@ const favoritesPanel = document.querySelector('[data-favorites-panel]');
 const favoritesList = document.querySelector('[data-favorites-list]');
 const favoritesEmpty = document.querySelector('[data-favorites-empty]');
 const favoritesStatus = document.querySelector('[data-favorites-status]');
+const watchedSummary = document.querySelector('[data-watched-summary]');
+const watchedEmpty = document.querySelector('[data-watched-empty]');
 const authOverlay = document.querySelector("[data-auth-overlay]");
 const authForm = document.querySelector("[data-auth-form]");
 const authStatus = document.querySelector("[data-auth-status]");
@@ -1318,6 +1320,76 @@ function renderDiaryEntries() {
     stack.append(labelRow, title, meta, actions);
     card.append(poster, stack);
     diaryList.append(card);
+  });
+}
+
+function renderWatchedSummary() {
+  if (!watchedSummary || !watchedEmpty) return;
+  watchedSummary.innerHTML = "";
+
+  if (state.diaryLoading) {
+    watchedEmpty.hidden = true;
+    const loadingText = document.createElement("p");
+    loadingText.className = "small-text muted";
+    loadingText.textContent = "Loading diary entries…";
+    watchedSummary.append(loadingText);
+    watchedSummary.hidden = false;
+    return;
+  }
+
+  if (state.diaryError) {
+    watchedEmpty.hidden = true;
+    const errorText = document.createElement("p");
+    errorText.className = "small-text muted";
+    errorText.textContent = state.diaryError;
+    watchedSummary.append(errorText);
+    watchedSummary.hidden = false;
+    return;
+  }
+
+  const entries = Array.isArray(state.diaryEntries) ? state.diaryEntries : [];
+  if (!entries.length) {
+    watchedSummary.hidden = true;
+    watchedEmpty.hidden = false;
+    return;
+  }
+
+  watchedSummary.hidden = false;
+  watchedEmpty.hidden = true;
+
+  entries.slice(0, 5).forEach((entry) => {
+    const row = document.createElement("div");
+    row.className = "diary-row";
+
+    const poster = document.createElement("div");
+    poster.className = "poster";
+    if (entry.movie && entry.movie.posterUrl) {
+      poster.style.backgroundImage = `url(${entry.movie.posterUrl})`;
+    }
+
+    const stack = document.createElement("div");
+    stack.className = "stack";
+
+    const labelRow = document.createElement("div");
+    labelRow.className = "label-row";
+    const date = document.createElement("span");
+    date.className = "small-text";
+    date.textContent = formatDiaryDate(entry.watchedOn || entry.createdAt);
+    const rating = document.createElement("span");
+    rating.className = "badge rating";
+    rating.textContent = formatDiaryRating(entry.rating);
+    labelRow.append(date, rating);
+
+    const title = document.createElement("strong");
+    title.textContent = (entry.movie && entry.movie.title) || "Untitled";
+
+    const meta = document.createElement("p");
+    meta.className = "small-text";
+    meta.textContent = buildDiaryMeta(entry);
+
+    stack.append(labelRow, title, meta);
+    row.append(poster, stack);
+    watchedSummary.append(row);
   });
 }
 
@@ -4497,6 +4569,7 @@ function init() {
   setAuthMode(state.authMode);
   updateAccountUi(state.session);
   renderFavoritesList();
+  renderWatchedSummary();
   subscribeToSocialOverview((overview) => {
     state.socialOverview = overview;
     renderProfileOverview();
@@ -4507,6 +4580,7 @@ function init() {
     state.diaryLoading = Boolean(payload?.loading);
     state.diaryError = payload?.error || "";
     renderDiaryEntries();
+    renderWatchedSummary();
     renderProfileOverview();
   });
   subscribeToCollaborativeState((collabState) => {
