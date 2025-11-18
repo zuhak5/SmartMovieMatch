@@ -1489,14 +1489,14 @@ p {
 }
 
 .horizontal-scroll.movie-card-row {
-  grid-auto-columns: min-content;
+  grid-auto-columns: 160px;
   padding: 10px 12px 14px;
   scroll-padding-inline: 12px;
 }
 
 @media (min-width: 640px) {
   .horizontal-scroll.movie-card-row {
-    grid-auto-columns: minmax(220px, 1fr);
+    grid-auto-columns: minmax(190px, 1fr);
   }
 }
 
@@ -1512,7 +1512,8 @@ p {
 }
 
 .horizontal-scroll.movie-card-row .movie-card__poster {
-  height: 100%;
+  height: auto;
+  aspect-ratio: 2 / 3;
   border-radius: 12px;
 }
 
