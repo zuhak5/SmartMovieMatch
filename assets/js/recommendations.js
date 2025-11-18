@@ -1,11 +1,4 @@
-import {
-  OfflineApiError,
-  fetchFromOmdb,
-  fetchFromTmdb,
-  fetchFromYoutube,
-  isApiOffline,
-  isOfflineError
-} from "./api.js";
+import { fetchFromOmdb, fetchFromTmdb, fetchFromYoutube } from "./api.js";
 import { TMDB_GENRES } from "./config.js";
 import {
   computeWatchedGenreWeights,
@@ -108,7 +101,7 @@ function isAbortError(error) {
 }
 
 function ensureRecoverable(error) {
-  if (isAbortError(error) || isOfflineError(error)) {
+  if (isAbortError(error)) {
     throw error;
   }
 }
@@ -366,10 +359,6 @@ export async function discoverCandidateMovies(options = {}, { signal } = {}) {
       ensureRecoverable(error);
       console.warn("TMDB trending error:", error);
     }
-  }
-
-  if (isApiOffline() && candidateMap.size === 0) {
-    throw new OfflineApiError("API offline; recommendations unavailable");
   }
 
   return Array.from(candidateMap.values());

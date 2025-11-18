@@ -3,8 +3,7 @@ import {
   fetchFromOmdb,
   fetchFromTmdb,
   fetchTrendingMovies,
-  fetchStreamingProviders,
-  isApiOffline
+  fetchStreamingProviders
 } from "./api.js";
 import {
   discoverCandidateMovies,
@@ -2976,15 +2975,6 @@ async function loadTrendingMovies(timeWindow = state.trendingWindow) {
   state.trendingError = "";
   renderTrendingStatus();
   renderTrendingMovies(state.trendingMovies);
-
-  if (isApiOffline()) {
-    state.trendingMovies = [];
-    state.trendingError = "Trending movies are unavailable while offline.";
-    state.trendingLoading = false;
-    renderTrendingMovies(state.trendingMovies);
-    renderTrendingStatus();
-    return;
-  }
 
   const controller = new AbortController();
   state.trendingAbort = controller;
