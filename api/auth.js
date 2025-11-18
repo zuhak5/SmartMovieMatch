@@ -11,8 +11,7 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const AUTH_SERVICE_CONFIGURED = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 const DEFAULT_NOTIFICATION_PREFERENCES = {
   securityEmails: true,
-  followEmails: false,
-  partyEmails: true
+  followEmails: false
 };
 
 function safeFilename(name) {
@@ -1060,16 +1059,11 @@ function sanitizeNotificationPreferences(prefs) {
     followEmails:
       typeof source.followEmails === "boolean"
         ? source.followEmails
-        : DEFAULT_NOTIFICATION_PREFERENCES.followEmails,
-    partyEmails:
-      typeof source.partyEmails === "boolean"
-        ? source.partyEmails
-        : DEFAULT_NOTIFICATION_PREFERENCES.partyEmails
+        : DEFAULT_NOTIFICATION_PREFERENCES.followEmails
   };
   const matchesDefaults =
     normalized.securityEmails === DEFAULT_NOTIFICATION_PREFERENCES.securityEmails &&
-    normalized.followEmails === DEFAULT_NOTIFICATION_PREFERENCES.followEmails &&
-    normalized.partyEmails === DEFAULT_NOTIFICATION_PREFERENCES.partyEmails;
+    normalized.followEmails === DEFAULT_NOTIFICATION_PREFERENCES.followEmails;
   return matchesDefaults ? null : normalized;
 }
 

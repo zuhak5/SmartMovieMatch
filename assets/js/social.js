@@ -64,10 +64,10 @@ export const PRESENCE_STATUS_PRESETS = [
   },
   {
     key: 'available',
-    label: 'Available for watch party',
+    label: 'Available to watch now',
     description: 'Ping me to co-host or jump into a movie night.',
-    highlight: 'is ready for a watch party.',
-    shortLabel: 'Available for watch party',
+    highlight: 'is ready to start a movie.',
+    shortLabel: 'Available to watch now',
     icon: '🎉'
   },
   {
@@ -114,8 +114,7 @@ const state = {
   notificationStream: null,
   notificationRetry: 0,
   collabState: {
-    lists: { owned: [], shared: [], invites: [] },
-    watchParties: { upcoming: [], invites: [] }
+    lists: { owned: [], shared: [], invites: [] }
   },
   presenceTicker: null,
   presenceStatusPreset: DEFAULT_PRESENCE_STATUS,
@@ -144,9 +143,6 @@ function buildAuthorizationMessage(status, action, data) {
     return 'Sign in to use social features.';
   }
   if (status === 403) {
-    if (action && String(action).includes('WatchParty')) {
-      return 'Only invited participants can access this watch party feature.';
-    }
     if (action && String(action).includes('Conversation')) {
       return 'You can only open conversations you are a member of.';
     }
@@ -195,8 +191,7 @@ function clearScopedAuthorizationState(scope) {
       break;
     case 'collaboration':
       state.collabState = {
-        lists: { owned: [], shared: [], invites: [] },
-        watchParties: { upcoming: [], invites: [] }
+        lists: { owned: [], shared: [], invites: [] }
       };
       notifyCollaborativeSubscribers();
       if (state.socialOverview && typeof state.socialOverview === 'object') {
@@ -376,8 +371,7 @@ subscribeToSession((session) => {
     state.presenceStatusPreset = DEFAULT_PRESENCE_STATUS;
     state.badges = [];
     state.collabState = {
-      lists: { owned: [], shared: [], invites: [] },
-      watchParties: { upcoming: [], invites: [] }
+      lists: { owned: [], shared: [], invites: [] }
     };
     state.reviewCache.clear();
     state.notifications = [];
@@ -470,102 +464,6 @@ export async function inviteCollaboratorRemote({ listId, username }) {
 
 export async function respondCollaboratorInviteRemote({ listId, decision }) {
   return callSocial('respondCollaboratorInvite', { listId, decision });
-}
-
-export async function scheduleWatchPartyRemote({ movie, scheduledFor, note, invitees }) {
-  return callSocial('scheduleWatchParty', { movie, scheduledFor, note, invitees });
-}
-
-export async function respondWatchPartyRemote({ partyId, response, note }) {
-  return callSocial('respondWatchParty', { partyId, response, note });
-}
-
-export async function joinWatchPartyRemote({ partyId, note }) {
-  return callSocial('joinWatchParty', { partyId, note });
-}
-
-export async function listConversationsRemote() {
-  const response = await callSocial('listConversations');
-  const conversations = Array.isArray(response?.conversations)
-    ? response.conversations.map(normalizeConversationSummary).filter(Boolean)
-    : [];
-  return conversations;
-}
-
-export async function startDirectConversationRemote(username, { reuseExisting = true } = {}) {
-  const normalized = canonicalUsername(username);
-  if (!normalized) {
-    throw new Error('Choose a profile to message first.');
-  }
-  const payload = { username: normalized };
-  if (reuseExisting !== undefined) {
-    payload.reuseExisting = reuseExisting !== false;
-  }
-  const response = await callSocial('startConversation', payload);
-  const conversation = normalizeConversationSummary(response?.conversation);
-  if (!conversation) {
-    throw new Error('Unable to open that conversation right now.');
-  }
-  return conversation;
-}
-
-export async function listConversationMessagesRemote(conversationId) {
-  const trimmed = normalizeConversationId(conversationId);
-  if (!trimmed) {
-    throw new Error('Choose a conversation first.');
-  }
-  const response = await callSocial('listConversationMessages', { conversationId: trimmed });
-  const messages = Array.isArray(response?.messages)
-    ? response.messages.map(normalizeConversationMessage).filter(Boolean)
-    : [];
-  return messages.sort(
-    (a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
-  );
-}
-
-export async function postConversationMessageRemote({ conversationId, body }) {
-  const trimmed = normalizeConversationId(conversationId);
-  const messageBody = typeof body === 'string' ? body.trim() : '';
-  if (!trimmed) {
-    throw new Error('Choose a conversation first.');
-  }
-  if (!messageBody) {
-    throw new Error('Type a message before sending.');
-  }
-  const response = await callSocial('postConversationMessage', {
-    conversationId: trimmed,
-    body: messageBody
-  });
-  const message = normalizeConversationMessage(response?.message);
-  if (!message) {
-    throw new Error('Unable to send that message right now.');
-  }
-  return message;
-}
-
-export async function listWatchPartyMessagesRemote({ partyId }) {
-  const trimmed = typeof partyId === 'string' ? partyId.trim() : '';
-  if (!trimmed) {
-    throw new Error('Choose a watch party first.');
-  }
-  const response = await callSocial('listWatchPartyMessages', { partyId: trimmed });
-  const messages = Array.isArray(response?.messages)
-    ? response.messages.map(normalizeWatchPartyMessage).filter(Boolean)
-    : [];
-  return messages;
-}
-
-export async function postWatchPartyMessageRemote({ partyId, body }) {
-  const trimmed = typeof partyId === 'string' ? partyId.trim() : '';
-  const message = typeof body === 'string' ? body.trim() : '';
-  if (!trimmed) {
-    throw new Error('Choose a watch party first.');
-  }
-  if (!message) {
-    throw new Error('Type a message before sending.');
-  }
-  const response = await callSocial('postWatchPartyMessage', { partyId: trimmed, body: message });
-  return normalizeWatchPartyMessage(response?.message);
 }
 
 export async function listUserListsRemote() {
@@ -3748,8 +3646,7 @@ async function pingPresence(stateLabel = 'online', options = {}) {
 async function loadCollaborativeState() {
   if (!state.session || !state.session.token) {
     state.collabState = {
-      lists: { owned: [], shared: [], invites: [] },
-      watchParties: { upcoming: [], invites: [] }
+      lists: { owned: [], shared: [], invites: [] }
     };
     notifyCollaborativeSubscribers();
     return;
@@ -3935,20 +3832,11 @@ function normalizeSocialSuggestion(entry, followersSet, followingSet) {
 
 function normalizeCollaborativeState(payload) {
   const listsRaw = payload && typeof payload.lists === 'object' ? payload.lists : {};
-  const watchPartiesRaw = payload && typeof payload.watchParties === 'object' ? payload.watchParties : {};
   return {
     lists: {
       owned: Array.isArray(listsRaw.owned) ? listsRaw.owned.map(normalizeCollaborativeListSummary).filter(Boolean) : [],
       shared: Array.isArray(listsRaw.shared) ? listsRaw.shared.map(normalizeCollaborativeListSummary).filter(Boolean) : [],
       invites: Array.isArray(listsRaw.invites) ? listsRaw.invites.map(normalizeCollaborativeInvite).filter(Boolean) : []
-    },
-    watchParties: {
-      upcoming: Array.isArray(watchPartiesRaw.upcoming)
-        ? watchPartiesRaw.upcoming.map(normalizeWatchPartySummary).filter(Boolean)
-        : [],
-      invites: Array.isArray(watchPartiesRaw.invites)
-        ? watchPartiesRaw.invites.map(normalizeWatchPartySummary).filter(Boolean)
-        : []
     }
   };
 }
@@ -4037,32 +3925,6 @@ function normalizeCollaborativeInvite(entry) {
   };
 }
 
-function normalizeWatchPartySummary(entry) {
-  if (!entry || typeof entry !== 'object') {
-    return null;
-  }
-  return {
-    id: entry.id,
-    host: entry.host || '',
-    movie: entry.movie || { title: '', tmdbId: null, imdbId: null },
-    scheduledFor: entry.scheduledFor || null,
-    createdAt: entry.createdAt || null,
-    note: entry.note || '',
-    response: entry.response || 'pending',
-    invitees: Array.isArray(entry.invitees) ? entry.invitees.slice() : [],
-    participants: Array.isArray(entry.participants)
-      ? entry.participants.map((participant) => ({
-          username: participant.username,
-          role: participant.role || 'guest',
-          joinedAt: participant.joinedAt || null,
-          lastActiveAt: participant.lastActiveAt || null,
-          isKicked: Boolean(participant.isKicked),
-          metadata: participant.metadata && typeof participant.metadata === 'object' ? participant.metadata : {}
-        }))
-      : []
-  };
-}
-
 function cloneSocialOverview(overview) {
   if (!overview || typeof overview !== 'object') {
     return createDefaultSocialOverview();
@@ -4146,8 +4008,7 @@ function cloneSocialOverview(overview) {
 function cloneCollaborativeState(collabState) {
   if (!collabState || typeof collabState !== 'object') {
     return {
-      lists: { owned: [], shared: [], invites: [] },
-      watchParties: { upcoming: [], invites: [] }
+      lists: { owned: [], shared: [], invites: [] }
     };
   }
   const mapList = (entry) => ({
@@ -4169,72 +4030,7 @@ function cloneCollaborativeState(collabState) {
       invites: Array.isArray(collabState.lists?.invites)
         ? collabState.lists.invites.map((entry) => ({ ...entry }))
         : []
-    },
-    watchParties: {
-      upcoming: Array.isArray(collabState.watchParties?.upcoming)
-        ? collabState.watchParties.upcoming.map((entry) => ({
-            ...entry,
-            movie: entry.movie ? { ...entry.movie } : { title: '', tmdbId: null, imdbId: null },
-            invitees: Array.isArray(entry.invitees)
-              ? entry.invitees.map((invite) => ({
-                  ...invite,
-                  bringing: typeof invite.bringing === 'string' ? invite.bringing : ''
-                }))
-              : [],
-            participants: Array.isArray(entry.participants)
-              ? entry.participants.map((participant) => ({
-                  ...participant,
-                  metadata:
-                    participant && typeof participant.metadata === 'object' && participant.metadata
-                      ? { ...participant.metadata }
-                      : {}
-                }))
-              : []
-          }))
-        : [],
-      invites: Array.isArray(collabState.watchParties?.invites)
-        ? collabState.watchParties.invites.map((entry) => ({
-            ...entry,
-            movie: entry.movie ? { ...entry.movie } : { title: '', tmdbId: null, imdbId: null },
-            invitees: Array.isArray(entry.invitees)
-              ? entry.invitees.map((invite) => ({
-                  ...invite,
-                  bringing: typeof invite.bringing === 'string' ? invite.bringing : ''
-                }))
-              : [],
-            participants: Array.isArray(entry.participants)
-              ? entry.participants.map((participant) => ({
-                  ...participant,
-                  metadata:
-                    participant && typeof participant.metadata === 'object' && participant.metadata
-                      ? { ...participant.metadata }
-                      : {}
-                }))
-              : []
-          }))
-        : []
     }
-  };
-}
-
-function normalizeWatchPartyMessage(entry) {
-  if (!entry || typeof entry !== 'object') {
-    return null;
-  }
-  const id = entry.id || String(Math.random());
-  const username = canonicalUsername(entry.username);
-  const body = typeof entry.body === 'string' ? entry.body : '';
-  if (!username || !body) {
-    return null;
-  }
-  return {
-    id,
-    partyId: entry.partyId || entry.party_id || null,
-    username,
-    body,
-    messageType: entry.messageType || entry.message_type || 'chat',
-    metadata: entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {},
-    createdAt: entry.createdAt || entry.created_at || null
   };
 }
 

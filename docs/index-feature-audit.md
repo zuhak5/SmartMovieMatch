@@ -24,7 +24,6 @@ Each item is a task for Codex (or any other assistant) to implement.
 - `SRCH-*`  – Search & discovery
 - `LIST-*`  – Lists, tags, and favorites
 - `STRM-*`  – Streaming providers & availability
-- `PARTY-*` – Watch parties
 - `DM-*`    – Direct messages & conversations
 - `NOTIF-*` – Notifications & activity
 - `CONF-*`  – App config & experiments
@@ -58,7 +57,6 @@ Each item is a task for Codex (or any other assistant) to implement.
     - If no active session, redirect to login or show an inline login prompt.
   - Files: SPA router / view-switcher, `assets/js/spa-app.js`.
   - Backend: Depends on Supabase RLS; rely on 401/403 to hide remote data if needed.
-  DONE 2025-11-17T03:25Z – Added guarded navigation for friends, library, profile, and watch-party tabs with login prompts.
 
 ---
 
@@ -188,30 +186,14 @@ Each item is a task for Codex (or any other assistant) to implement.
 
 ---
 
-## Watch parties (PARTY)
 
-- [x] **PARTY-001 – Create watch party flow**
-  - Description: Implement UI to create a watch party from a movie detail page:
     - Fields: title, description, scheduled time, visibility (public/friends/invite-only).
     - Save to `watch_parties`.
-  - Files: Movie detail actions, party creation modal.
   - Backend: `watch_parties` with RLS for host ownership.
-  DONE 2025-11-17T14:45Z – Added movie detail watch-party form with visibility options persisting to watch_parties and surfacing party visibility in the home lobby.
 
-- [x] **PARTY-002 – Join & participants list**
-  - Description: Allow users to join an existing party and see who is attending.
-    - Use `watch_party_participants` for joins and presence.
-  - Files: Party detail view, participants sidebar.
-  - Backend: `watch_parties`, `watch_party_participants`.
   DONE 2025-11-17T08:26Z – Added join action plus presence-aware participant roster for watch parties, syncing host and attendee presence with the invite lobby.
 
-- [x] **PARTY-003 – In-party chat**
-  - Description: Implement a simple chat box inside the watch-party view.
-    - Messages stored in `watch_party_messages`.
     - Visible only to hosts and participants as enforced by RLS.
-  - Files: Party chat panel component.
-  - Backend: `watch_party_messages`.
-  DONE 2025-11-17T08:45Z – Added authenticated watch-party chat with live message history, host/participant gating, and Supabase-backed persistence for lobby conversations.
 
 ---
 

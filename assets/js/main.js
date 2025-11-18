@@ -38,9 +38,6 @@ import {
   createCollaborativeListRemote,
   inviteCollaboratorRemote,
   respondCollaboratorInviteRemote,
-  scheduleWatchPartyRemote,
-  respondWatchPartyRemote,
-  joinWatchPartyRemote,
   voteCollaborativeItemRemote,
   postCollaborativeNoteRemote,
   subscribeToCollaborativeState,
@@ -84,7 +81,6 @@ import { getWatchedRatingPreference } from "./taste.js";
 const RECOMMENDATIONS_PAGE_SIZE = 20;
 const MAX_FOLLOW_NOTE_LENGTH = 180;
 const MAX_SUGGESTED_COLLABORATORS = 4;
-const MAX_WATCH_PARTY_SUGGESTIONS = 6;
 const COLLAB_DISCUSSION_MAX_LENGTH = 220;
 const GLOBAL_SEARCH_MIN_LENGTH = 2;
 const SOCIAL_SEARCH_MIN_LENGTH = 3;
@@ -95,8 +91,7 @@ const GLOBAL_SEARCH_MAX_GENRES = 8;
 const GLOBAL_SEARCH_DEFAULT_STATUS = "Search for a movie title, friend handle, or genre.";
 const DEFAULT_NOTIFICATION_PREFERENCES = {
   securityEmails: true,
-  followEmails: false,
-  partyEmails: true
+  followEmails: false
 };
 
 let removeDocumentListeners = null;
@@ -115,10 +110,7 @@ const SOCIAL_NOTIFICATION_TYPES = new Set([
   "friend_favorite",
   "friend_watched",
   "collab_invite",
-  "collab_accept",
-  "watch_party",
-  "watch_party_update",
-  "watch_party_reminder"
+  "collab_accept"
 ]);
 
 const RECOMMENDATION_LAYOUT_STORAGE_KEY = "smm.recommendation-layout.v1";
@@ -177,7 +169,6 @@ const state = {
 };
 
 const collabSuggestionSelections = new Set();
-const watchPartySuggestionSelections = new Set();
 
 const THEME_COLOR_MAP = {
   dark: "#020617",
@@ -1278,8 +1269,6 @@ function maybeApplyPageContextFromQuery() {
   }
   let targetId = "";
   switch (context) {
-    case "party":
-      targetId = "watchPartyInviteList";
       break;
     case "collab":
       targetId = "collabInviteList";
@@ -2643,8 +2632,6 @@ function openProfileDeepLink(context = "social") {
   const normalized = typeof context === "string" ? context.toLowerCase() : "social";
   let hash = "";
   switch (normalized) {
-    case "party":
-      hash = "watchPartyInviteList";
       break;
     case "collab":
       hash = "collabInviteList";
@@ -2752,7 +2739,6 @@ function populateAccountSettings() {
   const notificationsStatus = $("accountNotificationsStatus");
   const notifySecurityInput = $("notifySecurityEmail");
   const notifyFollowInput = $("notifyFollowEmail");
-  const notifyPartyInput = $("notifyPartyEmail");
   const avatarInput = $("accountAvatarInput");
   const handleValue = $("accountHandleValue");
   const taglinePreview = $("accountTaglinePreview");
@@ -2821,8 +2807,6 @@ function populateAccountSettings() {
   if (notifyFollowInput) {
     notifyFollowInput.checked = notificationPrefs.followEmails;
   }
-  if (notifyPartyInput) {
-    notifyPartyInput.checked = notificationPrefs.partyEmails;
   }
 
   const initials = getActiveDisplayName().slice(0, 2).toUpperCase() || "SM";
@@ -2860,10 +2844,6 @@ function getNotificationPreferenceSnapshot() {
       typeof raw.followEmails === "boolean"
         ? raw.followEmails
         : DEFAULT_NOTIFICATION_PREFERENCES.followEmails,
-    partyEmails:
-      typeof raw.partyEmails === "boolean"
-        ? raw.partyEmails
-        : DEFAULT_NOTIFICATION_PREFERENCES.partyEmails
   };
 }
 
@@ -3081,21 +3061,17 @@ async function handleNotificationPreferencesSubmit(event) {
   const statusEl = $("accountNotificationsStatus");
   const securityInput = $("notifySecurityEmail");
   const followInput = $("notifyFollowEmail");
-  const partyInput = $("notifyPartyEmail");
-  if (!statusEl || !securityInput || !followInput || !partyInput) {
     return;
   }
 
   const nextPrefs = {
     securityEmails: Boolean(securityInput.checked),
     followEmails: Boolean(followInput.checked),
-    partyEmails: Boolean(partyInput.checked)
   };
   const currentPrefs = getNotificationPreferenceSnapshot();
   const noChanges =
     nextPrefs.securityEmails === currentPrefs.securityEmails &&
     nextPrefs.followEmails === currentPrefs.followEmails &&
-    nextPrefs.partyEmails === currentPrefs.partyEmails;
   if (noChanges) {
     statusEl.textContent = "Already saved.";
     statusEl.removeAttribute("data-variant");
@@ -6568,7 +6544,6 @@ function wireFollowForm() {
         result.sharedWatchParties.slice(0, 2).forEach((summary) => {
           const tag = document.createElement("span");
           tag.className = "social-suggestion-tag";
-          tag.dataset.variant = "party";
           tag.textContent = summary;
           parties.appendChild(tag);
         });
@@ -6811,87 +6786,6 @@ function wireCollaborativeForms() {
       } catch (error) {
         setCollabStatus(
           error instanceof Error ? error.message : "Couldn’t create that list right now.",
-          "error"
-        );
-      } finally {
-        if (submitButton) {
-          submitButton.disabled = false;
-        }
-      }
-    });
-  }
-
-  const watchForm = $("watchPartyForm");
-  const watchTitleInput = $("watchPartyTitle");
-  const watchTmdbInput = $("watchPartyTmdbId");
-  const watchImdbInput = $("watchPartyImdbId");
-  const watchDateInput = $("watchPartyDatetime");
-  const watchNoteInput = $("watchPartyNote");
-  const watchInviteInput = $("watchPartyInvitees");
-  if (watchForm && !watchForm.dataset.wired) {
-    watchForm.dataset.wired = "true";
-    watchForm.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      if (!state.session || !state.session.token) {
-        window.location.href = "login.html";
-        return;
-      }
-      const title = watchTitleInput ? watchTitleInput.value.trim() : "";
-      if (title.length < 2) {
-        setCollabStatus("Add a movie title for your watch party.", "error");
-        if (watchTitleInput) {
-          watchTitleInput.focus();
-        }
-        return;
-      }
-      const tmdbId = watchTmdbInput ? watchTmdbInput.value.trim() : "";
-      const imdbId = watchImdbInput ? watchImdbInput.value.trim() : "";
-      if (!tmdbId && !imdbId) {
-        setCollabStatus("Provide a TMDB or IMDb ID so we can match the movie.", "error");
-        if (watchTmdbInput) {
-          watchTmdbInput.focus();
-        }
-        return;
-      }
-      const whenRaw = watchDateInput ? watchDateInput.value.trim() : "";
-      if (!whenRaw) {
-        setCollabStatus("Choose a date and time for your watch party.", "error");
-        if (watchDateInput) {
-          watchDateInput.focus();
-        }
-        return;
-      }
-      const whenDate = new Date(whenRaw);
-      if (Number.isNaN(whenDate.getTime())) {
-        setCollabStatus("Enter a valid date and time.", "error");
-        if (watchDateInput) {
-          watchDateInput.focus();
-        }
-        return;
-      }
-      const note = watchNoteInput ? watchNoteInput.value.trim() : "";
-      const invitees = parseInviteHandles(watchInviteInput ? watchInviteInput.value : "");
-      const suggestedHandles = getSelectedWatchPartyHandles();
-      const combinedInvitees = Array.from(new Set([...invitees, ...suggestedHandles]));
-      const submitButton = watchForm.querySelector("button[type=\"submit\"]");
-      if (submitButton) {
-        submitButton.disabled = true;
-      }
-      setCollabStatus("Scheduling watch party…", "loading");
-      try {
-        await scheduleWatchPartyRemote({
-          movie: { title, tmdbId: tmdbId || null, imdbId: imdbId || null },
-          scheduledFor: whenDate.toISOString(),
-          note,
-          invitees: combinedInvitees
-        });
-        setCollabStatus("Watch party scheduled!", "success");
-        watchForm.reset();
-        clearWatchPartySuggestionSelections();
-        await refreshCollaborativeState();
-      } catch (error) {
-        setCollabStatus(
-          error instanceof Error ? error.message : "Couldn’t schedule that watch party right now.",
           "error"
         );
       } finally {
@@ -7396,7 +7290,6 @@ function renderSocialConnections() {
     return suggestion && suggestion.username && !followingSet.has(suggestion.username);
   });
   renderCollaborativeSuggestions(availableSuggestions);
-  renderWatchPartySuggestions(availableSuggestions);
   const activeEntries = following
     .map((username) => ({ username, presence: presence[username] }))
     .filter((entry) => entry.presence && entry.presence.state);
@@ -7434,7 +7327,6 @@ function renderSocialConnections() {
     upcomingPartiesCount > 0
       ? formatCountLabel(
           upcomingPartiesCount,
-          "One watch party is on your calendar.",
           `${upcomingPartiesCount.toLocaleString()} watch parties are on your calendar.`
         )
       : "You’re all caught up on invites.";
@@ -7573,7 +7465,6 @@ function renderSocialConnections() {
         const inviteBtn = document.createElement('button');
         inviteBtn.type = 'button';
         inviteBtn.className = 'social-presence-action-btn';
-        inviteBtn.textContent = 'Invite to party';
         inviteBtn.addEventListener('click', () => handlePresenceInviteAction(entry.username));
         actions.appendChild(inviteBtn);
         const shareBtn = document.createElement('button');
@@ -7886,7 +7777,6 @@ function buildSocialSuggestionReason(entry) {
     return `Logged ${formatFriendlyList(entry.sharedWatchHistory, 2)} recently too.`;
   }
   if (Array.isArray(entry.sharedWatchParties) && entry.sharedWatchParties.length) {
-    return `Joined ${formatPlural(entry.sharedWatchParties.length, "party", "parties")} together.`;
   }
   if (Array.isArray(entry.mutualFollowers) && entry.mutualFollowers.length) {
     return `Shares ${formatPlural(entry.mutualFollowers.length, "mutual", "mutuals")}.`;
@@ -7905,17 +7795,12 @@ function handlePresenceInviteAction(username) {
   if (!state.session || !state.session.token) {
     showToast({
       title: 'Sign in to invite friends',
-      text: 'Sign in to schedule a watch party with your friends.',
       icon: '🔒'
     });
     return;
   }
-  const inviteInput = $("watchPartyInvitees");
-  const form = $("watchPartyForm");
   if (!inviteInput || !form) {
     showToast({
-      title: 'Open the watch party planner',
-      text: 'Head to the Social tab to schedule a watch party.',
       icon: '🎬'
     });
     return;
@@ -8143,9 +8028,6 @@ function clearCollaborativeSuggestionSelections() {
   updateCollaborativeSuggestionSelectionStates();
 }
 
-function renderWatchPartySuggestions(suggestions) {
-  const container = $("watchPartySuggestedContainer");
-  const emptyEl = $("watchPartySuggestedEmpty");
   if (!container || !emptyEl) {
     return;
   }
@@ -8155,15 +8037,12 @@ function renderWatchPartySuggestions(suggestions) {
         .map((entry) => ({
           username: canonicalHandle(entry.username || ""),
           displayName: entry.displayName || formatSocialDisplayName(entry.username),
-          reason: buildWatchPartySuggestionReason(entry)
         }))
         .filter((entry) => entry.username)
         .slice(0, MAX_WATCH_PARTY_SUGGESTIONS)
     : [];
   const availableHandles = new Set(normalized.map((entry) => entry.username));
-  Array.from(watchPartySuggestionSelections).forEach((handle) => {
     if (!availableHandles.has(handle)) {
-      watchPartySuggestionSelections.delete(handle);
     }
   });
   if (!normalized.length) {
@@ -8174,29 +8053,21 @@ function renderWatchPartySuggestions(suggestions) {
   normalized.forEach((entry) => {
     const chip = document.createElement("button");
     chip.type = "button";
-    chip.className = "watch-party-suggested-chip";
-    chip.dataset.watchPartySuggestChip = "true";
     chip.dataset.handle = entry.username;
     chip.setAttribute("aria-pressed", "false");
     const name = document.createElement("span");
-    name.className = "watch-party-suggested-name";
     name.textContent = entry.displayName;
     chip.appendChild(name);
     const meta = document.createElement("span");
-    meta.className = "watch-party-suggested-meta";
     meta.textContent = entry.reason;
     chip.appendChild(meta);
     chip.addEventListener("click", () => {
-      toggleWatchPartySuggestion(entry.username);
     });
     container.appendChild(chip);
   });
-  updateWatchPartySuggestionSelectionStates();
 }
 
-function buildWatchPartySuggestionReason(entry) {
   if (Array.isArray(entry.sharedWatchParties) && entry.sharedWatchParties.length) {
-    return `Co-hosted ${formatPlural(entry.sharedWatchParties.length, "party", "parties")} together`;
   }
   if (Array.isArray(entry.sharedInterests) && entry.sharedInterests.length) {
     return `Also into ${formatFriendlyList(entry.sharedInterests, 2)}`;
@@ -8210,36 +8081,23 @@ function buildWatchPartySuggestionReason(entry) {
   return "High taste match";
 }
 
-function toggleWatchPartySuggestion(handle) {
   const normalized = canonicalHandle(handle);
   if (!normalized) {
     return;
   }
-  if (watchPartySuggestionSelections.has(normalized)) {
-    watchPartySuggestionSelections.delete(normalized);
   } else {
-    watchPartySuggestionSelections.add(normalized);
   }
-  updateWatchPartySuggestionSelectionStates();
 }
 
-function updateWatchPartySuggestionSelectionStates() {
-  const chips = document.querySelectorAll('[data-watch-party-suggest-chip="true"]');
   chips.forEach((chip) => {
     const handle = canonicalHandle(chip.dataset.handle || "");
-    const selected = handle && watchPartySuggestionSelections.has(handle);
     chip.dataset.selected = selected ? "true" : "false";
     chip.setAttribute("aria-pressed", selected ? "true" : "false");
   });
 }
 
-function getSelectedWatchPartyHandles() {
-  return Array.from(watchPartySuggestionSelections);
 }
 
-function clearWatchPartySuggestionSelections() {
-  watchPartySuggestionSelections.clear();
-  updateWatchPartySuggestionSelectionStates();
 }
 
 async function inviteSuggestedCollaboratorsToList(listId, handles) {
@@ -8280,8 +8138,6 @@ function renderCollaborativeSections(collabStateInput) {
   renderCollaborativeListCollection(lists.owned, "collabOwnedList", "collabOwnedEmpty", "owner");
   renderCollaborativeListCollection(lists.shared, "collabSharedList", "collabSharedEmpty", "shared");
   renderCollaborativeInviteCollection(lists.invites, "collabInviteList", "collabInviteEmpty");
-  renderWatchPartyCollection(watchParties.upcoming, "watchPartyList", "watchPartyEmpty", "upcoming");
-  renderWatchPartyCollection(watchParties.invites, "watchPartyInviteList", "watchPartyInviteEmpty", "invite");
 }
 
 function renderCollaborativeListCollection(entries, listId, emptyId, mode) {
@@ -8334,7 +8190,6 @@ function renderCollaborativeInviteCollection(entries, listId, emptyId) {
   });
 }
 
-function renderWatchPartyCollection(entries, listId, emptyId, mode) {
   const container = $(listId);
   const empty = $(emptyId);
   if (!container || !empty) {
@@ -8355,7 +8210,6 @@ function renderWatchPartyCollection(entries, listId, emptyId, mode) {
   container.hidden = false;
   empty.hidden = true;
   list.forEach((entry) => {
-    const card = buildWatchPartyCard(entry, mode);
     container.appendChild(card);
   });
 }
@@ -8860,9 +8714,7 @@ function buildCollaborativeInviteCard(entry) {
   return card;
 }
 
-function buildWatchPartyCard(entry, mode) {
   const card = document.createElement("article");
-  card.className = "watch-party-card";
   card.dataset.mode = mode;
   const invitees = Array.isArray(entry.invitees) ? entry.invitees : [];
   const participants = Array.isArray(entry.participants) ? entry.participants : [];
@@ -8871,15 +8723,11 @@ function buildWatchPartyCard(entry, mode) {
   );
 
   const header = document.createElement("header");
-  header.className = "watch-party-card-header";
   const title = document.createElement("h4");
-  title.textContent = entry.movie && entry.movie.title ? entry.movie.title : "Watch party";
   header.appendChild(title);
   card.appendChild(header);
 
   const meta = document.createElement("div");
-  meta.className = "watch-party-meta";
-  const schedule = formatWatchPartyDate(entry.scheduledFor);
   if (schedule) {
     meta.appendChild(document.createTextNode(schedule));
   }
@@ -8900,7 +8748,6 @@ function buildWatchPartyCard(entry, mode) {
     }
     const inlineFollow = createInlineFollowPill(entry.host, {
       size: "xs",
-      className: "watch-party-inline-follow",
       ariaLabel: `Follow ${formatSocialDisplayName(entry.host)}`
     });
     if (inlineFollow) {
@@ -8911,7 +8758,6 @@ function buildWatchPartyCard(entry, mode) {
 
   if (entry.note) {
     const note = document.createElement("p");
-    note.className = "watch-party-note";
     note.textContent = entry.note;
     card.appendChild(note);
   }
@@ -8921,43 +8767,33 @@ function buildWatchPartyCard(entry, mode) {
   const myInvite = invitees.find((invite) => canonicalHandle(invite.username) === username);
   if (mode === "upcoming" && username && entry.host !== username && (myInvite || isParticipant)) {
     const response = document.createElement("p");
-    response.className = "watch-party-response";
-    if (isParticipant && (!myInvite || normalizePartyResponse(myInvite.response) !== "accept")) {
-      response.textContent = "You joined this watch party.";
     } else if (myInvite) {
-      response.textContent = `You responded: ${formatPartyResponse(myInvite.response)}`;
     }
     card.appendChild(response);
   }
 
-  const lobby = buildWatchPartyLobby(entry, participants);
   if (lobby) {
     card.appendChild(lobby);
   }
 
-  const participantList = buildWatchPartyParticipants(entry);
   if (participantList) {
     card.appendChild(participantList);
   }
 
   if (mode === "upcoming") {
-    const summary = buildWatchPartySummary(entry);
     if (summary) {
       card.appendChild(summary);
-      card.classList.add("watch-party-card--past");
     }
   }
 
   if (mode === "invite") {
     const vibeField = document.createElement("div");
-    vibeField.className = "watch-party-vibe-field";
     const vibeLabel = document.createElement("span");
     vibeLabel.className = "field-label";
     vibeLabel.textContent = "What snack or vibe are you bringing?";
     vibeField.appendChild(vibeLabel);
     const vibeInput = document.createElement("input");
     vibeInput.type = "text";
-    vibeInput.className = "input-base input-text watch-party-vibe-input";
     vibeInput.placeholder = "Popcorn, neon drinks, cozy blankets…";
     vibeInput.maxLength = 80;
     vibeInput.value = myInvite && myInvite.bringing ? myInvite.bringing : "";
@@ -8965,14 +8801,12 @@ function buildWatchPartyCard(entry, mode) {
     card.appendChild(vibeField);
 
     const actions = document.createElement("div");
-    actions.className = "watch-party-actions";
     const acceptBtn = document.createElement("button");
     acceptBtn.type = "button";
     acceptBtn.className = "btn-secondary";
     acceptBtn.textContent = "Accept";
     acceptBtn.addEventListener("click", () => {
       playUiClick();
-      handleWatchPartyResponseAction(entry.id, "accept", acceptBtn, actions, vibeInput);
     });
     const maybeBtn = document.createElement("button");
     maybeBtn.type = "button";
@@ -8980,7 +8814,6 @@ function buildWatchPartyCard(entry, mode) {
     maybeBtn.textContent = "Maybe";
     maybeBtn.addEventListener("click", () => {
       playUiClick();
-      handleWatchPartyResponseAction(entry.id, "maybe", maybeBtn, actions, vibeInput);
     });
     const declineBtn = document.createElement("button");
     declineBtn.type = "button";
@@ -8988,7 +8821,6 @@ function buildWatchPartyCard(entry, mode) {
     declineBtn.textContent = "Decline";
     declineBtn.addEventListener("click", () => {
       playUiClick();
-      handleWatchPartyResponseAction(entry.id, "decline", declineBtn, actions, vibeInput);
     });
     actions.appendChild(acceptBtn);
     actions.appendChild(maybeBtn);
@@ -8998,14 +8830,11 @@ function buildWatchPartyCard(entry, mode) {
 
   if (mode === "upcoming" && username && entry.host !== username && !isParticipant) {
     const joinActions = document.createElement("div");
-    joinActions.className = "watch-party-actions";
     const joinBtn = document.createElement("button");
     joinBtn.type = "button";
     joinBtn.className = "btn-primary";
-    joinBtn.textContent = "Join party";
     joinBtn.addEventListener("click", () => {
       playUiClick();
-      handleWatchPartyJoinAction(entry.id, joinBtn, joinActions);
     });
     joinActions.appendChild(joinBtn);
     card.appendChild(joinActions);
@@ -9014,16 +8843,13 @@ function buildWatchPartyCard(entry, mode) {
   return card;
 }
 
-function buildWatchPartyLobby(entry, participants = []) {
   const invitees = Array.isArray(entry && entry.invitees) ? entry.invitees : [];
   const participantList = Array.isArray(participants) ? participants : [];
   if (!invitees.length && !participantList.length) {
     return null;
   }
   const lobby = document.createElement("div");
-  lobby.className = "watch-party-lobby";
   const statusWrap = document.createElement("div");
-  statusWrap.className = "watch-party-lobby-status";
   const presenceMap = getPresenceOverviewMap();
   const participantHandles = new Set(
     participantList.map((participant) => canonicalHandle(participant.username)).filter(Boolean)
@@ -9038,10 +8864,8 @@ function buildWatchPartyLobby(entry, participants = []) {
     if (group.key === "going") {
       members = participantList.length
         ? participantList
-        : invitees.filter((invite) => normalizePartyResponse(invite.response) === "accept");
     } else {
       members = invitees.filter((invite) => {
-        const normalized = normalizePartyResponse(invite.response);
         const handle = canonicalHandle(invite.username);
         if (!handle || participantHandles.has(handle)) {
           return false;
@@ -9053,20 +8877,16 @@ function buildWatchPartyLobby(entry, participants = []) {
       return;
     }
     const section = document.createElement("div");
-    section.className = "watch-party-lobby-group";
     section.dataset.state = group.dataset;
     const label = document.createElement("span");
-    label.className = "watch-party-lobby-label";
     label.textContent = `${group.label} (${members.length})`;
     section.appendChild(label);
     const chips = document.createElement("div");
-    chips.className = "watch-party-lobby-chips";
     members.forEach((member) => {
       if (!member || !member.username) {
         return;
       }
       const chip = document.createElement("span");
-      chip.className = "watch-party-lobby-chip";
       chip.dataset.state = group.dataset;
       const normalized = canonicalHandle(member.username);
       const presence = normalized ? presenceMap[normalized] : null;
@@ -9086,7 +8906,6 @@ function buildWatchPartyLobby(entry, participants = []) {
       const bringing = member.metadata?.bringing || member.bringing;
       if (bringing) {
         const vibe = document.createElement("span");
-        vibe.className = "watch-party-lobby-note";
         vibe.textContent = bringing;
         chip.appendChild(vibe);
       }
@@ -9098,14 +8917,12 @@ function buildWatchPartyLobby(entry, participants = []) {
   if (statusWrap.childNodes.length) {
     lobby.appendChild(statusWrap);
   }
-  const vibeRow = buildWatchPartyBringingRow(invitees);
   if (vibeRow) {
     lobby.appendChild(vibeRow);
   }
   return lobby.childNodes.length ? lobby : null;
 }
 
-function buildWatchPartyParticipants(entry) {
   const participants = Array.isArray(entry && entry.participants)
     ? entry.participants.filter((participant) => participant && participant.username)
     : [];
@@ -9114,13 +8931,10 @@ function buildWatchPartyParticipants(entry) {
   }
   const presenceMap = getPresenceOverviewMap();
   const container = document.createElement("div");
-  container.className = "watch-party-participants";
   const heading = document.createElement("div");
-  heading.className = "watch-party-participants-heading";
   heading.textContent = `Participants (${participants.length})`;
   container.appendChild(heading);
   const list = document.createElement("div");
-  list.className = "watch-party-participants-list";
   participants
     .slice()
     .sort((a, b) => {
@@ -9140,7 +8954,6 @@ function buildWatchPartyParticipants(entry) {
         return;
       }
       const row = document.createElement("div");
-      row.className = "watch-party-participant";
       const presence = presenceMap[handle];
       if (presence && presence.state) {
         row.dataset.presence = presence.state;
@@ -9158,11 +8971,9 @@ function buildWatchPartyParticipants(entry) {
         row.appendChild(name);
       }
       const role = document.createElement("span");
-      role.className = "watch-party-participant-role";
       role.textContent = participant.role === "host" ? "Host" : "Guest";
       row.appendChild(role);
       const timing = document.createElement("span");
-      timing.className = "watch-party-participant-meta";
       const timestamp = participant.lastActiveAt || participant.joinedAt;
       timing.textContent = timestamp ? `Active ${formatTimeAgo(timestamp)}` : "Active recently";
       row.appendChild(timing);
@@ -9172,7 +8983,6 @@ function buildWatchPartyParticipants(entry) {
   return container;
 }
 
-function buildWatchPartyBringingRow(invitees) {
   const entries = invitees
     .map((invite) => {
       const text = typeof invite.bringing === "string" ? invite.bringing.trim() : "";
@@ -9186,16 +8996,12 @@ function buildWatchPartyBringingRow(invitees) {
     return null;
   }
   const row = document.createElement("div");
-  row.className = "watch-party-bringing";
   const label = document.createElement("span");
-  label.className = "watch-party-bringing-label";
   label.textContent = "Snacks & vibes";
   row.appendChild(label);
   const chips = document.createElement("div");
-  chips.className = "watch-party-bringing-chips";
   entries.slice(0, 6).forEach((entry) => {
     const chip = document.createElement("span");
-    chip.className = "watch-party-chip watch-party-chip--vibe";
     chip.textContent = `${formatSocialDisplayName(entry.username)}: ${entry.text}`;
     chips.appendChild(chip);
   });
@@ -9203,19 +9009,13 @@ function buildWatchPartyBringingRow(invitees) {
   return row;
 }
 
-function buildWatchPartySummary(entry) {
   const scheduledAt = toTimestamp(entry && entry.scheduledFor);
   if (!scheduledAt || Date.now() < scheduledAt) {
     return null;
   }
   const invitees = Array.isArray(entry && entry.invitees) ? entry.invitees : [];
-  const going = invitees.filter((invite) => normalizePartyResponse(invite.response) === "accept");
-  const maybe = invitees.filter((invite) => normalizePartyResponse(invite.response) === "maybe");
-  const pending = invitees.filter((invite) => normalizePartyResponse(invite.response) === "pending");
   const summary = document.createElement("div");
-  summary.className = "watch-party-summary";
   const line = document.createElement("p");
-  line.className = "watch-party-summary-line";
   const parts = [];
   parts.push(
     formatCountLabel(
@@ -9234,16 +9034,13 @@ function buildWatchPartySummary(entry) {
   line.textContent = parts.filter(Boolean).join(" • ");
   summary.appendChild(line);
   const prompt = document.createElement("p");
-  prompt.className = "watch-party-summary-prompt";
   prompt.textContent = "Share a quick review to capture the vibe while it’s fresh.";
   summary.appendChild(prompt);
   const cta = document.createElement("button");
   cta.type = "button";
-  cta.className = "btn-link watch-party-summary-cta";
   cta.textContent = "Leave a quick review";
   cta.addEventListener("click", () => {
     showToast({
-      title: "Review this party",
       text: `Tell friends how ${entry.movie && entry.movie.title ? entry.movie.title : "the night"} went.`,
       icon: "📝"
     });
@@ -9309,18 +9106,14 @@ async function handleCollaboratorInviteDecision(listId, decision, button, action
   }
 }
 
-async function handleWatchPartyResponseAction(partyId, response, button, actionGroup, vibeInput) {
-  if (!partyId) {
     return;
   }
   const buttons = actionGroup ? Array.from(actionGroup.querySelectorAll("button")) : [button];
   buttons.forEach((btn) => {
     btn.disabled = true;
   });
-  setCollabStatus("Updating watch party RSVP…", "loading");
   const bringing = vibeInput && typeof vibeInput.value === "string" ? vibeInput.value.trim() : "";
   try {
-    await respondWatchPartyRemote({ partyId, response, bringing });
     setCollabStatus("Response recorded.", "success");
     await refreshCollaborativeState();
   } catch (error) {
@@ -9335,22 +9128,17 @@ async function handleWatchPartyResponseAction(partyId, response, button, actionG
   }
 }
 
-async function handleWatchPartyJoinAction(partyId, button, actionGroup) {
-  if (!partyId) {
     return;
   }
   const buttons = actionGroup ? Array.from(actionGroup.querySelectorAll("button")) : [button];
   buttons.forEach((btn) => {
     btn.disabled = true;
   });
-  setCollabStatus("Joining watch party…", "loading");
   try {
-    await joinWatchPartyRemote({ partyId });
     setCollabStatus("You’re in!", "success");
     await refreshCollaborativeState();
   } catch (error) {
     setCollabStatus(
-      error instanceof Error ? error.message : "Couldn’t join that watch party right now.",
       "error"
     );
   } finally {
@@ -9974,8 +9762,6 @@ function buildPeerContextBanner({ displayName, isFollowing }) {
         actionType = "follow";
       }
       break;
-    case "party":
-      message = `${safeName} invited you to a watch party.`;
       actionLabel = "View invite";
       actionTarget = "parties";
       break;
@@ -10204,14 +9990,7 @@ function createPeerHeroActions({ normalized, isFollowing, displayName, isMuted, 
   }
   const secondary = document.createElement("div");
   secondary.className = "peeruser-secondary-actions";
-  const partyBtn = document.createElement("button");
-  partyBtn.type = "button";
-  partyBtn.className = "btn-subtle";
-  partyBtn.textContent = "Invite to watch party";
-  partyBtn.addEventListener("click", () => {
-    handlePeerSecondaryAction("party", displayName);
   });
-  secondary.appendChild(partyBtn);
   const collabBtn = document.createElement("button");
   collabBtn.type = "button";
   collabBtn.className = "btn-subtle";
@@ -10247,8 +10026,6 @@ function createPeerHeroActions({ normalized, isFollowing, displayName, isMuted, 
 }
 
 function handlePeerSecondaryAction(type, displayName) {
-  const noun = type === "party" ? "watch party" : "collaborative list";
-  const icon = type === "party" ? "🎬" : "👥";
   showToast({
     title: "Coming soon",
     text: `We’ll connect you with ${displayName || "this friend"} once ${noun} invites are live.`,
@@ -10503,7 +10280,6 @@ function buildPeerOverlapColumn(profile, options = {}) {
     {
       title: "Watch parties together",
       values: parties,
-      variant: "party",
       key: "parties",
       emptyText: "No parties yet — invite them to one!"
     }
@@ -10717,7 +10493,6 @@ function computeTasteCompatibility(profile) {
     summaryParts.push(`Recently aligned on ${formatFriendlyList(watches)}`);
   }
   if (parties.length) {
-    summaryParts.push(`Joined ${formatPlural(parties.length, "watch party")}`);
   }
   const summary = summaryParts.slice(0, 2).join(" • ") || "Swap more favorites to sharpen this match.";
   const highlights = [];
@@ -10729,7 +10504,6 @@ function computeTasteCompatibility(profile) {
     highlights.push(`${watches.length} overlapping watch${watches.length === 1 ? "" : "es"}`);
   }
   if (parties.length) {
-    const label = parties.length === 1 ? "watch party" : "watch parties";
     highlights.push(`${parties.length} ${label}`);
   }
   return { score, tier, summary, highlights };
@@ -10780,7 +10554,6 @@ function createFriendshipStoryCard(profile) {
   statGrid.appendChild(createStoryStat("Shared favorites", formatPlural(favorites.length, "film")));
   statGrid.appendChild(createStoryStat("Shared genres", formatPlural(genres.length, "genre")));
   statGrid.appendChild(createStoryStat("Recent overlap", formatPlural(watches.length, "watch", "watches")));
-  statGrid.appendChild(createStoryStat("Watch parties", formatPlural(parties.length, "party", "parties")));
   card.appendChild(statGrid);
 
   const summaryText = buildFriendshipStorySummary({ favorites, genres, watches, parties });
@@ -10833,7 +10606,6 @@ function buildFriendshipStorySummary({ favorites, genres, watches, parties }) {
     phrases.push(`Lean into ${formatFriendlyList(genres)}`);
   }
   if (parties.length) {
-    phrases.push(`Joined ${formatPlural(parties.length, "watch party", "watch parties")}`);
   }
   return phrases.slice(0, 2).join(" • ");
 }
@@ -11421,7 +11193,6 @@ function buildSuggestionCard(suggestion, onFollow) {
   suggestion.sharedWatchParties.slice(0, 2).forEach((summary) => {
     const tag = document.createElement("span");
     tag.className = "social-suggestion-tag";
-    tag.dataset.variant = "party";
     tag.textContent = summary;
     tags.appendChild(tag);
   });
@@ -11536,7 +11307,6 @@ function formatTimeAgo(value) {
   });
 }
 
-function formatWatchPartyDate(value) {
   if (!value) {
     return "Scheduled soon";
   }
@@ -11552,7 +11322,6 @@ function formatWatchPartyDate(value) {
   });
 }
 
-function formatPartyResponse(response) {
   switch (response) {
     case "accept":
     case "accepted":
@@ -11569,7 +11338,6 @@ function formatPartyResponse(response) {
   }
 }
 
-function normalizePartyResponse(response) {
   const value = typeof response === "string" ? response.toLowerCase() : "";
   if (value === "accept" || value === "accepted") {
     return "accept";
@@ -11947,11 +11715,6 @@ function getNotificationActionConfig(note) {
       return { label: "Review invite", handler: () => openProfileDeepLink("collab") };
     case "collab_accept":
       return { label: "See the list", handler: () => openProfileDeepLink("collab") };
-    case "watch_party":
-      return { label: "View watch party", handler: () => openProfileDeepLink("party") };
-    case "watch_party_update":
-    case "watch_party_reminder":
-      return { label: "Open RSVP", handler: () => openProfileDeepLink("party") };
     default:
       break;
   }
