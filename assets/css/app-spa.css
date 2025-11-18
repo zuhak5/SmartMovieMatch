@@ -1432,7 +1432,7 @@ p {
   justify-self: center;
   flex-wrap: wrap;
   gap: 0px;
-  margin: 10px 0 16px;
+  margin: 20px 0 10px;
 }
 
 .filter-pill {
