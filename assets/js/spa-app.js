@@ -522,15 +522,35 @@ function createPoster(url) {
   return poster;
 }
 
+function formatCompactNumber(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return "";
+  return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(numericValue);
+}
+
+function formatTrendScore(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return "";
+  if (Math.abs(numericValue) >= 100) return Math.round(numericValue).toString();
+  if (Math.abs(numericValue) >= 10) return numericValue.toFixed(1);
+  return numericValue.toFixed(2);
+}
+
 function buildGlassMovieCard(normalized, options = {}) {
   if (!normalized || !normalized.title) return null;
 
   const imdbScore = normalized.rating ? `${normalized.rating.toFixed(1)}/10` : "";
-  const rtScore = normalized.watchCount
-    ? `${normalized.watchCount} logs`
-    : normalized.trendScore
-    ? `${normalized.trendScore.toFixed(1)} buzz`
-    : "";
+  const primaryLabel = imdbScore ? "TMDB" : "Score";
+
+  let secondaryLabel = "RT";
+  let rtScore = "";
+  if (normalized.watchCount) {
+    secondaryLabel = "Logs";
+    rtScore = `${formatCompactNumber(normalized.watchCount)}`;
+  } else if (normalized.trendScore) {
+    secondaryLabel = "Buzz";
+    rtScore = `${formatTrendScore(normalized.trendScore)}`;
+  }
 
   const card = createGlassMovieCard({
     posterUrl: normalized.posterUrl || "",
@@ -538,6 +558,8 @@ function buildGlassMovieCard(normalized, options = {}) {
     year: normalized.releaseYear || "",
     imdbScore,
     rtScore,
+    primaryLabel,
+    secondaryLabel,
     liked: isFavoriteMovie(normalized),
     watched: Boolean(options.watched),
     onToggleLike: async (isLiked) => {
