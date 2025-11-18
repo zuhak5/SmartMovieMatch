@@ -248,7 +248,6 @@ const VIBE_PRESET_SELECTOR = '[data-vibe-preset]';
 const PRESENCE_STATUS_PRESET_MAP = new Map(PRESENCE_STATUS_PRESETS.map((preset) => [preset.key, preset]));
 
 const THEME_STORAGE_KEY = "smm.theme.v1";
-const ONBOARDING_STORAGE_KEY = "smm.onboarding.v1";
 
 function getStoredRecommendationLayout() {
   const stored = getItem(RECOMMENDATION_LAYOUT_STORAGE_KEY);
@@ -601,13 +600,32 @@ function focusOnboardingTarget(selector) {
   }
 }
 
-function hasCompletedOnboarding() {
-  return getItem(ONBOARDING_STORAGE_KEY) === "complete";
+function hasCompletedOnboarding(session = state.session) {
+  const completedAt = session?.preferencesSnapshot?.onboardingCompletedAt;
+  if (!completedAt) {
+    return false;
+  }
+  const parsed = new Date(completedAt);
+  return !Number.isNaN(parsed.getTime());
 }
 
 function markOnboardingComplete() {
   state.onboardingSeen = true;
-  setItem(ONBOARDING_STORAGE_KEY, "complete");
+  if (!state.session) {
+    return;
+  }
+
+  const completionTimestamp = new Date().toISOString();
+  const updatedSnapshot = {
+    ...(state.session.preferencesSnapshot || {}),
+    onboardingCompletedAt: completionTimestamp
+  };
+
+  state.session = { ...state.session, preferencesSnapshot: updatedSnapshot };
+
+  persistPreferencesRemote(state.session, updatedSnapshot).catch((error) => {
+    console.warn("Failed to persist onboarding completion", error);
+  });
 }
 
 function evaluatePasswordRules(password, confirmPassword = "") {
@@ -1080,13 +1098,13 @@ document.addEventListener("DOMContentLoaded", init);
 function init() {
   const initialTheme = getStoredTheme();
   applyTheme(initialTheme, { persist: false });
-  state.onboardingSeen = hasCompletedOnboarding();
   state.recommendationLayout = getStoredRecommendationLayout();
   updateRecommendationLayout();
 
   state.watchedMovies = [];
   state.favorites = [];
   state.session = loadSession();
+  state.onboardingSeen = hasCompletedOnboarding(state.session);
   state.notificationFocusTarget = getNotificationDeepLinkTarget();
   setupSocialFeatures();
   hydrateFromSession(state.session);
@@ -1111,6 +1129,7 @@ function init() {
   subscribeToSession((session) => {
     const previousSession = state.session;
     state.session = session;
+    state.onboardingSeen = hasCompletedOnboarding(session);
     const wasSignedIn = Boolean(previousSession && previousSession.token);
     const isSignedIn = Boolean(session && session.token);
     hydrateFromSession(session);
