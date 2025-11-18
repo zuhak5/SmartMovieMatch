@@ -1496,8 +1496,6 @@ p {
 
 @media (min-width: 640px) {
   .horizontal-scroll.movie-card-row {
-    grid-auto-columns: minmax(220px, 1fr);
-  }
 }
 
 .horizontal-scroll.movie-card-row .movie-card {
