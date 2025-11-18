@@ -585,6 +585,8 @@ function createPoster(url) {
 function buildGlassMovieCard(normalized, options = {}) {
   if (!normalized || !normalized.title) return null;
 
+  const { variant = "default" } = options;
+
   const imdbScore = normalized.rating ? `${normalized.rating.toFixed(1)}/10` : "";
   const rtScore = normalized.watchCount
     ? `${normalized.watchCount} logs`
@@ -601,6 +603,7 @@ function buildGlassMovieCard(normalized, options = {}) {
     inWatchlist: Boolean(options.inWatchlist),
     liked: isFavoriteMovie(normalized),
     watched: Boolean(options.watched),
+    variant,
     onToggleWatchlist: async (isInWatchlist) => {
       if (typeof options.onWatchlist === "function") {
         const next = await options.onWatchlist(isInWatchlist, card);
@@ -1686,6 +1689,7 @@ function renderTrendingMovies(movies = []) {
 
   normalized.forEach((movie, index) => {
     const card = buildGlassMovieCard(movie, {
+      variant: "compact",
       onWatchlist: async (isInWatchlist) => {
         if (!isInWatchlist) return false;
         if (!hasActiveSession()) return false;
@@ -3721,6 +3725,7 @@ function renderHomeRecommendations(items = []) {
     };
 
     const card = buildGlassMovieCard(normalized, {
+      variant: "compact",
       onWatchlist: async (isInWatchlist) => {
         if (!isInWatchlist) return false;
         if (!hasActiveSession()) return false;
