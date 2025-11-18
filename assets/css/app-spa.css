@@ -3097,50 +3097,63 @@ p {
 }
 
 .movie-card {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  position: relative;
+  aspect-ratio: 2 / 3;
   color: var(--text);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
   border-radius: 14px;
   overflow: hidden;
   box-shadow: 0 10px 32px rgba(0, 0, 0, 0.35);
   transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #0b1021;
 }
 
 .movie-card:hover {
   transform: translateY(-4px) scale(1.01);
-  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.5);
   border-color: rgba(255, 255, 255, 0.22);
 }
 
 .movie-card__poster {
-  position: relative;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
-  border-radius: 12px 12px 0 0;
+  border-radius: 14px;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
 }
 
 .movie-card__poster img {
   width: 100%;
   height: 100%;
-  aspect-ratio: 2 / 3;
   object-fit: cover;
   display: block;
-  transition: transform 160ms ease;
+  transition: transform 180ms ease;
 }
 
 .movie-card:hover .movie-card__poster img {
   transform: scale(1.02);
 }
 
+.movie-card__gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(10, 12, 26, 0) 40%, rgba(10, 12, 26, 0.82) 100%);
+  backdrop-filter: blur(2px);
+}
+
 .movie-card__body {
-  padding: 12px 12px 14px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 14px 12px 16px;
   display: grid;
   gap: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.35);
 }
 
 .movie-card__title-row {
