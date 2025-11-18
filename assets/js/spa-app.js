@@ -94,6 +94,7 @@ const state = {
   activeSection: "home",
   discoverFilter: "popular",
   discoverAbort: null,
+  discoverSeriesAbort: null,
   discoverPeopleAbort: null,
   trendingAbort: null,
   recommendationsAbort: null,
@@ -291,6 +292,7 @@ const sections = document.querySelectorAll("[data-section-panel]");
 const tabGroups = document.querySelectorAll("[data-section-tabs]");
 const discoverSearchInput = document.querySelector("[data-discover-search]");
 const discoverGrid = document.querySelector('[data-grid="discover-movies"]');
+const discoverSeriesGrid = document.querySelector('[data-grid="discover-series"]');
 const discoverPeopleList = document.querySelector('[data-list="discover-people"]');
 const trendingRow = document.querySelector('[data-row="discover-trending"]');
 const trendingStatus = document.querySelector('[data-trending-status]');
@@ -1558,6 +1560,34 @@ function renderDiscoverMovies(movies = []) {
   });
 }
 
+function renderDiscoverSeries(series = []) {
+  if (!discoverSeriesGrid) return;
+  discoverSeriesGrid.innerHTML = "";
+  if (!series.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "No series matched—try a different filter.";
+    discoverSeriesGrid.append(empty);
+    return;
+  }
+
+  series.forEach((show) => {
+    const normalized = normalizeDiscoverSeries(show);
+    if (!normalized) return;
+    const card = buildGlassMovieCard(normalized);
+
+    if (!card) return;
+    const meta = [normalized.releaseYear ? String(normalized.releaseYear) : "", formatGenres(normalized.genres)]
+      .filter(Boolean)
+      .join(" • ");
+    const providerBadges = (normalized.streamingProviders || [])
+      .slice(0, 4)
+      .map((provider) => createProviderBadge(provider));
+    decorateMovieCard(card, { meta, chips: providerBadges });
+    discoverSeriesGrid.append(card);
+  });
+}
+
 function renderTrendingStatus() {
   if (!trendingStatus) return;
   trendingStatus.textContent = "";
@@ -1679,7 +1709,8 @@ function normalizeDiscoverMovie(movie = {}) {
   const releaseYear =
     movie.releaseYear ||
     movie.release_year ||
-    (movie.release_date ? movie.release_date.slice(0, 4) : null);
+    (movie.release_date ? movie.release_date.slice(0, 4) : null) ||
+    (movie.first_air_date ? movie.first_air_date.slice(0, 4) : null);
 
   const rating =
     Number.isFinite(movie.avgRating) && movie.avgRating >= 0
@@ -1716,6 +1747,30 @@ function normalizeDiscoverMovie(movie = {}) {
     streamingProviders: normalizeStreamingProviders(
       movie.streamingProviders || movie.streaming_providers || []
     )
+  };
+}
+
+function normalizeDiscoverSeries(show = {}) {
+  if (!show || typeof show !== "object") {
+    return null;
+  }
+
+  const normalized = normalizeDiscoverMovie({
+    ...show,
+    releaseYear:
+      show.releaseYear ||
+      show.release_year ||
+      (show.first_air_date ? show.first_air_date.slice(0, 4) : null)
+  });
+
+  if (!normalized) return null;
+
+  return {
+    ...normalized,
+    title: show.name || show.original_name || normalized.title,
+    releaseYear:
+      normalized.releaseYear ||
+      (show.first_air_date ? show.first_air_date.slice(0, 4) : null)
   };
 }
 
@@ -3239,6 +3294,42 @@ function buildDiscoverParams(filter = "popular", query = "") {
   return { path: "discover/movie", params };
 }
 
+function buildDiscoverSeriesParams(filter = "popular", query = "") {
+  const params = {
+    language: "en-US",
+    include_adult: "false",
+    page: 1
+  };
+
+  if (query) {
+    params.query = query;
+    return { path: "search/tv", params };
+  }
+
+  switch (filter) {
+    case "top-rated":
+      params.sort_by = "vote_average.desc";
+      params["vote_count.gte"] = 300;
+      break;
+    case "new":
+      params.sort_by = "first_air_date.desc";
+      params["first_air_date.gte"] = formatRecentDate(120);
+      break;
+    case "streaming":
+      params.sort_by = "popularity.desc";
+      params.with_watch_monetization_types = "flatrate|ads|free";
+      params.watch_region = "US";
+      break;
+    case "friends":
+      params.sort_by = "popularity.desc";
+      break;
+    default:
+      params.sort_by = "popularity.desc";
+  }
+
+  return { path: "discover/tv", params };
+}
+
 function formatRecentDate(daysAgo = 120) {
   const boundary = new Date();
   boundary.setDate(boundary.getDate() - daysAgo);
@@ -3282,7 +3373,15 @@ async function fetchDiscoverMoviesOnline({ query = "", filter = "popular", signa
   return attachOmdbMetadata(results, { signal, max: Math.min(6, limit) });
 }
 
-async function loadDiscoverResults({ query = "" } = {}) {
+async function fetchDiscoverSeriesOnline({ query = "", filter = "popular", signal } = {}) {
+  const limit = getUiLimit("ui.discover.maxSeries", 12);
+  const { path, params } = buildDiscoverSeriesParams(filter, query);
+  const data = await fetchFromTmdb(path, params, { signal });
+  const results = Array.isArray(data?.results) ? data.results.slice(0, limit) : [];
+  return results;
+}
+
+async function loadDiscoverMovieResults({ query = "" } = {}) {
   const trimmedQuery = query.trim();
   if (state.discoverAbort) {
     state.discoverAbort.abort();
@@ -3312,6 +3411,49 @@ async function loadDiscoverResults({ query = "" } = {}) {
   } finally {
     state.discoverAbort = null;
   }
+}
+
+async function loadDiscoverSeriesResults({ query = "" } = {}) {
+  const trimmedQuery = query.trim();
+  if (state.discoverSeriesAbort) {
+    state.discoverSeriesAbort.abort();
+  }
+  const controller = new AbortController();
+  state.discoverSeriesAbort = controller;
+
+  try {
+    const seriesResults = await fetchDiscoverSeriesOnline({
+      query: trimmedQuery,
+      filter: state.discoverFilter,
+      signal: controller.signal
+    });
+    renderDiscoverSeries(seriesResults);
+    if (trimmedQuery.length >= 2) {
+      logSearchEvent({
+        query: trimmedQuery,
+        filters: { source: "discover-series", sort: state.discoverFilter },
+        resultsCount: seriesResults.length,
+        clientContext: { hasSession: Boolean(state.session?.token) }
+      });
+    }
+  } catch (error) {
+    if (error.name === "AbortError") return;
+    console.warn("series search failed", error);
+    renderDiscoverSeries([]);
+  } finally {
+    state.discoverSeriesAbort = null;
+  }
+}
+
+async function loadDiscoverResults({ query = "" } = {}) {
+  const trimmedQuery = query.trim();
+  const discoverTab = state.activeTabs.discover;
+  if (discoverTab === "series") {
+    await loadDiscoverSeriesResults({ query: trimmedQuery });
+    return;
+  }
+
+  await loadDiscoverMovieResults({ query: trimmedQuery });
 }
 
 async function handleAuthSubmit(event) {
@@ -3933,7 +4075,15 @@ function attachListeners() {
     group.querySelectorAll("[data-tab]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const section = group.dataset.sectionTabs;
-        setTab(section, btn.dataset.tab);
+        const tab = btn.dataset.tab;
+        setTab(section, tab);
+        if (section === "discover") {
+          if (tab === "people") {
+            loadDiscoverPeople(discoverSearchInput ? discoverSearchInput.value : "");
+          } else {
+            loadDiscover(state.discoverFilter);
+          }
+        }
       });
     });
   });

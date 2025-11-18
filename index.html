@@ -92,6 +92,7 @@
         </div>
         <div class="tab-group" data-section-tabs="discover" role="tablist" aria-label="Discover tabs">
           <button class="tab-button" data-tab="movies" role="tab">Movies</button>
+          <button class="tab-button" data-tab="series" role="tab">Series</button>
           <button class="tab-button" data-tab="people" role="tab">People</button>
         </div>
         <div class="tab-group" data-section-tabs="home" role="tablist" aria-label="Home tabs">
@@ -238,7 +239,7 @@
           <div class="panel-heading">
             <div>
               <h2>Discover</h2>
-              <p class="lead">Search across movies, people, and curated lists.</p>
+              <p class="lead">Search across movies, series, people, and curated lists.</p>
             </div>
           </div>
           <div class="search-bar">
@@ -247,7 +248,7 @@
               id="discoverSearch"
               data-discover-search
               type="search"
-              placeholder="Search movies or people…"
+              placeholder="Search movies, series, or people…"
             />
           </div>
           <div class="panel-heading" style="align-items: center;">
@@ -270,6 +271,15 @@
               <button class="filter-pill" data-filter="friends">From friends</button>
             </div>
             <div class="horizontal-scroll movie-card-row" data-grid="discover-movies"></div>
+          </div>
+          <div class="tab-panel" data-tab-panel="series">
+            <div class="filter-row">
+              <button class="filter-pill is-active" data-filter="popular">Popular</button>
+              <button class="filter-pill" data-filter="top-rated">Top rated</button>
+              <button class="filter-pill" data-filter="new">New</button>
+              <button class="filter-pill" data-filter="friends">From friends</button>
+            </div>
+            <div class="horizontal-scroll movie-card-row" data-grid="discover-series"></div>
           </div>
           <div class="tab-panel" data-tab-panel="people">
             <div class="stack" data-list="discover-people"></div>
