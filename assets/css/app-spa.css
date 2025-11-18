@@ -1489,25 +1489,22 @@ p {
 }
 
 .horizontal-scroll.movie-card-row {
-  grid-auto-columns: min-content;
+  grid-auto-columns: minmax(190px, 1fr);
   padding: 10px 12px 14px;
   scroll-padding-inline: 12px;
 }
 
 @media (min-width: 640px) {
   .horizontal-scroll.movie-card-row {
+    grid-auto-columns: clamp(200px, 24vw, 240px);
   }
 }
 
 .horizontal-scroll.movie-card-row .movie-card {
   height: 100%;
   width: 100%;
+  min-width: 190px;
   scroll-snap-align: start;
-  aspect-ratio: auto;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  align-items: stretch;
-  gap: 0;
 }
 
 .horizontal-scroll.movie-card-row .movie-card__poster {
