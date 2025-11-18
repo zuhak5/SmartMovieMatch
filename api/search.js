@@ -129,13 +129,12 @@ async function searchSupabase({
     'select',
     [
       'imdb_id,tmdb_id,title,poster_url,release_year,genres,synopsis,last_synced_at',
-      'watch_diary:watch_diary(count)',
       'movie_reviews:movie_reviews(count)',
       'user_favorites:user_favorites(count)'
     ].join(',')
   );
 
-  const { orderField, direction, timeWindow } = resolveOrdering(filter);
+  const { orderField, direction } = resolveOrdering(filter);
   searchParams.set('order', `${orderField}.${direction}.nullslast`);
   searchParams.set('limit', String(limit));
 
@@ -150,10 +149,6 @@ async function searchSupabase({
 
   if (year) {
     searchParams.append('release_year', `eq.${year}`);
-  }
-
-  if (timeWindow) {
-    searchParams.append('watch_diary.watched_on', `gte.${timeWindow}`);
   }
 
   const url = new URL('/rest/v1/movies', SUPABASE_URL);
@@ -200,7 +195,6 @@ async function searchSupabase({
 }
 
 function normalizeMovieRow(row) {
-  const watchCount = extractRelationshipCount(row.watch_diary);
   const favorites = extractRelationshipCount(row.user_favorites);
   const reviews = extractRelationshipCount(row.movie_reviews);
 
@@ -213,7 +207,6 @@ function normalizeMovieRow(row) {
     genres: Array.isArray(row.genres) ? row.genres : [],
     synopsis: row.synopsis || '',
     stats: {
-      watchCount,
       favorites,
       reviews
     },
@@ -291,9 +284,6 @@ function extractRelationshipCount(rel) {
 }
 
 function resolveOrdering(filter) {
-  const now = new Date();
-  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-
   switch (filter) {
     case 'top-rated':
       return { orderField: 'movie_reviews.count', direction: 'desc' };
@@ -302,9 +292,9 @@ function resolveOrdering(filter) {
     case 'friends':
       return { orderField: 'user_favorites.count', direction: 'desc' };
     case 'streaming':
-      return { orderField: 'watch_diary.count', direction: 'desc' };
+      return { orderField: 'movie_reviews.count', direction: 'desc' };
     default:
-      return { orderField: 'watch_diary.count', direction: 'desc', timeWindow: weekAgo };
+      return { orderField: 'user_favorites.count', direction: 'desc' };
   }
 }
 

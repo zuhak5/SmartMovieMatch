@@ -231,46 +231,6 @@ create table IF NOT EXISTS public.user_tags (
   constraint user_tags_unique_per_user unique (username, label),
   constraint user_tags_username_fkey foreign KEY (username) references auth_users (username) on delete CASCADE
 ) TABLESPACE pg_default;
-create table IF NOT EXISTS public.watch_diary (
-  id uuid not null default gen_random_uuid (),
-  username text not null,
-  movie_imdb_id text not null,
-  watched_on date not null,
-  rating numeric(2, 1) null,
-  review_id uuid null,
-  tags text[] null,
-  visibility text not null default 'public'::text,
-  created_at timestamp with time zone not null default timezone ('utc'::text, now()),
-  updated_at timestamp with time zone not null default timezone ('utc'::text, now()),
-  constraint watch_diary_pkey primary key (id),
-  constraint watch_diary_movie_imdb_id_fkey foreign KEY (movie_imdb_id) references movies (imdb_id) on delete CASCADE,
-  constraint watch_diary_review_fk foreign KEY (review_id) references movie_reviews (id) on delete set null,
-  constraint watch_diary_username_fkey foreign KEY (username) references auth_users (username) on delete CASCADE,
-  constraint watch_diary_rating_range check (
-    (
-      (rating is null)
-      or (
-        (rating >= (0)::numeric)
-        and (rating <= (10)::numeric)
-      )
-    )
-  ),
-  constraint watch_diary_visibility_check check (
-    (
-      visibility = any (
-        array[
-          'public'::text,
-          'friends'::text,
-          'private'::text
-        ]
-      )
-    )
-  )
-) TABLESPACE pg_default;
-
-create index IF not exists watch_diary_username_idx on public.watch_diary using btree (username, watched_on desc) TABLESPACE pg_default;
-
-create index IF not exists watch_diary_movie_idx on public.watch_diary using btree (movie_imdb_id) TABLESPACE pg_default;
 
 -- Ensure all columns exist (safe if already there)
 
@@ -386,17 +346,6 @@ ALTER TABLE IF EXISTS public.user_tags
   ADD COLUMN IF NOT EXISTS username text not null,
   ADD COLUMN IF NOT EXISTS label text not null;
 
-ALTER TABLE IF EXISTS public.watch_diary
-  ADD COLUMN IF NOT EXISTS id uuid not null default gen_random_uuid (),
-  ADD COLUMN IF NOT EXISTS username text not null,
-  ADD COLUMN IF NOT EXISTS movie_imdb_id text not null,
-  ADD COLUMN IF NOT EXISTS watched_on date not null,
-  ADD COLUMN IF NOT EXISTS rating numeric(2, 1) null,
-  ADD COLUMN IF NOT EXISTS review_id uuid null,
-  ADD COLUMN IF NOT EXISTS tags text[] null,
-  ADD COLUMN IF NOT EXISTS visibility text not null default 'public'::text,
-  ADD COLUMN IF NOT EXISTS created_at timestamp with time zone not null default timezone ('utc'::text, now()),
-  ADD COLUMN IF NOT EXISTS updated_at timestamp with time zone not null default timezone ('utc'::text, now());
 
 -- Ensure all constraints exist (safe if already there)
 
@@ -945,101 +894,6 @@ BEGIN
   END IF;
 END $$;
 
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conname = 'watch_diary_pkey'
-      AND conrelid = 'public.watch_diary'::regclass
-  ) THEN
-    ALTER TABLE public.watch_diary
-      ADD CONSTRAINT watch_diary_pkey primary key (id);
-  END IF;
-END $$;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conname = 'watch_diary_movie_imdb_id_fkey'
-      AND conrelid = 'public.watch_diary'::regclass
-  ) THEN
-    ALTER TABLE public.watch_diary
-      ADD CONSTRAINT watch_diary_movie_imdb_id_fkey foreign KEY (movie_imdb_id) references movies (imdb_id) on delete CASCADE;
-  END IF;
-END $$;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conname = 'watch_diary_review_fk'
-      AND conrelid = 'public.watch_diary'::regclass
-  ) THEN
-    ALTER TABLE public.watch_diary
-      ADD CONSTRAINT watch_diary_review_fk foreign KEY (review_id) references movie_reviews (id) on delete set null;
-  END IF;
-END $$;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conname = 'watch_diary_username_fkey'
-      AND conrelid = 'public.watch_diary'::regclass
-  ) THEN
-    ALTER TABLE public.watch_diary
-      ADD CONSTRAINT watch_diary_username_fkey foreign KEY (username) references auth_users (username) on delete CASCADE;
-  END IF;
-END $$;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conname = 'watch_diary_rating_range'
-      AND conrelid = 'public.watch_diary'::regclass
-  ) THEN
-    ALTER TABLE public.watch_diary
-      ADD CONSTRAINT watch_diary_rating_range check (
-          (
-            (rating is null)
-            or (
-              (rating >= (0)::numeric)
-              and (rating <= (10)::numeric)
-            )
-          )
-        );
-  END IF;
-END $$;
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint
-    WHERE conname = 'watch_diary_visibility_check'
-      AND conrelid = 'public.watch_diary'::regclass
-  ) THEN
-    ALTER TABLE public.watch_diary
-      ADD CONSTRAINT watch_diary_visibility_check check (
-          (
-            visibility = any (
-              array[
-                'public'::text,
-                'friends'::text,
-                'private'::text
-              ]
-            )
-          )
-        );
-  END IF;
-END $$;
 
 -- =====================================================================
 -- FUTURE-PROOF CORE EXTENSIONS
@@ -1332,12 +1186,6 @@ ALTER TABLE IF EXISTS public.movies
   ADD COLUMN IF NOT EXISTS popularity_score numeric(10, 4) null,
   ADD COLUMN IF NOT EXISTS metadata jsonb not null default '{}'::jsonb;
 
--- watch_diary: richer logging per viewing
-ALTER TABLE IF EXISTS public.watch_diary
-  ADD COLUMN IF NOT EXISTS rewatch_number integer not null default 1,
-  ADD COLUMN IF NOT EXISTS source text null,
-  ADD COLUMN IF NOT EXISTS device text null,
-  ADD COLUMN IF NOT EXISTS metadata jsonb not null default '{}'::jsonb;
 
 -- movie_reviews: counters, tags & metadata
 ALTER TABLE IF EXISTS public.movie_reviews
@@ -1421,12 +1269,6 @@ ALTER TABLE IF EXISTS public.user_tags
 --         * providers/external_ids jsonb for deep links,
 --         * rating_average + rating_count for sort & badges,
 --         * popularity_score for trending views.
-
--- watch_diary (new columns)
---   Powers:
---     - Rewatch tracking via rewatch_number.
---     - Basic analytics on where/how the user watched (source, device).
---     - Flexible per-entry extensions via metadata jsonb.
 
 -- movie_reviews (new columns)
 --   Powers:
@@ -1613,44 +1455,7 @@ create policy "Users can manage their own profile"
 
 
 -- ---------------------------------------------------------------------
--- RLS: Watch diary & reviews (visibility + friends)
--- ---------------------------------------------------------------------
-alter table public.watch_diary enable row level security;
 
-drop policy if exists "Diary entries are visible based on visibility + follows" on public.watch_diary;
-create policy "Diary entries are visible based on visibility + follows"
-  on public.watch_diary
-  for select
-  to anon, authenticated
-  using (
-    -- Owner
-    (current_username() is not null and username = current_username())
-    -- Public entries
-    or visibility = 'public'
-    -- Friends-only entries: follower has accepted follow to this user
-    or (
-      visibility = 'friends'
-      and current_username() is not null
-      and exists (
-        select 1
-        from public.user_follows f
-        where f.follower_username = current_username()
-          and f.followed_username = watch_diary.username
-          and f.status = 'accepted'
-      )
-    )
-  );
-
-drop policy if exists "Users can manage their own diary entries" on public.watch_diary;
-create policy "Users can manage their own diary entries"
-  on public.watch_diary
-  for all
-  to authenticated
-  using ( username = current_username() )
-  with check ( username = current_username() );
-
-
-alter table public.movie_reviews enable row level security;
 
 drop policy if exists "Reviews are visible based on visibility + follows" on public.movie_reviews;
 create policy "Reviews are visible based on visibility + follows"

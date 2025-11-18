@@ -22,7 +22,6 @@ Each item is a task for Codex (or any other assistant) to implement.
 - `PROF-*`  – Profiles & onboarding
 - `SOC-*`   – Following, friends, social graph
 - `SRCH-*`  – Search & discovery
-- `DIARY-*` – Watch diary & reviews
 - `LIST-*`  – Lists, tags, and favorites
 - `STRM-*`  – Streaming providers & availability
 - `PARTY-*` – Watch parties
@@ -55,7 +54,7 @@ Each item is a task for Codex (or any other assistant) to implement.
   DONE 2025-11-17T03:11Z – Added inline sign-in/sign-up modal backed by the auth API; successful auth persists Supabase sessions, refreshes SPA state, and logout clears stored tokens with UI reset.
 
 - [x] **AUTH-003 – Enforce auth for protected views**
-  - Description: Guard pages that require a logged-in user (feed, diary, lists, watch parties).
+  - Description: Guard pages that require a logged-in user (feed, lists, watch parties).
     - If no active session, redirect to login or show an inline login prompt.
   - Files: SPA router / view-switcher, `assets/js/spa-app.js`.
   - Backend: Depends on Supabase RLS; rely on 401/403 to hide remote data if needed.
@@ -108,11 +107,10 @@ Each item is a task for Codex (or any other assistant) to implement.
   DONE 2025-11-17T07:39Z – Added Supabase-backed follow counts from `user_follows` so the profile header reflects live follower and following totals.
 
 - [x] **SOC-003 – Friend feed based on social graph**
-  - Description: Replace static friend feed items with:
-    - Recent diary entries and reviews from people the user follows (`watch_diary`, `movie_reviews`).
+  - Description: Replace static friend feed items with recent reviews from people the user follows (`movie_reviews`).
   - Files: Home/feed view rendering.
-  - Backend: `watch_diary`, `movie_reviews`, `user_follows`, visibility logic aligned with RLS.
-  DONE 2025-11-17T07:57Z – Added Supabase-backed friend feed that pulls diary entries and reviews from followed users with privacy-aware filtering and a refreshed inline highlights UI.
+  - Backend: `movie_reviews`, `user_follows`, visibility logic aligned with RLS.
+  DONE 2025-11-17T07:57Z – Added Supabase-backed friend feed that surfaces reviews from followed users with privacy-aware filtering and a refreshed inline highlights UI.
 
 ---
 
@@ -142,31 +140,7 @@ Each item is a task for Codex (or any other assistant) to implement.
 
 ---
 
-## Watch diary & reviews (DIARY)
 
-- [x] **DIARY-001 – Persist watch diary entries**
-  - Description: Replace any local mock watch history with Supabase-backed `watch_diary` rows.
-    - Support `watched_on`, `rating`, `tags`, `rewatch_number`, `source`, `device`.
-  - Files: Diary entry creation UI, diary list view.
-  - Backend: `watch_diary` with RLS so only the owner can mutate and visibility is respected for readers.
-  DONE 2025-11-17T11:17Z – Added Supabase-backed diary form and list with movie search, tag/source/device metadata, and insert logic wired to `watch_diary`.
-
-- [x] **DIARY-002 – Rewatch support**
-  - Description: When rewatching a movie from the diary or detail page:
-    - Increment `rewatch_number` and create a new diary entry or update existing, per UX decision.
-  - Files: Movie detail actions, diary item actions.
-  - Backend: `watch_diary.rewatch_number`.
-  DONE 2025-11-17T11:25Z – Added “Log rewatch” buttons on diary entries that increment `rewatch_number`, reuse movie metadata, and save a fresh diary row with current date.
-
-- [x] **DIARY-003 – Reviews with engagement counters**
-  - Description: Wire review creation UI to `movie_reviews`, including:
-    - headline, body, rating, visibility, tags.
-    - Update `likes_count` and `comments_count` from `review_likes` and `review_comments` when rendering.
-  - Files: Review form, movie detail review list.
-  - Backend: `movie_reviews`, `review_likes`, `review_comments`.
-  DONE 2025-11-17T11:32Z – Captured Supabase-backed headlines, tags, and visibility in the review form, persisted review metadata, and surfaced like/comment counters from review_likes and review_comments with new UI badges.
-
----
 
 ## Lists, favorites, and tags (LIST)
 
@@ -279,7 +253,7 @@ Each item is a task for Codex (or any other assistant) to implement.
   DONE 2025-11-17T10:03Z – Added Supabase-backed notification bell with unread badge, dropdown list, click-to-mark-read and mark-all controls wired to the social API stream.
 
 - [x] **NOTIF-002 – Activity log for user actions**
-  - Description: Log key SPA actions to `user_activity` (e.g. follow, review, diary entry).
+  - Description: Log key SPA actions to `user_activity` (e.g. follow, review, list update).
     - Use metadata to capture context (movie id, source action).
   - Files: Centralized logging helper in SPA.
   - Backend: `user_activity`.
@@ -312,7 +286,7 @@ Each item is a task for Codex (or any other assistant) to implement.
     - Only use `select/insert/update/delete` on tables where RLS rules are defined for client.
     - Treat 401/403 responses as “not allowed” and hide the corresponding UI safely.
   - Files: Supabase client wrapper, data hooks/services.
-  - Backend: All RLS-protected tables (diary, reviews, lists, parties, DMs, etc.).
+  - Backend: All RLS-protected tables (reviews, lists, parties, DMs, etc.).
   DONE 2025-11-17T10:59Z – Added authorization-aware social API errors that clear protected state, stop polling/streams, and surface clear access messaging instead of leaking restricted UI.
 
 - [x] **RLS-002 – Anonymous vs authenticated access**

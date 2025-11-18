@@ -1622,13 +1622,6 @@ p {
   border: 1px solid rgba(139, 92, 246, 0.4);
 }
 
-.diary-row {
-  display: grid;
-  grid-template-columns: 60px 1fr;
-  gap: 12px;
-  align-items: center;
-}
-
 .label-row {
   display: flex;
   align-items: center;

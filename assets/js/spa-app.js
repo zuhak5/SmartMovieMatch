@@ -46,10 +46,7 @@ import {
   listWatchPartyMessagesRemote,
   postWatchPartyMessageRemote,
   searchSocialUsers,
-  acknowledgeNotifications,
-  subscribeToDiaryEntries,
-  refreshDiaryEntries,
-  saveDiaryEntry
+  acknowledgeNotifications
 } from "./social.js";
 import { logRecommendationEvent, logSearchEvent } from "./analytics.js";
 
@@ -146,13 +143,6 @@ const state = {
   watchPartyMessagesPartyId: null,
   watchPartyMessagesLoading: false,
   watchPartyMessageSending: false,
-  diaryEntries: [],
-  diaryLoading: false,
-  diaryError: "",
-  diarySelection: null,
-  diarySearchResults: [],
-  diarySearchAbort: null,
-  diarySubmitting: false,
   appConfig: {
     config: {},
     experiments: { experiments: [], assignments: {} },
@@ -277,7 +267,7 @@ const authRequiredViews = [
   },
   {
     section: "profile",
-    message: "Sign in to view your profile and diary."
+    message: "Sign in to view your profile."
   },
   {
     section: "home",
@@ -323,21 +313,6 @@ const conversationThreadStatus = document.querySelector('[data-conversation-thre
 const conversationForm = document.querySelector('[data-conversation-form]');
 const conversationInput = document.querySelector('[data-conversation-input]');
 const conversationSendButton = document.querySelector('[data-conversation-send]');
-const diaryForm = document.querySelector('[data-diary-form]');
-const diaryList = document.querySelector('[data-diary-list]');
-const diaryEmpty = document.querySelector('[data-diary-empty]');
-const diaryStatus = document.querySelector('[data-diary-status]');
-const diarySearchInput = document.querySelector('[data-diary-search]');
-const diarySearchResults = document.querySelector('[data-diary-search-results]');
-const diarySelected = document.querySelector('[data-diary-selected]');
-const diaryDateInput = document.querySelector('[data-diary-date]');
-const diaryRatingInput = document.querySelector('[data-diary-rating]');
-const diaryTagsInput = document.querySelector('[data-diary-tags]');
-const diaryRewatchInput = document.querySelector('[data-diary-rewatch]');
-const diaryVisibilitySelect = document.querySelector('[data-diary-visibility]');
-const diarySourceSelect = document.querySelector('[data-diary-source]');
-const diaryDeviceSelect = document.querySelector('[data-diary-device]');
-const diarySubmitButton = document.querySelector('[data-diary-submit]');
 const favoritesPanel = document.querySelector('[data-favorites-panel]');
 const favoritesList = document.querySelector('[data-favorites-list]');
 const favoritesEmpty = document.querySelector('[data-favorites-empty]');
@@ -385,7 +360,6 @@ const profileWebsite = document.querySelector("[data-profile-website]");
 const profileAvatar = document.querySelector("[data-profile-avatar]");
 const profileStats = {
   films: document.querySelector('[data-profile-stat="films"]'),
-  diary: document.querySelector('[data-profile-stat="diary"]'),
   followers: document.querySelector('[data-profile-stat="followers"]'),
   following: document.querySelector('[data-profile-stat="following"]')
 };
@@ -1052,7 +1026,7 @@ function maybeNavigateForNotification(entry) {
   } else if (type.includes("follow") || type.includes("friend")) {
     setSection("friends");
     setTab("friends", "requests");
-  } else if (type.includes("review") || type.includes("diary")) {
+  } else if (type.includes("review")) {
     setSection("friends");
     setTab("friends", "feed");
   }
@@ -1130,21 +1104,12 @@ function renderProfileOverview() {
   const bio = sanitizeProfileText(profilePrefs.bio || "", 280);
   const location = sanitizeProfileText(profilePrefs.location || "", 120);
   const website = typeof profilePrefs.website === "string" ? profilePrefs.website : "";
-  const diaryCount = Array.isArray(state.diaryEntries) ? state.diaryEntries.length : null;
   const filmsLogged =
     state.session &&
     state.session.preferencesSnapshot &&
     Number.isFinite(state.session.preferencesSnapshot.filmsLogged)
       ? state.session.preferencesSnapshot.filmsLogged
       : 0;
-  const diaryLogged =
-    diaryCount !== null
-      ? diaryCount
-      : state.session &&
-          state.session.preferencesSnapshot &&
-          Number.isFinite(state.session.preferencesSnapshot.diaryEntries)
-        ? state.session.preferencesSnapshot.diaryEntries
-        : 0;
   const profile = {
     name: hasSession
       ? state.session.displayName || state.session.username
@@ -1161,7 +1126,6 @@ function renderProfileOverview() {
     avatarUrl: hasSession && state.session.avatarUrl ? state.session.avatarUrl : null,
     stats: {
       films: filmsLogged,
-      diary: diaryLogged,
       followers:
         state.socialOverview && state.socialOverview.counts
           ? Number(state.socialOverview.counts.followers || 0)
@@ -1214,302 +1178,6 @@ function renderProfileOverview() {
   });
 }
 
-function setDiaryStatus(message, variant = "") {
-  if (!diaryStatus) return;
-  diaryStatus.textContent = message || "";
-  if (variant) {
-    diaryStatus.dataset.variant = variant;
-  } else {
-    delete diaryStatus.dataset.variant;
-  }
-}
-
-function formatDiaryDate(value) {
-  if (!value) return "Just now";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "Just now";
-  }
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-function formatDiaryRating(value) {
-  if (typeof value !== "number" || Number.isNaN(value)) {
-    return "–";
-  }
-  return `${Math.round(value * 10) / 10}/10`;
-}
-
-function buildDiaryMeta(entry) {
-  const parts = [];
-  if (entry.rewatchNumber && entry.rewatchNumber > 1) {
-    parts.push(`Rewatch #${entry.rewatchNumber}`);
-  }
-  if (entry.source) {
-    parts.push(entry.source);
-  }
-  if (entry.device) {
-    parts.push(entry.device);
-  }
-  if (Array.isArray(entry.tags) && entry.tags.length) {
-    parts.push(`#${entry.tags.slice(0, 3).join(" #")}`);
-  }
-  if (entry.visibility && entry.visibility !== "public") {
-    parts.push(entry.visibility === "friends" ? "Friends" : "Private");
-  }
-  return parts.join(" • ");
-}
-
-function renderDiaryEntries() {
-  if (!diaryList || !diaryEmpty) return;
-  diaryList.innerHTML = "";
-  if (state.diaryLoading) {
-    setDiaryStatus("Loading diary…", "loading");
-    diaryEmpty.hidden = true;
-    return;
-  }
-  if (state.diaryError) {
-    setDiaryStatus(state.diaryError, "error");
-  } else {
-    setDiaryStatus("", "");
-  }
-  const entries = Array.isArray(state.diaryEntries) ? state.diaryEntries : [];
-  if (!entries.length) {
-    diaryEmpty.hidden = false;
-    diaryList.hidden = true;
-    return;
-  }
-  diaryList.hidden = false;
-  diaryEmpty.hidden = true;
-  entries.forEach((entry) => {
-    const card = document.createElement("div");
-    card.className = "card diary-row";
-    const poster = document.createElement("div");
-    poster.className = "poster";
-    if (entry.movie && entry.movie.posterUrl) {
-      poster.style.backgroundImage = `url(${entry.movie.posterUrl})`;
-    }
-    const stack = document.createElement("div");
-    stack.className = "stack";
-    const labelRow = document.createElement("div");
-    labelRow.className = "label-row";
-    const date = document.createElement("span");
-    date.className = "small-text";
-    date.textContent = formatDiaryDate(entry.watchedOn || entry.createdAt);
-    const rating = document.createElement("span");
-    rating.className = "badge rating";
-    rating.textContent = formatDiaryRating(entry.rating);
-    labelRow.append(date, rating);
-    const title = document.createElement("strong");
-    title.textContent = (entry.movie && entry.movie.title) || "Untitled";
-    const meta = document.createElement("p");
-    meta.className = "small-text";
-    meta.textContent = buildDiaryMeta(entry);
-    const actions = document.createElement("div");
-    actions.className = "label-row diary-actions";
-    const rewatchButton = document.createElement("button");
-    rewatchButton.type = "button";
-    rewatchButton.className = "btn-ghost btn";
-    const nextRewatchNumber =
-      (Number.isFinite(entry.rewatchNumber) ? entry.rewatchNumber : 1) + 1;
-    rewatchButton.textContent = `Log rewatch #${nextRewatchNumber}`;
-    rewatchButton.addEventListener("click", () => handleDiaryRewatch(entry, rewatchButton));
-    actions.append(rewatchButton);
-    stack.append(labelRow, title, meta, actions);
-    card.append(poster, stack);
-    diaryList.append(card);
-  });
-}
-
-async function handleDiaryRewatch(entry, button) {
-  if (!entry || !entry.movie || !entry.movie.imdbId) {
-    setDiaryStatus("Missing movie details for this diary entry.", "error");
-    return;
-  }
-  if (!hasActiveSession()) {
-    setDiaryStatus("Sign in to log a rewatch.", "error");
-    openAuthOverlay("login");
-    return;
-  }
-  const targetButton = button || null;
-  if (targetButton) {
-    targetButton.disabled = true;
-  }
-  const currentRewatchNumber = Number.isFinite(entry.rewatchNumber) ? entry.rewatchNumber : 1;
-  const nextRewatchNumber = currentRewatchNumber + 1;
-  const today = new Date().toISOString().slice(0, 10);
-  const payload = {
-    movie: {
-      imdbId: entry.movie.imdbId,
-      tmdbId: entry.movie.tmdbId || null,
-      title: entry.movie.title || "",
-      releaseYear: entry.movie.releaseYear || null
-    },
-    watchedOn: today,
-    rating: typeof entry.rating === "number" ? entry.rating : null,
-    tags: Array.isArray(entry.tags) ? entry.tags : [],
-    rewatchNumber: nextRewatchNumber,
-    visibility: entry.visibility || "public",
-    source: entry.source || null,
-    device: entry.device || null
-  };
-  try {
-    setDiaryStatus(`Logging rewatch #${nextRewatchNumber}…`, "loading");
-    await saveDiaryEntry(payload);
-    setDiaryStatus(`Logged rewatch #${nextRewatchNumber}.`, "success");
-  } catch (error) {
-    setDiaryStatus(
-      error instanceof Error ? error.message : "Could not log your rewatch.",
-      "error"
-    );
-  } finally {
-    if (targetButton) {
-      targetButton.disabled = false;
-    }
-  }
-}
-
-function renderDiarySearchResults() {
-  if (!diarySearchResults) return;
-  diarySearchResults.innerHTML = "";
-  if (!state.diarySearchResults.length) {
-    diarySearchResults.hidden = true;
-    return;
-  }
-  diarySearchResults.hidden = false;
-  state.diarySearchResults.forEach((movie) => {
-    if (!movie || !movie.imdbId) return;
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "pill";
-    const year = movie.releaseYear ? ` (${movie.releaseYear})` : "";
-    button.textContent = `${movie.title}${year}`;
-    button.addEventListener("click", () => selectDiaryMovie(movie));
-    diarySearchResults.append(button);
-  });
-}
-
-function selectDiaryMovie(movie) {
-  if (!movie || !movie.imdbId) {
-    state.diarySelection = null;
-    if (diarySelected) {
-      diarySelected.textContent = "Search to choose a movie to log.";
-    }
-    return;
-  }
-  state.diarySelection = {
-    imdbId: movie.imdbId,
-    tmdbId: movie.tmdbId || null,
-    title: movie.title || "Untitled",
-    releaseYear: movie.releaseYear || null
-  };
-  if (diarySelected) {
-    const year = state.diarySelection.releaseYear ? ` (${state.diarySelection.releaseYear})` : "";
-    diarySelected.textContent = `Selected: ${state.diarySelection.title}${year}`;
-  }
-  if (diarySearchInput) {
-    diarySearchInput.value = state.diarySelection.title;
-  }
-}
-
-async function handleDiarySearchInput(event) {
-  const query = event.target && typeof event.target.value === "string" ? event.target.value.trim() : "";
-  state.diarySelection = null;
-  if (diarySelected) {
-    diarySelected.textContent = "Search to choose a movie to log.";
-  }
-  if (state.diarySearchAbort) {
-    state.diarySearchAbort.abort();
-  }
-  if (query.length < 2) {
-    state.diarySearchResults = [];
-    renderDiarySearchResults();
-    return;
-  }
-  const controller = new AbortController();
-  state.diarySearchAbort = controller;
-  try {
-    const response = await fetchFromSearch({ q: query, limit: 6 }, { signal: controller.signal });
-    if (controller !== state.diarySearchAbort) {
-      return;
-    }
-    state.diarySearchResults = Array.isArray(response.movies) ? response.movies : [];
-    renderDiarySearchResults();
-  } catch (error) {
-    if (error && error.name === "AbortError") {
-      return;
-    }
-    setDiaryStatus("Unable to search for that movie right now.", "error");
-  }
-}
-
-function readDiaryFormValues() {
-  const tagsRaw = diaryTagsInput && typeof diaryTagsInput.value === "string" ? diaryTagsInput.value : "";
-  const parsedTags = tagsRaw
-    .split(",")
-    .map((tag) => tag.trim())
-    .filter(Boolean);
-  const rewatchRaw = diaryRewatchInput ? diaryRewatchInput.value : "";
-  const rewatchNumber = Number.isFinite(Number(rewatchRaw)) ? Number(rewatchRaw) : 1;
-  return {
-    watchedOn:
-      diaryDateInput && diaryDateInput.value
-        ? diaryDateInput.value
-        : new Date().toISOString().slice(0, 10),
-    rating:
-      diaryRatingInput && diaryRatingInput.value !== ""
-        ? Number(diaryRatingInput.value)
-        : null,
-    tags: parsedTags,
-    rewatchNumber: Number.isFinite(rewatchNumber) && rewatchNumber > 0 ? rewatchNumber : 1,
-    visibility: diaryVisibilitySelect ? diaryVisibilitySelect.value : "public",
-    source: diarySourceSelect ? diarySourceSelect.value : null,
-    device: diaryDeviceSelect ? diaryDeviceSelect.value : null
-  };
-}
-
-async function handleDiarySubmit(event) {
-  event.preventDefault();
-  if (!hasActiveSession()) {
-    setAuthStatus("Sign in to log diary entries.", "error");
-    openAuthOverlay("login");
-    return;
-  }
-  if (!state.diarySelection || !state.diarySelection.imdbId) {
-    setDiaryStatus("Choose a movie from search before saving.", "error");
-    return;
-  }
-  if (state.diarySubmitting) return;
-  state.diarySubmitting = true;
-  if (diarySubmitButton) {
-    diarySubmitButton.disabled = true;
-  }
-  setDiaryStatus("Saving your diary entry…", "loading");
-  try {
-    const payload = { ...readDiaryFormValues(), movie: state.diarySelection };
-    await saveDiaryEntry(payload);
-    setDiaryStatus("Diary entry saved.", "success");
-    if (diaryTagsInput) diaryTagsInput.value = "";
-    if (diaryRatingInput) diaryRatingInput.value = "";
-    if (diaryRewatchInput) diaryRewatchInput.value = "1";
-    state.diarySelection = null;
-    if (diarySelected) {
-      diarySelected.textContent = "Search to choose a movie to log.";
-    }
-    state.diarySearchResults = [];
-    renderDiarySearchResults();
-  } catch (error) {
-    setDiaryStatus(
-      error instanceof Error ? error.message : "Could not save your diary entry.",
-      "error"
-    );
-  } finally {
-    state.diarySubmitting = false;
-    if (diarySubmitButton) {
-      diarySubmitButton.disabled = false;
-    }
-  }
-}
 
 function renderDiscoverMovies(movies = []) {
   if (!discoverGrid) return;
@@ -4413,14 +4081,6 @@ function attachListeners() {
     profileEditForm.addEventListener("submit", handleProfileEditorSubmit);
   }
 
-  if (diarySearchInput) {
-    diarySearchInput.addEventListener("input", handleDiarySearchInput);
-  }
-
-  if (diaryForm) {
-    diaryForm.addEventListener("submit", handleDiarySubmit);
-  }
-
   if (profileGenreOptions) {
     profileGenreOptions.addEventListener("change", updateProfileEditorCounts);
   }
@@ -4502,13 +4162,6 @@ function init() {
     renderProfileOverview();
     renderPeopleSection();
   });
-  subscribeToDiaryEntries((payload) => {
-    state.diaryEntries = Array.isArray(payload?.entries) ? payload.entries : [];
-    state.diaryLoading = Boolean(payload?.loading);
-    state.diaryError = payload?.error || "";
-    renderDiaryEntries();
-    renderProfileOverview();
-  });
   subscribeToCollaborativeState((collabState) => {
     state.collabState = collabState || getDefaultCollaborativeState();
     setActiveWatchParty(selectPrimaryWatchParty(state.collabState));
@@ -4557,9 +4210,6 @@ function init() {
     refreshAppConfig();
   });
   initSocialFeatures();
-  if (diaryDateInput && !diaryDateInput.value) {
-    diaryDateInput.value = new Date().toISOString().slice(0, 10);
-  }
   attachListeners();
   refreshAppConfig();
   loadStreamingProviders();
@@ -4568,7 +4218,6 @@ function init() {
   loadDiscover(state.discoverFilter);
   loadDiscoverPeople();
   loadHomeRecommendations();
-  refreshDiaryEntries();
 }
 
 init();

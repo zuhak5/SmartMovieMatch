@@ -108,7 +108,6 @@ const state = {
   friendFeed: [],
   friendFeedLoaded: false,
   friendFeedLoading: false,
-  diary: { entries: [], loading: false, error: '' },
   notificationTimer: null,
   notificationSeen: new Set(),
   toastHost: null,
@@ -132,7 +131,6 @@ const socialOverviewSubscribers = new Set();
 const collaborativeSubscribers = new Set();
 const presenceStatusSubscribers = new Set();
 const mutedSubscribers = new Set();
-const diarySubscribers = new Set();
 
 export function isAuthorizationError(error) {
   return (
@@ -195,9 +193,6 @@ function clearScopedAuthorizationState(scope) {
       state.friendFeedLoading = false;
       notifyFriendFeedSubscribers();
       break;
-    case 'diary':
-      resetDiaryState();
-      break;
     case 'collaboration':
       state.collabState = {
         lists: { owned: [], shared: [], invites: [] },
@@ -221,7 +216,6 @@ function clearAuthorizationState() {
   clearScopedAuthorizationState('following');
   clearScopedAuthorizationState('notifications');
   clearScopedAuthorizationState('friend-feed');
-  clearScopedAuthorizationState('diary');
   clearScopedAuthorizationState('collaboration');
   clearScopedAuthorizationState('presence');
 }
@@ -877,7 +871,7 @@ export function buildCommunitySection(movieContext) {
   });
   const visibilityHint = document.createElement('p');
   visibilityHint.className = 'community-visibility-hint';
-  visibilityHint.textContent = 'Dial down visibility per diary entry to keep vulnerable takes comfy.';
+  visibilityHint.textContent = 'Dial down visibility per review to keep vulnerable takes comfy.';
   visibilityField.appendChild(visibilityLabel);
   visibilityField.appendChild(visibilitySelect);
   visibilityField.appendChild(visibilityHint);
@@ -1157,83 +1151,6 @@ export function getFriendFeedSnapshot() {
 
 export function refreshFriendFeed() {
   return loadFriendFeed(true);
-}
-
-export function subscribeToDiaryEntries(callback) {
-  if (typeof callback !== 'function') {
-    return () => {};
-  }
-  diarySubscribers.add(callback);
-  try {
-    callback(getDiaryEntriesSnapshot());
-  } catch (error) {
-    console.warn('Diary subscriber error', error);
-  }
-  return () => {
-    diarySubscribers.delete(callback);
-  };
-}
-
-export function getDiaryEntriesSnapshot() {
-  return {
-    entries: state.diary.entries.slice(),
-    loading: state.diary.loading,
-    error: state.diary.error
-  };
-}
-
-export async function refreshDiaryEntries(force = false) {
-  if (!state.session || !state.session.token) {
-    resetDiaryState();
-    return;
-  }
-  if (state.diary.loading && !force) {
-    return;
-  }
-  state.diary.loading = true;
-  notifyDiarySubscribers();
-  try {
-    const response = await callSocial('listDiaryEntries');
-    state.diary.entries = Array.isArray(response.entries) ? response.entries : [];
-    state.diary.error = '';
-  } catch (error) {
-    state.diary.error = error instanceof Error ? error.message : 'Unable to load your diary.';
-    if (handleAuthorizationError(error, { scope: 'diary', silent: true })) {
-      return;
-    }
-  } finally {
-    state.diary.loading = false;
-    notifyDiarySubscribers();
-  }
-}
-
-export async function saveDiaryEntry(entry) {
-  if (!state.session || !state.session.token) {
-    throw new Error('Sign in to save diary entries.');
-  }
-  const payload = entry && typeof entry === 'object' ? entry : {};
-  let response;
-  try {
-    response = await callSocial('upsertDiaryEntry', { entry: payload });
-  } catch (error) {
-    handleAuthorizationError(error, { scope: 'diary' });
-    throw error;
-  }
-  await refreshDiaryEntries(true);
-  const normalizedEntry = response && response.entry ? response.entry : null;
-  if (normalizedEntry && normalizedEntry.movie) {
-    logUserActivity({
-      verb: 'diary_add',
-      objectType: 'movie',
-      metadata: {
-        imdbId: normalizedEntry.movie.imdbId || null,
-        tmdbId: normalizedEntry.movie.tmdbId || null,
-        rating: normalizedEntry.rating,
-        rewatchNumber: normalizedEntry.rewatchNumber || 1
-      }
-    });
-  }
-  return normalizedEntry;
 }
 
 export async function acknowledgeNotifications() {
@@ -3537,22 +3454,6 @@ function notifyFriendFeedSubscribers() {
   });
 }
 
-function notifyDiarySubscribers() {
-  const snapshot = getDiaryEntriesSnapshot();
-  diarySubscribers.forEach((callback) => {
-    try {
-      callback(snapshot);
-    } catch (error) {
-      console.warn('Diary subscriber error', error);
-    }
-  });
-}
-
-function resetDiaryState() {
-  state.diary = { entries: [], loading: false, error: '' };
-  notifyDiarySubscribers();
-}
-
 function countUnreadNotifications() {
   return state.notifications.filter((entry) => !entry.readAt).length;
 }
@@ -3642,7 +3543,7 @@ function applyFriendFeedPayload(payload) {
   const normalized = list.map((entry) => ({
     id: entry.id || `${entry.username || 'friend'}-${entry.createdAt || Date.now()}`,
     username: entry.username || '',
-    type: entry.type === 'review' ? 'review' : 'diary',
+    type: 'review',
     movieTitle: entry.movieTitle || '',
     rating: typeof entry.rating === 'number' ? entry.rating : null,
     capsule: typeof entry.capsule === 'string' ? entry.capsule.trim() : '',
