@@ -107,12 +107,6 @@ module.exports = async (req, res) => {
       case 'getMovieReviews':
         result = await handleGetMovieReviews(req, payload);
         break;
-      case 'listDiaryEntries':
-        result = await handleListDiaryEntries(req, payload);
-        break;
-      case 'upsertDiaryEntry':
-        result = await handleUpsertDiaryEntry(req, payload);
-        break;
       case 'upsertReview':
         result = await handleUpsertReview(req, payload);
         break;
@@ -489,105 +483,6 @@ async function handleGetMovieReviews(req, payload) {
       stats
     }
   };
-}
-
-async function handleListDiaryEntries(req, payload) {
-  const { user } = await authenticate(req, payload);
-  const limit = clampLimit(payload.limit, 40, 5);
-
-  if (usingLocalStore()) {
-    const store = await readSocialStore();
-    const entries = (Array.isArray(store.watchDiary) ? store.watchDiary : [])
-      .filter((entry) => entry && entry.username === user.username)
-      .sort((a, b) => normalizeTimestamp(b.watchedOn) - normalizeTimestamp(a.watchedOn))
-      .slice(0, limit)
-      .map(mapLocalDiaryEntry);
-    return { body: { ok: true, entries } };
-  }
-
-  try {
-    const rows = await supabaseFetch('watch_diary', {
-      query: {
-        select:
-          'id,watched_on,rating,tags,rewatch_number,source,device,visibility,created_at,updated_at,' +
-          'movie:movies(imdb_id,tmdb_id,title,poster_url,release_year)',
-        username: `eq.${user.username}`,
-        order: 'watched_on.desc',
-        limit: String(limit)
-      }
-    });
-    const entries = Array.isArray(rows) ? rows.map(mapDiaryRow) : [];
-    return { body: { ok: true, entries } };
-  } catch (error) {
-    enableLocalFallback('loading diary entries', error);
-    return handleListDiaryEntries(req, payload);
-  }
-}
-
-async function handleUpsertDiaryEntry(req, payload) {
-  const { user } = await authenticate(req, payload);
-  const entryInput = payload.entry && typeof payload.entry === 'object' ? payload.entry : {};
-  const normalizedEntry = normalizeDiaryEntry(entryInput);
-  if (!normalizedEntry) {
-    throw new HttpError(400, 'Select a movie before saving to your diary.');
-  }
-
-  const timestamp = new Date().toISOString();
-
-  if (usingLocalStore()) {
-    const store = await readSocialStore();
-    const entryId = randomUUID();
-    const payloadEntry = {
-      id: entryId,
-      username: user.username,
-      movieImdbId: normalizedEntry.movie.imdbId,
-      movieTmdbId: normalizedEntry.movie.tmdbId || null,
-      movieTitle: normalizedEntry.movie.title,
-      watchedOn: normalizedEntry.watchedOn,
-      rating: normalizedEntry.rating,
-      tags: normalizedEntry.tags,
-      rewatchNumber: normalizedEntry.rewatchNumber,
-      source: normalizedEntry.source,
-      device: normalizedEntry.device,
-      visibility: normalizedEntry.visibility,
-      createdAt: timestamp,
-      updatedAt: timestamp
-    };
-    if (!Array.isArray(store.watchDiary)) {
-      store.watchDiary = [];
-    }
-    store.watchDiary.unshift(payloadEntry);
-    await writeSocialStore(store);
-    return { body: { ok: true, entry: mapLocalDiaryEntry(payloadEntry) } };
-  }
-
-  try {
-    await ensureMovieRecord(normalizedEntry.movie);
-    const rows = await supabaseFetch('watch_diary', {
-      method: 'POST',
-      headers: { Prefer: 'return=representation' },
-      body: [
-        {
-          username: user.username,
-          movie_imdb_id: normalizedEntry.movie.imdbId,
-          watched_on: normalizedEntry.watchedOn,
-          rating: normalizedEntry.rating,
-          tags: normalizedEntry.tags,
-          rewatch_number: normalizedEntry.rewatchNumber,
-          source: normalizedEntry.source || null,
-          device: normalizedEntry.device || null,
-          visibility: normalizedEntry.visibility,
-          metadata: normalizedEntry.metadata || {},
-          updated_at: timestamp
-        }
-      ]
-    });
-    const row = Array.isArray(rows) && rows.length ? rows[0] : null;
-    return { body: { ok: true, entry: row ? mapDiaryRow(row) : null } };
-  } catch (error) {
-    enableLocalFallback('saving a diary entry', error);
-    return handleUpsertDiaryEntry(req, payload);
-  }
 }
 
 async function handleUpsertReview(req, payload) {
@@ -4947,29 +4842,12 @@ async function buildRemoteFriendFeed(usernames, limit = 24) {
     return [];
   }
 
-  let diaryRows = [];
   let reviewRows = [];
-  try {
-    diaryRows = await supabaseFetch('watch_diary', {
-      query: {
-        select:
-          'id,username,watched_on,visibility,rating,movie_imdb_id,review_id,created_at,' +
-          'movie:movies(title,tmdb_id,poster_url,release_year),' +
-          'review:movie_reviews(id,body,rating,created_at,visibility)',
-        username: inFilter,
-        visibility: 'in.(public,friends)',
-        order: 'watched_on.desc',
-        limit
-      }
-    });
-  } catch (error) {
-    console.warn('Diary fetch failed', error);
-  }
-
   try {
     reviewRows = await supabaseFetch('movie_reviews', {
       query: {
-        select: 'id,username,movie_imdb_id,rating,visibility,created_at,body,movie:movies(title,tmdb_id,poster_url,release_year)',
+        select:
+          'id,username,movie_imdb_id,rating,visibility,created_at,body,movie:movies(title,tmdb_id,poster_url,release_year)',
         username: inFilter,
         visibility: 'in.(public,friends)',
         order: 'created_at.desc',
@@ -4994,28 +4872,6 @@ async function buildRemoteFriendFeed(usernames, limit = 24) {
       rating: typeof row.rating === 'number' ? row.rating : Number(row.rating) || null,
       capsule,
       createdAt: row.created_at || null
-    });
-  });
-
-  (Array.isArray(diaryRows) ? diaryRows : []).forEach((row) => {
-    if (!row || row.visibility === 'private') {
-      return;
-    }
-    const reviewCapsule = row.review ? extractReviewCapsule(row.review.body) : '';
-    const ratingValue =
-      typeof row.rating === 'number'
-        ? row.rating
-        : row.review && typeof row.review.rating === 'number'
-        ? row.review.rating
-        : Number(row.rating) || Number(row.review && row.review.rating) || null;
-    entries.push({
-      id: `diary-${row.id || randomUUID()}`,
-      username: row.username,
-      type: 'diary',
-      movieTitle: row.movie && row.movie.title ? row.movie.title : '',
-      rating: ratingValue,
-      capsule: reviewCapsule,
-      createdAt: row.watched_on || row.created_at || null
     });
   });
 

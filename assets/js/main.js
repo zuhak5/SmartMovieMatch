@@ -6995,11 +6995,11 @@ function buildFriendWatchActivityEntries(source = [], limit = 4) {
       id: entry.id,
       username: entry.username,
       movieTitle: entry.movieTitle || "",
-      type: entry.type === "review" ? "friend_review" : "friend_diary",
+      type: "friend_review",
       createdAt: entry.createdAt || null,
       rating: typeof entry.rating === "number" ? entry.rating : null,
       capsule: entry.capsule || "",
-      metaLabel: entry.type === "review" ? "Review" : "Diary entry"
+      metaLabel: "Review"
     }));
 }
 
