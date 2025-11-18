@@ -120,7 +120,7 @@ const state = {
     importChoice: "later"
   },
   onboardingDismissed: false,
-  collabState: {},
+  collabState: { watchParties: { upcoming: [], invites: [] } },
   favorites: [],
   favoritesSaving: false,
   favoritesStatus: "",
@@ -138,6 +138,11 @@ const state = {
   conversationMessageSending: false,
   profileContextHandle: "",
   activeConversationId: null,
+  activeWatchParty: null,
+  watchPartyMessages: [],
+  watchPartyMessagesPartyId: null,
+  watchPartyMessagesLoading: false,
+  watchPartyMessageSending: false,
   appConfig: {
     config: {},
     experiments: { experiments: [], assignments: {} },
@@ -158,6 +163,22 @@ function getUiLimit(key, fallback) {
 }
 
 function applyFeatureFlags() {
+  const watchPartyEnabled = getFeatureFlag("feature.watchParties.enabled", true);
+  if (watchPartyPanel) {
+    if (watchPartyEnabled) {
+      watchPartyPanel.removeAttribute("hidden");
+    } else {
+      watchPartyPanel.setAttribute("hidden", "true");
+    }
+  }
+  if (watchPartyEmpty) {
+    if (watchPartyEnabled) {
+      watchPartyEmpty.removeAttribute("hidden");
+    } else {
+      watchPartyEmpty.setAttribute("hidden", "true");
+    }
+  }
+
   const notificationsEnabled = getFeatureFlag("feature.notifications.enabled", true);
   if (notificationButton) {
     notificationButton.disabled = !notificationsEnabled;
@@ -268,6 +289,17 @@ const trendingWindowSelect = document.querySelector('[data-trending-window]');
 const homeRecommendationsRow = document.querySelector('[data-row="home-recommendations"]');
 const tonightPickCard = document.querySelector("[data-tonight-pick]");
 const groupPicksList = document.querySelector('[data-list="group-picks"]');
+const watchPartyPanel = document.querySelector('[data-watch-party-panel]');
+const watchPartyEmpty = document.querySelector('[data-watch-party-empty]');
+const watchPartyTitle = document.querySelector('[data-watch-party-title]');
+const watchPartyMeta = document.querySelector('[data-watch-party-meta]');
+const watchPartyTime = document.querySelector('[data-watch-party-time]');
+const watchPartyParticipants = document.querySelector('[data-watch-party-participants]');
+const watchPartyJoinButton = document.querySelector('[data-watch-party-join]');
+const watchPartyMessagesList = document.querySelector('[data-watch-party-messages]');
+const watchPartyForm = document.querySelector('[data-watch-party-chat-form]');
+const watchPartyInput = document.querySelector('[data-watch-party-input]');
+const watchPartyStatus = document.querySelector('[data-watch-party-status]');
 const conversationList = document.querySelector('[data-conversation-list]');
 const conversationStatus = document.querySelector('[data-conversation-status]');
 const conversationPreview = document.querySelector('[data-conversation-preview]');
@@ -988,6 +1020,9 @@ function maybeNavigateForNotification(entry) {
   const type = String(entry.type).toLowerCase();
   if (type.includes("message")) {
     setSection("messages");
+  } else if (type.includes("party")) {
+    setSection("home");
+    setTab("home", "with-friends");
   } else if (type.includes("follow") || type.includes("friend")) {
     setSection("friends");
     setTab("friends", "requests");
@@ -1998,6 +2033,328 @@ function createCheckIcon(filled) {
   path.setAttribute("stroke-linejoin", "round");
   svg.appendChild(path);
   return svg;
+}
+
+function getDefaultCollaborativeState() {
+  return { watchParties: { upcoming: [], invites: [] } };
+}
+
+function selectPrimaryWatchParty(collabState) {
+  const upcoming = Array.isArray(collabState?.watchParties?.upcoming)
+    ? collabState.watchParties.upcoming
+    : [];
+  if (!upcoming.length) {
+    return null;
+  }
+  const sorted = [...upcoming].sort((a, b) => {
+    const aTime = new Date(a.scheduledFor || a.createdAt || 0).getTime();
+    const bTime = new Date(b.scheduledFor || b.createdAt || 0).getTime();
+    return aTime - bTime;
+  });
+  return sorted[0];
+}
+
+function setActiveWatchParty(party) {
+  const previousId = state.activeWatchParty ? state.activeWatchParty.id : null;
+  state.activeWatchParty = party || null;
+  if (!party) {
+    state.watchPartyMessages = [];
+    state.watchPartyMessagesPartyId = null;
+    state.watchPartyMessagesLoading = false;
+    setWatchPartyStatus("", null);
+    renderWatchPartyPanel();
+    return;
+  }
+  setWatchPartyStatus("", null);
+  renderWatchPartyPanel();
+  if (party.id && party.id !== previousId) {
+    state.watchPartyMessages = [];
+    state.watchPartyMessagesPartyId = party.id;
+    loadWatchPartyMessages(party.id);
+  }
+}
+
+function canChatInActiveParty() {
+  if (!hasActiveSession()) {
+    return false;
+  }
+  const party = state.activeWatchParty;
+  if (!party) {
+    return false;
+  }
+  const response = typeof party.response === "string" ? party.response.toLowerCase() : "";
+  return ["host", "joined", "accept", "accepted", "yes", "maybe", "waiting"].includes(response);
+}
+
+function renderWatchPartyPanel() {
+  if (!watchPartyPanel || !watchPartyEmpty) return;
+  const party = state.activeWatchParty;
+  if (!party || !hasActiveSession()) {
+    watchPartyPanel.hidden = true;
+    watchPartyEmpty.hidden = false;
+    return;
+  }
+
+  watchPartyEmpty.hidden = true;
+  watchPartyPanel.hidden = false;
+  const title = party.movie?.title || party.note || "Watch party";
+  if (watchPartyTitle) {
+    watchPartyTitle.textContent = title;
+  }
+  if (watchPartyMeta) {
+    const host = party.host ? `Hosted by @${canonicalHandle(party.host)}` : "Watch party";
+    const visibility = party.visibility ? `${formatWatchPartyVisibilityLabel(party.visibility)} • ` : "";
+    watchPartyMeta.textContent = `${visibility}${host}`;
+  }
+  if (watchPartyTime) {
+    watchPartyTime.textContent = formatWatchPartyTime(party.scheduledFor || party.createdAt);
+  }
+  renderWatchPartyParticipants(party.participants || []);
+  renderWatchPartyMessages();
+  if (watchPartyJoinButton) {
+    const chatAllowed = canChatInActiveParty();
+    watchPartyJoinButton.hidden = chatAllowed;
+    watchPartyJoinButton.disabled = state.watchPartyMessageSending;
+  }
+  if (watchPartyInput) {
+    watchPartyInput.disabled = !canChatInActiveParty();
+  }
+}
+
+function renderWatchPartyParticipants(participants = []) {
+  if (!watchPartyParticipants) return;
+  watchPartyParticipants.innerHTML = "";
+  if (!participants.length) {
+    const empty = document.createElement("p");
+    empty.className = "small-text muted";
+    empty.textContent = "No participants yet.";
+    watchPartyParticipants.append(empty);
+    return;
+  }
+  participants.forEach((participant) => {
+    const row = document.createElement("div");
+    row.className = "watch-party-participant";
+    row.dataset.presence = participant.metadata?.presence || "online";
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    const participantName = participant.username || "?";
+    const avatarUrl =
+      (typeof participant.avatarUrl === "string" && participant.avatarUrl.trim()) ||
+      (typeof participant.avatar_url === "string" && participant.avatar_url.trim()) ||
+      "";
+    setAvatarContent(avatar, {
+      imageUrl: avatarUrl,
+      initials: initialsFromName(participantName),
+      label: `${participantName} avatar`
+    });
+    const stack = document.createElement("div");
+    stack.className = "stack";
+    const name = document.createElement("strong");
+    name.textContent = `@${canonicalHandle(participant.username)}`;
+    const role = document.createElement("span");
+    role.className = "watch-party-participant-role";
+    role.textContent = participant.role ? participant.role : "guest";
+    stack.append(name, role);
+    const meta = document.createElement("span");
+    meta.className = "watch-party-participant-meta";
+    if (participant.metadata?.bringing) {
+      meta.textContent = `Bringing: ${participant.metadata.bringing}`;
+    } else if (participant.lastActiveAt) {
+      meta.textContent = `Seen ${formatWatchPartyTime(participant.lastActiveAt)}`;
+    }
+    row.append(avatar, stack, meta);
+    watchPartyParticipants.append(row);
+  });
+}
+
+function renderWatchPartyMessages() {
+  if (!watchPartyMessagesList) return;
+  watchPartyMessagesList.innerHTML = "";
+  if (state.watchPartyMessagesLoading) {
+    const loading = document.createElement("p");
+    loading.className = "small-text muted";
+    loading.textContent = "Loading chat…";
+    watchPartyMessagesList.append(loading);
+    return;
+  }
+  const messages = Array.isArray(state.watchPartyMessages)
+    ? [...state.watchPartyMessages].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0))
+    : [];
+  if (!messages.length) {
+    const empty = document.createElement("p");
+    empty.className = "small-text muted";
+    empty.textContent = "No chat yet—say hi!";
+    watchPartyMessagesList.append(empty);
+    return;
+  }
+  messages.forEach((message) => {
+    const row = document.createElement("div");
+    row.className = "watch-party-message";
+    const header = document.createElement("div");
+    header.className = "watch-party-message-meta";
+    header.textContent = `@${canonicalHandle(message.username)} · ${formatWatchPartyTime(message.createdAt)}`;
+    const body = document.createElement("p");
+    body.textContent = message.body;
+    row.append(header, body);
+    watchPartyMessagesList.append(row);
+  });
+  watchPartyMessagesList.scrollTop = watchPartyMessagesList.scrollHeight;
+}
+
+function formatWatchPartyTime(value) {
+  if (!value) {
+    return "Time to be decided";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Time to be decided";
+  }
+  const now = Date.now();
+  const diffMinutes = Math.round((date.getTime() - now) / 60000);
+  if (Math.abs(diffMinutes) < 60) {
+    if (diffMinutes > 0) {
+      return `in ${diffMinutes} min`;
+    }
+    return `${Math.abs(diffMinutes)} min ago`;
+  }
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function formatWatchPartyVisibilityLabel(value) {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (normalized === "public") {
+    return "Public";
+  }
+  if (normalized.startsWith("invite")) {
+    return "Invite-only";
+  }
+  return "Friends";
+}
+
+function formatRelativeTimestamp(value) {
+  if (!value) {
+    return "Just now";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Just now";
+  }
+  const diffMinutes = Math.round((Date.now() - date.getTime()) / 60000);
+  if (diffMinutes < 1) {
+    return "Just now";
+  }
+  if (diffMinutes < 60) {
+    return `${diffMinutes}m ago`;
+  }
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `${diffHours}h ago`;
+  }
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function setWatchPartyStatus(message, variant = null) {
+  if (!watchPartyStatus) return;
+  watchPartyStatus.textContent = message || "";
+  if (variant) {
+    watchPartyStatus.dataset.variant = variant;
+  } else {
+    watchPartyStatus.removeAttribute("data-variant");
+  }
+}
+
+async function loadWatchPartyMessages(partyId) {
+  if (!partyId || state.watchPartyMessagesLoading) {
+    return;
+  }
+  state.watchPartyMessagesLoading = true;
+  setWatchPartyStatus("Loading chat…", "loading");
+  try {
+    const messages = await listWatchPartyMessagesRemote({ partyId });
+    if (state.activeWatchParty && state.activeWatchParty.id === partyId) {
+      state.watchPartyMessages = messages;
+      renderWatchPartyMessages();
+      setWatchPartyStatus("", null);
+    }
+  } catch (error) {
+    setWatchPartyStatus(error.message || "Unable to load watch party chat.", "error");
+  } finally {
+    state.watchPartyMessagesLoading = false;
+  }
+}
+
+async function handleWatchPartyMessageSubmit(event) {
+  if (event) {
+    event.preventDefault();
+  }
+  if (!state.activeWatchParty) {
+    setWatchPartyStatus("Select a watch party first.", "error");
+    return;
+  }
+  if (!hasActiveSession()) {
+    openAuthOverlay("login");
+    return;
+  }
+  if (!canChatInActiveParty()) {
+    setWatchPartyStatus("Join the party to chat.", "error");
+    return;
+  }
+  const message = watchPartyInput ? watchPartyInput.value.trim() : "";
+  if (!message) {
+    if (watchPartyInput) {
+      watchPartyInput.focus();
+    }
+    return;
+  }
+  state.watchPartyMessageSending = true;
+  setWatchPartyStatus("Sending…", "loading");
+  if (watchPartyInput) {
+    watchPartyInput.disabled = true;
+  }
+  try {
+    const sent = await postWatchPartyMessageRemote({ partyId: state.activeWatchParty.id, body: message });
+    if (sent) {
+      state.watchPartyMessages = [...state.watchPartyMessages, sent];
+      renderWatchPartyMessages();
+    }
+    if (watchPartyInput) {
+      watchPartyInput.value = "";
+    }
+    setWatchPartyStatus("Message sent", "success");
+  } catch (error) {
+    setWatchPartyStatus(error.message || "Unable to send chat message.", "error");
+  } finally {
+    state.watchPartyMessageSending = false;
+    if (watchPartyInput) {
+      watchPartyInput.disabled = !canChatInActiveParty();
+    }
+  }
+}
+
+async function handleJoinWatchParty(event) {
+  if (event) {
+    event.preventDefault();
+  }
+  if (!state.activeWatchParty || !state.activeWatchParty.id) {
+    return;
+  }
+  if (!hasActiveSession()) {
+    openAuthOverlay("login");
+    return;
+  }
+  setWatchPartyStatus("Joining…", "loading");
+  try {
+    await joinWatchPartyRemote({ partyId: state.activeWatchParty.id, note: "" });
+    await refreshCollaborativeState();
+    setWatchPartyStatus("Joined the watch party.", "success");
+  } catch (error) {
+    setWatchPartyStatus(error.message || "Could not join this watch party.", "error");
+  }
 }
 
 function resetConversationsState() {
@@ -3786,6 +4143,13 @@ function attachListeners() {
     conversationForm.addEventListener("submit", handleConversationMessageSubmit);
   }
 
+  if (watchPartyForm) {
+    watchPartyForm.addEventListener("submit", handleWatchPartyMessageSubmit);
+  }
+  if (watchPartyJoinButton) {
+    watchPartyJoinButton.addEventListener("click", handleJoinWatchParty);
+  }
+
   attachDocumentHandlers();
 }
 
@@ -3799,7 +4163,8 @@ function init() {
     renderPeopleSection();
   });
   subscribeToCollaborativeState((collabState) => {
-    state.collabState = collabState || {};
+    state.collabState = collabState || getDefaultCollaborativeState();
+    setActiveWatchParty(selectPrimaryWatchParty(state.collabState));
   });
   if (unsubscribeNotifications) {
     unsubscribeNotifications();
