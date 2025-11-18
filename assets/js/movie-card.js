@@ -23,6 +23,8 @@ export function createMovieCard(props = {}) {
     year = "",
     imdbScore = "",
     rtScore = "",
+    primaryLabel = "IMDb",
+    secondaryLabel = "RT",
     liked = false,
     watched = false,
     onToggleLike = noop,
@@ -51,12 +53,12 @@ export function createMovieCard(props = {}) {
           ${year ? `<span class="movie-card__year">${year}</span>` : ""}
         </div>
         <div class="movie-card__ratings" aria-label="Ratings">
-          <span class="movie-card__rating-chip" title="IMDb score">
-            <small>IMDb</small>
+          <span class="movie-card__rating-chip" title="${primaryLabel} score" aria-label="${primaryLabel} score">
+            <small>${primaryLabel}</small>
             <span>${imdbScore || "—"}</span>
           </span>
-          <span class="movie-card__rating-chip" title="Rotten Tomatoes score">
-            <small>RT</small>
+          <span class="movie-card__rating-chip" title="${secondaryLabel} stat" aria-label="${secondaryLabel} stat">
+            <small>${secondaryLabel}</small>
             <span>${rtScore || "—"}</span>
           </span>
         </div>
@@ -92,7 +94,9 @@ export function createMovieCard(props = {}) {
         inactiveLabel: "Favorite",
         isActive: state.liked
       });
-      likeBtn.setAttribute("title", state.liked ? "Remove favorite" : "Favorite this movie");
+      const likeLabel = state.liked ? "Remove favorite" : "Favorite this movie";
+      likeBtn.setAttribute("title", likeLabel);
+      likeBtn.setAttribute("aria-label", likeLabel);
     }
     if (watchedBtn) {
       setActiveState(watchedBtn, state.watched);
@@ -101,7 +105,9 @@ export function createMovieCard(props = {}) {
         inactiveLabel: "Watch",
         isActive: state.watched
       });
-      watchedBtn.setAttribute("title", state.watched ? "Mark as not watched" : "Mark as watched");
+      const watchLabel = state.watched ? "Mark as not watched" : "Mark as watched";
+      watchedBtn.setAttribute("title", watchLabel);
+      watchedBtn.setAttribute("aria-label", watchLabel);
     }
     if (watchedIndicator) {
       watchedIndicator.style.display = state.watched ? "inline-flex" : "none";

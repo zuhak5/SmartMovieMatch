@@ -1519,9 +1519,10 @@ p {
 }
 
 .horizontal-scroll.movie-card-row .movie-card__body {
-  padding: 10px 10px 12px;
-  display: table-header-group;
-  min-height: 0;
+  padding: 10px 12px 12px;
+  display: grid;
+  gap: 8px;
+  align-content: end;
 }
 
 .hero-card {
@@ -3103,6 +3104,7 @@ p {
   transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: #0b1021;
+  isolation: isolate;
 }
 
 .movie-card:hover {
@@ -3117,6 +3119,7 @@ p {
   overflow: hidden;
   border-radius: 14px;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  z-index: 0;
 }
 
 .movie-card__poster img {
@@ -3134,8 +3137,10 @@ p {
 .movie-card__gradient {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(10, 12, 26, 0) 40%, rgba(10, 12, 26, 0.82) 100%);
+  background: linear-gradient(180deg, rgba(10, 12, 26, 0) 32%, rgba(10, 12, 26, 0.88) 100%);
   backdrop-filter: drop-shadow(2px 4px 6px black);
+  pointer-events: none;
+  z-index: 1;
 }
 
 .movie-card__body {
@@ -3143,19 +3148,22 @@ p {
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 14px 12px 16px;
+  padding: 14px 14px 16px;
   display: grid;
-  gap: 8px;
-  background: rgba(0, 0, 0, 0.4);
+  gap: 10px;
+  grid-auto-rows: min-content;
+  align-content: end;
+  background: rgba(0, 0, 0, 0.48);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-top: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.35);
+  z-index: 2;
 }
 
 .movie-card__title-row {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   gap: 8px;
   min-width: 0;
 }
@@ -3192,7 +3200,7 @@ p {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
+  padding: 6px 12px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -3211,9 +3219,9 @@ p {
 
 .movie-card__actions {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 2px;
+  align-items: stretch;
+  gap: 10px;
+  margin-top: 4px;
 }
 
 .movie-card__action-btn {
@@ -3222,16 +3230,18 @@ p {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px 10px;
+  padding: 10px 12px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #f3f4f6;
   cursor: pointer;
   font-weight: 650;
+  font-size: 0.95rem;
   transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
   line-height: 1.1;
   white-space: nowrap;
+  min-height: 44px;
 }
 
 .movie-card__action-btn .icon {
@@ -3284,6 +3294,8 @@ p {
   left: 10px;
   display: flex;
   gap: 6px;
+  z-index: 3;
+  pointer-events: none;
 }
 
 .movie-card__status-chip {
