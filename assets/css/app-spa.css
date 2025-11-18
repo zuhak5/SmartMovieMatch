@@ -1428,10 +1428,10 @@ p {
 
 .filter-row {
   display: flex;
-  font-size: x-small;
+  font-size: xx-small;
   justify-self: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 0px;
   margin: 10px 0 16px;
 }
 
