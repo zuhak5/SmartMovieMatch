@@ -35,40 +35,41 @@ export function createMovieCard(props = {}) {
   card.className = "movie-card";
   card.innerHTML = `
     <div class="movie-card__poster">
+      <img src="" alt="" loading="lazy" />
       <div class="movie-card__status-bar" aria-hidden="true">
         <span class="movie-card__status-chip" data-watched-indicator>
           <span class="icon">✔</span>
           <span>Watched</span>
         </span>
       </div>
-      <img src="" alt="" loading="lazy" />
-    </div>
-    <div class="movie-card__body">
-      <div class="movie-card__title-row">
-        <div class="movie-card__title">
-          <div class="truncate">${title}</div>
+      <div class="movie-card__gradient" aria-hidden="true"></div>
+      <div class="movie-card__body" aria-label="Movie details">
+        <div class="movie-card__title-row">
+          <div class="movie-card__title">
+            <div class="truncate">${title}</div>
+          </div>
+          ${year ? `<span class="movie-card__year">${year}</span>` : ""}
         </div>
-        ${year ? `<span class="movie-card__year">${year}</span>` : ""}
-      </div>
-      <div class="movie-card__ratings" aria-label="Ratings">
-        <span class="movie-card__rating-chip" title="IMDb score">
-          <small>IMDb</small>
-          <span>${imdbScore || "—"}</span>
-        </span>
-        <span class="movie-card__rating-chip" title="Rotten Tomatoes score">
-          <small>RT</small>
-          <span>${rtScore || "—"}</span>
-        </span>
-      </div>
-      <div class="movie-card__actions">
-        <button class="movie-card__action-btn" type="button" data-action="like" aria-pressed="false" aria-label="Favorite movie">
-          <span class="icon" data-icon-inactive="🤍" data-icon-active="❤️">🤍</span>
-          <span class="label">Favorite</span>
-        </button>
-        <button class="movie-card__action-btn movie-card__pill" type="button" data-action="watched" aria-pressed="false" aria-label="Mark as watched">
-          <span class="icon" data-icon-inactive="👁️" data-icon-active="✔">👁️</span>
-          <span class="label">Watched</span>
-        </button>
+        <div class="movie-card__ratings" aria-label="Ratings">
+          <span class="movie-card__rating-chip" title="IMDb score">
+            <small>IMDb</small>
+            <span>${imdbScore || "—"}</span>
+          </span>
+          <span class="movie-card__rating-chip" title="Rotten Tomatoes score">
+            <small>RT</small>
+            <span>${rtScore || "—"}</span>
+          </span>
+        </div>
+        <div class="movie-card__actions">
+          <button class="movie-card__action-btn" type="button" data-action="like" aria-pressed="false" aria-label="Favorite movie">
+            <span class="icon" data-icon-inactive="🤍" data-icon-active="❤️">🤍</span>
+            <span class="label">Favorite</span>
+          </button>
+          <button class="movie-card__action-btn movie-card__pill" type="button" data-action="watched" aria-pressed="false" aria-label="Mark as watched">
+            <span class="icon" data-icon-inactive="👁️" data-icon-active="✔">👁️</span>
+            <span class="label">Watched</span>
+          </button>
+        </div>
       </div>
     </div>
   `;
