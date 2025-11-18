@@ -1342,7 +1342,7 @@ p {
 
 .badge,
 .pill {
-  display: inline-flex;
+  display: none;
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
@@ -1432,7 +1432,7 @@ p {
   justify-self: center;
   flex-wrap: wrap;
   gap: 0px;
-  margin: 20px 0 10px;
+  margin: 25px 0 0px;
 }
 
 .filter-pill {
@@ -1489,8 +1489,8 @@ p {
 }
 
 .horizontal-scroll.movie-card-row {
-  grid-auto-columns: minmax(190px, 1fr);
-  padding: 10px 12px 14px;
+  grid-auto-columns: minmax(280px, 1fr);
+  padding: 10px 12px 60px;
   scroll-padding-inline: 12px;
 }
 
