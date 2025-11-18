@@ -2102,7 +2102,15 @@ function normalizeFavoriteMovie(movie = {}) {
     tmdbId: normalized.tmdbId || null,
     poster: normalized.posterUrl || "",
     releaseYear: normalized.releaseYear || "",
-    genres: Array.isArray(normalized.genres) ? normalized.genres : []
+    genres: Array.isArray(normalized.genres) ? normalized.genres : [],
+    rating: Number.isFinite(normalized.rating) ? normalized.rating : null,
+    synopsis: normalized.synopsis || "",
+    rtScore:
+      Number.isFinite(normalized.rtScore)
+        ? normalized.rtScore
+        : Number.isFinite(normalized.trendScore)
+        ? Math.round(normalized.trendScore)
+        : null
   };
 }
 
@@ -2158,6 +2166,8 @@ async function toggleFavorite(movie) {
 function renderFavoritesList() {
   if (!favoritesPanel || !favoritesList) return;
   favoritesList.innerHTML = "";
+  favoritesList.classList.add("library-card-grid");
+  favoritesList.classList.remove("stack");
   const favorites = Array.isArray(state.favorites) ? state.favorites : [];
   if (!favorites.length) {
     favoritesPanel.classList.add("is-empty");
@@ -2170,38 +2180,191 @@ function renderFavoritesList() {
   if (favoritesEmpty) favoritesEmpty.hidden = true;
 
   favorites.forEach((favorite) => {
-    const row = document.createElement("div");
-    row.className = "inline-actions";
-    const meta = document.createElement("div");
-    meta.className = "stack";
-    const title = document.createElement("strong");
-    title.textContent = favorite.title;
-    const details = document.createElement("div");
-    details.className = "small-text muted";
-    const pieces = [];
-    if (favorite.releaseYear) pieces.push(favorite.releaseYear);
-    if (Array.isArray(favorite.genres) && favorite.genres.length) {
-      pieces.push(formatGenres(favorite.genres));
-    }
-    details.textContent = pieces.join(" • ");
-    meta.append(title, details);
-
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.className = "btn-ghost btn";
-    remove.textContent = "Remove";
-    remove.addEventListener("click", (event) => {
-      event.preventDefault();
-      const key = getFavoriteKey(favorite);
-      state.favorites = state.favorites.filter((entry) => getFavoriteKey(entry) !== key);
-      renderFavoritesList();
-      syncFavoritesRemote();
-      setFavoritesStatus(`Removed “${favorite.title}” from favorites.`);
+    const card = buildLibraryCard(favorite, {
+      onToggleFavorite: () => toggleFavorite(favorite),
+      onToggleWatched: () => setFavoritesStatus("Watched tracking coming soon.")
     });
-
-    row.append(meta, remove);
-    favoritesList.append(row);
+    favoritesList.append(card);
   });
+}
+
+function buildLibraryCard(movie, { onToggleFavorite, onToggleWatched } = {}) {
+  const imdbScore = Number.isFinite(movie.rating) ? movie.rating.toFixed(1) : "—";
+  const rtScore = Number.isFinite(movie.rtScore)
+    ? `${Math.round(movie.rtScore)}%`
+    : "—";
+  const synopsis = movie.synopsis && movie.synopsis.trim()
+    ? movie.synopsis.trim()
+    : "Saved to your Library.";
+
+  const card = document.createElement("article");
+  card.className = "library-card";
+
+  const poster = document.createElement("div");
+  poster.className = "library-card__poster";
+  if (movie.poster) {
+    const img = document.createElement("img");
+    img.src = movie.poster;
+    img.alt = `${movie.title} poster`;
+    poster.appendChild(img);
+  } else {
+    const placeholder = document.createElement("div");
+    placeholder.className = "library-card__poster-placeholder";
+    placeholder.textContent = "🎬";
+    poster.appendChild(placeholder);
+  }
+
+  const content = document.createElement("div");
+  content.className = "library-card__content";
+
+  const header = document.createElement("div");
+  header.className = "library-card__header";
+  const title = document.createElement("h3");
+  title.className = "library-card__title";
+  title.textContent = movie.title || "Untitled";
+  const year = document.createElement("span");
+  year.className = "library-card__year";
+  year.textContent = movie.releaseYear || "—";
+  header.append(title, year);
+
+  const description = document.createElement("p");
+  description.className = "library-card__description";
+  description.textContent = synopsis;
+
+  const ratingsRow = document.createElement("div");
+  ratingsRow.className = "library-card__ratings";
+  ratingsRow.append(
+    createLibraryBadge("IMDb", imdbScore),
+    createLibraryBadge("RT", rtScore)
+  );
+
+  const actions = document.createElement("div");
+  actions.className = "library-card__actions";
+  const favoriteBtn = createLibraryActionButton({
+    label: "Favorite",
+    active: true,
+    ariaLabel: "Remove from favorites",
+    icon: createHeartIcon(true),
+    onClick: (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (typeof onToggleFavorite === "function") {
+        onToggleFavorite();
+      }
+    }
+  });
+
+  let watchedActive = Boolean(movie.watched);
+  const watchedBtn = createLibraryActionButton({
+    label: watchedActive ? "Watched" : "Watch",
+    active: watchedActive,
+    ariaLabel: watchedActive ? "Mark as unwatched" : "Mark as watched",
+    icon: createCheckIcon(watchedActive),
+    onClick: (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      watchedActive = !watchedActive;
+      updateLibraryActionButton(watchedBtn, {
+        label: watchedActive ? "Watched" : "Watch",
+        active: watchedActive,
+        icon: createCheckIcon(watchedActive),
+        ariaLabel: watchedActive ? "Mark as unwatched" : "Mark as watched"
+      });
+      if (typeof onToggleWatched === "function") {
+        onToggleWatched(watchedActive);
+      }
+    }
+  });
+
+  actions.append(favoriteBtn, watchedBtn);
+
+  content.append(header, description, ratingsRow, actions);
+  card.append(poster, content);
+  return card;
+}
+
+function createLibraryBadge(label, value) {
+  const badge = document.createElement("span");
+  badge.className = "library-card__badge";
+  const labelEl = document.createElement("span");
+  labelEl.className = "library-card__badge-label";
+  labelEl.textContent = label;
+  const valueEl = document.createElement("span");
+  valueEl.className = "library-card__badge-value";
+  valueEl.textContent = value;
+  badge.append(labelEl, valueEl);
+  return badge;
+}
+
+function createLibraryActionButton({ label, active, ariaLabel, icon, onClick }) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "library-card__action-btn";
+  btn.setAttribute("aria-label", ariaLabel || label);
+  const iconWrap = document.createElement("span");
+  iconWrap.className = "library-card__action-icon";
+  iconWrap.appendChild(icon);
+  const text = document.createElement("span");
+  text.className = "library-card__action-text";
+  text.textContent = label;
+  btn.append(iconWrap, text);
+  updateLibraryActionButton(btn, { active });
+  if (typeof onClick === "function") {
+    btn.addEventListener("click", onClick);
+  }
+  return btn;
+}
+
+function updateLibraryActionButton(btn, { active, label, icon, ariaLabel } = {}) {
+  if (!btn) return;
+  btn.classList.toggle("is-active", Boolean(active));
+  if (label) {
+    const text = btn.querySelector(".library-card__action-text");
+    if (text) text.textContent = label;
+  }
+  if (icon) {
+    const iconWrap = btn.querySelector(".library-card__action-icon");
+    if (iconWrap) {
+      iconWrap.innerHTML = "";
+      iconWrap.appendChild(icon);
+    }
+  }
+  if (ariaLabel) {
+    btn.setAttribute("aria-label", ariaLabel);
+  }
+}
+
+function createHeartIcon(filled) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", filled ? "currentColor" : "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "1.8");
+  svg.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute(
+    "d",
+    "M12 21s-6.5-4.35-9-9c-1.9-3.6.6-7.5 4-7.5 2 0 3.2 1.1 5 3 1.8-1.9 3-3 5-3 3.4 0 5.9 3.9 4 7.5-2.5 4.65-9 9-9 9Z"
+  );
+  path.setAttribute("stroke-linecap", "round");
+  path.setAttribute("stroke-linejoin", "round");
+  svg.appendChild(path);
+  return svg;
+}
+
+function createCheckIcon(filled) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", filled ? "currentColor" : "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "1.8");
+  svg.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", "M20 6 9 17l-5-5");
+  path.setAttribute("stroke-linecap", "round");
+  path.setAttribute("stroke-linejoin", "round");
+  svg.appendChild(path);
+  return svg;
 }
 
 function getDefaultCollaborativeState() {
