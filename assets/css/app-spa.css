@@ -804,10 +804,10 @@ textarea {
 }
 
 .app-shell {
-  display: flex;
+  display: contents;
   justify-content: center;
   min-height: 100vh;
-  padding: 12px;
+  padding: 10px;
   padding-bottom: 80px;
 }
 
