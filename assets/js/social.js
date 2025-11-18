@@ -2,6 +2,7 @@ import { loadSession, subscribeToSession } from './auth.js';
 import { logUserActivity } from './analytics.js';
 import { API_ROUTES } from './config.js';
 import { createInlineProfileLink } from './profile-overlay.js';
+import { getItem, setItem } from './memory-store.js';
 
 const SOCIAL_ENDPOINT = API_ROUTES.social;
 const MAX_REVIEW_LENGTH = 600;
@@ -34,11 +35,8 @@ class AuthorizationError extends Error {
 }
 
 function loadMutedUsersFromStorage() {
-  if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
-    return [];
-  }
   try {
-    const raw = window.localStorage.getItem(MUTED_USERS_STORAGE_KEY);
+    const raw = getItem(MUTED_USERS_STORAGE_KEY);
     if (!raw) {
       return [];
     }
@@ -249,11 +247,8 @@ function handleAuthorizationError(error, { scope = null, silent = false } = {}) 
 }
 
 function persistMutedUsers(handles) {
-  if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
-    return;
-  }
   try {
-    window.localStorage.setItem(MUTED_USERS_STORAGE_KEY, JSON.stringify(handles));
+    setItem(MUTED_USERS_STORAGE_KEY, JSON.stringify(handles));
   } catch (error) {
     console.warn('Failed to persist muted users', error);
   }

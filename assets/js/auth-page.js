@@ -6,6 +6,7 @@ import {
 } from "./auth.js";
 import { $ } from "./dom.js";
 import { playUiClick } from "./sound.js";
+import { getItem, setItem } from "./memory-store.js";
 
 const state = {
   mode: "login"
@@ -29,13 +30,9 @@ const authRootElement = document.documentElement;
 let activeTheme = "dark";
 
 function resolveStoredTheme() {
-  try {
-    const stored = localStorage.getItem(THEME_STORAGE_KEY);
-    if (stored === "light" || stored === "dark") {
-      return stored;
-    }
-  } catch (error) {
-    console.warn("Failed to read stored theme", error);
+  const stored = getItem(THEME_STORAGE_KEY);
+  if (stored === "light" || stored === "dark") {
+    return stored;
   }
   return "dark";
 }
@@ -90,11 +87,7 @@ function applyThemeChoice(theme, { persist = false } = {}) {
   }
   updateAuthThemeToggle(normalized);
   if (persist) {
-    try {
-      localStorage.setItem(THEME_STORAGE_KEY, normalized);
-    } catch (error) {
-      console.warn("Failed to persist auth theme", error);
-    }
+    setItem(THEME_STORAGE_KEY, normalized);
   }
 }
 

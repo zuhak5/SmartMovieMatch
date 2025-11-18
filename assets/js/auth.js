@@ -1,4 +1,5 @@
 import { API_ROUTES } from "./config.js";
+import { getItem, setItem, removeItem } from "./memory-store.js";
 
 const AUTH_STORAGE_KEY = "smartMovieMatch.auth";
 const AUTH_SESSION_COOKIE_KEY = "smartMovieMatch.auth";
@@ -204,22 +205,16 @@ function persistSession(session) {
   const normalized = session ? normalizeSession(session) : null;
   currentSession = normalized;
 
-  const localStorageRef = typeof window !== "undefined" ? window.localStorage : null;
-  const sessionStorageRef = typeof window !== "undefined" ? window.sessionStorage : null;
-
   if (normalized) {
     const serialized = JSON.stringify(normalized);
-    const storedLocally = writeSessionToStorage(localStorageRef, serialized, false, "localStorage");
-    if (!storedLocally) {
-      writeSessionToStorage(sessionStorageRef, serialized, false, "sessionStorage");
-    } else {
-      // keep sessionStorage in sync but ignore failures
-      writeSessionToStorage(sessionStorageRef, serialized, true, "sessionStorage");
+    try {
+      setItem(AUTH_STORAGE_KEY, serialized);
+    } catch (error) {
+      console.warn("Failed to cache auth session in memory", error);
     }
     writeSessionCookie(normalized);
   } else {
-    clearSessionFromStorage(localStorageRef, "localStorage");
-    clearSessionFromStorage(sessionStorageRef, "sessionStorage");
+    removeItem(AUTH_STORAGE_KEY);
     clearSessionCookie();
   }
 
@@ -227,27 +222,18 @@ function persistSession(session) {
 }
 
 function readStoredSession() {
-  const localStorageRef = typeof window !== "undefined" ? window.localStorage : null;
-  const sessionStorageRef = typeof window !== "undefined" ? window.sessionStorage : null;
-
-  const fromLocal = readSessionFromStorage(localStorageRef, "localStorage");
-  if (fromLocal) {
-    return fromLocal;
-  }
-
-  const fromSession = readSessionFromStorage(sessionStorageRef, "sessionStorage");
-  if (fromSession) {
-    return fromSession;
+  const fromMemory = readSessionFromMemory();
+  if (fromMemory) {
+    return fromMemory;
   }
 
   const fromCookie = readSessionFromCookie();
   if (fromCookie) {
     try {
       const serialized = JSON.stringify(fromCookie);
-      writeSessionToStorage(localStorageRef, serialized, true, "localStorage");
-      writeSessionToStorage(sessionStorageRef, serialized, true, "sessionStorage");
+      setItem(AUTH_STORAGE_KEY, serialized);
     } catch (error) {
-      console.warn("Failed to mirror cookie session into web storage", error);
+      console.warn("Failed to mirror cookie session into memory cache", error);
     }
     return fromCookie;
   }
@@ -262,45 +248,16 @@ function sanitizeUsername(username) {
   return username.trim();
 }
 
-function writeSessionToStorage(storage, serialized, silent = false, label = "storage") {
-  if (!storage || typeof storage.setItem !== "function") {
-    return false;
-  }
+function readSessionFromMemory() {
   try {
-    storage.setItem(AUTH_STORAGE_KEY, serialized);
-    return true;
-  } catch (error) {
-    if (!silent) {
-      console.warn(`Failed to persist auth session to ${label}`, error);
-    }
-    return false;
-  }
-}
-
-function clearSessionFromStorage(storage, label = "storage") {
-  if (!storage || typeof storage.removeItem !== "function") {
-    return;
-  }
-  try {
-    storage.removeItem(AUTH_STORAGE_KEY);
-  } catch (error) {
-    console.warn(`Failed to clear auth session from ${label}`, error);
-  }
-}
-
-function readSessionFromStorage(storage, label = "storage") {
-  if (!storage || typeof storage.getItem !== "function") {
-    return null;
-  }
-  try {
-    const raw = storage.getItem(AUTH_STORAGE_KEY);
+    const raw = getItem(AUTH_STORAGE_KEY);
     if (!raw) {
       return null;
     }
     const parsed = JSON.parse(raw);
     return normalizeSession(parsed);
   } catch (error) {
-    console.warn(`Failed to load auth session from ${label}`, error);
+    console.warn("Failed to load auth session from memory", error);
     return null;
   }
 }
