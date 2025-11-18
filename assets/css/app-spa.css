@@ -1191,7 +1191,7 @@ textarea {
 
 .main-content {
   flex: 1;
-  padding: 16px;
+  padding: 10px;
   overflow-y: auto;
   background: linear-gradient(180deg, rgba(16, 23, 43, 0.6), rgba(11, 16, 33, 0.95));
 }
@@ -3138,7 +3138,7 @@ p {
   position: absolute;
   inset: 0;
   background: linear-gradient(180deg, rgba(10, 12, 26, 0) 40%, rgba(10, 12, 26, 0.82) 100%);
-  backdrop-filter: blur(2px);
+  backdrop-filter: drop-shadow(2px 4px 6px black);
 }
 
 .movie-card__body {
