@@ -1504,6 +1504,27 @@ p {
   height: 100%;
   width: 100%;
   scroll-snap-align: start;
+  aspect-ratio: 1 / 1;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 0;
+}
+
+.horizontal-scroll.movie-card-row .movie-card__poster {
+  height: 100%;
+  border-radius: 12px;
+}
+
+.horizontal-scroll.movie-card-row .movie-card__poster img {
+  height: 100%;
+  aspect-ratio: auto;
+  object-fit: cover;
+}
+
+.horizontal-scroll.movie-card-row .movie-card__body {
+  padding: 10px 10px 12px;
+  min-height: 0;
 }
 
 .hero-card {
