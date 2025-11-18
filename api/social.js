@@ -203,6 +203,15 @@ module.exports = async (req, res) => {
       case 'postCollaborativeNote':
         result = await handlePostCollaborativeNote(req, payload);
         break;
+      case 'scheduleWatchParty':
+        result = await handleScheduleWatchParty(req, payload);
+        break;
+      case 'respondWatchParty':
+        result = await handleRespondWatchParty(req, payload);
+        break;
+      case 'joinWatchParty':
+        result = await handleJoinWatchParty(req, payload);
+        break;
       case 'startConversation':
         result = await handleStartConversation(req, payload);
         break;
@@ -214,6 +223,12 @@ module.exports = async (req, res) => {
         break;
       case 'postConversationMessage':
         result = await handlePostConversationMessage(req, payload);
+        break;
+      case 'listWatchPartyMessages':
+        result = await handleListWatchPartyMessages(req, payload);
+        break;
+      case 'postWatchPartyMessage':
+        result = await handlePostWatchPartyMessage(req, payload);
         break;
       case 'updatePresence':
         result = await handleUpdatePresence(req, payload);
@@ -1534,6 +1549,11 @@ async function handleSearchUsers(req, payload) {
       const sharedFavorites = computeSharedFavorites(suggestionContext.userProfile, profile);
       const sharedGenres = computeSharedGenres(suggestionContext.userProfile, profile);
       const sharedWatchHistory = computeSharedWatchHistory(suggestionContext.userProfile, profile);
+      const sharedWatchParties = computeSharedWatchParties(
+        graph.username,
+        profile.username,
+        suggestionContext.partyIndex
+      );
       const mutualFollowers = computeMutualFollowersForCandidate(
         profile,
         graph.followingSet,
@@ -1545,6 +1565,7 @@ async function handleSearchUsers(req, payload) {
         (sharedFavorites.length * 4) +
         (sharedGenres.length * 2) +
         (sharedWatchHistory.length * 3) +
+        (sharedWatchParties.length ? 4 : 0) +
         (mutualFollowers.length ? 2 : 0) +
         (followsYou ? 3 : 0);
       return {
@@ -1823,16 +1844,19 @@ async function handleListCollaborativeState(req, payload) {
     return {
       body: {
         ok: true,
-        lists: { owned: [], shared: [], invites: [] }
+        lists: { owned: [], shared: [], invites: [] },
+        watchParties: { upcoming: [], invites: [] }
       }
     };
   }
   const store = await readSocialStore();
   const lists = listCollaborativeSummary(store, user.username);
+  const watchParties = listWatchPartySummary(store, user.username);
   return {
     body: {
       ok: true,
-      lists
+      lists,
+      watchParties
     }
   };
 }
@@ -2161,6 +2185,317 @@ async function handlePostCollaborativeNote(req, payload) {
       list: formatCollaborativeListForUser(list, user.username)
     }
   };
+}
+
+async function handleScheduleWatchParty(req, payload) {
+  const { user } = await authenticate(req, payload);
+  if (!usingLocalStore()) {
+    throw new HttpError(501, 'Watch parties are not yet available with remote storage.');
+  }
+  const movie = normalizeMovieInput(payload.movie);
+  if (!movie || !movie.tmdbId || !movie.title) {
+    throw new HttpError(400, 'Missing movie identifiers.');
+  }
+  const resolvedMovie = await resolveMovieIdentifiers(movie);
+  const whenRaw = typeof payload.scheduledFor === 'string' ? payload.scheduledFor.trim() : '';
+  if (!whenRaw) {
+    throw new HttpError(400, 'Choose a date for your watch party.');
+  }
+  const when = new Date(whenRaw);
+  if (Number.isNaN(when.getTime())) {
+    throw new HttpError(400, 'Enter a valid watch party date.');
+  }
+  const note = typeof payload.note === 'string' ? payload.note.trim() : '';
+  const visibility = normalizePartyVisibility(payload.visibility);
+  const invitees = Array.isArray(payload.invitees)
+    ? Array.from(new Set(payload.invitees.map((entry) => canonicalUsername(entry)).filter(Boolean)))
+    : [];
+  const timestamp = new Date().toISOString();
+  const store = await readSocialStore();
+  const party = {
+    id: randomUUID(),
+    host: user.username,
+    movieTmdbId: resolvedMovie.tmdbId,
+    movieImdbId: resolvedMovie.imdbId || null,
+    movieTitle: resolvedMovie.title,
+    scheduledFor: when.toISOString(),
+    note,
+    visibility,
+    invitees: invitees.map((username) => ({ username, response: 'pending', bringing: '' })),
+    participants: [
+      {
+        username: user.username,
+        role: 'host',
+        joinedAt: timestamp,
+        lastActiveAt: timestamp,
+        isKicked: false,
+        metadata: {}
+      }
+    ],
+    createdAt: timestamp
+  };
+  store.watchParties.push(party);
+  await writeSocialStore(store);
+  await Promise.all(
+    invitees.map((invitee) =>
+      enqueueNotification({
+        username: invitee,
+        type: 'watch_party',
+        actor: user.username,
+        movie: { title: resolvedMovie.title }
+      })
+    )
+  );
+  const watchParties = listWatchPartySummary(store, user.username);
+  return {
+    body: {
+      ok: true,
+      party: formatWatchPartyForUser(party, user.username),
+      watchParties
+    }
+  };
+}
+
+async function handleRespondWatchParty(req, payload) {
+  const { user } = await authenticate(req, payload);
+  if (!usingLocalStore()) {
+    throw new HttpError(501, 'Watch parties are not yet available with remote storage.');
+  }
+  const partyId = typeof payload.partyId === 'string' ? payload.partyId.trim() : '';
+  if (!partyId) {
+    throw new HttpError(400, 'Missing watch party identifier.');
+  }
+  const decision = (typeof payload.response === 'string' ? payload.response.trim().toLowerCase() : '').replace(/[^a-z]/g, '');
+  if (!['accept', 'decline', 'maybe'].includes(decision)) {
+    throw new HttpError(400, 'Select attending, maybe, or decline.');
+  }
+  const store = await readSocialStore();
+  const party = store.watchParties.find((entry) => entry.id === partyId);
+  if (!party) {
+    throw new HttpError(404, 'Watch party not found.');
+  }
+  ensurePartyParticipants(party);
+  if (party.host === user.username) {
+    party.note = typeof payload.note === 'string' ? payload.note.trim() : party.note || '';
+    if (payload.scheduledFor) {
+      const next = new Date(String(payload.scheduledFor));
+      if (!Number.isNaN(next.getTime())) {
+        party.scheduledFor = next.toISOString();
+      }
+    }
+  }
+  party.invitees = Array.isArray(party.invitees) ? party.invitees : [];
+  const invite = party.invitees.find((entry) => canonicalUsername(entry.username) === user.username);
+  if (!invite && party.host !== user.username) {
+    throw new HttpError(403, 'You are not invited to this watch party.');
+  }
+  if (invite) {
+    invite.response = decision;
+    invite.respondedAt = new Date().toISOString();
+  }
+  const bringingRaw = typeof payload.bringing === 'string' ? payload.bringing.trim() : '';
+  if (invite) {
+    invite.bringing = bringingRaw ? bringingRaw.slice(0, 80) : '';
+  }
+  if (decision === 'decline') {
+    removePartyParticipant(party, user.username);
+  } else {
+    upsertPartyParticipant(party, user.username, decision === 'accept' ? 'guest' : 'waiting', {
+      bringing: bringingRaw ? bringingRaw.slice(0, 80) : undefined
+    });
+  }
+  await writeSocialStore(store);
+  if (party.host !== user.username) {
+    await enqueueNotification({
+      username: party.host,
+      type: 'watch_party_update',
+      actor: user.username,
+      movie: { title: party.movieTitle }
+    });
+  }
+  return {
+    body: {
+      ok: true,
+      party: formatWatchPartyForUser(party, user.username)
+    }
+  };
+}
+
+async function handleJoinWatchParty(req, payload) {
+  const { user } = await authenticate(req, payload);
+  if (!usingLocalStore()) {
+    throw new HttpError(501, 'Watch parties are not yet available with remote storage.');
+  }
+  const partyId = typeof payload.partyId === 'string' ? payload.partyId.trim() : '';
+  if (!partyId) {
+    throw new HttpError(400, 'Missing watch party identifier.');
+  }
+  const bringRaw = typeof payload.note === 'string' ? payload.note.trim() : '';
+  const store = await readSocialStore();
+  const party = store.watchParties.find((entry) => entry.id === partyId);
+  if (!party) {
+    throw new HttpError(404, 'Watch party not found.');
+  }
+  ensurePartyParticipants(party);
+  const existingParticipant = party.participants.find((entry) => entry.username === user.username);
+  if (existingParticipant && existingParticipant.isKicked) {
+    throw new HttpError(403, 'You can no longer join this watch party.');
+  }
+  upsertPartyParticipant(party, user.username, party.host === user.username ? 'host' : 'guest', {
+    bringing: bringRaw ? bringRaw.slice(0, 80) : undefined
+  });
+  const hasInvite = Array.isArray(party.invitees)
+    ? party.invitees.some((entry) => canonicalUsername(entry.username) === user.username)
+    : false;
+  if (!hasInvite) {
+    party.invitees = Array.isArray(party.invitees) ? party.invitees : [];
+    party.invitees.push({ username: user.username, response: 'accept', bringing: bringRaw.slice(0, 80) });
+  }
+  await writeSocialStore(store);
+  if (party.host !== user.username) {
+    await enqueueNotification({
+      username: party.host,
+      type: 'watch_party_update',
+      actor: user.username,
+      movie: { title: party.movieTitle }
+    });
+  }
+  return {
+    body: {
+      ok: true,
+      party: formatWatchPartyForUser(party, user.username)
+    }
+  };
+}
+
+async function handleListWatchPartyMessages(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const partyId = typeof payload.partyId === 'string' ? payload.partyId.trim() : '';
+  if (!partyId) {
+    throw new HttpError(400, 'Choose a watch party first.');
+  }
+
+  if (usingLocalStore()) {
+    const store = await readSocialStore();
+    const party = store.watchParties.find((entry) => entry.id === partyId);
+    if (!party) {
+      throw new HttpError(404, 'Watch party not found.');
+    }
+    ensurePartyParticipants(party);
+    if (!isPartyParticipant(party, user.username)) {
+      throw new HttpError(403, 'Only hosts and participants can view party chat.');
+    }
+    const messages = Array.isArray(store.watchPartyMessages)
+      ? store.watchPartyMessages
+          .filter((entry) => entry.partyId === partyId)
+          .map(formatWatchPartyMessage)
+          .filter(Boolean)
+          .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+      : [];
+    return { body: { ok: true, messages } };
+  }
+
+  const party = await assertWatchPartyAccessSupabase(partyId, user.username);
+  if (!party) {
+    throw new HttpError(404, 'Watch party not found.');
+  }
+  const rows = await supabaseFetch('watch_party_messages', {
+    query: {
+      select: 'id,party_id,username,body,message_type,metadata,created_at',
+      party_id: `eq.${partyId}`,
+      order: 'created_at.asc'
+    }
+  });
+  const messages = Array.isArray(rows)
+    ? rows
+        .map((row) => ({
+          id: row.id || randomUUID(),
+          partyId: row.party_id || partyId,
+          username: canonicalUsername(row.username),
+          body: row.body || '',
+          messageType: row.message_type || 'chat',
+          metadata: row.metadata && typeof row.metadata === 'object' ? row.metadata : {},
+          createdAt: row.created_at || null
+        }))
+        .filter((entry) => entry.username && entry.body)
+    : [];
+  return { body: { ok: true, messages } };
+}
+
+async function handlePostWatchPartyMessage(req, payload) {
+  const { user } = await authenticate(req, payload);
+  const partyId = typeof payload.partyId === 'string' ? payload.partyId.trim() : '';
+  const bodyRaw = typeof payload.body === 'string' ? payload.body.trim() : '';
+  if (!partyId) {
+    throw new HttpError(400, 'Choose a watch party first.');
+  }
+  if (!bodyRaw) {
+    throw new HttpError(400, 'Type a message before sending.');
+  }
+  const body = bodyRaw.slice(0, 500);
+
+  if (usingLocalStore()) {
+    const store = await readSocialStore();
+    const party = store.watchParties.find((entry) => entry.id === partyId);
+    if (!party) {
+      throw new HttpError(404, 'Watch party not found.');
+    }
+    ensurePartyParticipants(party);
+    if (!isPartyParticipant(party, user.username)) {
+      throw new HttpError(403, 'Only hosts and participants can send messages.');
+    }
+    const timestamp = new Date().toISOString();
+    const message = {
+      id: randomUUID(),
+      partyId,
+      username: canonicalUsername(user.username),
+      body,
+      messageType: 'chat',
+      metadata: {},
+      createdAt: timestamp
+    };
+    store.watchPartyMessages = Array.isArray(store.watchPartyMessages)
+      ? store.watchPartyMessages
+      : [];
+    store.watchPartyMessages.push(message);
+    party.updatedAt = timestamp;
+    await writeSocialStore(store);
+    return { body: { ok: true, message: formatWatchPartyMessage(message) } };
+  }
+
+  await assertWatchPartyAccessSupabase(partyId, user.username);
+  const rows = await supabaseFetch('watch_party_messages', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: {
+      party_id: partyId,
+      username: canonicalUsername(user.username),
+      body,
+      message_type: 'chat',
+      metadata: {}
+    }
+  });
+  const inserted = Array.isArray(rows) && rows.length ? rows[0] : null;
+  const message = inserted
+    ? {
+        id: inserted.id || randomUUID(),
+        partyId: inserted.party_id || partyId,
+        username: canonicalUsername(inserted.username),
+        body: inserted.body || body,
+        messageType: inserted.message_type || 'chat',
+        metadata: inserted.metadata && typeof inserted.metadata === 'object' ? inserted.metadata : {},
+        createdAt: inserted.created_at || new Date().toISOString()
+      }
+    : {
+        id: randomUUID(),
+        partyId,
+        username: canonicalUsername(user.username),
+        body,
+        messageType: 'chat',
+        metadata: {},
+        createdAt: new Date().toISOString()
+      };
+  return { body: { ok: true, message } };
 }
 
 async function handleStartConversation(req, payload) {
@@ -3004,6 +3339,7 @@ async function buildFollowSuggestions({
       const mutuals = suggestionContext.mutualMap.get(handle) || [];
       const candidateProfile = suggestionContext.profileMap.get(handle) || null;
       const sharedWatchHistory = computeSharedWatchHistory(suggestionContext.userProfile, candidateProfile);
+      const sharedWatchParties = computeSharedWatchParties(username, handle, suggestionContext.partyIndex);
       addSuggestion({
         username: handle,
         displayName: formatDisplayNameFromHandle(handle),
@@ -3011,6 +3347,7 @@ async function buildFollowSuggestions({
         sharedInterests: [],
         sharedFavorites: [],
         sharedWatchHistory,
+        sharedWatchParties,
         mutualFollowers: mutuals,
         followsYou: true,
         tagline: 'They already follow you back.',
@@ -3034,12 +3371,19 @@ async function buildFollowSuggestions({
         suggestionContext.userProfile,
         profile
       );
+      const sharedWatchParties = computeSharedWatchParties(
+        username,
+        profile.username,
+        suggestionContext.partyIndex
+      );
       const mutuals = computeMutualFollowersForCandidate(profile, followingSet, followersSet);
       const followsYou = followersSet.has(profile.username);
       const score =
         (sharedFavorites.length * 4) +
         (sharedGenres.length * 2) +
         (sharedWatchHistory.length * 3) +
+        (sharedWatchParties.length ? 5 : 0) +
+        Math.min(sharedWatchParties.length, 2) * 2 +
         (mutuals.length ? 3 : 0) +
         (followsYou ? 3 : 0) +
         Math.min(profile.followerCount || 0, 4) +
@@ -3049,6 +3393,7 @@ async function buildFollowSuggestions({
         sharedFavorites,
         sharedGenres,
         sharedWatchHistory,
+        sharedWatchParties,
         mutuals,
         followsYou,
         score
@@ -3077,6 +3422,7 @@ async function buildFollowSuggestions({
       sharedInterests: entry.sharedGenres,
       sharedFavorites: entry.sharedFavorites,
       sharedWatchHistory: entry.sharedWatchHistory,
+      sharedWatchParties: entry.sharedWatchParties,
       mutualFollowers: entry.mutuals,
       followsYou: entry.followsYou,
       preferencesSnapshot: entry.profile.preferencesSnapshot || null
@@ -3087,9 +3433,10 @@ async function buildFollowSuggestions({
 }
 
 async function loadSuggestionCandidates({ username, followingSet, followersSet }) {
-  const [profiles, followRows] = await Promise.all([
+  const [profiles, followRows, partyIndex] = await Promise.all([
     fetchAllUserProfiles(),
-    fetchFollowGraph()
+    fetchFollowGraph(),
+    fetchWatchPartyIndex()
   ]);
 
   const followerMap = buildFollowerMap(followRows);
@@ -3112,7 +3459,7 @@ async function loadSuggestionCandidates({ username, followingSet, followersSet }
     mutualMap.set(handle, computeMutualFollowersFromMap(handle, followerMap, followingSet, followersSet));
   });
 
-  return { userProfile, candidates, mutualMap, profileMap };
+  return { userProfile, candidates, mutualMap, partyIndex, profileMap };
 }
 
 function computeMutualFollowersFromMap(handle, followerMap, followingSet, followersSet) {
@@ -3222,6 +3569,59 @@ function computeSharedWatchHistory(currentProfile, candidateProfile) {
   return results.slice(0, 3);
 }
 
+function computeSharedWatchParties(username, candidateUsername, partyIndex) {
+  if (!partyIndex || !partyIndex.participationMap || !partyIndex.partyDetailMap) {
+    return [];
+  }
+  const currentHandle = canonicalUsername(username);
+  const candidateHandle = canonicalUsername(candidateUsername);
+  if (!currentHandle || !candidateHandle) {
+    return [];
+  }
+  const userParties = partyIndex.participationMap.get(currentHandle);
+  const candidateParties = partyIndex.participationMap.get(candidateHandle);
+  if (!userParties || !candidateParties) {
+    return [];
+  }
+  const sharedIds = [];
+  userParties.forEach((partyId) => {
+    if (candidateParties.has(partyId)) {
+      sharedIds.push(partyId);
+    }
+  });
+  const formatted = sharedIds
+    .map((partyId) => partyIndex.partyDetailMap.get(partyId))
+    .filter(Boolean)
+    .map(formatWatchPartyTag)
+    .filter(Boolean);
+  return formatted.slice(0, 2);
+}
+
+function formatWatchPartyTag(detail) {
+  if (!detail) {
+    return '';
+  }
+  const parts = [];
+  if (detail.title) {
+    parts.push(detail.title);
+  }
+  if (detail.scheduledFor) {
+    const date = new Date(detail.scheduledFor);
+    if (!Number.isNaN(date.getTime())) {
+      parts.push(
+        date.toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric'
+        })
+      );
+    }
+  }
+  if (!parts.length && detail.host) {
+    parts.push(`${formatDisplayNameFromHandle(detail.host)}’s party`);
+  }
+  return parts.join(' • ');
+}
+
 function normalizeSuggestionPayload(entry, { username, followingSet, followersSet }) {
   if (!entry || typeof entry !== 'object') {
     return null;
@@ -3242,6 +3642,9 @@ function normalizeSuggestionPayload(entry, { username, followingSet, followersSe
     : [];
   const sharedWatchHistory = Array.isArray(entry.sharedWatchHistory)
     ? entry.sharedWatchHistory.map((value) => (typeof value === 'string' ? value.trim() : '')).filter(Boolean)
+    : [];
+  const sharedWatchParties = Array.isArray(entry.sharedWatchParties)
+    ? entry.sharedWatchParties.map((value) => (typeof value === 'string' ? value.trim() : '')).filter(Boolean)
     : [];
   const mutualFollowers = Array.isArray(entry.mutualFollowers)
     ? Array.from(
@@ -3271,6 +3674,13 @@ function normalizeSuggestionPayload(entry, { username, followingSet, followersSe
   }
   if (sharedWatchHistory.length) {
     reasonParts.push(`Recently watched: ${sharedWatchHistory.slice(0, 2).join(', ')}`);
+  }
+  if (sharedWatchParties.length) {
+    reasonParts.push(
+      sharedWatchParties.length === 1
+        ? `Joined the same watch party: ${sharedWatchParties[0]}`
+        : `Joined ${sharedWatchParties.length} of the same watch parties`
+    );
   }
   if (entry.reason && typeof entry.reason === 'string') {
     reasonParts.push(entry.reason.trim());
@@ -3478,6 +3888,75 @@ async function fetchFollowGraph() {
     enableLocalFallback('loading follow graph', error);
     return fetchFollowGraph();
   }
+}
+
+async function fetchWatchPartyIndex() {
+  if (usingLocalStore()) {
+    const store = await readSocialStore();
+    return buildWatchPartyIndex(Array.isArray(store.watchParties) ? store.watchParties : []);
+  }
+  return { participationMap: new Map(), partyDetailMap: new Map() };
+}
+
+function buildWatchPartyIndex(entries) {
+  const participationMap = new Map();
+  const partyDetailMap = new Map();
+  if (!Array.isArray(entries)) {
+    return { participationMap, partyDetailMap };
+  }
+  entries.forEach((party) => {
+    if (!party || !party.id) {
+      return;
+    }
+    const partyId = String(party.id);
+    const host = canonicalUsername(party.host || '');
+    const title = typeof party.movieTitle === 'string'
+      ? party.movieTitle
+      : typeof party.movie?.title === 'string'
+      ? party.movie.title
+      : '';
+    const scheduledFor = party.scheduledFor || party.scheduled_for || null;
+    partyDetailMap.set(partyId, {
+      id: partyId,
+      title: title ? title.trim() : '',
+      scheduledFor,
+      host
+    });
+    if (host) {
+      addPartyParticipation(participationMap, host, partyId);
+    }
+    const invitees = Array.isArray(party.invitees) ? party.invitees : [];
+    invitees.forEach((invite) => {
+      const handle = canonicalUsername(invite && invite.username ? invite.username : '');
+      if (!handle) {
+        return;
+      }
+      const response = (invite.response || invite.status || '').toLowerCase();
+      if (!response || response === 'accepted' || response === 'attending' || response === 'yes' || response === 'host') {
+        addPartyParticipation(participationMap, handle, partyId);
+      }
+    });
+    if (Array.isArray(party.participants)) {
+      party.participants.forEach((participant) => {
+        const handle = canonicalUsername(participant && participant.username ? participant.username : '');
+        if (!handle) {
+          return;
+        }
+        addPartyParticipation(participationMap, handle, partyId);
+      });
+    }
+  });
+  return { participationMap, partyDetailMap };
+}
+
+function addPartyParticipation(map, username, partyId) {
+  if (!username || !partyId) {
+    return;
+  }
+  if (!map.has(username)) {
+    map.set(username, new Set());
+  }
+  map.get(username).add(partyId);
 }
 
 function buildFollowerMap(rows) {
@@ -4538,6 +5017,10 @@ function formatNotificationMessage(type, context = {}) {
       return `${actor} invited you to co-curate “${title || 'their collection'}”.`;
     case 'collab_accept':
       return `${actor} joined your collaborative collection “${title || 'Untitled'}”.`;
+    case 'watch_party':
+      return `${actor} invited you to a watch party for ${title}.`;
+    case 'watch_party_update':
+      return `${actor} updated their watch party RSVP for ${title}.`;
     default:
       return `New activity from ${actor}.`;
   }
@@ -4862,6 +5345,345 @@ function listCollaborativeSummary(store, username) {
   return { owned, shared, invites };
 }
 
+function formatWatchPartyForUser(party, username) {
+  if (!party) {
+    return null;
+  }
+  const canonical = canonicalUsername(username);
+  ensurePartyParticipants(party);
+  const invite = Array.isArray(party.invitees)
+    ? party.invitees.find((entry) => canonicalUsername(entry.username) === canonical)
+    : null;
+  const participant = party.participants.find((entry) => canonicalUsername(entry.username) === canonical);
+  let response = 'none';
+  if (participant) {
+    response = participant.role === 'waiting' ? 'maybe' : participant.role === 'host' ? 'host' : 'joined';
+  } else if (invite) {
+    response = invite.response || 'pending';
+  } else if (party.host === canonical) {
+    response = 'host';
+  }
+  return {
+    id: party.id,
+    host: party.host,
+    visibility: normalizePartyVisibility(party.visibility),
+    movie: {
+      title: party.movieTitle || '',
+      tmdbId: party.movieTmdbId || null,
+      imdbId: party.movieImdbId || null
+    },
+    scheduledFor: party.scheduledFor || null,
+    createdAt: party.createdAt || null,
+    note: party.note || '',
+    response,
+    invitees: Array.isArray(party.invitees)
+      ? party.invitees.map((entry) => ({
+          username: canonicalUsername(entry.username),
+          response: entry.response || 'pending',
+          bringing: typeof entry.bringing === 'string' ? entry.bringing : ''
+        }))
+      : [],
+    participants: Array.isArray(party.participants)
+      ? party.participants.map(formatWatchPartyParticipant).filter(Boolean)
+      : []
+  };
+}
+
+function listWatchPartySummary(store, username) {
+  const canonical = canonicalUsername(username);
+  if (!Array.isArray(store.watchParties)) {
+    return { upcoming: [], invites: [] };
+  }
+  const upcoming = [];
+  const invites = [];
+  store.watchParties.forEach((party) => {
+    const formatted = formatWatchPartyForUser(party, canonical);
+    if (!formatted) {
+      return;
+    }
+    if (party.host === canonical || isUpcomingPartyResponse(formatted.response)) {
+      upcoming.push(formatted);
+    } else if (formatted.response === 'pending') {
+      invites.push(formatted);
+    }
+  });
+  return { upcoming, invites };
+}
+
+function isUpcomingPartyResponse(response) {
+  const normalized = typeof response === 'string' ? response.trim().toLowerCase() : '';
+  if (!normalized) {
+    return false;
+  }
+  return ['host', 'joined', 'accept', 'accepted', 'attending', 'yes', 'maybe'].includes(normalized);
+}
+
+function normalizePartyVisibility(value) {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (normalized === 'public') {
+    return 'public';
+  }
+  if (normalized.startsWith('invite') || normalized === 'private') {
+    return 'invite-only';
+  }
+  return 'friends';
+}
+
+function ensurePartyParticipants(party) {
+  if (!party) {
+    return;
+  }
+  if (!Array.isArray(party.participants)) {
+    party.participants = [];
+  }
+  const canonicalHost = canonicalUsername(party.host || '');
+  const hostPresent = party.participants.some(
+    (entry) => entry && canonicalUsername(entry.username) === canonicalHost
+  );
+  if (!hostPresent && canonicalHost) {
+    const now = new Date().toISOString();
+    party.participants.unshift({
+      username: canonicalHost,
+      role: 'host',
+      joinedAt: party.createdAt || now,
+      lastActiveAt: now,
+      isKicked: false,
+      metadata: {}
+    });
+  }
+}
+
+function isPartyParticipant(party, username) {
+  if (!party || !username || !Array.isArray(party.participants)) {
+    return false;
+  }
+  const canonical = canonicalUsername(username);
+  return party.participants.some(
+    (entry) => canonicalUsername(entry.username) === canonical && !entry.isKicked
+  );
+}
+
+function upsertPartyParticipant(party, username, role = 'guest', metadata = {}) {
+  if (!party || !username) {
+    return;
+  }
+  ensurePartyParticipants(party);
+  const canonical = canonicalUsername(username);
+  if (!canonical) {
+    return;
+  }
+  const now = new Date().toISOString();
+  const existing = party.participants.find((entry) => canonicalUsername(entry.username) === canonical);
+  if (existing) {
+    existing.role = role || existing.role || 'guest';
+    existing.lastActiveAt = now;
+    existing.isKicked = false;
+    existing.metadata = {
+      ...(existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
+      ...(metadata && typeof metadata === 'object' ? metadata : {})
+    };
+    if (!existing.joinedAt) {
+      existing.joinedAt = now;
+    }
+    return;
+  }
+  party.participants.push({
+    username: canonical,
+    role: role || 'guest',
+    joinedAt: now,
+    lastActiveAt: now,
+    isKicked: false,
+    metadata: metadata && typeof metadata === 'object' ? metadata : {}
+  });
+}
+
+function removePartyParticipant(party, username) {
+  if (!party || !username || !Array.isArray(party.participants)) {
+    return;
+  }
+  const canonical = canonicalUsername(username);
+  party.participants = party.participants.filter((entry) => canonicalUsername(entry.username) !== canonical);
+  if (party.host === canonical && !party.participants.length) {
+    ensurePartyParticipants(party);
+  }
+}
+
+function formatWatchPartyParticipant(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+  const username = canonicalUsername(entry.username);
+  if (!username) {
+    return null;
+  }
+  return {
+    username,
+    role: entry.role || 'guest',
+    joinedAt: entry.joinedAt || null,
+    lastActiveAt: entry.lastActiveAt || null,
+    isKicked: Boolean(entry.isKicked),
+    metadata: entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {}
+  };
+}
+
+function formatWatchPartyMessage(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+  const id = entry.id || randomUUID();
+  const username = canonicalUsername(entry.username);
+  const body = typeof entry.body === 'string' ? entry.body : '';
+  if (!username || !body) {
+    return null;
+  }
+  return {
+    id,
+    partyId: entry.partyId || entry.party_id || null,
+    username,
+    body,
+    messageType: entry.messageType || entry.message_type || 'chat',
+    metadata: entry.metadata && typeof entry.metadata === 'object' ? entry.metadata : {},
+    createdAt: entry.createdAt || entry.created_at || null
+  };
+}
+
+async function assertWatchPartyAccessSupabase(partyId, username) {
+  const normalizedParty = typeof partyId === 'string' ? partyId.trim() : '';
+  const normalizedUser = canonicalUsername(username);
+  if (!normalizedParty || !normalizedUser) {
+    throw new HttpError(400, 'Missing watch party details.');
+  }
+  const partyRows = await supabaseFetch('watch_parties', {
+    query: {
+      select: 'id,host_username',
+      id: `eq.${normalizedParty}`,
+      limit: '1'
+    }
+  });
+  const party = Array.isArray(partyRows) && partyRows.length ? partyRows[0] : null;
+  if (!party) {
+    throw new HttpError(404, 'Watch party not found.');
+  }
+  if (canonicalUsername(party.host_username) === normalizedUser) {
+    return party;
+  }
+  const participantRows = await supabaseFetch('watch_party_participants', {
+    query: {
+      select: 'username,is_kicked',
+      party_id: `eq.${normalizedParty}`,
+      username: `eq.${normalizedUser}`,
+      limit: '1'
+    }
+  });
+  const participant = Array.isArray(participantRows) && participantRows.length
+    ? participantRows[0]
+    : null;
+  if (!participant || participant.is_kicked) {
+    throw new HttpError(403, 'You do not have access to this watch party.');
+  }
+  return party;
+}
+
+function assertLocalConversationAccess(store, conversationId, username) {
+  const normalizedConversation = typeof conversationId === 'string' ? conversationId.trim() : '';
+  const actor = canonicalUsername(username);
+  if (!normalizedConversation || !actor) {
+    throw new HttpError(400, 'Missing conversation details.');
+  }
+  const conversation = Array.isArray(store.userConversations)
+    ? store.userConversations.find((entry) => normalizeId(entry.id) === normalizedConversation)
+    : null;
+  if (!conversation) {
+    throw new HttpError(404, 'Conversation not found.');
+  }
+  const members = Array.isArray(store.userConversationMembers)
+    ? store.userConversationMembers.filter((entry) => normalizeId(entry.conversation_id) === normalizedConversation)
+    : [];
+  const isParticipant = members.some((entry) => canonicalUsername(entry.username) === actor);
+  if (!isParticipant) {
+    throw new HttpError(403, 'Only conversation participants can view messages.');
+  }
+  const messages = Array.isArray(store.userMessages)
+    ? store.userMessages
+        .filter((entry) => normalizeId(entry.conversation_id) === normalizedConversation)
+        .map((entry) => normalizeConversationMessage(entry))
+        .filter((message) => message && message.conversationId === normalizedConversation)
+        .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime())
+    : [];
+  return { conversation, members, messages };
+}
+
+async function assertConversationAccessSupabase(conversationId, username) {
+  const normalizedConversation = typeof conversationId === 'string' ? conversationId.trim() : '';
+  const actor = canonicalUsername(username);
+  if (!normalizedConversation || !actor) {
+    throw new HttpError(400, 'Missing conversation details.');
+  }
+
+  const membershipRows = await supabaseFetch('user_conversation_members', {
+    query: {
+      select: 'conversation_id,username,role,joined_at,last_read_message_id,metadata',
+      conversation_id: `eq.${normalizedConversation}`,
+      username: `eq.${actor}`,
+      limit: '1'
+    }
+  });
+  const membership = Array.isArray(membershipRows) && membershipRows.length ? membershipRows[0] : null;
+  if (!membership) {
+    throw new HttpError(403, 'Only conversation participants can view messages.');
+  }
+
+  const conversationRows = await supabaseFetch('user_conversations', {
+    query: {
+      select: 'id,title,is_group,last_message_at,created_by_username,metadata,created_at,updated_at',
+      id: `eq.${normalizedConversation}`,
+      limit: '1'
+    }
+  });
+  const conversationRow = Array.isArray(conversationRows) && conversationRows.length ? conversationRows[0] : null;
+  if (!conversationRow) {
+    throw new HttpError(404, 'Conversation not found.');
+  }
+
+  const participantRows = await supabaseFetch('user_conversation_members', {
+    query: {
+      select: 'conversation_id,username,role,joined_at,last_read_message_id,metadata',
+      conversation_id: `eq.${normalizedConversation}`
+    }
+  });
+
+  return {
+    conversation: normalizeConversationFromRow(conversationRow),
+    participants: Array.isArray(participantRows)
+      ? participantRows.map((entry) => normalizeConversationParticipant(entry)).filter(Boolean)
+      : []
+  };
+}
+
+function recordPresence(username, { state, movie, statusPreset, source }) {
+  const canonical = canonicalUsername(username);
+  if (!canonical) {
+    return;
+  }
+  const now = Date.now();
+  const existing = presenceMap.get(canonical) || {};
+  presenceMap.set(canonical, {
+    state: state || existing.state || 'online',
+    updatedAt: now,
+    source: source || existing.source || 'manual',
+    movieTmdbId: movie && movie.tmdbId ? movie.tmdbId : existing.movieTmdbId || null,
+    movieImdbId: movie && movie.imdbId ? movie.imdbId : existing.movieImdbId || null,
+    movieTitle: movie && movie.title ? movie.title : existing.movieTitle || null,
+    statusPreset:
+      statusPreset !== undefined
+        ? PRESENCE_STATUS_PRESETS.has(statusPreset)
+          ? statusPreset
+          : 'default'
+        : existing.statusPreset || 'default'
+  });
+  schedulePresenceCleanup();
+}
+
 function buildPresenceSnapshot() {
   const now = Date.now();
   const snapshot = {};
@@ -4926,6 +5748,9 @@ function computeRecognitionBadgesFromStore(store, username) {
   const comments = Array.isArray(store.reviewComments)
     ? store.reviewComments.filter((entry) => canonicalUsername(entry.username) === canonical)
     : [];
+  const hostedParties = Array.isArray(store.watchParties)
+    ? store.watchParties.filter((party) => canonicalUsername(party.host) === canonical)
+    : [];
 
   const badges = [];
   if (reviews.length >= 5) {
@@ -4947,6 +5772,13 @@ function computeRecognitionBadgesFromStore(store, username) {
       key: 'conversation-starter',
       label: 'Conversation Starter',
       description: `Jumped into ${comments.length} community threads.`
+    });
+  }
+  if (hostedParties.length >= 1) {
+    badges.push({
+      key: 'event-planner',
+      label: 'Event Planner',
+      description: `Hosted ${hostedParties.length} watch party${hostedParties.length === 1 ? '' : 'ies'}.`
     });
   }
 
