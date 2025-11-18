@@ -118,68 +118,16 @@
             </div>
           </div>
           <div class="tab-panel" data-tab-panel="feed">
-            <article class="card">
-              <div class="avatar">JS</div>
-              <div class="stack">
-                <div class="meta-row">
-                  <strong>Jenna Sparks</strong>
-                  <span class="small-text">3h ago</span>
-                </div>
-                <p>Rated ⭐⭐⭐⭐ “The Silent Shore”.</p>
-                <div class="card">
-                  <div class="poster"></div>
-                  <div class="stack">
-                    <strong>The Silent Shore</strong>
-                    <div class="small-text">2024 · Mystery · 1h 52m</div>
-                  </div>
-                </div>
-              </div>
-            </article>
-            <article class="card">
-              <div class="avatar">AP</div>
-              <div class="stack">
-                <div class="meta-row">
-                  <strong>Alex Price</strong>
-                  <span class="small-text">5h ago</span>
-                </div>
-                <p>Shared new favorites: “Cozy Thrillers”.</p>
-                <div class="list-collage">
-                  <div class="mini-poster"></div>
-                  <div class="mini-poster"></div>
-                  <div class="mini-poster"></div>
-                  <div class="mini-poster"></div>
-                </div>
-                <div class="list-meta">
-                  <span class="badge trend">Trending</span>
-                  <span class="small-text">18 films · Shared</span>
-                </div>
-              </div>
-            </article>
+            <div class="stack" data-friend-feed></div>
+            <div class="empty-state" data-friend-feed-empty>
+              Sign in to see live updates from people you follow.
+            </div>
           </div>
           <div class="tab-panel" data-tab-panel="requests">
-            <div class="card">
-              <div class="avatar">MT</div>
-              <div class="stack">
-                <strong>Mina Torres</strong>
-                <div class="small-text">2 mutual friends</div>
-                <div class="action-row">
-                  <button class="btn-primary btn">Accept</button>
-                  <button class="btn-ghost btn">Ignore</button>
-                </div>
-              </div>
+            <div class="stack" data-friend-requests></div>
+            <div class="empty-state" data-friend-requests-empty>
+              Friend requests and invites will appear here once you’re connected.
             </div>
-            <div class="card">
-              <div class="poster" style="max-width: 90px"></div>
-              <div class="stack">
-                <strong>Watch party invite</strong>
-                <div class="small-text">Hosted by Theo · Tonight 8:00pm</div>
-                <div class="action-row">
-                  <button class="btn-primary btn">Join</button>
-                  <button class="btn-ghost btn">View</button>
-                </div>
-              </div>
-            </div>
-            <div class="empty-state">No more requests right now. Grab popcorn!</div>
           </div>
         </section>
 
@@ -314,13 +262,7 @@
           </div>
           <div class="tab-panel" data-tab-panel="with-friends">
             <h3>Plan a movie night</h3>
-            <div class="grid-avatars">
-              <div class="avatar">AL</div>
-              <div class="avatar">MT</div>
-              <div class="avatar">JD</div>
-              <div class="avatar">SS</div>
-              <div class="icon-circle" aria-label="Add friend">＋</div>
-            </div>
+            <p class="small-text muted">Add friends to sync watch parties and shared picks.</p>
             <div class="panel-heading">
               <h3>Group picks</h3>
               <span class="small-text">Built from everyone’s favorites.</span>
@@ -399,29 +341,12 @@
                 <span class="badge">Diary</span>
               </div>
               <p class="small-text" style="margin: 0 0 8px 0;">
-                Use the diary tab on your profile to record watched titles. Here are a few recent highlights.
+                Use the diary tab on your profile to record watched titles. Entries from your online diary will
+                appear here.
               </p>
-              <div class="card" style="margin: 0;">
-                <div class="poster" style="max-width: 90px;"></div>
-                <div class="stack">
-                  <strong>Starless Road</strong>
-                  <div class="small-text">2023 · 1h 44m · Drama</div>
-                  <div class="action-row">
-                    <span class="badge rating">4.1</span>
-                    <button class="btn-ghost btn">Mark as favorite ❤️</button>
-                  </div>
-                </div>
-              </div>
-              <div class="card" style="margin: 8px 0 0 0;">
-                <div class="poster" style="max-width: 90px;"></div>
-                <div class="stack">
-                  <strong>Glasshouse</strong>
-                  <div class="small-text">2022 · 1h 58m · Thriller</div>
-                  <div class="action-row">
-                    <span class="badge rating">4.3</span>
-                    <button class="btn-ghost btn">Mark as favorite ❤️</button>
-                  </div>
-                </div>
+              <div class="stack" data-watched-summary></div>
+              <div class="empty-state" data-watched-empty>
+                No diary entries yet. Log watches to keep your online history up to date.
               </div>
             </div>
           </div>
