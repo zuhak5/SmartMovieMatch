@@ -1524,6 +1524,7 @@ p {
 
 .horizontal-scroll.movie-card-row .movie-card__body {
   padding: 10px 10px 12px;
+  display: table-header-group;
   min-height: 0;
 }
 
