@@ -1,5 +1,3 @@
-const fs = require('fs/promises');
-const path = require('path');
 const { randomUUID } = require('crypto');
 const { setInterval: nodeSetInterval, clearInterval: nodeClearInterval } = require('timers');
 
@@ -7,10 +5,6 @@ const { fetchWithTimeout } = require('../lib/http-client');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const SOCIAL_STORE_PATH = path.join(__dirname, '..', 'data', 'social.json');
-const AUTH_STORE_PATH = path.join(__dirname, '..', 'data', 'auth-users.json');
-const USING_LOCAL_STORE = !(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
-let forceLocalStore = false;
 let qrCodeModulePromise = null;
 
 async function getQrCodeModule() {
@@ -22,15 +16,13 @@ async function getQrCodeModule() {
 }
 
 function usingLocalStore() {
-  return USING_LOCAL_STORE || forceLocalStore;
+  return false;
 }
 
 function enableLocalFallback(reason, error) {
-  if (!forceLocalStore && !USING_LOCAL_STORE) {
-    const details = error instanceof Error ? error.message : String(error);
-    console.warn(`Falling back to local social store after ${reason}: ${details}`);
-  }
-  forceLocalStore = true;
+  const details = error instanceof Error ? error.message : String(error);
+  console.error(`Local social store disabled (${reason}): ${details}`);
+  throw error instanceof HttpError ? error : new HttpError(500, 'Social service unavailable.');
 }
 
 const MAX_REVIEW_LENGTH = 600;
@@ -6972,115 +6964,15 @@ class HttpError extends Error {
 }
 
 async function readSocialStore() {
-  try {
-    const text = await fs.readFile(SOCIAL_STORE_PATH, 'utf8');
-    const parsed = JSON.parse(text);
-    const legacyLibrary = Array.isArray(parsed.library)
-      ? parsed.library.map((row) => ({
-          username: row.username,
-          verb: row.action,
-          objectType: 'movie',
-          metadata: {
-            movie_tmdb_id: row.movieTmdbId,
-            movie_imdb_id: row.movieImdbId || null,
-            movie_title: row.movieTitle || ''
-          },
-          createdAt: row.createdAt
-        }))
-      : [];
-    return {
-      follows: Array.isArray(parsed.follows) ? parsed.follows.slice() : [],
-      reviews: Array.isArray(parsed.reviews) ? parsed.reviews.slice() : [],
-      reviewLikes: Array.isArray(parsed.reviewLikes) ? parsed.reviewLikes.slice() : [],
-      notifications: Array.isArray(parsed.notifications) ? parsed.notifications.slice() : [],
-      activity: Array.isArray(parsed.activity) ? parsed.activity.slice() : legacyLibrary,
-      reviewComments: Array.isArray(parsed.reviewComments) ? parsed.reviewComments.slice() : [],
-      reviewReactions: Array.isArray(parsed.reviewReactions) ? parsed.reviewReactions.slice() : [],
-      watchDiary: Array.isArray(parsed.watchDiary) ? parsed.watchDiary.slice() : [],
-      collabLists: Array.isArray(parsed.collabLists) ? parsed.collabLists.slice() : [],
-      watchParties: Array.isArray(parsed.watchParties) ? parsed.watchParties.slice() : [],
-      watchPartyMessages: Array.isArray(parsed.watchPartyMessages)
-        ? parsed.watchPartyMessages.slice()
-        : [],
-      userConversations: Array.isArray(parsed.userConversations)
-        ? parsed.userConversations.slice()
-        : [],
-      userConversationMembers: Array.isArray(parsed.userConversationMembers)
-        ? parsed.userConversationMembers.slice()
-        : [],
-      userMessages: Array.isArray(parsed.userMessages) ? parsed.userMessages.slice() : [],
-      userLists: Array.isArray(parsed.userLists) ? parsed.userLists.slice() : [],
-      userListItems: Array.isArray(parsed.userListItems) ? parsed.userListItems.slice() : [],
-      userTags: Array.isArray(parsed.userTags) ? parsed.userTags.slice() : [],
-      userTaggedMovies: Array.isArray(parsed.userTaggedMovies) ? parsed.userTaggedMovies.slice() : []
-    };
-  } catch (error) {
-    return {
-      follows: [],
-      reviews: [],
-      reviewLikes: [],
-      notifications: [],
-      activity: [],
-      reviewComments: [],
-      reviewReactions: [],
-      watchDiary: [],
-      collabLists: [],
-      watchParties: [],
-      watchPartyMessages: [],
-      userConversations: [],
-      userConversationMembers: [],
-      userMessages: [],
-      userLists: [],
-      userListItems: [],
-      userTags: [],
-      userTaggedMovies: []
-    };
-  }
+  throw new HttpError(503, 'Local social data is disabled.');
 }
 
-async function writeSocialStore(store) {
-  const payload = JSON.stringify(
-    {
-      follows: Array.isArray(store.follows) ? store.follows : [],
-      reviews: Array.isArray(store.reviews) ? store.reviews : [],
-      reviewLikes: Array.isArray(store.reviewLikes) ? store.reviewLikes : [],
-      notifications: Array.isArray(store.notifications) ? store.notifications : [],
-      activity: Array.isArray(store.activity) ? store.activity : [],
-      reviewComments: Array.isArray(store.reviewComments) ? store.reviewComments : [],
-      reviewReactions: Array.isArray(store.reviewReactions) ? store.reviewReactions : [],
-      watchDiary: Array.isArray(store.watchDiary) ? store.watchDiary : [],
-      collabLists: Array.isArray(store.collabLists) ? store.collabLists : [],
-      watchParties: Array.isArray(store.watchParties) ? store.watchParties : [],
-      watchPartyMessages: Array.isArray(store.watchPartyMessages)
-        ? store.watchPartyMessages
-        : [],
-      userConversations: Array.isArray(store.userConversations) ? store.userConversations : [],
-      userConversationMembers: Array.isArray(store.userConversationMembers)
-        ? store.userConversationMembers
-        : [],
-      userMessages: Array.isArray(store.userMessages) ? store.userMessages : [],
-      userLists: Array.isArray(store.userLists) ? store.userLists : [],
-      userListItems: Array.isArray(store.userListItems) ? store.userListItems : [],
-      userTags: Array.isArray(store.userTags) ? store.userTags : [],
-      userTaggedMovies: Array.isArray(store.userTaggedMovies) ? store.userTaggedMovies : []
-    },
-    null,
-    2
-  );
-  await fs.writeFile(SOCIAL_STORE_PATH, payload, 'utf8');
+async function writeSocialStore() {
+  throw new HttpError(503, 'Local social data is disabled.');
 }
 
 async function readAuthStore() {
-  try {
-    const text = await fs.readFile(AUTH_STORE_PATH, 'utf8');
-    const parsed = JSON.parse(text);
-    return {
-      users: Array.isArray(parsed.users) ? parsed.users.slice() : [],
-      sessions: Array.isArray(parsed.sessions) ? parsed.sessions.slice() : []
-    };
-  } catch (error) {
-    return { users: [], sessions: [] };
-  }
+  throw new HttpError(503, 'Local auth data is disabled.');
 }
 
 async function supabaseFetch(pathname, { method = 'GET', headers = {}, query, body } = {}) {
