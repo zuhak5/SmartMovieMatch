@@ -1,7 +1,10 @@
 import { API_ROUTES } from './config.js';
 import { loadSession, subscribeToSession } from './auth.js';
+import { getItem, setItem } from './memory-store.js';
 
 const CONFIG_ENDPOINT = API_ROUTES.config;
+const CONFIG_CACHE_KEY = 'smartmoviematch.configCache.v1';
+
 const DEFAULT_CONFIG = {
   'ui.home.maxRecommendations': 10,
   'ui.home.groupPicks': 3,
@@ -23,6 +26,11 @@ const state = {
 
 const subscribers = new Set();
 let currentSession = loadSession();
+
+const cachedConfig = loadCachedConfig();
+if (cachedConfig) {
+  applyCachedConfig(cachedConfig, { markLoaded: true, silent: true });
+}
 
 subscribeToSession((session) => {
   currentSession = session || null;
@@ -65,7 +73,33 @@ function getSnapshot() {
     loaded: state.loaded,
     error: state.error
   };
-function applyRemoteConfig({ config, experiments }, { markLoaded = false, silent = false } = {}) {
+}
+
+function loadCachedConfig() {
+  try {
+    const raw = getItem(CONFIG_CACHE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    const config = parsed && typeof parsed.config === 'object' ? parsed.config : {};
+    const experiments = parsed && typeof parsed.experiments === 'object' ? parsed.experiments : {};
+    return { config, experiments };
+  } catch (error) {
+    console.warn('Unable to read cached config', error);
+    return null;
+  }
+}
+
+function persistCachedConfig(payload) {
+  try {
+    setItem(CONFIG_CACHE_KEY, JSON.stringify(payload));
+  } catch (error) {
+    console.warn('Unable to cache config', error);
+  }
+}
+
+function applyCachedConfig({ config, experiments }, { markLoaded = false, silent = false } = {}) {
   state.config = { ...DEFAULT_CONFIG, ...(config || {}) };
   state.experiments = {
     experiments: Array.isArray(experiments?.experiments) ? experiments.experiments : [],
@@ -120,6 +154,7 @@ export async function refreshAppConfig() {
       state.config = { ...DEFAULT_CONFIG };
       state.experiments = { experiments: [], assignments: {} };
       state.error = 'Sign in to load personalized configuration and experiments.';
+      persistCachedConfig({ config: state.config, experiments: state.experiments });
     } else {
       if (!response.ok) {
         throw new Error('Request failed');
@@ -129,11 +164,18 @@ export async function refreshAppConfig() {
       const experiments = payload && typeof payload.experiments === 'object'
         ? payload.experiments
         : { experiments: [], assignments: {} };
-      applyRemoteConfig({ config, experiments }, { silent: true });
+      applyCachedConfig({ config, experiments }, { silent: true });
+      persistCachedConfig({ config: state.config, experiments: state.experiments });
       state.error = '';
     }
   } catch (error) {
-    state.error = 'Unable to load remote config.';
+    const cached = loadCachedConfig();
+    if (cached) {
+      applyCachedConfig(cached, { markLoaded: true, silent: true });
+      state.error = 'Using cached configuration; live refresh failed.';
+    } else {
+      state.error = 'Unable to load remote config.';
+    }
   } finally {
     state.loading = false;
     state.loaded = true;
