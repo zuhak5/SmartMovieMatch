@@ -111,7 +111,6 @@ const state = {
   profileEditorOpen: false,
   profileEditorSaving: false,
   onboardingOpen: false,
-  suppressOnboardingThisSession: false,
   onboardingStep: ONBOARDING_STEPS[0],
   onboardingSubmitting: false,
   onboardingSelections: {
@@ -876,10 +875,6 @@ function updateAccountUi(session) {
       initials: initialsFromName(name),
       label: `${name} avatar`
     });
-  }
-
-  if (!hasSession) {
-    state.suppressOnboardingThisSession = false;
   }
 
   if (notificationButton) {
@@ -3330,7 +3325,6 @@ async function handleAuthSubmit(event) {
         : await loginUser({ username, password });
     setAuthStatus("You're signed in!", "success");
     closeAuthOverlay();
-    state.suppressOnboardingThisSession = state.authMode === "signup";
     updateAccountUi(session);
   } catch (error) {
     const message =
@@ -3658,7 +3652,6 @@ function shouldOpenOnboarding() {
 }
 
 function maybeOpenOnboarding(force = false) {
-  if (state.suppressOnboardingThisSession && !force) return;
   if (force) {
     state.onboardingDismissed = false;
   }

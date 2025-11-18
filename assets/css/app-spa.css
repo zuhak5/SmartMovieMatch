@@ -1663,7 +1663,7 @@ p {
   display: none !important;
 }
 
-:is([data-profile-editor], [data-onboarding]) {
+.sheet-overlay {
   position: fixed;
   inset: 0;
   display: none;
@@ -1679,8 +1679,8 @@ p {
   overflow: hidden;
 }
 
-:is([data-profile-editor], [data-onboarding])::before,
-:is([data-profile-editor], [data-onboarding])::after {
+.sheet-overlay::before,
+.sheet-overlay::after {
   content: "";
   position: absolute;
   inset: 16% auto auto 10%;
@@ -1691,17 +1691,17 @@ p {
   pointer-events: none;
 }
 
-:is([data-profile-editor], [data-onboarding])::after {
+.sheet-overlay::after {
   inset: auto 12% 10% auto;
   background: radial-gradient(circle, rgba(59, 130, 246, 0.24), transparent 55%);
 }
 
-:is([data-profile-editor], [data-onboarding]).is-visible {
+.sheet-overlay.is-visible {
   display: flex;
   animation: sheetOverlayFade 240ms ease;
 }
 
-:is([data-profile-editor], [data-onboarding])[hidden] {
+.sheet-overlay[hidden] {
   display: none !important;
 }
 
@@ -1730,7 +1730,7 @@ p {
   transition: transform 0.3s ease, opacity 0.3s ease;
 }
 
-:is([data-profile-editor], [data-onboarding]).is-visible .sheet-dialog {
+.sheet-overlay.is-visible .sheet-dialog {
   transform: translateY(0) scale(1);
   opacity: 1;
 }
@@ -2444,7 +2444,7 @@ p {
 }
 
 @media (max-width: 640px) {
-  :is([data-profile-editor], [data-onboarding]) {
+  .sheet-overlay {
     padding: 10px;
     align-items: flex-start;
   }
@@ -2593,7 +2593,7 @@ p {
 }
 
 @media (max-width: 640px) {
-  :is([data-profile-editor], [data-onboarding]) {
+  .sheet-overlay {
     padding: 12px;
     align-items: flex-start;
   }

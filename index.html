@@ -267,6 +267,41 @@
               <span class="small-text">Built from everyone’s favorites.</span>
             </div>
             <div class="horizontal-scroll movie-card-row" data-list="group-picks"></div>
+            <div class="watch-party-card" data-watch-party-panel hidden>
+              <div class="watch-party-heading">
+                <span class="badge trend">Live watch party</span>
+                <h4 data-watch-party-title>Loading party…</h4>
+                <p class="watch-party-meta" data-watch-party-meta></p>
+                <p class="small-text" data-watch-party-time>Time to be decided</p>
+              </div>
+              <div class="watch-party-grid">
+                <div>
+                  <div class="watch-party-participants" data-watch-party-participants></div>
+                  <button class="btn btn-primary" type="button" style="margin-top: 10px; width: 100%;" data-watch-party-join>
+                    Join watch party
+                  </button>
+                </div>
+                <div class="watch-party-chat">
+                  <div class="watch-party-messages" data-watch-party-messages></div>
+                  <form class="collab-thread-form" data-watch-party-chat-form>
+                    <input
+                      class="input-base collab-thread-input"
+                      type="text"
+                      placeholder="Say hi to the group…"
+                      data-watch-party-input
+                    />
+                    <button class="btn btn-secondary" type="submit">Send</button>
+                  </form>
+                  <p class="small-text watch-party-status" data-watch-party-status></p>
+                </div>
+              </div>
+            </div>
+            <div class="empty-state" data-watch-party-empty>
+              Start a watch party to open the shared lobby and live chat.
+            </div>
+          </div>
+        </section>
+
         <section class="section-panel" data-section-panel="library">
           <div class="panel-heading">
             <div>
@@ -498,7 +533,7 @@
     </div>
   </div>
 
-  <div data-profile-editor hidden>
+  <div class="sheet-overlay" data-profile-editor hidden>
     <div class="sheet-dialog" role="dialog" aria-modal="true" aria-labelledby="profileEditorTitle">
       <div class="sheet-dialog-body">
         <div class="sheet-header">
@@ -651,6 +686,114 @@
               </ul>
             </div>
           </aside>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet-overlay" data-onboarding hidden>
+    <div class="sheet-dialog onboarding-dialog" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
+      <div class="sheet-dialog-body">
+        <div class="sheet-header">
+          <div class="sheet-title-group">
+            <p class="sheet-eyebrow">Welcome to Smart Movie Match</p>
+            <h3 id="onboardingTitle">Set up your taste and services</h3>
+            <p class="small-text" data-onboarding-status>
+              Choose a few preferences so recommendations and friends' suggestions stay relevant.
+            </p>
+            <div class="sheet-pill-row">
+              <span class="sheet-pill is-soft" data-onboarding-progress>Step 1 of 3 · Taste profile</span>
+            </div>
+          </div>
+          <div class="sheet-header-actions">
+            <button class="icon-circle close-circle" type="button" aria-label="Skip onboarding" data-onboarding-close>
+              ✕
+            </button>
+          </div>
+        </div>
+        <div class="onboarding-steps" data-onboarding-steps>
+          <div class="onboarding-step" data-onboarding-step="taste">
+            <div class="sheet-section-heading">
+              <p class="small-text">Step 1 · Tune your taste</p>
+              <p class="small-text muted">Pick genres and decades you love most.</p>
+            </div>
+            <div class="onboarding-grid">
+              <div class="sheet-preference-block">
+                <div class="label-row">
+                  <span class="small-text">Favorite genres</span>
+                  <span class="small-text" data-onboarding-genre-count>0 selected</span>
+                </div>
+                <div class="chip-grid" data-onboarding-genre-options></div>
+              </div>
+              <div class="sheet-preference-block">
+                <div class="label-row">
+                  <span class="small-text">Favorite decades</span>
+                  <span class="small-text" data-onboarding-decade-count>0 selected</span>
+                </div>
+                <div class="chip-grid" data-onboarding-decade-options></div>
+              </div>
+            </div>
+          </div>
+          <div class="onboarding-step" data-onboarding-step="providers" hidden>
+            <div class="sheet-section-heading">
+              <p class="small-text">Step 2 · Streaming services</p>
+              <p class="small-text muted">
+                Tell us where you watch so we can highlight availability in your feed.
+              </p>
+            </div>
+            <div class="sheet-preference-block">
+              <div class="label-row">
+                <span class="small-text">Subscribed providers</span>
+                <span class="small-text" data-onboarding-provider-count>0 selected</span>
+              </div>
+              <div class="chip-grid" data-onboarding-provider-options></div>
+              <p class="small-text muted" style="margin-top: 8px;">
+                These sync to <code>user_streaming_profiles</code> for better availability filtering.
+              </p>
+            </div>
+          </div>
+          <div class="onboarding-step" data-onboarding-step="import" hidden>
+            <div class="sheet-section-heading">
+              <p class="small-text">Step 3 · Bring your history</p>
+              <p class="small-text muted">
+                Optionally queue an import or set a reminder; we'll use it to seed discovery.
+              </p>
+            </div>
+            <div class="onboarding-radio-group">
+              <label class="radio-row">
+                <input type="radio" name="onboarding-import" value="later" checked data-onboarding-import />
+                <div>
+                  <strong>I'll add ratings later</strong>
+                  <p class="small-text muted">Keep things simple for now and stay in the app.</p>
+                </div>
+              </label>
+              <label class="radio-row">
+                <input type="radio" name="onboarding-import" value="remind" data-onboarding-import />
+                <div>
+                  <strong>Remind me to import from Letterboxd</strong>
+                  <p class="small-text muted">We'll prompt you to connect when import jobs are available.</p>
+                </div>
+              </label>
+              <label class="radio-row">
+                <input type="radio" name="onboarding-import" value="stub" data-onboarding-import />
+                <div>
+                  <strong>Start a placeholder import job</strong>
+                  <p class="small-text muted">Prepare an <code>import_jobs</code> entry so we can backfill quickly.</p>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="sheet-action-bar onboarding-actions">
+          <div class="sheet-action-note">
+            <span class="ping"></span>
+            <p class="small-text muted">Save to sync with your Supabase profile preferences.</p>
+          </div>
+          <div class="sheet-action-buttons">
+            <button type="button" class="btn-ghost btn" data-onboarding-back>Back</button>
+            <button type="button" class="btn btn-secondary" data-onboarding-next>Next</button>
+            <button type="button" class="btn-primary btn" data-onboarding-finish>Save &amp; continue</button>
+          </div>
         </div>
       </div>
     </div>
