@@ -1496,6 +1496,7 @@ p {
 
 @media (min-width: 640px) {
   .horizontal-scroll.movie-card-row {
+  }
 }
 
 .horizontal-scroll.movie-card-row .movie-card {
