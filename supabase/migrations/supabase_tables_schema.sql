@@ -987,67 +987,6 @@ on conflict (key) do update
       updated_at = timezone('utc'::text, now());
 
 -- ---------------------------------------------------------------------
--- 3) Watch parties (for live/shared viewing & chat)
--- ---------------------------------------------------------------------
-create table IF NOT EXISTS public.watch_parties (
-  id uuid not null default gen_random_uuid(),
-  host_username text not null,
-  movie_imdb_id text null,
-  title text not null,
-  description text null,
-  status text not null default 'scheduled',
-  visibility text not null default 'friends',
-  scheduled_for timestamp with time zone null,
-  started_at timestamp with time zone null,
-  ended_at timestamp with time zone null,
-  settings jsonb not null default '{}'::jsonb,
-  metadata jsonb not null default '{}'::jsonb,
-  created_at timestamp with time zone not null default timezone('utc'::text, now()),
-  updated_at timestamp with time zone not null default timezone('utc'::text, now()),
-  constraint watch_parties_pkey primary key (id),
-  constraint watch_parties_host_fkey foreign key (host_username) references auth_users (username) on delete cascade,
-  constraint watch_parties_movie_fkey foreign key (movie_imdb_id) references movies (imdb_id) on delete set null
-) TABLESPACE pg_default;
-
-create index IF not exists watch_parties_host_idx
-  on public.watch_parties using btree (host_username, status, scheduled_for);
-
-create index IF not exists watch_parties_movie_idx
-  on public.watch_parties using btree (movie_imdb_id, status);
-
-create table IF NOT EXISTS public.watch_party_participants (
-  party_id uuid not null,
-  username text not null,
-  role text not null default 'guest',
-  joined_at timestamp with time zone not null default timezone('utc'::text, now()),
-  last_active_at timestamp with time zone null,
-  is_kicked boolean not null default false,
-  metadata jsonb not null default '{}'::jsonb,
-  constraint watch_party_participants_pkey primary key (party_id, username),
-  constraint watch_party_participants_party_fkey foreign key (party_id) references watch_parties (id) on delete cascade,
-  constraint watch_party_participants_user_fkey foreign key (username) references auth_users (username) on delete cascade
-) TABLESPACE pg_default;
-
-create index IF not exists watch_party_participants_user_idx
-  on public.watch_party_participants using btree (username);
-
-create table IF NOT EXISTS public.watch_party_messages (
-  id uuid not null default gen_random_uuid(),
-  party_id uuid not null,
-  username text not null,
-  body text not null,
-  message_type text not null default 'chat',
-  created_at timestamp with time zone not null default timezone('utc'::text, now()),
-  metadata jsonb not null default '{}'::jsonb,
-  constraint watch_party_messages_pkey primary key (id),
-  constraint watch_party_messages_party_fkey foreign key (party_id) references watch_parties (id) on delete cascade,
-  constraint watch_party_messages_user_fkey foreign key (username) references auth_users (username) on delete cascade
-) TABLESPACE pg_default;
-
-create index IF not exists watch_party_messages_party_idx
-  on public.watch_party_messages using btree (party_id, created_at);
-
--- ---------------------------------------------------------------------
 -- 4) Conversations & direct messaging (generic chat model)
 -- ---------------------------------------------------------------------
 create table IF NOT EXISTS public.user_conversations (
@@ -1302,11 +1241,9 @@ ALTER TABLE IF EXISTS public.user_tags
 --   Powers:
 --     - Color/icon/emoji styling and behavior flags for tags.
 
--- watch_parties / watch_party_participants / watch_party_messages
 --   Powers:
 --     - Scheduled & live watch parties with host, title, description.
 --     - Participation list with roles (host/guest), kicks, presence.
---     - In-party chat messages, including future system & reaction messages.
 
 -- user_conversations / user_conversation_members / user_messages
 --   Powers:
@@ -1790,13 +1727,10 @@ create policy "Watch parties visible based on visibility, host, or participation
           and f.status = 'accepted'
       )
     )
-    -- Any participant can see the party
     or (
       current_username() is not null
       and exists (
         select 1
-        from public.watch_party_participants p
-        where p.party_id = watch_parties.id
           and p.username = current_username()
       )
     )
@@ -1811,11 +1745,8 @@ create policy "Hosts can manage their own watch parties"
   with check ( host_username = current_username() );
 
 
-alter table public.watch_party_participants enable row level security;
 
-drop policy if exists "Participants and host can view participants" on public.watch_party_participants;
 create policy "Participants and host can view participants"
-  on public.watch_party_participants
   for select
   to authenticated
   using (
@@ -1823,20 +1754,15 @@ create policy "Participants and host can view participants"
     or exists (
       select 1
       from public.watch_parties wp
-      where wp.id = party_id
         and wp.host_username = current_username()
     )
     or exists (
       select 1
-      from public.watch_party_participants p2
-      where p2.party_id = party_id
         and p2.username = current_username()
     )
   );
 
-drop policy if exists "Hosts can invite participants; users can join themselves" on public.watch_party_participants;
 create policy "Hosts can invite participants; users can join themselves"
-  on public.watch_party_participants
   for insert
   to authenticated
   with check (
@@ -1846,14 +1772,11 @@ create policy "Hosts can invite participants; users can join themselves"
     or exists (
       select 1
       from public.watch_parties wp
-      where wp.id = party_id
         and wp.host_username = current_username()
     )
   );
 
-drop policy if exists "Hosts or participants can update participant state" on public.watch_party_participants;
 create policy "Hosts or participants can update participant state"
-  on public.watch_party_participants
   for all
   to authenticated
   using (
@@ -1861,7 +1784,6 @@ create policy "Hosts or participants can update participant state"
     or exists (
       select 1
       from public.watch_parties wp
-      where wp.id = party_id
         and wp.host_username = current_username()
     )
   )
@@ -1870,37 +1792,26 @@ create policy "Hosts or participants can update participant state"
     or exists (
       select 1
       from public.watch_parties wp
-      where wp.id = party_id
         and wp.host_username = current_username()
     )
   );
 
 
-alter table public.watch_party_messages enable row level security;
 
-drop policy if exists "Only participants/host can read party messages" on public.watch_party_messages;
-create policy "Only participants/host can read party messages"
-  on public.watch_party_messages
   for select
   to authenticated
   using (
     exists (
       select 1
-      from public.watch_party_participants p
-      where p.party_id = party_id
         and p.username = current_username()
     )
     or exists (
       select 1
       from public.watch_parties wp
-      where wp.id = party_id
         and wp.host_username = current_username()
     )
   );
 
-drop policy if exists "Only participants/host can send party messages" on public.watch_party_messages;
-create policy "Only participants/host can send party messages"
-  on public.watch_party_messages
   for insert
   to authenticated
   with check (
@@ -1908,14 +1819,11 @@ create policy "Only participants/host can send party messages"
     and (
       exists (
         select 1
-        from public.watch_party_participants p
-        where p.party_id = party_id
           and p.username = current_username()
       )
       or exists (
         select 1
         from public.watch_parties wp
-        where wp.id = party_id
           and wp.host_username = current_username()
       )
     )
