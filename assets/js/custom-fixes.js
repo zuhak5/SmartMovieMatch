@@ -168,11 +168,6 @@ function enhanceLogoutButtons() {
       event.preventDefault();
       event.stopPropagation();
       logoutSession();
-      try {
-        window.localStorage?.removeItem('smartMovieMatch.sessionCache');
-      } catch (_) {
-        // Ignore storage errors.
-      }
       window.location.assign('index.html');
     });
   });

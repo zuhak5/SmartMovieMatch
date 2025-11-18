@@ -10,6 +10,7 @@ import {
   updateProfile,
   changePassword
 } from "./auth.js";
+import { getItem, setItem, removeItem } from "./memory-store.js";
 import {
   discoverCandidateMovies,
   scoreAndSelectCandidates,
@@ -250,23 +251,15 @@ const THEME_STORAGE_KEY = "smm.theme.v1";
 const ONBOARDING_STORAGE_KEY = "smm.onboarding.v1";
 
 function getStoredRecommendationLayout() {
-  try {
-    const stored = localStorage.getItem(RECOMMENDATION_LAYOUT_STORAGE_KEY);
-    if (stored === "grid" || stored === "carousel") {
-      return stored;
-    }
-  } catch (error) {
-    console.warn("Failed to read stored recommendation layout", error);
+  const stored = getItem(RECOMMENDATION_LAYOUT_STORAGE_KEY);
+  if (stored === "grid" || stored === "carousel") {
+    return stored;
   }
   return "grid";
 }
 
 function persistRecommendationLayout(layout) {
-  try {
-    localStorage.setItem(RECOMMENDATION_LAYOUT_STORAGE_KEY, layout);
-  } catch (error) {
-    console.warn("Failed to persist recommendation layout", error);
-  }
+  setItem(RECOMMENDATION_LAYOUT_STORAGE_KEY, layout);
 }
 
 const ONBOARDING_STEPS = [
@@ -331,13 +324,9 @@ function getGenreIconByLabel(label) {
 }
 
 function getStoredTheme() {
-  try {
-    const stored = localStorage.getItem(THEME_STORAGE_KEY);
-    if (stored === "light" || stored === "dark") {
-      return stored;
-    }
-  } catch (error) {
-    console.warn("Failed to read stored theme", error);
+  const stored = getItem(THEME_STORAGE_KEY);
+  if (stored === "light" || stored === "dark") {
+    return stored;
   }
   return "dark";
 }
@@ -397,11 +386,7 @@ function applyTheme(theme, { persist = true } = {}) {
   updateDocumentThemeAttributes(normalized);
   updateThemeToggle(normalized);
   if (persist) {
-    try {
-      localStorage.setItem(THEME_STORAGE_KEY, normalized);
-    } catch (error) {
-      console.warn("Failed to persist theme", error);
-    }
+    setItem(THEME_STORAGE_KEY, normalized);
   }
 }
 
@@ -617,21 +602,12 @@ function focusOnboardingTarget(selector) {
 }
 
 function hasCompletedOnboarding() {
-  try {
-    return localStorage.getItem(ONBOARDING_STORAGE_KEY) === "complete";
-  } catch (error) {
-    console.warn("Failed to read onboarding state", error);
-    return false;
-  }
+  return getItem(ONBOARDING_STORAGE_KEY) === "complete";
 }
 
 function markOnboardingComplete() {
   state.onboardingSeen = true;
-  try {
-    localStorage.setItem(ONBOARDING_STORAGE_KEY, "complete");
-  } catch (error) {
-    console.warn("Failed to persist onboarding state", error);
-  }
+  setItem(ONBOARDING_STORAGE_KEY, "complete");
 }
 
 function evaluatePasswordRules(password, confirmPassword = "") {
@@ -5289,21 +5265,12 @@ function initVibePresetToggle() {
     toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
     toggle.textContent = collapsed ? "Show presets" : "Hide presets";
   };
-  let collapsed = false;
-  try {
-    collapsed = window.localStorage?.getItem(storageKey) === "true";
-  } catch (error) {
-    collapsed = false;
-  }
+  let collapsed = getItem(storageKey) === "true";
   applyState(collapsed);
   toggle.addEventListener("click", () => {
     collapsed = !collapsed;
     applyState(collapsed);
-    try {
-      window.localStorage?.setItem(storageKey, collapsed ? "true" : "false");
-    } catch (error) {
-      // Ignore storage errors.
-    }
+    setItem(storageKey, collapsed ? "true" : "false");
   });
 }
 
@@ -5372,11 +5339,6 @@ function bindGlobalSignOutButtons() {
       event.preventDefault();
       playUiClick();
       logoutSession();
-      try {
-        window.localStorage?.removeItem("smartMovieMatch.sessionCache");
-      } catch (error) {
-        // Ignore storage errors so the sign-out still completes.
-      }
       window.location.assign("index.html");
     });
   });
@@ -5915,81 +5877,54 @@ function normalizePresenceStatusKey(value) {
 }
 
 function getStoredPresenceStatusPreset() {
-  try {
-    const stored = window.localStorage.getItem(PRESENCE_STATUS_STORAGE_KEY);
-    return normalizePresenceStatusKey(stored || 'default');
-  } catch (error) {
-    console.warn('Unable to read presence status preference', error);
-    return 'default';
-  }
+  const stored = getItem(PRESENCE_STATUS_STORAGE_KEY);
+  return normalizePresenceStatusKey(stored || 'default');
 }
 
 function persistPresenceStatusPreset(value) {
   const normalized = normalizePresenceStatusKey(value);
-  try {
-    if (normalized === 'default') {
-      window.localStorage.removeItem(PRESENCE_STATUS_STORAGE_KEY);
-    } else {
-      window.localStorage.setItem(PRESENCE_STATUS_STORAGE_KEY, normalized);
-    }
-  } catch (error) {
-    console.warn('Unable to store presence status preference', error);
+  if (normalized === 'default') {
+    removeItem(PRESENCE_STATUS_STORAGE_KEY);
+  } else {
+    setItem(PRESENCE_STATUS_STORAGE_KEY, normalized);
   }
   return normalized;
 }
 
 function getStoredPresenceStatusDuration() {
-  try {
-    const stored = window.localStorage.getItem(PRESENCE_DURATION_STORAGE_KEY);
-    const minutes = parseInt(stored || '0', 10);
-    if (!Number.isFinite(minutes) || minutes <= 0) {
-      return 0;
-    }
-    return minutes;
-  } catch (error) {
-    console.warn('Unable to read presence status duration', error);
+  const stored = getItem(PRESENCE_DURATION_STORAGE_KEY);
+  const minutes = parseInt(stored || '0', 10);
+  if (!Number.isFinite(minutes) || minutes <= 0) {
     return 0;
   }
+  return minutes;
 }
 
 function persistPresenceStatusDuration(value) {
   const minutes = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
-  try {
-    if (!minutes) {
-      window.localStorage.removeItem(PRESENCE_DURATION_STORAGE_KEY);
-    } else {
-      window.localStorage.setItem(PRESENCE_DURATION_STORAGE_KEY, String(minutes));
-    }
-  } catch (error) {
-    console.warn('Unable to store presence status duration', error);
+  if (!minutes) {
+    removeItem(PRESENCE_DURATION_STORAGE_KEY);
+  } else {
+    setItem(PRESENCE_DURATION_STORAGE_KEY, String(minutes));
   }
   return minutes;
 }
 
 function getStoredPresenceStatusExpiry() {
-  try {
-    const stored = window.localStorage.getItem(PRESENCE_EXPIRY_STORAGE_KEY);
-    if (!stored) {
-      return 0;
-    }
-    const timestamp = parseInt(stored, 10);
-    return Number.isFinite(timestamp) ? timestamp : 0;
-  } catch (error) {
-    console.warn('Unable to read presence status expiry', error);
+  const stored = getItem(PRESENCE_EXPIRY_STORAGE_KEY);
+  if (!stored) {
     return 0;
   }
+  const timestamp = parseInt(stored, 10);
+  return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
 function persistPresenceStatusExpiry(timestamp) {
   const normalized = Number.isFinite(timestamp) && timestamp > 0 ? Math.floor(timestamp) : 0;
-  try {
-    if (!normalized) {
-      window.localStorage.removeItem(PRESENCE_EXPIRY_STORAGE_KEY);
-    } else {
-      window.localStorage.setItem(PRESENCE_EXPIRY_STORAGE_KEY, String(normalized));
-    }
-  } catch (error) {
-    console.warn('Unable to store presence status expiry', error);
+  if (!normalized) {
+    removeItem(PRESENCE_EXPIRY_STORAGE_KEY);
+  } else {
+    setItem(PRESENCE_EXPIRY_STORAGE_KEY, String(normalized));
   }
   return normalized;
 }

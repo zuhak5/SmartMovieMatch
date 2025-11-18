@@ -4,11 +4,11 @@ import { playExpandSound, playFavoriteSound, playUiClick } from "./sound.js";
 import { acknowledgeFriendActivity } from "./social.js";
 import { TMDB_GENRES } from "./config.js";
 
-const COLLECTION_STATE_KEY = "smm.collection-state.v1";
 const COLLECTION_DEFAULT_STATE = {
   expandedItems: { favorites: [], watched: [] },
   viewExpanded: { favorites: false, watched: false }
 };
+let collectionStateCache = cloneCollectionState(COLLECTION_DEFAULT_STATE);
 const TOAST_DURATION = 4200;
 const MOVIE_OVERLAY_TRANSITION_MS = 220;
 const LANGUAGE_DISPLAY =
@@ -518,25 +518,11 @@ function cloneCollectionState(state) {
 }
 
 function readCollectionState() {
-  try {
-    const raw = localStorage.getItem(COLLECTION_STATE_KEY);
-    if (!raw) {
-      return cloneCollectionState(COLLECTION_DEFAULT_STATE);
-    }
-    const parsed = JSON.parse(raw);
-    return cloneCollectionState({ ...COLLECTION_DEFAULT_STATE, ...parsed });
-  } catch (error) {
-    console.warn("Failed to read collection state", error);
-    return cloneCollectionState(COLLECTION_DEFAULT_STATE);
-  }
+  return cloneCollectionState(collectionStateCache);
 }
 
 function writeCollectionState(state) {
-  try {
-    localStorage.setItem(COLLECTION_STATE_KEY, JSON.stringify(state));
-  } catch (error) {
-    console.warn("Failed to persist collection state", error);
-  }
+  collectionStateCache = cloneCollectionState(state);
 }
 
 function updateCollectionState(updater) {

@@ -84,7 +84,7 @@ const STREAMING_PROVIDER_OPTIONS = [
   { value: "paramount-plus", label: "Paramount+" }
 ];
 
-const ONBOARDING_STORAGE_KEY = "smartMovieMatch.onboardingComplete";
+const onboardingCompletionMap = {};
 const ONBOARDING_STEPS = ["taste", "providers", "import"];
 let authAvatarPreviewUrl = null;
 let detachDocumentHandlers = null;
@@ -705,14 +705,7 @@ function uniqueStringList(list, maxItems = 12, maxLength = 60) {
 }
 
 function readOnboardingLocalMap() {
-  if (typeof window === "undefined" || !window.localStorage) return {};
-  try {
-    const raw = window.localStorage.getItem(ONBOARDING_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch (error) {
-    console.warn("Unable to read onboarding state", error);
-    return {};
-  }
+  return { ...onboardingCompletionMap };
 }
 
 function isOnboardingLocallyComplete(username = "anonymous") {
@@ -721,14 +714,7 @@ function isOnboardingLocallyComplete(username = "anonymous") {
 }
 
 function markOnboardingCompleteLocally(username = "anonymous") {
-  if (typeof window === "undefined" || !window.localStorage) return;
-  const map = readOnboardingLocalMap();
-  map[username] = true;
-  try {
-    window.localStorage.setItem(ONBOARDING_STORAGE_KEY, JSON.stringify(map));
-  } catch (error) {
-    console.warn("Unable to persist onboarding completion", error);
-  }
+  onboardingCompletionMap[username] = true;
 }
 
 function arraysEqual(a = [], b = []) {

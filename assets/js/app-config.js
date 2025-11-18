@@ -1,5 +1,6 @@
 import { API_ROUTES } from './config.js';
 import { loadSession, subscribeToSession } from './auth.js';
+import { getItem, setItem } from './memory-store.js';
 
 const CONFIG_ENDPOINT = API_ROUTES.config;
 const CONFIG_CACHE_KEY = 'smartmoviematch.configCache.v1';
@@ -76,7 +77,7 @@ function getSnapshot() {
 
 function loadCachedConfig() {
   try {
-    const raw = window.localStorage.getItem(CONFIG_CACHE_KEY);
+    const raw = getItem(CONFIG_CACHE_KEY);
     if (!raw) {
       return null;
     }
@@ -92,7 +93,7 @@ function loadCachedConfig() {
 
 function persistCachedConfig(payload) {
   try {
-    window.localStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(payload));
+    setItem(CONFIG_CACHE_KEY, JSON.stringify(payload));
   } catch (error) {
     console.warn('Unable to cache config', error);
   }
