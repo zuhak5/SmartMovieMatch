@@ -4,20 +4,21 @@ type MovieCardProps = {
   posterUrl: string;
   title: string;
   year: string | number;
+  description?: string;
   imdbScore: number;
   rtScore: number;
-  favorited: boolean;
+  Favorite: boolean;
   watched: boolean;
-  onToggleFavorited?: () => void;
+  onToggleFavorite?: () => void;
   onToggleWatched?: () => void;
 };
 
-const HeartIcon: React.FC<{ filled: boolean }> = ({ filled }) => (
+const HeartIcon: React.FC<{ active: boolean }> = ({ active }) => (
   <svg
     aria-hidden
     className="h-5 w-5"
     viewBox="0 0 24 24"
-    fill={filled ? "currentColor" : "none"}
+    fill={active ? "currentColor" : "none"}
     stroke="currentColor"
     strokeWidth={1.8}
   >
@@ -29,20 +30,16 @@ const HeartIcon: React.FC<{ filled: boolean }> = ({ filled }) => (
   </svg>
 );
 
-const CheckIcon: React.FC<{ filled: boolean }> = ({ filled }) => (
+const CheckIcon: React.FC<{ active: boolean }> = ({ active }) => (
   <svg
     aria-hidden
     className="h-5 w-5"
     viewBox="0 0 24 24"
-    fill={filled ? "currentColor" : "none"}
+    fill={active ? "currentColor" : "none"}
     stroke="currentColor"
     strokeWidth={1.8}
   >
-    <path
-      d="M20 6 9 17l-5-5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
+    <path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
@@ -50,70 +47,76 @@ const MovieCard: React.FC<MovieCardProps> = ({
   posterUrl,
   title,
   year,
+  description,
   imdbScore,
   rtScore,
-  favorited,
+  Favorite,
   watched,
-  onToggleFavorited,
+  onToggleFavorite,
   onToggleWatched,
 }) => {
-  const favoriteLabel = favorited ? "Unfavorite movie" : "Favorite movie";
+  const favoriteLabel = Favorite ? "Unfavorite movie" : "Favorite movie";
   const watchedLabel = watched ? "Mark as unwatched" : "Mark as watched";
 
   return (
     <article
-      className="group relative flex aspect-[2/3] w-full overflow-hidden rounded-xl shadow-lg transition duration-200 ease-out hover:scale-[1.02] hover:shadow-xl"
+      className="relative flex min-h-[180px] w-full overflow-hidden rounded-xl border border-white/10 bg-white/10 shadow-lg backdrop-blur-md transition duration-200 ease-out hover:scale-[1.02] hover:shadow-xl"
     >
-      <img
-        src={posterUrl}
-        alt={`${title} poster`}
-        className="absolute inset-0 h-full w-full object-cover"
-        loading="lazy"
-      />
+      <div className="basis-1/3 max-w-[40%] min-w-[120px] overflow-hidden">
+        <img
+          src={posterUrl}
+          alt={`${title} poster`}
+          className="h-full w-full object-cover"
+          loading="lazy"
+        />
+      </div>
 
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/10" />
-
-      <div className="relative mt-auto w-full p-3 sm:p-4">
-        <div className="rounded-xl border border-white/10 bg-black/50 backdrop-blur-md shadow-inner">
-          <div className="space-y-2 p-3 text-white sm:p-4">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold leading-tight sm:text-base">{title}</p>
-                <p className="text-xs text-slate-200/80 sm:text-sm">{year}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs text-slate-100/90 sm:text-sm">
-              <span className="flex items-center gap-1 rounded-md bg-black/30 px-2 py-1 shadow-inner">IMDb {imdbScore.toFixed(1)}</span>
-              <span className="flex items-center gap-1 rounded-md bg-black/30 px-2 py-1 shadow-inner">RT {rtScore}%</span>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs sm:text-sm">
-              <button
-                type="button"
-                onClick={onToggleFavorited}
-                aria-label={favoriteLabel}
-                className={`flex-1 inline-flex items-center justify-center gap-1 rounded-lg border border-white/10 px-3 py-2 font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 hover:bg-white/10 ${
-                  favorited ? "text-pink-400" : "text-slate-100"
-                }`}
-              >
-                <HeartIcon filled={favorited} />
-                <span className="sr-only sm:not-sr-only sm:text-xs">{favorited ? "Favorited" : "Favorite"}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={onToggleWatched}
-                aria-label={watchedLabel}
-                className={`flex-1 inline-flex items-center justify-center gap-1 rounded-lg border border-white/10 px-3 py-2 font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 hover:bg-white/10 ${
-                  watched ? "text-emerald-300" : "text-slate-100"
-                }`}
-              >
-                <CheckIcon filled={watched} />
-                <span className="sr-only sm:not-sr-only sm:text-xs">{watched ? "Watched" : "Watch"}</span>
-              </button>
-            </div>
+      <div className="flex flex-1 flex-col gap-3 p-3 text-white sm:p-4">
+        <div className="space-y-1">
+          <div className="flex items-baseline gap-2">
+            <h3 className="truncate text-base font-semibold leading-tight sm:text-lg">{title}</h3>
+            <span className="text-xs text-slate-300 sm:text-sm">{year}</span>
           </div>
+          {description ? (
+            <p className="text-sm text-slate-300 line-clamp-2 sm:line-clamp-3">{description}</p>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-100 sm:text-sm">
+          <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/10 px-2 py-1">
+            <span className="text-[0.7rem] uppercase tracking-wide text-slate-200">IMDb</span>
+            <span className="font-semibold">{imdbScore.toFixed(1)}</span>
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/10 px-2 py-1">
+            <span className="text-[0.7rem] uppercase tracking-wide text-slate-200">RT</span>
+            <span className="font-semibold">{rtScore}%</span>
+          </span>
+        </div>
+
+        <div className="mt-auto flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onToggleFavorite}
+            aria-label={favoriteLabel}
+            className={`inline-flex items-center gap-1 rounded-full border border-white/10 px-3 py-1.5 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 hover:bg-white/10 ${
+              Favorite ? "bg-pink-500/20 text-pink-300" : "text-slate-100"
+            }`}
+          >
+            <HeartIcon active={Favorite} />
+            <span className="sr-only sm:not-sr-only sm:text-xs">{Favorite ? "Favorited" : "Favorite"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onToggleWatched}
+            aria-label={watchedLabel}
+            className={`inline-flex items-center gap-1 rounded-full border border-white/10 px-3 py-1.5 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 hover:bg-white/10 ${
+              watched ? "bg-emerald-500/20 text-emerald-200" : "text-slate-100"
+            }`}
+          >
+            <CheckIcon active={watched} />
+            <span className="sr-only sm:not-sr-only sm:text-xs">{watched ? "Watched" : "Watch"}</span>
+          </button>
         </div>
       </div>
     </article>
