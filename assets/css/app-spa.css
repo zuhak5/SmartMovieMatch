@@ -1489,7 +1489,7 @@ p {
 }
 
 .horizontal-scroll.movie-card-row {
-  grid-auto-columns: minmax(200px, 70vw);
+  grid-auto-columns: min-content;
   padding: 10px 12px 14px;
   scroll-padding-inline: 12px;
 }
@@ -1504,7 +1504,7 @@ p {
   height: 100%;
   width: 100%;
   scroll-snap-align: start;
-  aspect-ratio: 1 / 1;
+  aspect-ratio: auto;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   align-items: stretch;
