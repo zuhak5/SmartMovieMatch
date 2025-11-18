@@ -111,8 +111,8 @@ const SOCIAL_NOTIFICATION_TYPES = new Set([
   "review_reply",
   "review_reaction",
   "friend_review",
-  "friend_watchlist",
   "friend_favorite",
+  "friend_watched",
   "collab_invite",
   "collab_accept",
   "watch_party",
@@ -4868,7 +4868,7 @@ function handleMarkWatched(omdbMovie, tmdbMovie) {
       (tmdbMovie && (tmdbMovie.title || tmdbMovie.original_title)) ||
       "";
     if (tmdbId && title) {
-      recordLibraryActivity('watchlist_add', {
+      recordLibraryActivity('watched_log', {
         tmdbId,
         imdbId: omdbMovie && omdbMovie.imdbID ? omdbMovie.imdbID : null,
         title
@@ -9489,7 +9489,7 @@ function setFollowNoteValue(note) {
 function buildFollowNoteTemplate() {
   const username = state.session && state.session.username ? state.session.username : "";
   const displayName = username ? formatSocialDisplayName(username) : "a movie fan";
-  return `Hey! It's ${displayName} from Smart Movie Match—let's swap watchlists!`;
+  return `Hey! It's ${displayName} from Smart Movie Match—let's swap favorites!`;
 }
 
 async function renderInviteQr(link) {
@@ -11883,10 +11883,10 @@ function getNotificationIcon(type) {
       return "👍";
     case "friend_review":
       return "📝";
-    case "friend_watchlist":
-      return "👀";
     case "friend_favorite":
       return "❤️";
+    case "friend_watched":
+      return "🎬";
     default:
       return "🔔";
   }

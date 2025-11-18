@@ -23,15 +23,13 @@ export function createMovieCard(props = {}) {
     year = "",
     imdbScore = "",
     rtScore = "",
-    inWatchlist = false,
     liked = false,
     watched = false,
-    onToggleWatchlist = noop,
     onToggleLike = noop,
     onToggleWatched = noop
   } = props;
 
-  const state = { inWatchlist, liked, watched };
+  const state = { liked, watched };
 
   const card = document.createElement("article");
   card.className = "movie-card";
@@ -63,13 +61,9 @@ export function createMovieCard(props = {}) {
         </span>
       </div>
       <div class="movie-card__actions">
-        <button class="movie-card__action-btn" type="button" data-action="watchlist" aria-pressed="false" aria-label="Add to watchlist">
-          <span class="icon" data-icon-inactive="🔖" data-icon-active="📌">🔖</span>
-          <span class="label">Watchlist</span>
-        </button>
-        <button class="movie-card__action-btn" type="button" data-action="like" aria-pressed="false" aria-label="Like movie">
-          <span class="icon" data-icon-inactive="👍" data-icon-active="❤️">👍</span>
-          <span class="label">Like</span>
+        <button class="movie-card__action-btn" type="button" data-action="like" aria-pressed="false" aria-label="Favorite movie">
+          <span class="icon" data-icon-inactive="🤍" data-icon-active="❤️">🤍</span>
+          <span class="label">Favorite</span>
         </button>
         <button class="movie-card__action-btn movie-card__pill" type="button" data-action="watched" aria-pressed="false" aria-label="Mark as watched">
           <span class="icon" data-icon-inactive="👁️" data-icon-active="✔">👁️</span>
@@ -86,28 +80,18 @@ export function createMovieCard(props = {}) {
   }
 
   const watchedIndicator = card.querySelector("[data-watched-indicator]");
-  const watchlistBtn = card.querySelector('[data-action="watchlist"]');
   const likeBtn = card.querySelector('[data-action="like"]');
   const watchedBtn = card.querySelector('[data-action="watched"]');
 
   const refresh = () => {
-    if (watchlistBtn) {
-      setActiveState(watchlistBtn, state.inWatchlist);
-      updateActionLabel(watchlistBtn, {
-        activeLabel: "In Watchlist",
-        inactiveLabel: "Watchlist",
-        isActive: state.inWatchlist
-      });
-      watchlistBtn.setAttribute("title", state.inWatchlist ? "Remove from watchlist" : "Add to watchlist");
-    }
     if (likeBtn) {
       setActiveState(likeBtn, state.liked);
       updateActionLabel(likeBtn, {
-        activeLabel: "Liked",
-        inactiveLabel: "Like",
+        activeLabel: "Favorited",
+        inactiveLabel: "Favorite",
         isActive: state.liked
       });
-      likeBtn.setAttribute("title", state.liked ? "Remove like" : "Like this movie");
+      likeBtn.setAttribute("title", state.liked ? "Remove favorite" : "Favorite this movie");
     }
     if (watchedBtn) {
       setActiveState(watchedBtn, state.watched);
@@ -122,15 +106,6 @@ export function createMovieCard(props = {}) {
       watchedIndicator.style.display = state.watched ? "inline-flex" : "none";
     }
   };
-
-  if (watchlistBtn) {
-    watchlistBtn.addEventListener("click", (event) => {
-      event.stopPropagation();
-      state.inWatchlist = !state.inWatchlist;
-      refresh();
-      onToggleWatchlist(state.inWatchlist, card);
-    });
-  }
 
   if (likeBtn) {
     likeBtn.addEventListener("click", (event) => {
@@ -151,7 +126,6 @@ export function createMovieCard(props = {}) {
   }
 
   card.setState = (nextState = {}) => {
-    state.inWatchlist = typeof nextState.inWatchlist === "boolean" ? nextState.inWatchlist : state.inWatchlist;
     state.liked = typeof nextState.liked === "boolean" ? nextState.liked : state.liked;
     state.watched = typeof nextState.watched === "boolean" ? nextState.watched : state.watched;
     refresh();

@@ -93,15 +93,14 @@
         <div class="tab-group" data-section-tabs="discover" role="tablist" aria-label="Discover tabs">
           <button class="tab-button" data-tab="movies" role="tab">Movies</button>
           <button class="tab-button" data-tab="people" role="tab">People</button>
-          <button class="tab-button" data-tab="lists" role="tab">Lists</button>
         </div>
         <div class="tab-group" data-section-tabs="home" role="tablist" aria-label="Home tabs">
           <button class="tab-button" data-tab="for-you" role="tab">For You</button>
           <button class="tab-button" data-tab="with-friends" role="tab">With Friends</button>
         </div>
         <div class="tab-group" data-section-tabs="library" role="tablist" aria-label="Library tabs">
-          <button class="tab-button" data-tab="watchlist" role="tab">Watchlist</button>
-          <button class="tab-button" data-tab="lists" role="tab">Lists</button>
+          <button class="tab-button" data-tab="favorites" role="tab">Favorites</button>
+          <button class="tab-button" data-tab="watched" role="tab">Watched</button>
         </div>
         <div class="tab-group" data-section-tabs="profile" role="tablist" aria-label="Profile tabs">
           <button class="tab-button" data-tab="overview" role="tab">Overview</button>
@@ -142,7 +141,7 @@
                   <strong>Alex Price</strong>
                   <span class="small-text">5h ago</span>
                 </div>
-                <p>Created a list: “Cozy Thrillers”.</p>
+                <p>Shared new favorites: “Cozy Thrillers”.</p>
                 <div class="list-collage">
                   <div class="mini-poster"></div>
                   <div class="mini-poster"></div>
@@ -248,7 +247,7 @@
               id="discoverSearch"
               data-discover-search
               type="search"
-              placeholder="Search movies, people, or lists…"
+              placeholder="Search movies or people…"
             />
           </div>
           <div class="panel-heading" style="align-items: center;">
@@ -275,9 +274,6 @@
           <div class="tab-panel" data-tab-panel="people">
             <div class="stack" data-list="discover-people"></div>
           </div>
-          <div class="tab-panel" data-tab-panel="lists">
-            <div class="stack" data-list="discover-lists"></div>
-          </div>
         </section>
 
         <section class="section-panel" data-section-panel="home">
@@ -302,7 +298,7 @@
             </article>
             <div class="panel-heading" style="margin-top: 18px;">
               <h3>Recommended for you</h3>
-              <span class="small-text">Based on your taste and watchlist.</span>
+              <span class="small-text">Based on your taste and saved favorites.</span>
             </div>
             <div class="horizontal-scroll movie-card-row" data-row="home-recommendations"></div>
           </div>
@@ -359,15 +355,15 @@
           <div class="panel-heading">
             <div>
               <h2>Library</h2>
-              <p class="lead">Your watchlist, finished films, and lists.</p>
+              <p class="lead">Your favorites and watched history.</p>
             </div>
-            <select class="sort-select" aria-label="Sort watchlist">
+            <select class="sort-select" aria-label="Sort library">
               <option>Recently added</option>
               <option>Release date</option>
               <option>A–Z</option>
             </select>
           </div>
-          <div class="tab-panel" data-tab-panel="watchlist">
+          <div class="tab-panel" data-tab-panel="favorites">
             <div class="card" data-favorites-panel>
               <div class="panel-heading">
                 <div>
@@ -382,105 +378,41 @@
                 Save a few go-to films to personalize your feed.
               </p>
             </div>
-            <div class="card">
-              <div class="poster" style="max-width: 90px;"></div>
-              <div class="stack">
-                <strong>Starless Road</strong>
-                <div class="small-text">2023 · 1h 44m · Drama</div>
-                <div class="action-row">
-                  <span class="badge rating">4.1</span>
-                  <button class="btn-ghost btn">Mark watched ✅</button>
-                </div>
-              </div>
-            </div>
-            <div class="card">
-              <div class="poster" style="max-width: 90px;"></div>
-              <div class="stack">
-                <strong>Glasshouse</strong>
-                <div class="small-text">2022 · 1h 58m · Thriller</div>
-                <div class="action-row">
-                  <span class="badge rating">4.3</span>
-                  <button class="btn-ghost btn">Mark watched ✅</button>
-                </div>
-              </div>
-            </div>
           </div>
-          <div class="tab-panel" data-tab-panel="lists">
-            <div class="card" data-list-create-card>
-              <div class="stack" style="gap: 8px;">
-                <div class="inline-actions" style="gap: 8px;">
-                  <button class="btn-ghost btn" type="button" data-list-create-toggle>+ Create new list</button>
-                  <button class="btn-ghost btn" type="button" data-list-refresh>Refresh</button>
-                </div>
-                <form class="stack" data-list-create-form hidden>
-                  <label class="field">
-                    <span class="small-text muted">Name</span>
-                    <input type="text" placeholder="My favorites" data-list-name />
-                  </label>
-                  <label class="field">
-                    <span class="small-text muted">Description</span>
-                    <input type="text" placeholder="Optional description" data-list-description />
-                  </label>
-                  <div class="inline-actions" style="gap: 8px; align-items: center;">
-                    <select data-list-visibility aria-label="List visibility">
-                      <option value="public">Public</option>
-                      <option value="private">Private</option>
-                    </select>
-                    <label class="checkbox">
-                      <input type="checkbox" data-list-collaborative />
-                      <span>Collaborative</span>
-                    </label>
-                    <button class="btn btn-primary" type="submit">Save list</button>
-                    <button class="btn-ghost btn" type="button" data-list-cancel>Cancel</button>
-                  </div>
-                </form>
-                <div class="small-text muted" data-list-status></div>
-              </div>
-            </div>
-            <div class="stack" data-library-lists></div>
-            <div class="card muted" data-library-lists-empty>
-              <div class="stack">
-                <strong>No lists yet</strong>
-                <div class="small-text">Sign in and create your first list to save movies from search.</div>
-              </div>
-            </div>
-            <div class="card" data-active-list-panel hidden>
+          <div class="tab-panel" data-tab-panel="watched">
+            <div class="card">
               <div class="panel-heading">
                 <div>
-                  <strong data-active-list-title>List</strong>
-                  <div class="small-text muted" data-active-list-meta></div>
+                  <strong>Watched</strong>
+                  <div class="small-text muted">Log what you've seen to track your history.</div>
                 </div>
-                <div class="inline-actions" style="gap: 8px;">
-                  <button class="btn-ghost btn" type="button" data-list-edit>✎ Edit</button>
-                  <button class="btn-ghost btn" type="button" data-list-delete>Delete</button>
+                <span class="badge">Diary</span>
+              </div>
+              <p class="small-text" style="margin: 0 0 8px 0;">
+                Use the diary tab on your profile to record watched titles. Here are a few recent highlights.
+              </p>
+              <div class="card" style="margin: 0;">
+                <div class="poster" style="max-width: 90px;"></div>
+                <div class="stack">
+                  <strong>Starless Road</strong>
+                  <div class="small-text">2023 · 1h 44m · Drama</div>
+                  <div class="action-row">
+                    <span class="badge rating">4.1</span>
+                    <button class="btn-ghost btn">Mark as favorite ❤️</button>
+                  </div>
                 </div>
               </div>
-              <div class="pill-row" data-list-tag-filters></div>
-              <p class="small-text muted" data-list-tag-status></p>
-              <form class="stack" data-list-edit-form hidden>
-                <label class="field">
-                  <span class="small-text muted">Name</span>
-                  <input type="text" data-list-edit-name />
-                </label>
-                <label class="field">
-                  <span class="small-text muted">Description</span>
-                  <input type="text" data-list-edit-description />
-                </label>
-                <div class="inline-actions" style="gap: 8px; align-items: center;">
-                  <select data-list-edit-visibility aria-label="List visibility">
-                    <option value="public">Public</option>
-                    <option value="private">Private</option>
-                  </select>
-                  <label class="checkbox">
-                    <input type="checkbox" data-list-edit-collaborative />
-                    <span>Collaborative</span>
-                  </label>
-                  <button class="btn btn-primary" type="submit">Save changes</button>
-                  <button class="btn-ghost btn" type="button" data-list-edit-cancel>Cancel</button>
+              <div class="card" style="margin: 8px 0 0 0;">
+                <div class="poster" style="max-width: 90px;"></div>
+                <div class="stack">
+                  <strong>Glasshouse</strong>
+                  <div class="small-text">2022 · 1h 58m · Thriller</div>
+                  <div class="action-row">
+                    <span class="badge rating">4.3</span>
+                    <button class="btn-ghost btn">Mark as favorite ❤️</button>
+                  </div>
                 </div>
-              </form>
-              <div class="small-text muted" data-list-item-status></div>
-              <div class="stack" data-list-item-container></div>
+              </div>
             </div>
           </div>
         </section>
@@ -1039,7 +971,7 @@
             <p class="small-text auth-dialog-eyebrow">Smart Movie Match account</p>
             <h3 id="authDialogTitle" data-auth-title>Sign in to Smart Movie Match</h3>
             <p class="small-text auth-dialog-subtitle" data-auth-subtitle>
-              Sync watchlists, ratings, and party invites.
+              Sync favorites, ratings, and party invites.
             </p>
           </div>
           <button

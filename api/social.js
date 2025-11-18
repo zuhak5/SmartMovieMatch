@@ -844,7 +844,7 @@ async function handleAcknowledgeNotifications(req, payload) {
 async function handleRecordLibraryAction(req, payload) {
   const { user } = await authenticate(req, payload);
   const action = typeof payload.action === 'string' ? payload.action : '';
-  if (!['watchlist_add', 'favorite_add'].includes(action)) {
+  if (!['watched_log', 'favorite_add'].includes(action)) {
     throw new HttpError(400, 'Unsupported library action.');
   }
   const movie = normalizeMovieInput(payload.movie);
@@ -4849,7 +4849,7 @@ async function recordLibraryActivity({ username, action, movie }) {
     return;
   }
   const timestamp = new Date().toISOString();
-  const notificationType = action === 'watchlist_add' ? 'friend_watchlist' : 'friend_favorite';
+  const notificationType = action === 'favorite_add' ? 'friend_favorite' : 'friend_watched';
 
   if (usingLocalStore()) {
     const store = await readSocialStore();
@@ -5161,14 +5161,14 @@ function formatNotificationMessage(type, context = {}) {
       return `${actor} reacted to your review for ${title}.`;
     case 'friend_review':
       return `${actor} posted a new review for ${title}.`;
-    case 'friend_watchlist':
-      return `${actor} added ${title} to their watchlist.`;
+    case 'friend_watched':
+      return `${actor} logged ${title} as watched.`;
     case 'friend_favorite':
       return `${actor} favorited ${title}.`;
     case 'collab_invite':
-      return `${actor} invited you to co-curate “${title || 'their list'}”.`;
+      return `${actor} invited you to co-curate “${title || 'their collection'}”.`;
     case 'collab_accept':
-      return `${actor} joined your collaborative list “${title || 'Untitled'}”.`;
+      return `${actor} joined your collaborative collection “${title || 'Untitled'}”.`;
     case 'watch_party':
       return `${actor} invited you to a watch party for ${title}.`;
     case 'watch_party_update':

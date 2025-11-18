@@ -63,7 +63,7 @@
         <h1>MovieCard</h1>
         <p>
           Compact, glassy cards for dense movie grids. Icons and labels clearly show
-          watchlist, like, and watched states on both desktop hover and touch devices.
+          favorite and watched states on both desktop hover and touch devices.
         </p>
       </header>
 
@@ -100,10 +100,8 @@
         imdbScore: "8.3/10",
         rtScore: "92%",
         liked: true,
-        inWatchlist: true,
         watched: false,
-        onToggleLike: handleToggle("Like"),
-        onToggleWatchlist: handleToggle("Watchlist"),
+        onToggleLike: handleToggle("Favorite"),
         onToggleWatched: handleToggle("Watched")
       });
       document.getElementById("single-card").appendChild(singleCard);
@@ -116,7 +114,6 @@
           imdbScore: "8.1/10",
           rtScore: "90%",
           liked: false,
-          inWatchlist: true,
           watched: true
         },
         {
@@ -126,7 +123,6 @@
           imdbScore: "7.8/10",
           rtScore: "86%",
           liked: true,
-          inWatchlist: false,
           watched: false
         },
         {
@@ -136,7 +132,6 @@
           imdbScore: "8.7/10",
           rtScore: "95%",
           liked: true,
-          inWatchlist: true,
           watched: true
         },
         {
@@ -146,7 +141,6 @@
           imdbScore: "7.5/10",
           rtScore: "82%",
           liked: false,
-          inWatchlist: false,
           watched: false
         },
         {
@@ -156,7 +150,6 @@
           imdbScore: "8.0/10",
           rtScore: "88%",
           liked: true,
-          inWatchlist: false,
           watched: true
         }
       ];
@@ -165,8 +158,7 @@
       gridMovies.forEach((movie) => {
         const card = createMovieCard({
           ...movie,
-          onToggleLike: handleToggle(`${movie.title} like`),
-          onToggleWatchlist: handleToggle(`${movie.title} watchlist`),
+          onToggleLike: handleToggle(`${movie.title} favorite`),
           onToggleWatched: handleToggle(`${movie.title} watched`)
         });
         gridContainer.appendChild(card);
