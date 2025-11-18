@@ -1427,7 +1427,7 @@ p {
 }
 
 .filter-row {
-  display: ruby-text;
+  display: flex;
   font-size: xx-small;
   justify-self: center;
   flex-wrap: wrap;
