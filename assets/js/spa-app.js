@@ -92,6 +92,7 @@ const state = {
   discoverAbort: null,
   discoverSeriesAbort: null,
   discoverPeopleAbort: null,
+  discoverDropdownAbort: null,
   trendingAbort: null,
   recommendationsAbort: null,
   recommendationSeed: Math.random(),
@@ -281,6 +282,7 @@ const navButtons = document.querySelectorAll("[data-section-button]");
 const sections = document.querySelectorAll("[data-section-panel]");
 const tabGroups = document.querySelectorAll("[data-section-tabs]");
 const discoverSearchInput = document.querySelector("[data-discover-search]");
+const discoverDropdown = document.querySelector("[data-discover-dropdown]");
 const discoverGrid = document.querySelector('[data-grid="discover-movies"]');
 const discoverSeriesGrid = document.querySelector('[data-grid="discover-series"]');
 const discoverPeopleList = document.querySelector('[data-list="discover-people"]');
@@ -510,6 +512,9 @@ function setTab(section, tab) {
     const isActive = panel.dataset.tabPanel === tab;
     panel.classList.toggle("is-active", isActive);
   });
+  if (section === "discover") {
+    updateDiscoverPlaceholder();
+  }
 }
 
 function createPoster(url) {
@@ -3340,11 +3345,156 @@ function renderGroupPicks(items = []) {
   });
 }
 
+function updateDiscoverPlaceholder() {
+  if (!discoverSearchInput) return;
+  const tab = state.activeTabs.discover;
+  const text = tab === "series" ? "Search series…" : tab === "people" ? "Search people…" : "Search movies…";
+  discoverSearchInput.placeholder = text;
+}
+
+function openDiscoverResults(tab, query) {
+  setSection("discover");
+  setTab("discover", tab);
+  if (discoverSearchInput) discoverSearchInput.value = query;
+  if (tab === "people") {
+    loadDiscoverPeople(query);
+  } else {
+    loadDiscoverResults({ query });
+  }
+  hideDiscoverDropdown();
+}
+
+function hideDiscoverDropdown() {
+  if (discoverDropdown) {
+    discoverDropdown.hidden = true;
+  }
+  if (discoverSearchInput) {
+    discoverSearchInput.setAttribute("aria-expanded", "false");
+  }
+}
+
+function renderDiscoverDropdown(items = [], mode = "movies", query = "") {
+  if (!discoverDropdown) return;
+  discoverDropdown.innerHTML = "";
+  discoverDropdown.hidden = false;
+  if (discoverSearchInput) {
+    discoverSearchInput.setAttribute("aria-expanded", "true");
+  }
+  const container = document.createElement("div");
+  container.className = "stack";
+
+  if (mode === "people") {
+    const list = document.createElement("div");
+    const max = getUiLimit("ui.discover.maxPeople", 6);
+    (items || []).slice(0, max).forEach((person) => {
+      const row = document.createElement("div");
+      row.className = "search-dropdown-item";
+      row.setAttribute("role", "option");
+      const avatar = document.createElement("div");
+      avatar.className = "avatar";
+      const display = person.displayName || person.name || "Member";
+      const handle = person.username || "";
+      const avatarUrl = person.avatarUrl || person.avatar_url || "";
+      setAvatarContent(avatar, { imageUrl: avatarUrl, initials: initialsFromName(display), label: `${display} avatar` });
+      const text = document.createElement("div");
+      text.className = "stack";
+      const name = document.createElement("strong");
+      name.textContent = display;
+      const meta = document.createElement("div");
+      meta.className = "small-text muted";
+      meta.textContent = handle ? `@${canonicalHandle(handle)}` : "";
+      text.append(name, meta);
+      row.append(avatar, text);
+      list.append(row);
+    });
+    container.append(list);
+  } else {
+    const first = Array.isArray(items) && items.length ? items[0] : null;
+    if (!first) {
+      const empty = document.createElement("div");
+      empty.className = "small-text muted";
+      empty.textContent = "No matches";
+      container.append(empty);
+    } else {
+      const normalized = mode === "series" ? normalizeDiscoverSeries(first) : normalizeDiscoverMovie(first);
+      const row = document.createElement("div");
+      row.className = "search-dropdown-item";
+      row.setAttribute("role", "option");
+      const poster = createPoster(normalized?.posterUrl || "");
+      const body = document.createElement("div");
+      body.className = "stack";
+      const title = document.createElement("strong");
+      const year = normalized?.releaseYear ? ` (${normalized.releaseYear})` : "";
+      title.textContent = `${normalized?.title || "Untitled"}${year}`;
+      const rating = document.createElement("div");
+      rating.className = "small-text";
+      rating.textContent = Number.isFinite(normalized?.rating) ? `${normalized.rating.toFixed(1)} / 10` : "";
+      body.append(title, rating);
+      row.append(poster, body);
+      container.append(row);
+    }
+  }
+
+  const footer = document.createElement("div");
+  footer.className = "search-dropdown-footer";
+  const moreBtn = document.createElement("button");
+  moreBtn.type = "button";
+  moreBtn.className = "btn btn-primary";
+  moreBtn.textContent = "Show more results";
+  const tab = mode === "series" ? "series" : mode === "people" ? "people" : "movies";
+  moreBtn.addEventListener("click", () => openDiscoverResults(tab, query));
+  footer.append(moreBtn);
+  discoverDropdown.append(container, footer);
+}
+
+async function loadDiscoverDropdown(query = "") {
+  const trimmed = query.trim();
+  if (!trimmed || trimmed.length < 2) {
+    hideDiscoverDropdown();
+    return;
+  }
+  if (state.discoverDropdownAbort) {
+    state.discoverDropdownAbort.abort();
+  }
+  const controller = new AbortController();
+  state.discoverDropdownAbort = controller;
+  if (discoverDropdown) {
+    discoverDropdown.hidden = false;
+    discoverDropdown.innerHTML = "<div class=\"small-text muted\">Searching…</div>";
+    if (discoverSearchInput) discoverSearchInput.setAttribute("aria-expanded", "true");
+  }
+  try {
+    const mode = state.activeTabs.discover === "series" ? "series" : state.activeTabs.discover === "people" ? "people" : "movies";
+    if (mode === "people") {
+      const people = await searchSocialUsers(trimmed);
+      if (controller.signal.aborted) return;
+      renderDiscoverDropdown(people, "people", trimmed);
+    } else if (mode === "series") {
+      const series = await fetchDiscoverSeriesOnline({ query: trimmed, filter: state.discoverFilter, signal: controller.signal, limitOverride: 1 });
+      renderDiscoverDropdown(series, "series", trimmed);
+    } else {
+      const movies = await fetchDiscoverMoviesOnline({ query: trimmed, filter: state.discoverFilter, signal: controller.signal, limitOverride: 1 });
+      renderDiscoverDropdown(movies, "movies", trimmed);
+    }
+  } catch (_) {
+    if (discoverDropdown) {
+      discoverDropdown.innerHTML = "<div class=\"small-text muted\">Couldn’t search right now.</div>";
+    }
+  } finally {
+    state.discoverDropdownAbort = null;
+  }
+}
+
 function handleDiscoverSearchInput(value) {
   const query = value.trim();
   state.peopleSearchActive = query.length >= 2;
   loadDiscoverResults({ query });
   loadDiscoverPeople(query);
+  if (query.length >= 2) {
+    loadDiscoverDropdown(query);
+  } else {
+    hideDiscoverDropdown();
+  }
 }
 
 async function loadDiscoverPeople(query = "") {
@@ -3491,16 +3641,16 @@ async function attachOmdbMetadata(movies, { signal, max = 6 } = {}) {
   });
 }
 
-async function fetchDiscoverMoviesOnline({ query = "", filter = "popular", signal } = {}) {
-  const limit = getUiLimit("ui.discover.maxMovies", 12);
+async function fetchDiscoverMoviesOnline({ query = "", filter = "popular", signal, limitOverride } = {}) {
+  const limit = Number.isFinite(limitOverride) && limitOverride > 0 ? limitOverride : getUiLimit("ui.discover.maxMovies", 12);
   const { path, params } = buildDiscoverParams(filter, query);
   const data = await fetchFromTmdb(path, params, { signal });
   const results = Array.isArray(data?.results) ? data.results.slice(0, limit) : [];
   return attachOmdbMetadata(results, { signal, max: Math.min(6, limit) });
 }
 
-async function fetchDiscoverSeriesOnline({ query = "", filter = "popular", signal } = {}) {
-  const limit = getUiLimit("ui.discover.maxSeries", 12);
+async function fetchDiscoverSeriesOnline({ query = "", filter = "popular", signal, limitOverride } = {}) {
+  const limit = Number.isFinite(limitOverride) && limitOverride > 0 ? limitOverride : getUiLimit("ui.discover.maxSeries", 12);
   const { path, params } = buildDiscoverSeriesParams(filter, query);
   const data = await fetchFromTmdb(path, params, { signal });
   const results = Array.isArray(data?.results) ? data.results.slice(0, limit) : [];
@@ -4153,6 +4303,13 @@ function handleOutsideClick(event) {
       closeNotificationMenu();
     }
   }
+  if (discoverDropdown && !discoverDropdown.hidden) {
+    const insideDropdown =
+      eventPathIncludes(event, discoverDropdown) || eventPathIncludes(event, discoverSearchInput);
+    if (!insideDropdown) {
+      hideDiscoverDropdown();
+    }
+  }
 }
 
 function handleEscape(event) {
@@ -4172,6 +4329,7 @@ function handleEscape(event) {
     if (state.onboardingOpen) {
       closeOnboarding();
     }
+    hideDiscoverDropdown();
   }
 }
 
@@ -4234,6 +4392,12 @@ function attachListeners() {
       const { value } = event.target;
       window.clearTimeout(handle);
       handle = window.setTimeout(() => handleDiscoverSearchInput(value), 140);
+    });
+    discoverSearchInput.addEventListener("focus", () => {
+      const q = discoverSearchInput.value || "";
+      if (q.trim().length >= 2) {
+        loadDiscoverDropdown(q.trim());
+      }
     });
   }
 
