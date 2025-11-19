@@ -232,6 +232,27 @@ create table IF NOT EXISTS public.user_tags (
   constraint user_tags_username_fkey foreign KEY (username) references auth_users (username) on delete CASCADE
 ) TABLESPACE pg_default;
 
+create table IF NOT EXISTS public.user_tagged_movies (
+  id uuid not null default gen_random_uuid(),
+  username text not null,
+  tag_id uuid not null,
+  movie_imdb_id text not null,
+  movie_tmdb_id text null,
+  movie_title text null,
+  created_at timestamp with time zone not null default timezone('utc'::text, now()),
+  metadata jsonb not null default '{}'::jsonb,
+  constraint user_tagged_movies_pkey primary key (id),
+  constraint user_tagged_movies_user_fkey foreign key (username) references auth_users (username) on delete cascade,
+  constraint user_tagged_movies_tag_fkey foreign key (tag_id) references user_tags (id) on delete cascade,
+  constraint user_tagged_movies_movie_fkey foreign key (movie_imdb_id) references movies (imdb_id) on delete cascade
+) TABLESPACE pg_default;
+
+create unique index IF not exists user_tagged_movies_unique_idx
+  on public.user_tagged_movies using btree (username, tag_id, movie_imdb_id);
+
+create index IF not exists user_tagged_movies_tag_idx
+  on public.user_tagged_movies using btree (tag_id);
+
 -- Ensure all columns exist (safe if already there)
 
 ALTER TABLE IF EXISTS public.auth_sessions
@@ -1718,6 +1739,23 @@ create policy "Users can see their own tags"
 drop policy if exists "Users can manage their own tags" on public.user_tags;
 create policy "Users can manage their own tags"
   on public.user_tags
+  for all
+  to authenticated
+  using ( username = current_username() )
+  with check ( username = current_username() );
+
+alter table public.user_tagged_movies enable row level security;
+
+drop policy if exists "Users can view their tagged movies" on public.user_tagged_movies;
+create policy "Users can view their tagged movies"
+  on public.user_tagged_movies
+  for select
+  to authenticated
+  using ( username = current_username() );
+
+drop policy if exists "Users can manage their tagged movies" on public.user_tagged_movies;
+create policy "Users can manage their tagged movies"
+  on public.user_tagged_movies
   for all
   to authenticated
   using ( username = current_username() )
