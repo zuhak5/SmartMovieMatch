@@ -874,75 +874,89 @@ async function handleRemoveUserListItem(req, payload) {
 
 async function handleListUserTags(req, payload) {
   const { user } = await authenticate(req, payload);
-  if (!usingLocalStore()) {
-    throw new HttpError(501, 'Personal tags are only available in local demo mode for now.');
-  }
-  const store = await readSocialStore();
-  return { body: formatUserTagsResponse(store, user.username) };
+  const response = await fetchUserTagsRemote(user.username);
+  return { body: response };
 }
 
 async function handleUpsertUserTag(req, payload) {
   const { user } = await authenticate(req, payload);
-  if (!usingLocalStore()) {
-    throw new HttpError(501, 'Personal tags are only available in local demo mode for now.');
-  }
   const label = sanitizeTagLabel(payload.label);
   if (!label) {
     throw new HttpError(400, 'Add a short tag name first.');
   }
   const tagId = normalizeUuid(payload.tagId || payload.tag_id || '');
   const username = canonicalUsername(user.username);
-  const store = await readSocialStore();
-  const existingTags = listUserTagsForUser(store, username);
-  const duplicate = existingTags.find((entry) => entry.label.toLowerCase() === label.toLowerCase());
-  const now = new Date().toISOString();
-  let tag;
-  if (tagId) {
-    tag = existingTags.find((entry) => entry.id === tagId);
-    if (!tag) {
-      throw new HttpError(404, 'Could not find that tag.');
+  let tagRow = null;
+  try {
+    if (tagId) {
+      const existing = await supabaseFetch('user_tags', {
+        query: { id: `eq.${tagId}`, username: `eq.${username}` }
+      });
+      if (!Array.isArray(existing) || !existing.length) {
+        throw new HttpError(404, 'Could not find that tag.');
+      }
+      const updated = await supabaseFetch(`user_tags?id=eq.${tagId}&username=eq.${username}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=representation' },
+        body: { label }
+      });
+      tagRow = Array.isArray(updated) && updated.length ? updated[0] : existing[0];
+    } else {
+      const inserted = await supabaseFetch('user_tags', {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+        body: [
+          {
+            username,
+            label
+          }
+        ]
+      });
+      tagRow = Array.isArray(inserted) && inserted.length ? inserted[0] : null;
     }
-    tag.label = label;
-  } else if (duplicate) {
-    tag = duplicate;
-  } else {
-    tag = { id: randomUUID(), username, label, createdAt: now };
-    store.userTags.push(tag);
+  } catch (error) {
+    enableLocalFallback('saving user tags', error);
   }
-  tag.updatedAt = now;
-  await writeSocialStore(store);
-  return { body: { ...formatUserTagsResponse(store, username), tag: formatUserTag(tag, store, username) } };
+
+  const response = await fetchUserTagsRemote(username);
+  return {
+    body: {
+      ...response,
+      tag: tagRow ? formatUserTag(tagRow, response.taggedMovies, username) : null
+    }
+  };
 }
 
 async function handleDeleteUserTag(req, payload) {
   const { user } = await authenticate(req, payload);
-  if (!usingLocalStore()) {
-    throw new HttpError(501, 'Personal tags are only available in local demo mode for now.');
-  }
   const tagId = normalizeUuid(payload.tagId || payload.tag_id || '');
   if (!tagId) {
     throw new HttpError(400, 'Choose a tag to delete.');
   }
   const username = canonicalUsername(user.username);
-  const store = await readSocialStore();
-  const existingTags = listUserTagsForUser(store, username);
-  const tag = existingTags.find((entry) => entry.id === tagId);
-  if (!tag) {
-    throw new HttpError(404, 'Could not find that tag.');
+  try {
+    const existing = await supabaseFetch('user_tags', { query: { id: `eq.${tagId}`, username: `eq.${username}` } });
+    if (!Array.isArray(existing) || !existing.length) {
+      throw new HttpError(404, 'Could not find that tag.');
+    }
+    await supabaseFetch('user_tagged_movies', {
+      method: 'DELETE',
+      query: { username: `eq.${username}`, tag_id: `eq.${tagId}` }
+    });
+    await supabaseFetch('user_tags', {
+      method: 'DELETE',
+      query: { id: `eq.${tagId}`, username: `eq.${username}` }
+    });
+  } catch (error) {
+    enableLocalFallback('removing user tag', error);
   }
-  store.userTags = store.userTags.filter((entry) => entry.id !== tagId);
-  store.userTaggedMovies = Array.isArray(store.userTaggedMovies)
-    ? store.userTaggedMovies.filter((entry) => entry.tagId !== tagId || entry.username !== username)
-    : [];
-  await writeSocialStore(store);
-  return { body: formatUserTagsResponse(store, username) };
+
+  const response = await fetchUserTagsRemote(username);
+  return { body: response };
 }
 
 async function handleTagMovie(req, payload) {
   const { user } = await authenticate(req, payload);
-  if (!usingLocalStore()) {
-    throw new HttpError(501, 'Personal tags are only available in local demo mode for now.');
-  }
   const tagId = normalizeUuid(payload.tagId || payload.tag_id || '');
   if (!tagId) {
     throw new HttpError(400, 'Choose a tag before saving.');
@@ -952,57 +966,69 @@ async function handleTagMovie(req, payload) {
     throw new HttpError(400, 'Missing movie identifiers.');
   }
   const username = canonicalUsername(user.username);
-  const store = await readSocialStore();
-  const tag = listUserTagsForUser(store, username).find((entry) => entry.id === tagId);
-  if (!tag) {
-    throw new HttpError(404, 'That tag does not belong to your profile.');
-  }
   const resolved = await resolveMovieIdentifiers(movie);
   await ensureMovieRecord(resolved);
-  const key = buildMovieKey(resolved);
-  if (!key) {
+  if (!resolved.imdbId) {
     throw new HttpError(400, 'Unable to resolve movie identifiers.');
   }
-  const now = new Date().toISOString();
-  store.userTaggedMovies = Array.isArray(store.userTaggedMovies) ? store.userTaggedMovies : [];
-  const already = store.userTaggedMovies.find(
-    (entry) => entry.username === username && entry.tagId === tagId && buildMovieKey(entry) === key
-  );
-  if (!already) {
-    store.userTaggedMovies.push({
-      id: randomUUID(),
-      username,
-      tagId,
-      tmdbId: resolved.tmdbId,
-      imdbId: resolved.imdbId || null,
-      movieTitle: resolved.title,
-      createdAt: now
+
+  try {
+    const tagRows = await supabaseFetch('user_tags', {
+      query: { id: `eq.${tagId}`, username: `eq.${username}` }
     });
+    if (!Array.isArray(tagRows) || !tagRows.length) {
+      throw new HttpError(404, 'That tag does not belong to your profile.');
+    }
+    await supabaseFetch('user_tagged_movies', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates' },
+      body: [
+        {
+          username,
+          tag_id: tagId,
+          movie_imdb_id: resolved.imdbId,
+          movie_tmdb_id: resolved.tmdbId || null,
+          movie_title: resolved.title || null
+        }
+      ]
+    });
+  } catch (error) {
+    enableLocalFallback('tagging a movie', error);
   }
-  await writeSocialStore(store);
-  return { body: formatUserTagsResponse(store, username) };
+
+  const response = await fetchUserTagsRemote(username);
+  return { body: response };
 }
 
 async function handleUntagMovie(req, payload) {
   const { user } = await authenticate(req, payload);
-  if (!usingLocalStore()) {
-    throw new HttpError(501, 'Personal tags are only available in local demo mode for now.');
-  }
   const tagId = normalizeUuid(payload.tagId || payload.tag_id || '');
   const movie = normalizeMovieInput(payload.movie);
   if (!tagId || !movie || !movie.tmdbId || !movie.title) {
     throw new HttpError(400, 'Missing tag or movie identifiers.');
   }
   const username = canonicalUsername(user.username);
-  const store = await readSocialStore();
-  const key = buildMovieKey(movie);
-  store.userTaggedMovies = Array.isArray(store.userTaggedMovies)
-    ? store.userTaggedMovies.filter(
-        (entry) => !(entry.username === username && entry.tagId === tagId && buildMovieKey(entry) === key)
-      )
-    : [];
-  await writeSocialStore(store);
-  return { body: formatUserTagsResponse(store, username) };
+  const resolved = await resolveMovieIdentifiers(movie);
+  const imdbId = resolved.imdbId;
+  if (!imdbId) {
+    throw new HttpError(400, 'Unable to resolve movie identifiers.');
+  }
+
+  try {
+    await supabaseFetch('user_tagged_movies', {
+      method: 'DELETE',
+      query: {
+        username: `eq.${username}`,
+        tag_id: `eq.${tagId}`,
+        movie_imdb_id: `eq.${imdbId}`
+      }
+    });
+  } catch (error) {
+    enableLocalFallback('untagging a movie', error);
+  }
+
+  const response = await fetchUserTagsRemote(username);
+  return { body: response };
 }
 
 function buildListUpdatePayload(payload) {
@@ -1099,68 +1125,74 @@ function buildMovieKey(movie) {
   return tmdbId ? String(tmdbId).trim() : '';
 }
 
-function listUserTagsForUser(store, username) {
-  const canonical = canonicalUsername(username);
-  if (!canonical) {
-    return [];
+function formatTaggedMovie(entry) {
+  if (!entry) {
+    return null;
   }
-  return Array.isArray(store.userTags)
-    ? store.userTags
-        .filter((entry) => canonicalUsername(entry.username) === canonical)
-        .map((entry) => ({ ...entry }))
-    : [];
+  const imdbId = entry.movie_imdb_id || entry.imdbId || null;
+  return {
+    id: entry.id,
+    tagId: entry.tag_id || entry.tagId,
+    imdbId,
+    tmdbId: entry.movie_tmdb_id || entry.tmdbId || null,
+    movieTitle: entry.movie_title || entry.movieTitle || '',
+    createdAt: entry.created_at || entry.createdAt || null
+  };
 }
 
-function listTaggedMoviesForUser(store, username) {
-  const canonical = canonicalUsername(username);
-  if (!canonical) {
-    return [];
-  }
-  return Array.isArray(store.userTaggedMovies)
-    ? store.userTaggedMovies
-        .filter((entry) => canonicalUsername(entry.username) === canonical)
-        .map((entry) => ({ ...entry }))
-    : [];
-}
-
-function formatUserTag(tag, store, username) {
+function formatUserTag(tag, taggedMovies, username) {
   if (!tag) {
     return null;
   }
-  const usageCount = Array.isArray(store.userTaggedMovies)
-    ? store.userTaggedMovies.filter(
-        (entry) => canonicalUsername(entry.username) === canonicalUsername(username) && entry.tagId === tag.id
+  const normalized = canonicalUsername(username);
+  const usageCount = Array.isArray(taggedMovies)
+    ? taggedMovies.filter(
+        (entry) => entry.tagId === tag.id && canonicalUsername(entry.username || username) === normalized
       ).length
     : 0;
   return {
     id: tag.id,
     label: tag.label || '',
-    createdAt: tag.createdAt || null,
-    updatedAt: tag.updatedAt || tag.createdAt || null,
+    createdAt: tag.created_at || tag.createdAt || null,
+    updatedAt: tag.updated_at || tag.updatedAt || tag.created_at || null,
     usageCount
   };
 }
 
-function formatTaggedMovie(entry) {
-  if (!entry) {
-    return null;
-  }
-  return {
-    id: entry.id,
-    tagId: entry.tagId,
-    imdbId: entry.imdbId || null,
-    tmdbId: entry.tmdbId || null,
-    movieTitle: entry.movieTitle || '',
-    createdAt: entry.createdAt || null
-  };
+function formatUserTagsResponse(tags, taggedMovies, username) {
+  const normalizedUsername = canonicalUsername(username);
+  const normalizedTagged = Array.isArray(taggedMovies)
+    ? taggedMovies
+        .filter((entry) => canonicalUsername(entry.username || normalizedUsername) === normalizedUsername)
+        .map((entry) => formatTaggedMovie(entry))
+        .filter(Boolean)
+    : [];
+  const normalizedTags = Array.isArray(tags)
+    ? tags
+        .filter((tag) => canonicalUsername(tag.username || normalizedUsername) === normalizedUsername)
+        .map((tag) => formatUserTag(tag, normalizedTagged, normalizedUsername))
+        .filter(Boolean)
+    : [];
+  return { tags: normalizedTags, taggedMovies: normalizedTagged };
 }
 
-function formatUserTagsResponse(store, username) {
-  const tags = listUserTagsForUser(store, username).map((tag) => formatUserTag(tag, store, username)).filter(Boolean);
-  const taggedMovies = listTaggedMoviesForUser(store, username)
-    .map((entry) => formatTaggedMovie(entry))
-    .filter(Boolean);
-  return { tags, taggedMovies };
+async function fetchUserTagsRemote(username) {
+  const [tagRows, taggedMovieRows] = await Promise.all([
+    supabaseFetch('user_tags', {
+      query: {
+        username: `eq.${username}`,
+        order: 'label.asc'
+      }
+    }),
+    supabaseFetch('user_tagged_movies', {
+      query: {
+        username: `eq.${username}`,
+        order: 'created_at.desc'
+      }
+    })
+  ]);
+
+  return formatUserTagsResponse(tagRows || [], taggedMovieRows || [], username);
 }
 
 function normalizeUuid(value) {
