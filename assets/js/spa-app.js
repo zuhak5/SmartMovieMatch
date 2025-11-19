@@ -122,6 +122,7 @@ const state = {
   onboardingDismissed: false,
   collabState: { watchParties: { upcoming: [], invites: [] } },
   favorites: [],
+  watchedHistory: [],
   favoritesSaving: false,
   favoritesStatus: "",
   notifications: [],
@@ -317,6 +318,9 @@ const favoritesPanel = document.querySelector('[data-favorites-panel]');
 const favoritesList = document.querySelector('[data-favorites-list]');
 const favoritesEmpty = document.querySelector('[data-favorites-empty]');
 const favoritesStatus = document.querySelector('[data-favorites-status]');
+const watchedPanel = document.querySelector('[data-watched-panel]');
+const watchedList = document.querySelector('[data-watched-list]');
+const watchedEmpty = document.querySelector('[data-watched-empty]');
 const authOverlay = document.querySelector("[data-auth-overlay]");
 const authForm = document.querySelector("[data-auth-form]");
 const authStatus = document.querySelector("[data-auth-status]");
@@ -1853,6 +1857,97 @@ function renderFavoritesList() {
       onToggleWatched: () => setFavoritesStatus("Watched tracking coming soon.")
     });
     favoritesList.append(card);
+  });
+}
+
+function normalizeWatchedEntry(entry) {
+  if (!entry || typeof entry !== "object") return null;
+  const title = typeof entry.title === "string" ? entry.title.trim() : "";
+  if (!title) return null;
+  const releaseYear = typeof entry.year === "string" ? entry.year.trim() : "";
+  const ratingValue =
+    typeof entry.rating === "number"
+      ? entry.rating
+      : typeof entry.rating === "string" && entry.rating.trim() !== ""
+      ? Number(entry.rating)
+      : null;
+
+  const rawLoggedAt =
+    entry.loggedAt || entry.logged_at || entry.updatedAt || entry.updated_at || entry.syncedAt || entry.synced_at;
+  let loggedAt = null;
+  if (typeof rawLoggedAt === "number" && Number.isFinite(rawLoggedAt)) {
+    loggedAt = rawLoggedAt;
+  } else if (typeof rawLoggedAt === "string" && rawLoggedAt.trim()) {
+    const parsed = Date.parse(rawLoggedAt);
+    if (!Number.isNaN(parsed)) {
+      loggedAt = parsed;
+    }
+  }
+
+  return {
+    title,
+    imdbId: entry.imdbID || entry.imdbId || null,
+    tmdbId: entry.tmdbId || entry.tmdbID || null,
+    poster: typeof entry.poster === "string" ? entry.poster : "",
+    releaseYear,
+    genres: Array.isArray(entry.genres)
+      ? entry.genres.map((genre) => (typeof genre === "string" ? genre.trim() : "")).filter(Boolean)
+      : [],
+    rating: Number.isFinite(ratingValue) ? ratingValue : null,
+    synopsis: typeof entry.overview === "string" ? entry.overview : "",
+    loggedAt,
+    watched: true
+  };
+}
+
+function normalizeWatchedHistory(history = []) {
+  return history.map(normalizeWatchedEntry).filter(Boolean);
+}
+
+function formatWatchedDate(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function renderWatchedList() {
+  if (!watchedPanel || !watchedList) return;
+  watchedList.innerHTML = "";
+  watchedList.classList.add("library-card-grid");
+  watchedList.classList.remove("stack");
+
+  const watchedEntries = Array.isArray(state.watchedHistory) ? state.watchedHistory : [];
+  if (!watchedEntries.length) {
+    watchedPanel.classList.add("is-empty");
+    if (watchedEmpty) watchedEmpty.hidden = false;
+    return;
+  }
+
+  watchedPanel.classList.remove("is-empty");
+  if (watchedEmpty) watchedEmpty.hidden = true;
+
+  watchedEntries.forEach((entry) => {
+    const card = buildLibraryCard(
+      { ...entry, watched: true },
+      {
+        onToggleFavorite: () => toggleFavorite(entry),
+        onToggleWatched: (watchedActive) => {
+          if (!watchedActive) {
+            const key = getFavoriteKey(entry);
+            state.watchedHistory = state.watchedHistory.filter((item) => getFavoriteKey(item) !== key);
+            renderWatchedList();
+          }
+        }
+      }
+    );
+
+    const badges = card.querySelector(".library-card__ratings");
+    if (badges && entry.loggedAt) {
+      badges.append(createLibraryBadge("Watched", formatWatchedDate(entry.loggedAt)));
+    }
+
+    watchedList.append(card);
   });
 }
 
@@ -4157,6 +4252,7 @@ function init() {
   setAuthMode(state.authMode);
   updateAccountUi(state.session);
   renderFavoritesList();
+  renderWatchedList();
   subscribeToSocialOverview((overview) => {
     state.socialOverview = overview;
     renderProfileOverview();
@@ -4186,7 +4282,9 @@ function init() {
     loadStreamingProviders();
     if (session && session.token) {
       state.favorites = Array.isArray(session.favoritesList) ? session.favoritesList : [];
+      state.watchedHistory = normalizeWatchedHistory(session.watchedHistory);
       renderFavoritesList();
+      renderWatchedList();
       closeAuthOverlay();
       refreshCollaborativeState();
       if (state.activeSection === "messages") {
@@ -4200,7 +4298,9 @@ function init() {
       setNotificationStatus("Loading notifications…");
     } else {
       state.favorites = [];
+      state.watchedHistory = [];
       renderFavoritesList();
+      renderWatchedList();
       state.collabState = getDefaultCollaborativeState();
       setActiveWatchParty(null);
       resetConversationsState();
