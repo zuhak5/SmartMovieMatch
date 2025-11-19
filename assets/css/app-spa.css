@@ -3255,7 +3255,7 @@ p {
 }
 
 .library-card__ratings {
-  display: flex;
+  display: contents;
   align-items: center;
   gap: 8px;
   font-size: 0.8rem;
@@ -3285,7 +3285,7 @@ p {
 
 .library-card__actions {
   margin-top: auto;
-  display: flex;
+  display: flow;
   justify-content: flex-end;
   gap: 8px;
 }
