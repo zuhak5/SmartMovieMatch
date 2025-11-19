@@ -363,10 +363,31 @@ const profileLocation = document.querySelector("[data-profile-location]");
 const profileWebsite = document.querySelector("[data-profile-website]");
 const profileAvatar = document.querySelector("[data-profile-avatar]");
 const profileStats = {
-  films: document.querySelector('[data-profile-stat="films"]'),
+  favorites: document.querySelector('[data-profile-stat="favorites"]'),
+  watched: document.querySelector('[data-profile-stat="watched"]'),
   followers: document.querySelector('[data-profile-stat="followers"]'),
   following: document.querySelector('[data-profile-stat="following"]')
 };
+const profilePrivacy = document.querySelector("[data-profile-privacy]");
+const profileProgressFill = document.querySelector("[data-profile-progress-fill]");
+const profileProgressLabel = document.querySelector("[data-profile-progress-label]");
+const profileFavoritesPreview = document.querySelector("[data-profile-favorites-preview]");
+const profileWatchedPreview = document.querySelector("[data-profile-watched-preview]");
+const profileFavoritesCount = document.querySelector("[data-profile-favorites-count]");
+const profileWatchedCount = document.querySelector("[data-profile-watched-count]");
+const profileGenreChips = document.querySelector("[data-profile-genre-chips]");
+const profileDecadeChips = document.querySelector("[data-profile-decade-chips]");
+const profileProviderChips = document.querySelector("[data-profile-provider-chips]");
+const profileAvailabilityStatus = document.querySelector("[data-profile-availability-status]");
+const profileSettingsName = document.querySelector("[data-profile-settings-name]");
+const profileSettingsHandle = document.querySelector("[data-profile-settings-handle]");
+const profileSettingsPrivacy = document.querySelector("[data-profile-settings-privacy]");
+const profileSettingsLocation = document.querySelector("[data-profile-settings-location]");
+const profileSettingsWebsite = document.querySelector("[data-profile-settings-website]");
+const profileSettingsProviders = document.querySelector("[data-profile-settings-providers]");
+const profileSettingsGenres = document.querySelector("[data-profile-settings-genres]");
+const profileSettingsTaste = document.querySelector("[data-profile-settings-taste]");
+const profileSettingsActivity = document.querySelector("[data-profile-settings-activity]");
 const profileEditOverlay = document.querySelector("[data-profile-editor]");
 const profileEditForm = document.querySelector("[data-profile-editor-form]");
 const profileEditStatus = document.querySelector("[data-profile-editor-status]");
@@ -398,6 +419,7 @@ const onboardingGenreCount = document.querySelector("[data-onboarding-genre-coun
 const onboardingDecadeCount = document.querySelector("[data-onboarding-decade-count]");
 const onboardingProviderCount = document.querySelector("[data-onboarding-provider-count]");
 const onboardingImportOptions = document.querySelectorAll("[data-onboarding-import]");
+const onboardingOpenButtons = document.querySelectorAll("[data-onboarding-open]");
 
 subscribeToConfig((configState) => {
   state.appConfig = configState;
@@ -1101,23 +1123,93 @@ function resetNotificationsUi() {
   setNotificationStatus("");
 }
 
+function mapStreamingProviderLabel(value) {
+  if (!value) return "";
+  const normalized = String(value).trim();
+  const fromState = (state.streamingProviders || []).find((provider) => provider.key === normalized);
+  if (fromState) return fromState.displayName || fromState.label || fromState.key || normalized;
+  const fallback = STREAMING_PROVIDER_OPTIONS.find((option) => option.value === normalized);
+  return (fallback && fallback.label) || normalized;
+}
+
+function renderProfileChipCollection(host, values = [], emptyText = "") {
+  if (!host) return;
+  host.innerHTML = "";
+  const cleaned = Array.isArray(values)
+    ? values.map((value) => (typeof value === "string" ? value.trim() : "")).filter(Boolean)
+    : [];
+  if (!cleaned.length) {
+    const empty = document.createElement("div");
+    empty.className = "profile-chip-empty";
+    empty.textContent = emptyText;
+    host.append(empty);
+    return;
+  }
+  cleaned.slice(0, 12).forEach((value) => {
+    const chip = document.createElement("span");
+    chip.className = "profile-chip-tag";
+    chip.textContent = value;
+    host.append(chip);
+  });
+}
+
+function renderProfilePreviewList(host, items = [], emptyText = "") {
+  if (!host) return;
+  host.innerHTML = "";
+  if (!items.length) {
+    const empty = document.createElement("div");
+    empty.className = "profile-pill-empty";
+    empty.textContent = emptyText;
+    host.append(empty);
+    return;
+  }
+  items.slice(0, 4).forEach((item) => {
+    const row = document.createElement("li");
+    row.className = "profile-pill-item";
+    const title = document.createElement("span");
+    title.className = "profile-pill-title";
+    title.textContent = item.title || "Saved pick";
+    const meta = document.createElement("span");
+    meta.className = "profile-pill-meta";
+    meta.textContent = item.meta || "";
+    row.append(title, meta);
+    host.append(row);
+  });
+}
+
 function renderProfileOverview() {
   const hasSession = Boolean(state.session && state.session.token);
   const preferences = (state.session && state.session.preferencesSnapshot) || {};
   const profilePrefs = preferences.profile || {};
+  const streamingPrefs = preferences.streaming || {};
   const bio = sanitizeProfileText(profilePrefs.bio || "", 280);
   const location = sanitizeProfileText(profilePrefs.location || "", 120);
   const website = typeof profilePrefs.website === "string" ? profilePrefs.website : "";
-  const filmsLogged =
-    state.session &&
-    state.session.preferencesSnapshot &&
-    Number.isFinite(state.session.preferencesSnapshot.filmsLogged)
-      ? state.session.preferencesSnapshot.filmsLogged
+  const favoriteGenres = Array.isArray(profilePrefs.favoriteGenres)
+    ? profilePrefs.favoriteGenres.filter(Boolean)
+    : [];
+  const favoriteDecades = Array.isArray(profilePrefs.favoriteDecades)
+    ? profilePrefs.favoriteDecades.filter(Boolean)
+    : [];
+  const providerSelections = Array.isArray(streamingPrefs.providers)
+    ? streamingPrefs.providers
+    : Array.isArray(state.onboardingSelections.streamingProviders)
+    ? state.onboardingSelections.streamingProviders
+    : [];
+  const favorites = Array.isArray(state.favorites) ? state.favorites : [];
+  const watchedHistory = Array.isArray(state.watchedHistory) ? state.watchedHistory : [];
+  const favoritesCount = favorites.length;
+  const watchedCount = watchedHistory.length;
+  const followers =
+    state.socialOverview && state.socialOverview.counts
+      ? Number(state.socialOverview.counts.followers || 0)
+      : 0;
+  const following =
+    state.socialOverview && state.socialOverview.counts
+      ? Number(state.socialOverview.counts.following || 0)
       : 0;
   const profile = {
-    name: hasSession
-      ? state.session.displayName || state.session.username
-      : "Guest",
+    name: hasSession ? state.session.displayName || state.session.username : "Guest",
     handle: hasSession && state.session.username ? `@${state.session.username}` : "@guest",
     bio:
       bio ||
@@ -1129,15 +1221,10 @@ function renderProfileOverview() {
     isPrivate: Boolean(profilePrefs.isPrivate),
     avatarUrl: hasSession && state.session.avatarUrl ? state.session.avatarUrl : null,
     stats: {
-      films: filmsLogged,
-      followers:
-        state.socialOverview && state.socialOverview.counts
-          ? Number(state.socialOverview.counts.followers || 0)
-          : 0,
-      following:
-        state.socialOverview && state.socialOverview.counts
-          ? Number(state.socialOverview.counts.following || 0)
-          : 0
+      favorites: favoritesCount,
+      watched: watchedCount,
+      followers,
+      following
     }
   };
 
@@ -1174,12 +1261,149 @@ function renderProfileOverview() {
       label: `${profile.name} avatar`
     });
   }
+  if (profilePrivacy) {
+    profilePrivacy.textContent = profile.isPrivate
+      ? "Private profile"
+      : hasSession
+      ? "Public profile"
+      : "Guest mode";
+  }
+
+  const completionParts = [
+    Boolean(bio),
+    Boolean(location),
+    Boolean(website),
+    favoriteGenres.length > 0,
+    favoriteDecades.length > 0,
+    providerSelections.length > 0,
+    favoritesCount > 0,
+    watchedCount > 0
+  ];
+  const completionPercent = Math.round(
+    (completionParts.filter(Boolean).length / completionParts.length) * 100
+  );
+  if (profileProgressFill) {
+    profileProgressFill.style.width = `${Math.max(12, completionPercent)}%`;
+  }
+  if (profileProgressLabel) {
+    profileProgressLabel.textContent = completionPercent >= 60
+      ? "Looking good—keep logging watches for richer stats."
+      : "Add taste and services to sharpen matches.";
+  }
 
   Object.entries(profileStats).forEach(([key, element]) => {
     if (!element) return;
     const value = profile.stats[key] || 0;
     element.textContent = value.toLocaleString();
   });
+
+  if (profileFavoritesCount) {
+    profileFavoritesCount.textContent = `${favoritesCount} saved`;
+  }
+  if (profileWatchedCount) {
+    profileWatchedCount.textContent = `${watchedCount} logged`;
+  }
+
+  const favoritePreview = favorites
+    .slice(-4)
+    .reverse()
+    .map((favorite) => {
+      const title = favorite.title || favorite.originalTitle || "Saved pick";
+      const year = favorite.releaseYear || favorite.year || "";
+      const runtime = favorite.runtime ? `${favorite.runtime} min` : "";
+      const metaParts = [year, runtime].filter(Boolean);
+      return { title, meta: metaParts.join(" • ") };
+    });
+  renderProfilePreviewList(
+    profileFavoritesPreview,
+    favoritePreview,
+    hasSession
+      ? "Tap a heart on a movie card to save favorites."
+      : "Sign in to start a favorites list."
+  );
+
+  const watchedPreview = watchedHistory
+    .slice(-4)
+    .reverse()
+    .map((entry) => {
+      const title = entry.title || "Logged title";
+      const year = entry.releaseYear || entry.year || "";
+      const rating = Number.isFinite(entry.rating) ? `${entry.rating}/10` : "";
+      const loggedAt = entry.loggedAt ? new Date(entry.loggedAt).toLocaleDateString() : "";
+      const metaParts = [year, rating, loggedAt].filter(Boolean);
+      return { title, meta: metaParts.join(" • ") };
+    });
+  renderProfilePreviewList(
+    profileWatchedPreview,
+    watchedPreview,
+    hasSession ? "Log watches to see them here." : "Sign in to track what you watch."
+  );
+
+  const providerLabels = providerSelections.map(mapStreamingProviderLabel);
+  renderProfileChipCollection(
+    profileGenreChips,
+    favoriteGenres,
+    hasSession ? "Pick a few genres in settings." : "Sign in to add genres."
+  );
+  renderProfileChipCollection(
+    profileDecadeChips,
+    favoriteDecades,
+    hasSession ? "Add decades you love." : "Sign in to save favorite eras."
+  );
+  renderProfileChipCollection(
+    profileProviderChips,
+    providerLabels,
+    hasSession
+      ? "Add streaming apps to show availability."
+      : "Sign in to sync streaming services."
+  );
+
+  if (profileAvailabilityStatus) {
+    profileAvailabilityStatus.textContent = providerLabels.length
+      ? "We’ll highlight matches available on your services."
+      : hasSession
+      ? "Add streaming apps to surface what’s playable tonight."
+      : "Sign in to personalize availability.";
+  }
+
+  if (profileSettingsName) {
+    profileSettingsName.textContent = profile.name;
+  }
+  if (profileSettingsHandle) {
+    profileSettingsHandle.textContent = profile.handle;
+  }
+  if (profileSettingsPrivacy) {
+    profileSettingsPrivacy.textContent = profile.isPrivate
+      ? "Private profile"
+      : hasSession
+      ? "Public profile"
+      : "Guest mode";
+  }
+  if (profileSettingsLocation) {
+    profileSettingsLocation.textContent = profile.location;
+  }
+  if (profileSettingsWebsite) {
+    profileSettingsWebsite.textContent = profile.website || "Website not added";
+  }
+  renderProfileChipCollection(
+    profileSettingsProviders,
+    providerLabels,
+    "No services selected yet."
+  );
+  renderProfileChipCollection(
+    profileSettingsGenres,
+    favoriteGenres,
+    "Add favorite genres to shape recs."
+  );
+  if (profileSettingsTaste) {
+    const tasteSummary = favoriteGenres.length || favoriteDecades.length
+      ? `${favoriteGenres.length} genres • ${favoriteDecades.length || 0} decades`
+      : "Add genres and decades to shape recs.";
+    profileSettingsTaste.textContent = tasteSummary;
+  }
+  if (profileSettingsActivity) {
+    profileSettingsActivity.textContent = `${watchedCount + favoritesCount} logged entries`;
+  }
 }
 
 
@@ -4131,7 +4355,7 @@ function attachListeners() {
   if (accountSettingsButton) {
     accountSettingsButton.addEventListener("click", () => {
       setSection("profile");
-      setTab("profile", "overview");
+      setTab("profile", "settings");
       toggleAccountMenu(false);
     });
   }
@@ -4182,6 +4406,19 @@ function attachListeners() {
 
   if (profileDecadeOptions) {
     profileDecadeOptions.addEventListener("change", updateProfileEditorCounts);
+  }
+
+  if (onboardingOpenButtons && onboardingOpenButtons.length) {
+    onboardingOpenButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        if (!hasActiveSession()) {
+          promptForAuth("profile", "settings");
+          return;
+        }
+        state.onboardingStep = ONBOARDING_STEPS[0];
+        openOnboarding();
+      });
+    });
   }
 
   const goToAdjacentOnboardingStep = (offset) => {
