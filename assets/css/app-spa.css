@@ -3230,7 +3230,7 @@ p {
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: pre-wrap;
 }
 
 .library-card__year {
