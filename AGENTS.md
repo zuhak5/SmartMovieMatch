@@ -1,4 +1,4 @@
-# Agent Instructions:
+# Agent Instructions
 
 ## Database Safety Checklist
 - Interact only with database tables defined in `supabase/migrations/supabase_tables_schema.sql`.
