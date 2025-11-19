@@ -1296,10 +1296,7 @@ p {
 
 .search-bar {
   margin: 4px 0 14px;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background: var(--bg);
+  position: relative;
 }
 
 .search-bar input {
@@ -1309,41 +1306,6 @@ p {
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
-}
-
-.search-dropdown {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% + 6px);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: var(--shadow);
-  padding: 8px;
-  max-height: 320px;
-  overflow-y: auto;
-}
-
-.search-dropdown-item {
-  display: grid;
-  grid-template-columns: 56px 1fr;
-  gap: 10px;
-  align-items: center;
-  padding: 8px;
-  border-radius: 10px;
-}
-
-.search-dropdown-item + .search-dropdown-item {
-  margin-top: 6px;
-}
-
-.search-dropdown-footer {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
-  margin-top: 8px;
 }
 
 .search-bar .search-icon {
