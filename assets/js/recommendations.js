@@ -1,4 +1,4 @@
-import { fetchFromOmdb, fetchFromTmdb, fetchFromYoutube } from "./api.js";
+import { fetchFromOmdb, fetchFromTmdb, fetchFromYoutube, fetchFromSearch } from "./api.js";
 import { TMDB_GENRES } from "./config.js";
 import {
   computeWatchedGenreWeights,
@@ -114,7 +114,23 @@ function throwIfAborted(signal) {
   }
 }
 
-export async function discoverCandidateMovies(options = {}, { signal } = {}) {
+const GENRE_NAME_TO_ID = Object.entries(TMDB_GENRES).reduce((acc, [id, name]) => {
+  if (typeof name === "string" && name.trim()) {
+    acc[name] = String(id);
+    acc[name.toLowerCase()] = String(id);
+  }
+  return acc;
+}, Object.create(null));
+
+function genreNamesToIds(names = []) {
+  if (!Array.isArray(names)) return [];
+  const ids = names
+    .map((n) => (typeof n === "string" ? GENRE_NAME_TO_ID[n] || GENRE_NAME_TO_ID[n.toLowerCase()] : null))
+    .filter(Boolean);
+  return Array.from(new Set(ids));
+}
+
+export async function discoverCandidateMovies(options = {}, { signal, token } = {}) {
   const selectedGenres = normalizeGenreSelections(options.selectedGenres);
   const selectedGenresSet = new Set(selectedGenres);
   const mood = typeof options.mood === "string" ? options.mood : "any";
@@ -128,6 +144,34 @@ export async function discoverCandidateMovies(options = {}, { signal } = {}) {
   const candidateMap = new Map();
 
   const fetchOptions = { signal };
+
+  if (options.preferUserProviders && token) {
+    try {
+      throwIfAborted(signal);
+      const data = await fetchFromSearch(
+        { filter: "streaming", streaming_only: "true", providers: "mine", limit: 20 },
+        { signal, token }
+      );
+      const movies = Array.isArray(data?.movies) ? data.movies : [];
+      const normalized = movies.map((m) => ({
+        id: m.tmdbId || m.imdbId || m.title,
+        title: m.title || "",
+        genre_ids: genreNamesToIds(m.genres || []),
+        release_date: m.releaseYear ? `${m.releaseYear}-01-01` : "",
+        vote_average: 0,
+        vote_count: 0,
+        popularity: 0,
+        streamingProviders: Array.isArray(m.streamingProviders) ? m.streamingProviders : []
+      }));
+      addCandidatesFromResults(normalized, {
+        weightMultiplier: 1.6,
+        moodBias: mood === "light" ? 1 : mood === "dark" ? 1 : 0.5,
+        reason: "Available on your services"
+      });
+    } catch (error) {
+      ensureRecoverable(error);
+    }
+  }
 
   const intensityMultiplier = intensity === 2 ? 1.35 : intensity === 0 ? 0.75 : 1;
 
@@ -619,7 +663,8 @@ export async function fetchOmdbForCandidates(entries, { signal } = {}) {
         candidate: movie,
         tmdb: movie,
         omdb: fallback,
-        reasons
+        reasons,
+        streamingProviders: Array.isArray(movie.streamingProviders) ? movie.streamingProviders : []
       };
     }
 
@@ -628,7 +673,8 @@ export async function fetchOmdbForCandidates(entries, { signal } = {}) {
       candidate: movie,
       tmdb: movie,
       omdb: data,
-      reasons
+      reasons,
+      streamingProviders: Array.isArray(movie.streamingProviders) ? movie.streamingProviders : []
     };
   });
 

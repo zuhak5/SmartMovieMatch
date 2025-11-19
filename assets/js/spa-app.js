@@ -3250,7 +3250,10 @@ function renderHomeRecommendations(items = []) {
     badge.className = "badge rating poster-badge";
     badge.textContent = tmdbScore ? tmdbScore.toFixed(1) : "New";
     const meta = [formatGenres(normalized.genres), year].filter(Boolean).join(" • ");
-    decorateMovieCard(card, { meta, chips: [badge] });
+    const providerBadges = Array.isArray(item.tmdb?.streamingProviders)
+      ? item.tmdb.streamingProviders.slice(0, 4).map((provider) => createProviderBadge(provider))
+      : [];
+    decorateMovieCard(card, { meta, chips: [badge, ...providerBadges] });
     homeRecommendationsRow.append(card);
   });
 }
@@ -3335,7 +3338,10 @@ function renderGroupPicks(items = []) {
     badge.className = "badge match";
     badge.textContent = `${82 + index * 4}% match`;
     const meta = [formatGenres(normalized.genres), year].filter(Boolean).join(" · ");
-    decorateMovieCard(card, { meta, chips: [badge] });
+    const providerBadges = Array.isArray(item.tmdb?.streamingProviders)
+      ? item.tmdb.streamingProviders.slice(0, 4).map((provider) => createProviderBadge(provider))
+      : [];
+    decorateMovieCard(card, { meta, chips: [badge, ...providerBadges] });
     groupPicksList.append(card);
   });
 }
@@ -3493,6 +3499,19 @@ async function attachOmdbMetadata(movies, { signal, max = 6 } = {}) {
 
 async function fetchDiscoverMoviesOnline({ query = "", filter = "popular", signal } = {}) {
   const limit = getUiLimit("ui.discover.maxMovies", 12);
+  if (filter === "streaming") {
+    const params = {
+      q: query,
+      filter,
+      limit,
+      streaming_only: "true",
+      providers: state.session?.token ? "mine" : undefined
+    };
+    const data = await fetchFromSearch(params, { signal, token: state.session?.token });
+    const results = Array.isArray(data?.movies) ? data.movies.slice(0, limit) : [];
+    return attachOmdbMetadata(results, { signal, max: Math.min(6, limit) });
+  }
+
   const { path, params } = buildDiscoverParams(filter, query);
   const data = await fetchFromTmdb(path, params, { signal });
   const results = Array.isArray(data?.results) ? data.results.slice(0, limit) : [];

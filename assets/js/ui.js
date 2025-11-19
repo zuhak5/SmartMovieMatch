@@ -1576,6 +1576,26 @@ function createMovieCard(tmdb, omdb, trailer, reasons, watchedLookup, favoriteLo
   tmdbPill.innerHTML = `<span class="star">★</span><strong>${tmdbRating}</strong><span>TMDB</span>`;
   ratingsRow.appendChild(tmdbPill);
 
+  const providers = Array.isArray(tmdb?.streamingProviders) ? tmdb.streamingProviders.slice(0, 4) : [];
+  if (providers.length) {
+    const availabilityRow = document.createElement("div");
+    availabilityRow.className = "movie-availability";
+    providers.forEach((provider) => {
+      const badge = document.createElement("span");
+      badge.className = "badge provider";
+      badge.textContent = provider.name || provider.key || "Stream";
+      if (provider.brandColor) {
+        badge.style.borderColor = provider.brandColor;
+        badge.style.color = provider.brandColor;
+      }
+      if (provider.region) {
+        badge.title = provider.region;
+      }
+      availabilityRow.appendChild(badge);
+    });
+    ratingsRow.appendChild(availabilityRow);
+  }
+
   const reasonText = formatReasons(reasons);
   const reasonRow = reasonText ? document.createElement("div") : null;
   if (reasonRow) {

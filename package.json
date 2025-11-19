@@ -1,0 +1,21 @@
+{
+  "name": "smart-movie-match",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "lint": "eslint \"{api,assets,lib}/**/*.js\"",
+    "format": "prettier -w \"**/*.{js,ts,tsx,css,md,json}\"",
+    "test": "vitest --environment jsdom",
+    "test:ui": "vitest --ui --environment jsdom",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^9.0.0",
+    "eslint": "^9.0.0",
+    "jsdom": "^27.2.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^1.6.0"
+  }
+}

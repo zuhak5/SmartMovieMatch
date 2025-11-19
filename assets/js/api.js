@@ -136,7 +136,7 @@ export async function fetchFromSearch(params = {}, { signal, token } = {}) {
   });
 }
 
-export async function fetchTrendingMovies(params = {}, { signal } = {}) {
+export async function fetchTrendingMovies(params = {}, { signal, token } = {}) {
   const searchParams = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value === undefined || value === null || value === "") {
@@ -145,7 +145,13 @@ export async function fetchTrendingMovies(params = {}, { signal } = {}) {
     searchParams.append(key, value);
   });
 
-  return fetchJson(`${API_ROUTES.trending}?${searchParams.toString()}`, { signal });
+  const headers = token
+    ? {
+        Authorization: `Bearer ${token}`
+      }
+    : undefined;
+
+  return fetchJson(`${API_ROUTES.trending}?${searchParams.toString()}`, { signal, headers });
 }
 
 export async function fetchStreamingProviders({ signal, token } = {}) {
